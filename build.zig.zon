@@ -47,6 +47,10 @@
             .url = "https://codeload.github.com/Scythe-Technology/libxev/tar.gz/679d93ec0aa54fcc08c8c4c9e93a8c118c9f92bd",
             .hash = "libxev-0.0.0-Gdacvg7NCwCdsSOQRjgmY1EM_TReMZ8Yo9yFyQ44VDIo",
         },
+        .tls = .{
+            .url = "https://codeload.github.com/ianic/tls.zig/tar.gz/7428921d2d5c397324d3e0343d7d8c90c2d35d31",
+            .hash = "tls-0.1.0-ER2e0p41BQBIbFFuNNQa3oOxWRJXcCB0lJIWi8Z10dZJ",
+        },
     },
     .paths = .{""},
     .fingerprint = 0x1168499f6fd62c8d,
