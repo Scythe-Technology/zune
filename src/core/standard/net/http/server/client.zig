@@ -772,7 +772,7 @@ pub fn onRecv(
                 const protocols = self.parser.headers.get("sec-websocket-protocol");
                 var accept_key: [28]u8 = undefined;
 
-                WebSocket.acceptHashKey(&accept_key, &key);
+                WebSocket.acceptHashKey(&accept_key, key);
 
                 const base_response = StaticResponse(.{
                     .status = "101 Switching Protocols",
