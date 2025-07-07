@@ -872,7 +872,7 @@ declare class NetHttpWebSocket
     --[[
         Whether the websocket is connected.
     ]]
-    connected: boolean
+    function isConnected(self): boolean
 
     --[[
         Sends a message to the websocket.
@@ -882,7 +882,7 @@ declare class NetHttpWebSocket
     --[[
         Closes the websocket.
     ]]
-    function close(self): ()
+    function close(self, code: number?): ()
 end
 
 declare class NetworkSocket
@@ -962,7 +962,7 @@ export type ServerWebSocketHandlers = {
 
         *`WebSocket` class will keep the same reference per connection*.
     ]]
-    close: ((websocket: NetHttpWebSocket) -> ())?,
+    close: ((websocket: NetHttpWebSocket, code: number) -> ())?,
 }
 
 export type ServeOptions = {
@@ -1068,6 +1068,10 @@ export type WebSocketOptions = {
         *Negative number for indefinite*
     ]]
     timeout: number?,
+    --[[
+        WebSocket accept event
+    ]]
+    accept: ((socket: NetHttpWebSocket, request: ServerResponse) -> boolean)?,
     --[[
         WebSocket open event.
     ]]
@@ -2188,6 +2192,11 @@ export type RandomLib = RandomConstructor & {
 --[======[ Random ]======]--
 
 declare zune: {
+    compiled: {
+        optimize: number,
+        debug: number,
+    }?,
+
     fs: FileSystemLib,
     process: ProcessLib,
     testing: TestingLib,

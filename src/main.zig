@@ -47,6 +47,7 @@ pub const debug = struct {
     pub const writerPrint = @import("core/utils/print.zig").writerPrint;
 };
 
+pub const tagged = @import("tagged.zig");
 pub const info = @import("zune-info");
 
 const VM = luau.VM;
@@ -68,7 +69,7 @@ pub const Flags = struct {
 
 pub var CONFIGURATIONS = .{.format_max_depth};
 
-pub const VERSION = "Zune " ++ info.version ++ "+" ++ std.fmt.comptimePrint("{d}.{d}", .{ luau.LUAU_VERSION.major, luau.LUAU_VERSION.minor });
+pub const VERSION = "zune " ++ info.version ++ "+" ++ std.fmt.comptimePrint("{d}.{d}", .{ luau.LUAU_VERSION.major, luau.LUAU_VERSION.minor });
 
 var STD_ENABLED = true;
 const FEATURES = struct {

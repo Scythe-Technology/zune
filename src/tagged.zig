@@ -4,6 +4,7 @@ const TagNames: []const []const u8 = &.{
     "FS_WATCHER",
     // NET
     "NET_SOCKET",
+    "NET_HTTP_WEBSOCKET",
     // IO
     "IO_STREAM",
     "IO_BUFFERSINK",

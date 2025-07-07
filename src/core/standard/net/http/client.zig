@@ -9,16 +9,11 @@ const Scheduler = Zune.Runtime.Scheduler;
 
 const LuaHelper = Zune.Utils.LuaHelper;
 
-const Response = @import("../http/response.zig");
-const WebSocket = @import("../http/websocket.zig");
-
-const zune_info = @import("zune-info");
-
 const VM = luau.VM;
 
 const Self = @This();
 
-const ZUNE_CLIENT_HEADER = "Zune/" ++ zune_info.version;
+const ZUNE_CLIENT_HEADER = "zune/" ++ Zune.info.version;
 
 const RequestAsyncContext = struct {
     completion: xev.Completion,

@@ -37,7 +37,7 @@ fn Execute(_: std.mem.Allocator, args: []const []const u8) !void {
         .exclusive = true,
     }) catch |err| switch (err) {
         error.PathAlreadyExists => {
-            std.debug.print("Zune configuration file, 'zune.toml' already exists.\n", .{});
+            std.debug.print("zune configuration file, 'zune.toml' already exists.\n", .{});
             return;
         },
         else => return err,

@@ -3,7 +3,7 @@ local testing = zune.testing;
 
 local describe = testing.describe;
 
-local _, version, _ = string.match(_VERSION, "(Zune) (%d+%.%d+%.%d+.*)+(%d+%.%d+)");
+local _, version, _ = string.match(_VERSION, "(zune) (%d+%.%d+%.%d+.*)+(%d+%.%d+)");
 assert(version and #version > 0, "No version");
 
 describe("Server", function()
