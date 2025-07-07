@@ -131,7 +131,7 @@ pub fn onAccept(
     const client_socket = r catch |err| switch (err) {
         error.Canceled => return .disarm,
         else => {
-            std.debug.print("Error accepting client: {}\n", .{err});
+            self.server.emitError(.accept, err);
             return .rearm;
         },
     };

@@ -242,7 +242,7 @@ pub fn onWrite(
         switch (err) {
             error.BrokenPipe, error.ConnectionResetByPeer => return .disarm,
             else => {
-                std.debug.print("Error writing to client: {}\n", .{err});
+                self.server.emitError(.raw_send, err);
                 return .disarm;
             },
         }
