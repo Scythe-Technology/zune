@@ -36,9 +36,9 @@ pub var ACTIVE = false;
 
 pub var HISTORY: ?*History = null;
 
-pub var BREAKPOINTS = std.StringHashMap(BreakpointState).init(Zune.DEFAULT_ALLOCATOR);
-pub var MAPPED_SOURCES = std.StringHashMap([]const u8).init(Zune.DEFAULT_ALLOCATOR);
-var CHANGES_COUNT: u32 = 0;
+pub threadlocal var BREAKPOINTS = std.StringHashMap(BreakpointState).init(Zune.DEFAULT_ALLOCATOR);
+pub threadlocal var MAPPED_SOURCES = std.StringHashMap([]const u8).init(Zune.DEFAULT_ALLOCATOR);
+threadlocal var CHANGES_COUNT: u32 = 0;
 
 const DEBUG_TAG = "\x1b[0m(dbg) ";
 const DEBUG_RESULT_TAG = "\x1b[0m(dbg): ";
@@ -46,8 +46,10 @@ const DEBUG_RESULT_TAG = "\x1b[0m(dbg): ";
 var MAIN_MUTEX: std.Thread.Mutex = .{};
 
 pub fn SigInt() void {
-    if (HISTORY) |history|
+    if (HISTORY) |history| {
         history.deinit();
+        HISTORY = null;
+    }
 }
 
 pub fn DebuggerExit() void {

@@ -11,7 +11,7 @@ const Lists = Zune.Utils.Lists;
 
 const VM = luau.VM;
 
-pub var SCHEDULERS = std.ArrayList(*Scheduler).init(Zune.DEFAULT_ALLOCATOR);
+pub threadlocal var SCHEDULERS = std.ArrayList(*Scheduler).init(Zune.DEFAULT_ALLOCATOR);
 
 pub fn KillScheduler(scheduler: *Scheduler, cleanUp: bool) void {
     {
@@ -111,7 +111,8 @@ const Synchronization = struct {
     completed: LinkedList = .{},
     queue: LinkedList = .{},
     mutex: std.Thread.Mutex = .{},
-    notified: bool = false,
+    queue_count: std.atomic.Value(usize) align(std.atomic.cache_line) = .init(0),
+    notified: std.atomic.Value(bool) align(std.atomic.cache_line) = .init(false),
     waiting: bool = false,
 
     pub const LinkedList = Lists.DoublyLinkedList;
@@ -133,10 +134,15 @@ const Synchronization = struct {
         };
     }
 
+    pub inline fn hasPending(self: *Synchronization) bool {
+        return self.waiting or // awaiting instances
+            self.notified.load(.acquire); // completed instances
+    }
+
     pub fn notify(self: *Synchronization, scheduler: *Scheduler) void {
-        if (self.notified)
+        if (self.notified.load(.acquire))
             return;
-        self.notified = true;
+        self.notified.store(true, .release);
         scheduler.@"async".notify() catch |err| std.debug.print("[Async Notify Error: {}]\n", .{err});
     }
 
@@ -146,8 +152,8 @@ const Synchronization = struct {
         completion: *xev.Dynamic.Completion,
         _: xev.Dynamic.Async.WaitError!void,
     ) xev.Dynamic.CallbackAction {
-        const self: *Synchronization = @fieldParentPtr("completion", completion);
-        if (self.queue.len > 0)
+        const self: *Synchronization = @alignCast(@fieldParentPtr("completion", completion));
+        if (self.queue_count.load(.acquire) > 0)
             return .rearm;
         self.waiting = false;
         return .disarm;
@@ -395,9 +401,11 @@ pub fn synchronize(self: *Scheduler, data: anytype) void {
     self.sync.queue.remove(&ptr.node);
     self.sync.completed.append(&ptr.node);
     self.sync.notify(self);
+    _ = self.sync.queue_count.fetchSub(1, .acq_rel);
 }
 
 pub fn asyncWaitForSync(self: *Scheduler, data: anytype) void {
+    _ = self.sync.queue_count.fetchAdd(1, .acq_rel);
     const Node = Synchronization.Node(@typeInfo(@TypeOf(data)).pointer.child);
     const ptr: *Node = @fieldParentPtr("data", data);
     self.sync.queue.append(&ptr.node);
@@ -495,7 +503,7 @@ inline fn hasPendingWork(self: *Scheduler) bool {
         self.deferred.len > 0 or
         self.awaits.items.len > 0 or
         self.async_tasks > 0 or
-        self.sync.queue.len > 0;
+        self.sync.hasPending();
 }
 
 pub fn XevNoopCallback(err: type, action: xev.CallbackAction) fn (
@@ -546,7 +554,7 @@ inline fn processFrame(self: *Scheduler, comptime frame: FrameKind) void {
             self.sync.mutex.lock();
             defer self.sync.mutex.unlock();
 
-            self.sync.notified = false;
+            self.sync.notified.store(false, .release);
 
             const SyncNode = Synchronization.Node(void);
 

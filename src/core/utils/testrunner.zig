@@ -67,8 +67,10 @@ pub fn runTest(comptime testFile: TestFile, args: []const []const u8, comptime o
 
     Zune.loadConfiguration(dir);
 
-    try Engine.prepAsync(L, &scheduler);
+    Engine.prepAsync(L, &scheduler);
+    const current_top = L.gettop();
     try Zune.openZune(L, args, .{});
+    std.debug.assert(L.gettop() == current_top); // zune should not leave anything on the stack
 
     L.setsafeenv(VM.lua.GLOBALSINDEX, true);
 

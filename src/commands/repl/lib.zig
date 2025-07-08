@@ -49,7 +49,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     try Scheduler.SCHEDULERS.append(&scheduler);
 
-    try Engine.prepAsync(L, &scheduler);
+    Engine.prepAsync(L, &scheduler);
     try Zune.openZune(L, args, .{});
 
     Engine.setLuaFileContext(L, .{
