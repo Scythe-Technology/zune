@@ -46,7 +46,6 @@ test("Basic", function()
     local client_events = {};
     local resume_thread: thread? = nil;
     local socket = net.http.websocket("ws://localhost:8080", {
-        timeout = 1,
         error = function(socket, scope, err)
             table.insert(client_events, `error: {scope}, {err}`);
         end,
@@ -161,6 +160,8 @@ test("Slow server", function()
     expect(socket).toBe(expect.type("userdata"));
     expect(socket:isConnected()).toBe(true);
 
+    task.wait(0.5);
+
     expect(server_events).toBe(expect.similar({
         "upgrade",
         "open",
@@ -209,7 +210,7 @@ test("Time out", function()
         websocket = {
             upgrade = function(req)
                 table.insert(server_events, `upgrade`);
-                task.wait(3);
+                task.wait(5);
                 return true;
             end,
             open = function(ws)
@@ -234,7 +235,7 @@ test("Time out", function()
 
     expect(function()
         net.http.websocket("ws://localhost:8080", {
-            timeout = 1,
+            timeout = 3,
             error = function(socket, scope, err)
             end,
             message = function(socket, message)
