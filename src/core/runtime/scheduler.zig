@@ -15,15 +15,6 @@ pub var SCHEDULERS = std.ArrayList(*Scheduler).init(Zune.DEFAULT_ALLOCATOR);
 
 pub fn KillScheduler(scheduler: *Scheduler, cleanUp: bool) void {
     {
-        var i = scheduler.tasks.items.len;
-        while (i > 0) {
-            i -= 1;
-            const task = scheduler.tasks.items[i];
-            task.virtualDtor(task.data, task.state.value, scheduler);
-            _ = scheduler.tasks.orderedRemove(i);
-        }
-    }
-    {
         var i = scheduler.awaits.items.len;
         while (i > 0) {
             i -= 1;
@@ -105,30 +96,14 @@ pub const TaskResult = enum {
 
 pub const AwaitTaskPriority = enum { Internal, User };
 
-const TaskFn = fn (ctx: *anyopaque, L: *VM.lua.State, scheduler: *Scheduler) TaskResult;
-const TaskFnDtor = fn (ctx: *anyopaque, L: *VM.lua.State, scheduler: *Scheduler) void;
-const AsyncCallbackFn = fn (ctx: ?*anyopaque, L: *VM.lua.State, scheduler: *Scheduler, failed: bool) void;
-const AwaitedFn = TaskFnDtor; // Similar to TaskFnDtor
-
-const TaskObject = struct {
-    data: *anyopaque,
-    state: ThreadRef,
-    virtualFn: *const TaskFn,
-    virtualDtor: *const TaskFnDtor,
-};
+const AwaitedFn = fn (ctx: *anyopaque, L: *VM.lua.State, scheduler: *Scheduler) void;
 
 const AwaitingObject = struct {
     data: *anyopaque,
     state: ThreadRef,
     resumeFn: *const AwaitedFn,
-    virtualDtor: *const TaskFnDtor,
+    virtualDtor: *const AwaitedFn,
     priority: AwaitTaskPriority,
-};
-
-const AsyncIoThread = struct {
-    data: ?*anyopaque,
-    state: ThreadRef,
-    handlerFn: ?*const AsyncCallbackFn,
 };
 
 const Synchronization = struct {
@@ -235,7 +210,6 @@ global: *VM.lua.State,
 allocator: std.mem.Allocator,
 sleeping: SleepingQueue,
 deferred: DeferredThread.LinkedList = .{},
-tasks: std.ArrayListUnmanaged(TaskObject) = .empty,
 awaits: std.ArrayListUnmanaged(AwaitingObject) = .empty,
 timer: xev.Dynamic.Timer,
 loop: xev.Dynamic.Loop,
@@ -308,27 +282,6 @@ pub fn sleepThread(
         .wake = wake,
         .args = args,
         .waited = waited,
-    }) catch |err| std.debug.panic("Error: {}\n", .{err});
-}
-
-pub fn addTask(self: *Scheduler, comptime T: type, data: *T, L: *VM.lua.State, comptime handler: *const fn (ctx: *T, L: *VM.lua.State, scheduler: *Scheduler) TaskResult, comptime destructor: *const fn (ctx: *T, L: *VM.lua.State, scheduler: *Scheduler) void) void {
-    const virtualFn = struct {
-        fn inner(ctx: *anyopaque, l: *VM.lua.State, scheduler: *Scheduler) TaskResult {
-            return @call(.always_inline, handler, .{ @as(*T, @alignCast(@ptrCast(ctx))), l, scheduler });
-        }
-    }.inner;
-
-    const virtualDtor = struct {
-        fn inner(ctx: *anyopaque, l: *VM.lua.State, scheduler: *Scheduler) void {
-            return @call(.always_inline, destructor, .{ @as(*T, @alignCast(@ptrCast(ctx))), l, scheduler });
-        }
-    }.inner;
-
-    self.tasks.append(self.allocator, .{
-        .data = @ptrCast(data),
-        .state = ThreadRef.init(L),
-        .virtualFn = virtualFn,
-        .virtualDtor = virtualDtor,
     }) catch |err| std.debug.panic("Error: {}\n", .{err});
 }
 
@@ -540,7 +493,6 @@ pub fn cancelThread(self: *Scheduler, thread: *VM.lua.State) void {
 inline fn hasPendingWork(self: *Scheduler) bool {
     return self.sleeping.items.len > 0 or
         self.deferred.len > 0 or
-        self.tasks.items.len > 0 or
         self.awaits.items.len > 0 or
         self.async_tasks > 0 or
         self.sync.queue.len > 0;
@@ -601,23 +553,6 @@ inline fn processFrame(self: *Scheduler, comptime frame: FrameKind) void {
             while (self.sync.completed.popFirst()) |node| {
                 const sync: *SyncNode = @fieldParentPtr("node", node);
                 sync.callback(sync, self);
-            }
-        },
-        .Task => {
-            var i = self.tasks.items.len;
-            while (i > 0) {
-                i -= 1;
-                const task = self.tasks.items[i];
-                switch (task.virtualFn(task.data, task.state.value, self)) {
-                    .Continue => {},
-                    .ContinueFast => {},
-                    .Stop => {
-                        var state = task.state;
-                        defer state.deref();
-                        _ = self.tasks.orderedRemove(i);
-                        task.virtualDtor(task.data, task.state.value, self);
-                    },
-                }
             }
         },
         .Sleeping => {
@@ -695,10 +630,7 @@ pub fn run(self: *Scheduler, comptime mode: Zune.RunMode) void {
             break;
         const now = VM.lperf.clock();
         self.now_clock = now;
-        const sleep_time: ?u64 = if (self.tasks.items.len > 0)
-            // TODO: change `tasks` design to go on the event loop stack.
-            0
-        else if (self.sleeping.peek()) |lowest|
+        const sleep_time: ?u64 = if (self.sleeping.peek()) |lowest|
             @intFromFloat(@max(lowest.wake - now, 0) * std.time.ms_per_s)
         else
             null;
@@ -715,8 +647,6 @@ pub fn run(self: *Scheduler, comptime mode: Zune.RunMode) void {
         self.processFrame(.EventLoop);
         if (self.sync.completed.len > 0)
             self.processFrame(.Synchronize);
-        if (self.tasks.items.len > 0)
-            self.processFrame(.Task);
         if (self.sleeping.items.len > 0)
             self.processFrame(.Sleeping);
         if (self.awaits.items.len > 0)
@@ -740,7 +670,6 @@ pub fn deinit(self: *Scheduler) void {
         while (self.deferred.pop()) |node|
             self.allocator.destroy(node);
     }
-    self.tasks.deinit(self.allocator);
     self.awaits.deinit(self.allocator);
     self.timer.deinit();
     self.loop.deinit();
