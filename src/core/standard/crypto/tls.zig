@@ -8,11 +8,9 @@ const LuaHelper = Zune.Utils.LuaHelper;
 
 const Socket = @import("../../objects/network/Socket.zig");
 
-const tagged = @import("../../../tagged.zig");
-
-const TAG_NET_SOCKET = tagged.Tags.get("NET_SOCKET").?;
-const TAG_CRYPTO_TLS_CERTBUNDLE = tagged.Tags.get("CRYPTO_TLS_CERTBUNDLE").?;
-const TAG_CRYPTO_TLS_CERTKEYPAIR = tagged.Tags.get("CRYPTO_TLS_CERTKEYPAIR").?;
+const TAG_NET_SOCKET = Zune.tagged.Tags.get("NET_SOCKET").?;
+const TAG_CRYPTO_TLS_CERTBUNDLE = Zune.tagged.Tags.get("CRYPTO_TLS_CERTBUNDLE").?;
+const TAG_CRYPTO_TLS_CERTKEYPAIR = Zune.tagged.Tags.get("CRYPTO_TLS_CERTKEYPAIR").?;
 
 const VM = luau.VM;
 
