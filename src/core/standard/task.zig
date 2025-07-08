@@ -131,7 +131,6 @@ fn lua_count(L: *VM.lua.State) !i32 {
             if (item.priority == .User)
                 total += 1;
         }
-        total += scheduler.tasks.items.len;
         total += scheduler.async_tasks;
         L.pushnumber(@floatFromInt(total));
         return 1;
@@ -162,7 +161,7 @@ fn lua_count(L: *VM.lua.State) !i32 {
             },
             't' => {
                 out += 1;
-                L.pushnumber(@floatFromInt(scheduler.tasks.items.len + scheduler.async_tasks));
+                L.pushnumber(@floatFromInt(scheduler.async_tasks));
             },
             else => return L.Zerror("Invalid kind"),
         }

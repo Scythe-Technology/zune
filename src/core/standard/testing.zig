@@ -99,13 +99,6 @@ fn testing_droptasks(L: *VM.lua.State) i32 {
         awaiting.virtualDtor(awaiting.data, awaiting.state.value, scheduler);
     }
 
-    var tasksSize = scheduler.tasks.items.len;
-    while (tasksSize > 0) {
-        tasksSize -= 1;
-        const task = scheduler.tasks.swapRemove(tasksSize);
-        task.virtualDtor(task.data, task.state.value, scheduler);
-    }
-
     var sleepingSize = scheduler.sleeping.items.len;
     while (sleepingSize > 0) {
         sleepingSize -= 1;
