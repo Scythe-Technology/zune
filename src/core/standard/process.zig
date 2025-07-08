@@ -531,6 +531,8 @@ fn process_onsignal(L: *VM.lua.State) !i32 {
     try L.Zchecktype(2, .Function);
 
     if (std.mem.eql(u8, sig, "INT")) {
+        if (Zune.STATE.MAIN_THREAD_ID != std.Thread.getCurrentId())
+            return L.Zerror("SIGINT handler can only be set in the main thread");
         const GL = L.mainthread();
         if (GL != L)
             L.xpush(GL, 2);
