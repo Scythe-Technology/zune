@@ -11,17 +11,16 @@ const MethodMap = Zune.Utils.MethodMap;
 const EnumMap = Zune.Utils.EnumMap;
 const Lists = Zune.Utils.Lists;
 
-const tagged = @import("../../../tagged.zig");
-
 const common = @import("common.zig");
 
 const VM = luau.VM;
 
-const TAG_CRYPTO_HASHER = tagged.Tags.get("CRYPTO_HASHER").?;
+const TAG_CRYPTO_HASHER = Zune.tagged.Tags.get("CRYPTO_HASHER").?;
 
 const hash = std.crypto.hash;
 const aead = std.crypto.aead;
 
+const tls = @import("tls.zig");
 const random = @import("random.zig");
 const password = @import("password.zig");
 
@@ -364,6 +363,18 @@ pub fn loadLib(L: *VM.lua.State) void {
         }
         L.setreadonly(-1, true);
         L.setfield(-2, "aead");
+    }
+
+    { // tls
+        L.Zpushvalue(.{
+            .keyPairFromFile = tls.lua_keyPairFromFile,
+            .bundleFromFile = tls.lua_bundleFromFile,
+            .bundleFromSystem = tls.lua_bundleFromSystem,
+            .setupClient = tls.lua_setupClient,
+            .setupServer = tls.lua_setupServer,
+        });
+        L.setreadonly(-1, true);
+        L.setfield(-2, "tls");
     }
 
     L.setreadonly(-1, true);

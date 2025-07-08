@@ -36,7 +36,7 @@ fn lua_createSocket(L: *VM.lua.State) !i32 {
 
     const socket = try createSocket(domain, flags, protocol);
 
-    try Socket.push(L, socket);
+    _ = try Socket.push(L, socket, .created);
 
     return 1;
 }
