@@ -100,6 +100,8 @@ pub const Parser = struct {
     pub fn deinit(self: *Parser) void {
         self.arena.deinit();
         self.headers.deinit(self.arena.child_allocator);
+        if (self.left) |left|
+            self.arena.child_allocator.free(left);
     }
 
     pub fn canKeepAlive(self: *const Parser) bool {
@@ -348,11 +350,15 @@ pub const Parser = struct {
                             break :blk alloc;
                         } else name;
                         const value_copy = try arena.dupe(u8, value);
-                        errdefer self.allocator.free(value_copy);
+                        errdefer arena.free(value_copy);
                         const res = self.headers.getOrPutAssumeCapacity(name_copy);
                         if (res.found_existing) {
+                            if (res.value_ptr.*.len + value_copy.len > max_header_size)
+                                return error.HeaderTooBig;
+                            const new_value = try std.mem.join(arena, ",", &.{ res.value_ptr.*, value_copy });
+                            arena.free(value_copy);
                             arena.free(res.value_ptr.*);
-                            res.value_ptr.* = value_copy;
+                            res.value_ptr.* = new_value;
                         } else res.value_ptr.* = value_copy;
                         // +2 to skip the \r\n
                         const next_line = value_start + skip_len + value.len + 2;

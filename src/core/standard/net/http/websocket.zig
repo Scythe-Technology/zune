@@ -1,10 +1,5 @@
 // This code is based on https://github.com/oven-sh/bun/blob/1aa35089d64f32b43901e850e34bc18b96c02899/src/http/websocket.zig
-
 const std = @import("std");
-
-const VStream = @import("vstream.zig");
-
-const posix = std.posix;
 
 pub const Opcode = enum(u4) {
     Continue = 0x0,
@@ -29,39 +24,24 @@ pub const Opcode = enum(u4) {
     }
 };
 
-pub fn acceptHashKey(allocator: std.mem.Allocator, key: []const u8) ![]u8 {
+pub fn acceptHashKey(out: []u8, key: []const u8) void {
+    std.debug.assert(out.len >= 28);
+    std.debug.assert(key.len == 24);
+
     var hash = std.crypto.hash.Sha1.init(.{});
     hash.update(key);
     hash.update("258EAFA5-E914-47DA-95CA-C5AB0DC85B11"); // https://www.rfc-editor.org/rfc/rfc6455
 
-    const result = try allocator.alloc(u8, 28);
-    _ = std.base64.standard.Encoder.encode(result, &hash.finalResult());
-
-    return result;
+    _ = std.base64.standard.Encoder.encode(out, &hash.finalResult());
 }
 
-pub const WebsocketHeader = packed struct(u16) {
+pub const Header = packed struct(u16) {
     len: u7,
     mask: bool,
     opcode: Opcode,
     rsv: u2 = 0, //rsv2 and rsv3
     compressed: bool = false, // rsv1
     final: bool = true,
-
-    pub fn writeHeader(header: WebsocketHeader, writer: anytype, n: usize) anyerror!void {
-        // packed structs are sometimes buggy
-        // lets check it worked right
-        var buf_ = [2]u8{ 0, 0 };
-        var stream = std.io.fixedBufferStream(&buf_);
-        stream.writer().writeInt(u16, @as(u16, @bitCast(header)), .big) catch unreachable;
-        stream.pos = 0;
-        const casted = stream.reader().readInt(u16, .big) catch unreachable;
-        std.debug.assert(casted == @as(u16, @bitCast(header)));
-        std.debug.assert(std.meta.eql(@as(WebsocketHeader, @bitCast(casted)), header));
-
-        try writer.writeInt(u16, @as(u16, @bitCast(header)), .big);
-        std.debug.assert(header.len == packLength(n));
-    }
 
     pub fn packLength(length: usize) u7 {
         return switch (length) {
@@ -70,41 +50,13 @@ pub const WebsocketHeader = packed struct(u16) {
             else => 127,
         };
     }
-
-    const mask_length = 4;
-    const header_length = 2;
-
-    pub fn lengthByteCount(byte_length: usize) usize {
-        return switch (byte_length) {
-            0...125 => 0,
-            126...0xFFFF => @sizeOf(u16),
-            else => @sizeOf(u64),
-        };
-    }
-
-    pub fn frameSize(byte_length: usize) usize {
-        return header_length + byte_length + lengthByteCount(byte_length);
-    }
-
-    pub fn frameSizeIncludingMask(byte_length: usize) usize {
-        return frameSize(byte_length) + mask_length;
-    }
-
-    pub fn slice(self: WebsocketHeader) [2]u8 {
-        return @as([2]u8, @bitCast(@byteSwap(@as(u16, @bitCast(self)))));
-    }
-
-    pub fn fromSlice(bytes: [2]u8) WebsocketHeader {
-        return @as(WebsocketHeader, @bitCast(@byteSwap(@as(u16, @bitCast(bytes)))));
-    }
 };
 
-pub const WebsocketDataFrame = struct {
-    header: WebsocketHeader,
-    mask: [4]u8 = undefined,
+pub const DataFrame = struct {
+    header: Header,
     data: []const u8,
 
-    pub fn isValid(dataframe: WebsocketDataFrame) bool {
+    pub fn isValid(dataframe: DataFrame) bool {
         // Validate control frame
         if (dataframe.header.opcode.isControl()) {
             if (!dataframe.header.final) {
@@ -125,190 +77,21 @@ pub const WebsocketDataFrame = struct {
     }
 };
 
-// Create a buffered writer
-// TODO: This will still split packets
-pub fn Writer(comptime size: usize, comptime opcode: Opcode) type {
-    const WriterType = switch (opcode) {
-        .Text => Self.TextFrameWriter,
-        .Binary => Self.BinaryFrameWriter,
-        else => @compileError("Unsupported writer opcode"),
-    };
-    return std.io.BufferedWriter(size, WriterType);
-}
-
-const ReadStream = std.io.FixedBufferStream([]u8);
-
-pub const WriteError = error{
-    InvalidMessage,
-    MessageTooLarge,
-    EndOfStream,
-} || std.fs.File.WriteError;
-
-const Self = @This();
-
-const PipedStream = struct {
-    any_reader: std.io.AnyReader,
-    stream_writer: std.net.Stream.Writer,
-};
-
-const VPipedStream = struct {
-    any_reader: std.io.AnyReader,
-    stream_writer: VStream.Writer,
-};
-
-const StreamProvider = union(enum) {
-    stream: std.net.Stream,
-    vstream: *VStream,
-    piped: PipedStream,
-    vpiped: VPipedStream,
-};
-
-stream: StreamProvider,
-allocator: std.mem.Allocator,
-is_client: bool = false,
-err: ?anyerror = null,
-header: [2]u8 = undefined,
-length: ?[]u8 = null,
-buf: ?[]u8 = null,
-
-pub fn init(allocator: std.mem.Allocator, stream: std.net.Stream, client: bool) Self {
-    return Self{
-        .allocator = allocator,
-        .is_client = client,
-        .stream = .{ .stream = stream },
-    };
-}
-
-pub fn initV(allocator: std.mem.Allocator, vstream: *VStream, client: bool) Self {
-    return Self{
-        .allocator = allocator,
-        .is_client = client,
-        .stream = .{ .vstream = vstream },
-    };
-}
-
-pub fn initAny(allocator: std.mem.Allocator, reader: std.io.AnyReader, writer: std.net.Stream.Writer, client: bool) Self {
-    return Self{
-        .allocator = allocator,
-        .is_client = client,
-        .stream = .{
-            .piped = .{
-                .any_reader = reader,
-                .stream_writer = writer,
-            },
-        },
-    };
-}
-
-pub fn initAnyV(allocator: std.mem.Allocator, reader: std.io.AnyReader, writer: VStream.Writer, client: bool) Self {
-    return Self{
-        .allocator = allocator,
-        .is_client = client,
-        .stream = .{
-            .vpiped = .{
-                .any_reader = reader,
-                .stream_writer = writer,
-            },
-        },
-    };
-}
-
-pub fn deinit(self: *Self) void {
-    if (self.buf) |buf| self.allocator.free(buf);
-    if (self.length) |buf| self.allocator.free(buf);
-}
-
-// ------------------------------------------------------------------------
-// Stream API
-// ------------------------------------------------------------------------
-pub const TextFrameWriter = std.io.Writer(*Self, WriteError, Self.writeText);
-pub const BinaryFrameWriter = std.io.Writer(*Self, anyerror, Self.writeBinary);
-
-// A buffered writer that will buffer up to size bytes before writing out
-pub fn newWriter(self: *Self, comptime size: usize, comptime opcode: Opcode) Writer(size, opcode) {
-    const BufferedWriter = Writer(size, opcode);
-    const frame_writer = switch (opcode) {
-        .Text => TextFrameWriter{ .context = self },
-        .Binary => BinaryFrameWriter{ .context = self },
-        else => @compileError("Unsupported writer type"),
-    };
-    return BufferedWriter{ .unbuffered_writer = frame_writer };
-}
-
-// Close and send the status
-pub fn close(self: *Self, code: u16) !void {
-    const c = @byteSwap(code);
-    const data = @as([2]u8, @bitCast(c));
-    _ = try self.writeMessage(.Close, &data);
-}
-
-// ------------------------------------------------------------------------
-// Low level API
-// ------------------------------------------------------------------------
-
-// Flush any buffered data out the underlying stream
-pub fn flush(self: *Self) !void {
-    try self.io.flush();
-}
-
-pub fn writeText(self: *Self, data: []const u8) !usize {
-    return self.writeMessage(.Text, data);
-}
-
-pub fn writeBinary(self: *Self, data: []const u8) anyerror!usize {
-    return self.writeMessage(.Binary, data);
-}
-
-// Write a final message packet with the given opcode
-pub fn writeMessage(self: *Self, opcode: Opcode, message: []const u8) anyerror!usize {
-    return self.writeSplitMessage(opcode, true, message);
-}
-
-// Write a message packet with the given opcode and final flag
-pub fn writeSplitMessage(self: *Self, opcode: Opcode, final: bool, message: []const u8) anyerror!usize {
-    return self.writeDataFrame(WebsocketDataFrame{
-        .header = .{
-            .final = final,
-            .opcode = opcode,
-            .mask = self.is_client,
-            .len = WebsocketHeader.packLength(message.len),
-        },
-        .data = message,
-    });
-}
-
-// Write a raw data frame
-pub fn writeDataFrame(self: *Self, dataframe: WebsocketDataFrame) anyerror!usize {
-    switch (self.stream) {
-        .stream => |s| return writeDataFrameAny(dataframe, s.writer()),
-        .vstream => |s| return writeDataFrameAny(dataframe, s.writer()),
-        .piped => |s| return writeDataFrameAny(dataframe, s.stream_writer),
-        .vpiped => |s| return writeDataFrameAny(dataframe, s.stream_writer),
-    }
-}
-
 pub fn calcWriteSize(len: usize, mask: bool) usize {
-    var size: usize = 2; // header
+    var size: usize = @as(usize, @sizeOf(Header)) + @as(usize, switch (len) {
+        0...126 => 0,
+        127...0xFFFF => @sizeOf(u16),
+        else => @sizeOf(u64),
+    }) + len;
 
-    switch (len) {
-        0...126 => {}, // Included in header
-        127...0xFFFF => size += 2,
-        else => size += 8,
-    }
-
-    if (mask) {
+    if (mask)
         size += 4; // mask
-    }
-
-    size += len;
 
     return size;
 }
 
-pub fn writeDataFrameBuf(buf: []u8, dataframe: WebsocketDataFrame) !void {
-    if (!dataframe.isValid())
-        return error.InvalidMessage;
-
+pub fn writeDataFrame(buf: []u8, dataframe: DataFrame) void {
+    std.debug.assert(dataframe.isValid());
     std.debug.assert(buf.len >= calcWriteSize(dataframe.data.len, dataframe.header.mask));
 
     std.mem.writeInt(u16, buf[0..2], @as(u16, @bitCast(dataframe.header)), .big);
@@ -329,11 +112,12 @@ pub fn writeDataFrameBuf(buf: []u8, dataframe: WebsocketDataFrame) !void {
     }
 
     // TODO: Handle compression
-    if (dataframe.header.compressed) return error.InvalidMessage;
+    std.debug.assert(!dataframe.header.compressed);
 
     if (dataframe.header.mask) {
-        const mask = &dataframe.mask;
-        @memcpy(buf[pos .. pos + 4], mask);
+        var mask: [4]u8 = undefined;
+        std.crypto.random.bytes(&mask);
+        @memcpy(buf[pos .. pos + 4], &mask);
         pos += 4;
 
         // Encode
@@ -345,126 +129,685 @@ pub fn writeDataFrameBuf(buf: []u8, dataframe: WebsocketDataFrame) !void {
     }
 }
 
-pub fn writeDataFrameAny(dataframe: WebsocketDataFrame, stream: anytype) anyerror!usize {
-    if (!dataframe.isValid())
-        return error.InvalidMessage;
+const ReaderState = enum { header, size, data, complete };
+pub fn Reader(comptime masked: bool, comptime staticSize: usize, comptime maxLength: ?union(enum) { fast: usize, safe: usize }) type {
+    return struct {
+        state: ReaderState = .header,
+        header: Header = std.mem.zeroes(Header),
+        written: usize = 0,
+        size: u64 = 0,
+        mask: if (masked) [4]u8 else void = if (masked) std.mem.zeroes([4]u8) else undefined,
+        data: union(enum) {
+            none: void,
+            allocated: []u8,
+            static: [staticSize]u8,
+        } = .none,
 
-    try stream.writeInt(u16, @as(u16, @bitCast(dataframe.header)), .big);
+        const StaticSize = staticSize;
 
-    // Write extended length if needed
-    const n = dataframe.data.len;
-    switch (n) {
-        0...126 => {}, // Included in header
-        127...0xFFFF => try stream.writeInt(u16, @as(u16, @truncate(n)), .big),
-        else => try stream.writeInt(u64, n, .big),
-    }
+        const Self = @This();
 
-    // TODO: Handle compression
-    if (dataframe.header.compressed) return error.InvalidMessage;
-
-    if (dataframe.header.mask) {
-        const mask = &dataframe.mask;
-        try stream.writeAll(mask);
-
-        // Encode
-        for (dataframe.data, 0..) |c, i| {
-            try stream.writeByte(c ^ mask[i % 4]);
+        comptime {
+            if (maxLength) |max|
+                switch (max) {
+                    .fast, .safe => |m| std.debug.assert(m >= staticSize),
+                };
         }
-    } else {
-        try stream.writeAll(dataframe.data);
-    }
 
-    // try self.io.flush();
+        pub fn next(self: *Self, allocator: std.mem.Allocator, buf: []const u8, consumed: *usize) !bool {
+            consumed.* = 0;
+            if (buf.len == 0)
+                return false;
+            errdefer self.state = .header;
+            next: switch (self.state) {
+                .complete => {
+                    self.reset(allocator);
+                    continue :next .header;
+                },
+                .header => {
+                    var short: [2]u8 = @bitCast(self.header);
+                    if (buf.len + self.written < 2) {
+                        @memcpy(short[self.written .. self.written + buf.len], buf[self.written..buf.len]);
+                        self.written += buf.len;
+                        self.header = @bitCast(short); // partial
+                        consumed.* += buf.len;
+                        return false;
+                    }
+                    const consume = 2 - self.written;
+                    @memcpy(short[self.written..2], buf[0..consume]); // full
+                    consumed.* += consume;
 
-    return dataframe.data.len;
+                    self.header = @bitCast(std.mem.readVarInt(u16, short[0..2], .big));
+
+                    self.written = 0;
+                    if (masked != self.header.mask)
+                        return if (comptime masked) error.UnmaskedMessage else error.MaskedMessage;
+
+                    self.state = .size;
+                    continue :next .size;
+                },
+                .size => {
+                    var size_slice: [@sizeOf(u64)]u8 = @bitCast(self.size);
+                    self.size = switch (self.header.len) {
+                        126 => blk: {
+                            const slice = buf[consumed.*..];
+                            if (slice.len == 0)
+                                return false;
+                            if (slice.len + self.written < 2) {
+                                @memcpy(size_slice[self.written .. self.written + slice.len], slice[0..]);
+                                self.written += slice.len;
+                                consumed.* += slice.len;
+                                self.size = @bitCast(size_slice); // partial
+                                return false;
+                            }
+                            const consume = 2 - self.written;
+                            @memcpy(size_slice[self.written..2], slice[0..consume]); // full
+                            consumed.* += consume;
+                            var short: [2]u8 = undefined;
+                            @memcpy(short[0..], size_slice[0..2]);
+                            break :blk @as(usize, @byteSwap(@as(u16, @bitCast(short))));
+                        },
+                        127 => blk: {
+                            const slice = buf[consumed.*..];
+                            if (slice.len == 0)
+                                return false;
+                            if (slice.len + self.written < 8) {
+                                @memcpy(size_slice[self.written .. self.written + slice.len], slice[0..]);
+                                self.written += slice.len;
+                                consumed.* += slice.len;
+                                self.size = @bitCast(size_slice); // partial
+                                return false;
+                            }
+                            const consume = 8 - self.written;
+                            @memcpy(size_slice[self.written..8], slice[0..consume]); // full
+                            consumed.* += consume;
+                            break :blk @as(usize, @byteSwap(@as(u64, @bitCast(size_slice))));
+                        },
+                        else => self.header.len,
+                    };
+                    self.written = 0;
+                    if (comptime maxLength) |max| {
+                        switch (comptime max) {
+                            .fast => |m| {
+                                errdefer self.size = 0;
+                                const size = self.size;
+                                if (size > m)
+                                    return error.MessageTooLarge;
+                            },
+                            else => {},
+                        }
+                    }
+                    self.state = .data;
+                    continue :next .data;
+                },
+                .data => {
+                    var slice = buf[consumed.*..];
+                    if (slice.len == 0)
+                        return false;
+                    if (comptime masked) {
+                        if (self.data == .none and self.written < 4) {
+                            if (slice.len + self.written < 4) {
+                                @memcpy(self.mask[self.written .. self.written + slice.len], slice[0..]);
+                                self.written += slice.len;
+                                consumed.* += slice.len;
+                                return false; // partial
+                            }
+                            const consume = 4 - self.written;
+                            @memcpy(self.mask[self.written..4], slice[0..consume]); // full
+                            consumed.* += consume;
+                            slice = slice[consume..];
+                            self.written = 0;
+                        }
+                    }
+                    if (self.size <= StaticSize) {
+                        if (self.size > 0) {
+                            if (self.data != .static)
+                                self.data = .{ .static = undefined };
+                            if (slice.len + self.written < self.size) {
+                                @memcpy(self.data.static[self.written .. self.written + slice.len], slice[0..]);
+                                self.written += slice.len;
+                                consumed.* += slice.len;
+                                return false; // partial
+                            }
+                            const consume = self.size - self.written;
+                            @memcpy(self.data.static[self.written..self.size], slice[0..consume]);
+                            consumed.* += consume;
+                        }
+                    } else {
+                        if (comptime maxLength) |max| {
+                            switch (comptime max) {
+                                .safe => |m| {
+                                    const size = self.size;
+                                    if (size > m) {
+                                        const consume = @min(self.size - self.written, slice.len);
+                                        self.written += consume;
+                                        consumed.* += consume;
+                                        if (self.written < size)
+                                            return false; // partial
+                                        self.reset(allocator);
+                                        return error.MessageTooLarge;
+                                    }
+                                },
+                                else => {},
+                            }
+                        }
+                        if (self.data != .allocated)
+                            self.data = .{ .allocated = try allocator.alloc(u8, self.size) };
+                        if (slice.len + self.written < self.size) {
+                            @memcpy(self.data.allocated[self.written .. self.written + slice.len], slice[0..]);
+                            consumed.* += slice.len;
+                            self.written += slice.len;
+                            return false; // partial
+                        }
+                        const consume = self.size - self.written;
+                        @memcpy(self.data.allocated[self.written..self.size], slice[0..consume]);
+                        consumed.* += consume;
+                    }
+                    if (comptime masked) {
+                        const mask = self.mask[0..];
+                        const payload: []u8 = switch (self.data) {
+                            .allocated => self.data.allocated[0..self.size],
+                            .static => self.data.static[0..self.size],
+                            .none => unreachable,
+                        };
+                        if (payload.len > 0)
+                            for (payload, 0..) |_, i| {
+                                payload[i] ^= mask[i % 4];
+                            };
+                    }
+                    self.state = .complete;
+                    return true;
+                },
+            }
+        }
+
+        pub fn getData(self: *Self) []const u8 {
+            return switch (self.data) {
+                .allocated => self.data.allocated[0..self.size],
+                .static => self.data.static[0..self.size],
+                .none => &[_]u8{},
+            };
+        }
+
+        pub fn reset(self: *Self, allocator: std.mem.Allocator) void {
+            switch (self.data) {
+                .allocated => |buf| allocator.free(buf),
+                .none, .static => {},
+            }
+            self.* = .{};
+        }
+
+        pub fn deinit(self: *Self, allocator: std.mem.Allocator) void {
+            self.reset(allocator);
+        }
+    };
 }
 
-pub fn read(self: *Self) !WebsocketDataFrame {
-    @memset(&self.header, 0);
-    // Read and retry if we hit the end of the stream buffer
-    const start = switch (self.stream) {
-        .stream => |s| try s.read(&self.header),
-        .vstream => |s| try s.read(&self.header),
-        .piped => |s| try s.any_reader.read(&self.header),
-        .vpiped => |s| try s.any_reader.read(&self.header),
-    };
-    if (start == 0) {
-        return error.ConnectionClosed;
+fn testReaderProcedural(reader: anytype, input: []const u8) !void {
+    const allocator = std.testing.allocator;
+
+    var tiny_buf: [1]u8 = undefined;
+    for (input, 0..) |b, i| {
+        tiny_buf[0] = b;
+        var consumed: usize = 0;
+        const finished = i == input.len - 1;
+        try std.testing.expect(try reader.next(allocator, tiny_buf[0..], &consumed) == finished);
+        try std.testing.expectEqual(1, consumed);
     }
 
-    return try self.readDataFrameInBuffer();
+    return;
 }
 
-// Read assuming everything can fit before the stream hits the end of
-// it's buffer
-pub fn readDataFrameInBuffer(
-    self: *Self,
-) !WebsocketDataFrame {
-    const header: WebsocketHeader = @bitCast(std.mem.readInt(u16, self.header[0..2], .big));
+fn testReaderProceduralIncomplete(reader: anytype, input: []const u8) !void {
+    const allocator = std.testing.allocator;
 
-    // Decode length
-    var length: u64 = header.len;
-    switch (header.len) {
-        126 => {
-            const lengthBuf = try self.allocator.alloc(u8, 2);
-            self.length = lengthBuf;
-            const size = switch (self.stream) {
-                .stream => |s| try s.read(lengthBuf),
-                .vstream => |s| try s.read(lengthBuf),
-                .piped => |s| try s.any_reader.read(lengthBuf),
-                .vpiped => |s| try s.any_reader.read(lengthBuf),
-            };
-            if (size == 0 or size != 2) return error.ConnectionClosed;
-            length = std.mem.readInt(u16, lengthBuf[0..2], .big);
-        },
-        127 => {
-            const lengthBuf = try self.allocator.alloc(u8, 8);
-            self.length = lengthBuf;
-            const size = switch (self.stream) {
-                .stream => |s| try s.read(lengthBuf),
-                .vstream => |s| try s.read(lengthBuf),
-                .piped => |s| try s.any_reader.read(lengthBuf),
-                .vpiped => |s| try s.any_reader.read(lengthBuf),
-            };
-            if (size == 0 or size != 8) return error.ConnectionClosed;
-            length = std.mem.readInt(u64, lengthBuf[0..8], .big);
-            // Most significant bit must be 0
-            if (length >> 63 == 1) return error.InvalidMessage;
-        },
-        else => {},
+    var tiny_buf: [1]u8 = undefined;
+    for (input) |b| {
+        tiny_buf[0] = b;
+        var consumed: usize = 0;
+        try std.testing.expect(try reader.next(allocator, tiny_buf[0..], &consumed) == false);
+        try std.testing.expectEqual(1, consumed);
     }
 
-    const read_len = length + @as(u64, (if (header.mask) 4 else 0));
-    const buf = try self.allocator.alloc(u8, read_len);
-    self.buf = buf;
+    return;
+}
 
-    const start: usize = if (header.mask) 4 else 0;
+test Reader {
+    const allocator = std.testing.allocator;
+    {
+        const example_header: Header = .{
+            .len = Header.packLength(5),
+            .mask = false,
+            .opcode = Opcode.Text,
+            .rsv = 0,
+            .compressed = false,
+            .final = true,
+        };
+        const header_bytes: [2]u8 = @bitCast(@byteSwap(@as(u16, @bitCast(example_header))));
+        var reader: Reader(false, 128, null) = .{};
 
-    const end = start + length;
+        var consumed: usize = 0;
+        try std.testing.expectEqual(.header, reader.state);
+        try std.testing.expect(!(reader.next(allocator, &[_]u8{}, &consumed) catch unreachable));
+        try std.testing.expectEqual(0, consumed);
+        try std.testing.expectEqual(.header, reader.state);
+        try std.testing.expect(!(reader.next(allocator, &[_]u8{header_bytes[0]}, &consumed) catch unreachable));
+        try std.testing.expectEqual(1, consumed);
+        try std.testing.expectEqual(.header, reader.state);
+        try std.testing.expect(!(reader.next(allocator, &[_]u8{header_bytes[1]}, &consumed) catch unreachable));
+        try std.testing.expectEqual(1, consumed);
 
-    const extend_length = switch (self.stream) {
-        .stream => |s| try s.read(buf),
-        .vstream => |s| try s.read(buf),
-        .piped => |s| try s.any_reader.read(buf),
-        .vpiped => |s| try s.any_reader.read(buf),
-    };
-    if (extend_length != read_len) {
-        return error.InvalidMessage;
+        try std.testing.expectEqual(.data, reader.state);
+        try std.testing.expectEqual(5, reader.header.len);
+        try std.testing.expectEqual(false, reader.header.mask);
+        try std.testing.expectEqual(.Text, reader.header.opcode);
+        try std.testing.expectEqual(0, reader.header.rsv);
+        try std.testing.expectEqual(false, reader.header.compressed);
+        try std.testing.expectEqual(true, reader.header.final);
+
+        try std.testing.expect(!(reader.next(allocator, &[_]u8{}, &consumed) catch unreachable));
+        try std.testing.expectEqual(0, consumed);
+        try std.testing.expectEqual(.data, reader.state);
+        try std.testing.expect(!(reader.next(allocator, &[_]u8{'H'}, &consumed) catch unreachable));
+        try std.testing.expectEqual(1, consumed);
+        try std.testing.expectEqual(.data, reader.state);
+        try std.testing.expect(!(reader.next(allocator, &[_]u8{'e'}, &consumed) catch unreachable));
+        try std.testing.expectEqual(1, consumed);
+        try std.testing.expectEqual(.data, reader.state);
+        try std.testing.expect(!(reader.next(allocator, &[_]u8{'l'}, &consumed) catch unreachable));
+        try std.testing.expectEqual(1, consumed);
+        try std.testing.expectEqual(.data, reader.state);
+        try std.testing.expect(!(reader.next(allocator, &[_]u8{'l'}, &consumed) catch unreachable));
+        try std.testing.expectEqual(1, consumed);
+        try std.testing.expectEqual(.data, reader.state);
+        try std.testing.expect(reader.next(allocator, &[_]u8{'o'}, &consumed) catch unreachable);
+        try std.testing.expectEqual(1, consumed);
+
+        try std.testing.expectEqual(.complete, reader.state);
+        try std.testing.expect(reader.data == .static);
+        try std.testing.expectEqualStrings("Hello", reader.getData());
     }
 
-    var data = buf[start..end];
+    {
+        const example_header: Header = .{
+            .len = Header.packLength(5),
+            .mask = false,
+            .opcode = Opcode.Text,
+            .rsv = 0,
+            .compressed = false,
+            .final = true,
+        };
+        const header_bytes: [2]u8 = @bitCast(@byteSwap(@as(u16, @bitCast(example_header))));
+        var reader: Reader(false, 2, null) = .{};
+        defer reader.deinit(allocator);
 
-    if (header.mask) {
-        const mask = buf[0..4];
-        // Decode data in place
-        for (data, 0..) |_, i| {
-            data[i] ^= mask[i % 4];
-        }
+        var consumed: usize = 0;
+        try std.testing.expect(!(reader.next(allocator, &[_]u8{header_bytes[0]}, &consumed) catch unreachable));
+        try std.testing.expectEqual(1, consumed);
+        try std.testing.expect(!(reader.next(allocator, &[_]u8{header_bytes[1]}, &consumed) catch unreachable));
+        try std.testing.expectEqual(1, consumed);
+        try std.testing.expectEqual(.data, reader.state);
+        try std.testing.expect(!(reader.next(allocator, &[_]u8{'H'}, &consumed) catch unreachable));
+        try std.testing.expectEqual(1, consumed);
+        try std.testing.expect(!(reader.next(allocator, &[_]u8{'e'}, &consumed) catch unreachable));
+        try std.testing.expectEqual(1, consumed);
+        try std.testing.expect(!(reader.next(allocator, &[_]u8{'l'}, &consumed) catch unreachable));
+        try std.testing.expectEqual(1, consumed);
+        try std.testing.expect(!(reader.next(allocator, &[_]u8{'l'}, &consumed) catch unreachable));
+        try std.testing.expectEqual(1, consumed);
+        try std.testing.expect(reader.next(allocator, &[_]u8{'o'}, &consumed) catch unreachable);
+        try std.testing.expectEqual(1, consumed);
+
+        try std.testing.expectEqual(.complete, reader.state);
+        try std.testing.expect(reader.data == .allocated);
+        try std.testing.expectEqualStrings("Hello", reader.getData());
     }
 
-    return WebsocketDataFrame{
-        .header = header,
-        .mask = if (header.mask) buf[0..4].* else undefined,
-        .data = data,
-    };
+    {
+        const example_header: Header = .{
+            .len = Header.packLength(5),
+            .mask = true,
+            .opcode = Opcode.Text,
+            .rsv = 0,
+            .compressed = false,
+            .final = true,
+        };
+        const header_bytes: [2]u8 = @bitCast(@byteSwap(@as(u16, @bitCast(example_header))));
+        var reader: Reader(true, 2, null) = .{};
+        defer reader.deinit(allocator);
+
+        var consumed: usize = 0;
+        try std.testing.expect(!(reader.next(allocator, &[_]u8{header_bytes[0]}, &consumed) catch unreachable));
+        try std.testing.expectEqual(1, consumed);
+        try std.testing.expect(!(reader.next(allocator, &[_]u8{header_bytes[1]}, &consumed) catch unreachable));
+        try std.testing.expectEqual(1, consumed);
+        try std.testing.expectEqual(.data, reader.state);
+        try std.testing.expect(!(reader.next(allocator, &[_]u8{0}, &consumed) catch unreachable));
+        try std.testing.expectEqual(1, consumed);
+        try std.testing.expectEqual(.data, reader.state);
+        try std.testing.expect(!(reader.next(allocator, &[_]u8{0}, &consumed) catch unreachable));
+        try std.testing.expectEqual(1, consumed);
+        try std.testing.expectEqual(.data, reader.state);
+        try std.testing.expect(!(reader.next(allocator, &[_]u8{0}, &consumed) catch unreachable));
+        try std.testing.expectEqual(1, consumed);
+        try std.testing.expectEqual(.data, reader.state);
+        try std.testing.expect(!(reader.next(allocator, &[_]u8{0}, &consumed) catch unreachable));
+        try std.testing.expectEqual(1, consumed);
+        try std.testing.expectEqual(.data, reader.state);
+        try std.testing.expect(!(reader.next(allocator, &[_]u8{'H'}, &consumed) catch unreachable));
+        try std.testing.expectEqual(1, consumed);
+        try std.testing.expect(!(reader.next(allocator, &[_]u8{'e'}, &consumed) catch unreachable));
+        try std.testing.expectEqual(1, consumed);
+        try std.testing.expect(!(reader.next(allocator, &[_]u8{'l'}, &consumed) catch unreachable));
+        try std.testing.expectEqual(1, consumed);
+        try std.testing.expect(!(reader.next(allocator, &[_]u8{'l'}, &consumed) catch unreachable));
+        try std.testing.expectEqual(1, consumed);
+        try std.testing.expect(reader.next(allocator, &[_]u8{'o'}, &consumed) catch unreachable);
+        try std.testing.expectEqual(1, consumed);
+
+        try std.testing.expectEqual(.complete, reader.state);
+        try std.testing.expect(reader.data == .allocated);
+        try std.testing.expectEqualStrings(&[_]u8{ 0, 0, 0, 0 }, reader.mask[0..]);
+        try std.testing.expectEqualStrings("Hello", reader.getData());
+    }
+
+    {
+        const example_header: Header = .{
+            .len = Header.packLength(200),
+            .mask = false,
+            .opcode = Opcode.Text,
+            .rsv = 0,
+            .compressed = false,
+            .final = true,
+        };
+        const header_bytes: [2]u8 = @bitCast(@byteSwap(@as(u16, @bitCast(example_header))));
+        var reader: Reader(false, 2, null) = .{};
+        defer reader.deinit(allocator);
+
+        var consumed: usize = 0;
+        try std.testing.expect(!(reader.next(allocator, &[_]u8{header_bytes[0]}, &consumed) catch unreachable));
+        try std.testing.expectEqual(1, consumed);
+        try std.testing.expect(!(reader.next(allocator, &[_]u8{header_bytes[1]}, &consumed) catch unreachable));
+        try std.testing.expectEqual(1, consumed);
+        try std.testing.expectEqual(.size, reader.state);
+        try std.testing.expect(!(reader.next(allocator, &[_]u8{ 0x00, 0xC8 }, &consumed) catch unreachable));
+        try std.testing.expectEqual(2, consumed);
+        try std.testing.expectEqual(200, reader.size);
+        try std.testing.expectEqual(.data, reader.state);
+    }
+
+    {
+        const example_header: Header = .{
+            .len = Header.packLength(5),
+            .mask = false,
+            .opcode = Opcode.Text,
+            .rsv = 0,
+            .compressed = false,
+            .final = true,
+        };
+        const header_bytes: [2]u8 = @bitCast(@byteSwap(@as(u16, @bitCast(example_header))));
+        var reader: Reader(false, 5, null) = .{};
+        defer reader.deinit(allocator);
+
+        var consumed: usize = 0;
+        try std.testing.expect((reader.next(allocator, &[_]u8{ header_bytes[0], header_bytes[1] } ++ "Hello and more bytes", &consumed) catch unreachable));
+        try std.testing.expectEqual(7, consumed);
+
+        try std.testing.expectEqual(.complete, reader.state);
+        try std.testing.expect(reader.data == .static);
+        try std.testing.expectEqualStrings("Hello", reader.getData());
+    }
+
+    {
+        const example_header: Header = .{
+            .len = Header.packLength(5),
+            .mask = false,
+            .opcode = Opcode.Text,
+            .rsv = 0,
+            .compressed = false,
+            .final = true,
+        };
+        const header_bytes: [2]u8 = @bitCast(@byteSwap(@as(u16, @bitCast(example_header))));
+        var reader: Reader(false, 2, null) = .{};
+        defer reader.deinit(allocator);
+
+        var consumed: usize = 0;
+        try std.testing.expect((reader.next(allocator, &[_]u8{ header_bytes[0], header_bytes[1] } ++ "Hello and more bytes", &consumed) catch unreachable));
+        try std.testing.expectEqual(7, consumed);
+
+        try std.testing.expectEqual(.complete, reader.state);
+        try std.testing.expect(reader.data == .allocated);
+        try std.testing.expectEqualStrings("Hello", reader.getData());
+    }
+
+    {
+        const example_header: Header = .{
+            .len = Header.packLength(5),
+            .mask = false,
+            .opcode = Opcode.Text,
+            .rsv = 0,
+            .compressed = false,
+            .final = true,
+        };
+        const header_bytes: [2]u8 = @bitCast(@byteSwap(@as(u16, @bitCast(example_header))));
+        var reader: Reader(false, 2, null) = .{};
+        defer reader.deinit(allocator);
+
+        try testReaderProcedural(&reader, &[_]u8{ header_bytes[0], header_bytes[1] } ++ "Hello");
+
+        try std.testing.expectEqual(.complete, reader.state);
+        try std.testing.expect(reader.data == .allocated);
+        try std.testing.expectEqualStrings("Hello", reader.getData());
+    }
+
+    {
+        const example_header: Header = .{
+            .len = Header.packLength(200),
+            .mask = false,
+            .opcode = Opcode.Text,
+            .rsv = 0,
+            .compressed = false,
+            .final = true,
+        };
+        const header_bytes: [2]u8 = @bitCast(@byteSwap(@as(u16, @bitCast(example_header))));
+        var reader: Reader(false, 200, null) = .{};
+        defer reader.deinit(allocator);
+
+        const short_size: u16 = 200;
+
+        var consumed: usize = 0;
+        try std.testing.expect((reader.next(allocator, &[_]u8{ header_bytes[0], header_bytes[1] } ++ @as([2]u8, @bitCast(@byteSwap(short_size))) ++ "Hello" ** 40, &consumed) catch unreachable));
+        try std.testing.expectEqual(204, consumed);
+
+        try std.testing.expectEqual(.complete, reader.state);
+        try std.testing.expect(reader.data == .static);
+        try std.testing.expectEqualStrings("Hello" ** 40, reader.getData());
+    }
+
+    {
+        const example_header: Header = .{
+            .len = Header.packLength(200),
+            .mask = false,
+            .opcode = Opcode.Text,
+            .rsv = 0,
+            .compressed = false,
+            .final = true,
+        };
+        const header_bytes: [2]u8 = @bitCast(@byteSwap(@as(u16, @bitCast(example_header))));
+        var reader: Reader(false, 200, null) = .{};
+        defer reader.deinit(allocator);
+
+        const short_size: u16 = 200;
+
+        try testReaderProcedural(&reader, &[_]u8{ header_bytes[0], header_bytes[1] } ++ @as([2]u8, @bitCast(@byteSwap(short_size))) ++ "Hello" ** 40);
+
+        try std.testing.expectEqual(.complete, reader.state);
+        try std.testing.expect(reader.data == .static);
+        try std.testing.expectEqualStrings("Hello" ** 40, reader.getData());
+    }
+
+    {
+        const example_header: Header = .{
+            .len = Header.packLength(200),
+            .mask = false,
+            .opcode = Opcode.Text,
+            .rsv = 0,
+            .compressed = false,
+            .final = true,
+        };
+        const header_bytes: [2]u8 = @bitCast(@byteSwap(@as(u16, @bitCast(example_header))));
+        var reader: Reader(false, 0, null) = .{};
+        defer reader.deinit(allocator);
+
+        const short_size: u16 = 200;
+
+        var consumed: usize = 0;
+        try std.testing.expect((reader.next(allocator, &[_]u8{ header_bytes[0], header_bytes[1] } ++ @as([2]u8, @bitCast(@byteSwap(short_size))) ++ "Hello" ** 40, &consumed) catch unreachable));
+        try std.testing.expectEqual(204, consumed);
+
+        try std.testing.expectEqual(.complete, reader.state);
+        try std.testing.expect(reader.data == .allocated);
+        try std.testing.expectEqualStrings("Hello" ** 40, reader.getData());
+    }
+
+    {
+        const example_header: Header = .{
+            .len = Header.packLength(200),
+            .mask = false,
+            .opcode = Opcode.Text,
+            .rsv = 0,
+            .compressed = false,
+            .final = true,
+        };
+        const header_bytes: [2]u8 = @bitCast(@byteSwap(@as(u16, @bitCast(example_header))));
+        var reader: Reader(false, 0, null) = .{};
+        defer reader.deinit(allocator);
+
+        const short_size: u16 = 200;
+        try testReaderProcedural(
+            &reader,
+            &[_]u8{ header_bytes[0], header_bytes[1] } ++ @as([2]u8, @bitCast(@byteSwap(short_size))) ++ "Hello" ** 40,
+        );
+
+        try std.testing.expectEqual(.complete, reader.state);
+        try std.testing.expect(reader.data == .allocated);
+        try std.testing.expectEqualStrings("Hello" ** 40, reader.getData());
+    }
+
+    {
+        const example_header: Header = .{
+            .len = Header.packLength(0xFFFF + 1),
+            .mask = false,
+            .opcode = Opcode.Text,
+            .rsv = 0,
+            .compressed = false,
+            .final = true,
+        };
+        const header_bytes: [2]u8 = @bitCast(@byteSwap(@as(u16, @bitCast(example_header))));
+        var reader: Reader(false, 0, null) = .{};
+        defer reader.deinit(allocator);
+
+        const short_size: u64 = 0xFFFF + 1;
+
+        var consumed: usize = 0;
+        try std.testing.expect(!(reader.next(allocator, &[_]u8{ header_bytes[0], header_bytes[1] } ++ @as([8]u8, @bitCast(@byteSwap(short_size))), &consumed) catch unreachable));
+        try std.testing.expectEqual(10, consumed);
+        try std.testing.expectEqual(.data, reader.state);
+        try std.testing.expect(reader.data == .none);
+        try std.testing.expectEqual(0xFFFF + 1, reader.size);
+    }
+
+    {
+        const example_header: Header = .{
+            .len = Header.packLength(0xFFFF + 1),
+            .mask = false,
+            .opcode = Opcode.Text,
+            .rsv = 0,
+            .compressed = false,
+            .final = true,
+        };
+        const header_bytes: [2]u8 = @bitCast(@byteSwap(@as(u16, @bitCast(example_header))));
+        var reader: Reader(false, 0, null) = .{};
+        defer reader.deinit(allocator);
+
+        const short_size: u64 = 0xFFFF + 1;
+
+        try testReaderProceduralIncomplete(&reader, &[_]u8{ header_bytes[0], header_bytes[1] } ++ @as([8]u8, @bitCast(@byteSwap(short_size))));
+
+        try std.testing.expectEqual(.data, reader.state);
+        try std.testing.expect(reader.data == .none);
+        try std.testing.expectEqual(0xFFFF + 1, reader.size);
+    }
+
+    {
+        const example_header: Header = .{
+            .len = Header.packLength(6),
+            .mask = true,
+            .opcode = Opcode.Text,
+            .rsv = 0,
+            .compressed = false,
+            .final = true,
+        };
+        const header_bytes: [2]u8 = @bitCast(@byteSwap(@as(u16, @bitCast(example_header))));
+        var reader: Reader(false, 0, null) = .{};
+        defer reader.deinit(allocator);
+
+        var consumed: usize = 0;
+        try std.testing.expectError(error.MaskedMessage, reader.next(allocator, &[_]u8{ header_bytes[0], header_bytes[1] }, &consumed));
+        try std.testing.expectEqual(.header, reader.state);
+        try std.testing.expectEqual(0, reader.written);
+        try std.testing.expectEqual(.none, reader.data);
+        try std.testing.expectEqual(0, reader.size);
+    }
+
+    {
+        const example_header: Header = .{
+            .len = Header.packLength(1),
+            .mask = false,
+            .opcode = Opcode.Text,
+            .rsv = 0,
+            .compressed = false,
+            .final = true,
+        };
+        const header_bytes: [2]u8 = @bitCast(@byteSwap(@as(u16, @bitCast(example_header))));
+        var reader: Reader(false, 0, .{ .fast = 0 }) = .{};
+        defer reader.deinit(allocator);
+
+        var consumed: usize = 0;
+        try std.testing.expectError(error.MessageTooLarge, reader.next(allocator, &[_]u8{ header_bytes[0], header_bytes[1] }, &consumed));
+        try std.testing.expectEqual(2, consumed);
+        try std.testing.expectEqual(.header, reader.state);
+        try std.testing.expectEqual(0, reader.written);
+        try std.testing.expectEqual(.none, reader.data);
+        try std.testing.expectEqual(0, reader.size);
+    }
+
+    {
+        const example_header: Header = .{
+            .len = Header.packLength(1),
+            .mask = false,
+            .opcode = Opcode.Text,
+            .rsv = 0,
+            .compressed = false,
+            .final = true,
+        };
+        const header_bytes: [2]u8 = @bitCast(@byteSwap(@as(u16, @bitCast(example_header))));
+        var reader: Reader(false, 0, .{ .safe = 0 }) = .{};
+        defer reader.deinit(allocator);
+
+        var consumed: usize = 0;
+        try std.testing.expect(!(reader.next(allocator, &[_]u8{ header_bytes[0], header_bytes[1] }, &consumed) catch unreachable));
+        try std.testing.expectEqual(2, consumed);
+        try std.testing.expectEqual(.data, reader.state);
+        try std.testing.expectEqual(0, reader.written);
+        try std.testing.expectEqual(.none, reader.data);
+        try std.testing.expectEqual(1, reader.size);
+
+        try std.testing.expectError(error.MessageTooLarge, reader.next(allocator, &[_]u8{1}, &consumed));
+        try std.testing.expectEqual(1, consumed);
+        try std.testing.expectEqual(.header, reader.state);
+        try std.testing.expectEqual(0, reader.written);
+        try std.testing.expectEqual(.none, reader.data);
+        try std.testing.expectEqual(0, reader.size);
+    }
 }

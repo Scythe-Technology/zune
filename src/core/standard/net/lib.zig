@@ -102,6 +102,9 @@ test {
 test {
     _ = @import("http/response.zig");
 }
+test {
+    _ = @import("http/websocket.zig");
+}
 
 test "net" {
     const TestRunner = @import("../../utils/testrunner.zig");

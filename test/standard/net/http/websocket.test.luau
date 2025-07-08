@@ -7,51 +7,222 @@ local describe = testing.describe;
 local expect = testing.expect;
 local test = testing.test;
 
-local _, version, _ = string.match(_VERSION, "(Zune) (%d+%.%d+%.%d+.*)+(%d+%.%d+)");
+local _, version, _ = string.match(_VERSION, "(zune) (%d+%.%d+%.%d+.*)+(%d+%.%d+)");
 assert(version and #version > 0, "No version");
 
-test("Generic", function()
-    local upgradeCalled = false;
-    local serverOpened = false;
-    local serverClosed = false;
-    local serverMessageCount = 0;
-    local references = {};
-    local reqCalled = false;
+test("Basic", function()
+    local server_events = {};
     local server = net.http.serve({
         port = 8080,
         reuseAddress = true,
         request = function(req)
-            reqCalled = true;
+            table.insert(server_events, `request`);
             return "";
         end,
         websocket = {
             upgrade = function(req)
-                upgradeCalled = true;
-                task.wait();
+                table.insert(server_events, `upgrade`);
                 return true;
             end,
             open = function(ws)
-                serverOpened = true;
-                ws:send("Hello");
-                if (not table.find(references, ws)) then
-                    table.insert(references, ws);
-                end
+                table.insert(server_events, `open`);
             end,
             message = function(ws, message)
-                serverMessageCount += 1;
-                ws:send("Echo: " .. message);
-                if (not table.find(references, ws)) then
-                    table.insert(references, ws);
-                end
-
-                if (serverMessageCount == 2) then
-                    ws:close();
-                end
+                table.insert(server_events, `message: {message}`);
+                ws:send(`Echo: {message}`);
+                ws:close(1000);
             end,
-            close = function(ws)
-                serverClosed = true;
-                if (not table.find(references, ws)) then
-                    table.insert(references, ws);
+            close = function(ws, code)
+                table.insert(server_events, `close: {code}`);
+            end,
+        },
+    });
+    expect(server).toBe(expect.type("userdata"));
+
+    testing.defer(function()
+        server:stop();
+    end)
+
+    local client_events = {};
+    local resume_thread: thread? = nil;
+    local socket = net.http.websocket("ws://localhost:8080", {
+        error = function(socket, scope, err)
+            table.insert(client_events, `error: {scope}, {err}`);
+        end,
+        message = function(socket, message)
+            table.insert(client_events, `message: {message}`);
+        end,
+        close = function(socket, closeCode)
+            table.insert(client_events, `close: {closeCode}`);
+            if (resume_thread) then
+                task.defer(resume_thread);
+            end
+        end,
+    });
+    expect(socket).toBe(expect.type("userdata"));
+    testing.defer(function()
+        socket:close();
+    end)
+
+    expect(socket).toBe(expect.type("userdata"));
+    expect(socket:isConnected()).toBe(true);
+
+    expect(server_events).toBe(expect.similar({
+        "upgrade",
+        "open",
+    }));
+    expect(client_events).toBe(expect.similar({}));
+
+    task.wait();
+    
+    socket:send("Test 1");
+
+    expect(socket:isConnected()).toBe(true);
+
+    resume_thread = coroutine.running();
+    coroutine.yield();
+
+    expect(socket:isConnected()).toBe(false);
+
+    expect(server_events).toBe(expect.similar({
+        "upgrade",
+        "open",
+        "message: Test 1",
+        "close: 1000",
+    }));
+    expect(client_events).toBe(expect.similar({
+        "message: Echo: Test 1",
+        "close: 1000",
+    }));
+end)
+
+test("Slow server", function()
+    local server_events = {};
+    local server = net.http.serve({
+        port = 8080,
+        reuseAddress = true,
+        request = function(req)
+            table.insert(server_events, `request`);
+            return "";
+        end,
+        websocket = {
+            upgrade = function(req)
+                table.insert(server_events, `upgrade`);
+                task.wait(0.5);
+                return true;
+            end,
+            open = function(ws)
+                table.insert(server_events, `open`);
+            end,
+            message = function(ws, message)
+                table.insert(server_events, `message: {message}`);
+                if (#server_events >= 5) then
+                    task.delay(1, function()
+                        ws:close(1000);
+                    end)
+                end
+                task.wait(0.5);
+                ws:send("Echo: " .. message);
+            end,
+            close = function(ws, code)
+                table.insert(server_events, `close: {code}`);
+            end,
+        },
+    });
+    expect(server).toBe(expect.type("userdata"));
+
+    testing.defer(function()
+        server:stop();
+    end)
+
+    local client_events = {};
+    local resume_thread: thread? = nil;
+    local socket = net.http.websocket("ws://localhost:8080", {
+        timeout = 5,
+        error = function(socket, scope, err)
+            table.insert(client_events, `error: {scope}, {err}`);
+        end,
+        message = function(socket, message)
+            table.insert(client_events, `message: {message}`);
+        end,
+        close = function(socket, closeCode)
+            table.insert(client_events, `close: {closeCode}`);
+            if (resume_thread) then
+                task.defer(resume_thread);
+            end
+        end,
+    });
+    expect(socket).toBe(expect.type("userdata"));
+    testing.defer(function()
+        socket:close();
+    end)
+
+    expect(socket).toBe(expect.type("userdata"));
+    expect(socket:isConnected()).toBe(true);
+
+    task.wait(0.5);
+
+    expect(server_events).toBe(expect.similar({
+        "upgrade",
+        "open",
+    }));
+    expect(client_events).toBe(expect.similar({}));
+
+    task.wait();
+    
+    socket:send("Test 1");
+    socket:send("Test 2");
+    socket:send("Test 3");
+
+    expect(socket:isConnected()).toBe(true);
+
+    resume_thread = coroutine.running();
+    coroutine.yield();
+
+    expect(socket:isConnected()).toBe(false);
+
+    expect(server_events).toBe(expect.similar({
+        "upgrade",
+        "open",
+        "message: Test 1",
+        "message: Test 2",
+        "message: Test 3",
+        "close: 1000",
+    }));
+    expect(client_events).toBe(expect.similar({
+        "message: Echo: Test 1",
+        "message: Echo: Test 2",
+        "message: Echo: Test 3",
+        "close: 1000",
+    }));
+end)
+
+test("Time out", function()
+    local server_events = {};
+    local resume_thread: thread? = nil;
+    local server = net.http.serve({
+        port = 8080,
+        reuseAddress = true,
+        request = function(req)
+            table.insert(server_events, `request`);
+            return "";
+        end,
+        websocket = {
+            upgrade = function(req)
+                table.insert(server_events, `upgrade`);
+                task.wait(5);
+                return true;
+            end,
+            open = function(ws)
+                table.insert(server_events, `open`);
+            end,
+            message = function(ws, message)
+                table.insert(server_events, `message: {message}`);
+            end,
+            close = function(ws, code)
+                table.insert(server_events, `close: {code}`);
+                if (resume_thread) then
+                    task.defer(resume_thread);
                 end
             end,
         },
@@ -62,33 +233,55 @@ test("Generic", function()
         server:stop();
     end)
 
-    local openCalled = false;
-    local messageCount = 0;
-    local closeCalled = false;
-    local socket = net.http.websocket("ws://localhost:8080", {
-        timeout = 1,
-        open = function(socket)
-            expect(upgradeCalled).toBe(true);
-            openCalled = true;
+    expect(function()
+        net.http.websocket("ws://localhost:8080", {
+            timeout = 3,
+            error = function(socket, scope, err)
+            end,
+            message = function(socket, message)
+            end,
+            close = function(socket, closeCode)
+            end,
+        });
+    end).toThrow("Timeout");
+
+    resume_thread = coroutine.running();
+    coroutine.yield();
+
+    expect(server_events).toBe(expect.similar({
+        "upgrade",
+        "open",
+        "close: 1006",
+    }));
+end)
+
+test("TLS", function()
+    if (zune.process.args[1] ~= "allow") then
+        print(`Skip TLS test`);
+        return;
+    end
+    local events = {};
+    local resume_thread: thread? = nil;
+    local socket = net.http.websocket("wss://echo.websocket.org", {
+        headers = {},
+        timeout = 10,
+        error = function(socket, scope, err)
+            table.insert(events, `error: {scope}, {err}`);
+        end,
+        accept = function(socket, res)
+            expect(res).toBe(expect.type("table"));
+            expect(res.statusCode).toBe(101);
+            table.insert(events, `accept: {res.statusCode}`);
+            return true;
         end,
         message = function(socket, message)
-            expect(openCalled).toBe(true);
-            if (messageCount == 0) then
-                expect(message).toBe("Hello");
-            elseif (messageCount == 1) then
-                expect(message).toBe("Echo: Test 1");
-            elseif (messageCount == 2) then
-                expect(message).toBe("Echo: Test 2");
-            else
-                error("Unexpected message: " .. message);
-            end
-            messageCount += 1;
+            table.insert(events, `message: {message}`);
         end,
         close = function(socket, closeCode)
-            expect(openCalled).toBe(true);
-            expect(messageCount).toBe(3);
-            expect(closeCode).toBe(1000);
-            closeCalled = true;
+            table.insert(events, `close: {closeCode}`);
+            if (resume_thread) then
+                task.defer(resume_thread);
+            end
         end,
     });
     expect(socket).toBe(expect.type("userdata"));
@@ -96,35 +289,34 @@ test("Generic", function()
         socket:close();
     end)
 
-    expect(socket).toBe(expect.type("userdata"));
-    expect(socket.connected).toBe(true);
+    expect(events).toBe(expect.similar({
+        "accept: 101",
+    }));
 
-    expect(serverOpened).toBe(true);
-    expect(serverMessageCount).toBe(0);
-    expect(serverClosed).toBe(false);
+    -- expect(socket.connected).toBe(true);
+    socket:send("Hello");
+    socket:send("Hello");
+    socket:send("Hello");
+    socket:send("Hello");
+    task.delay(0.5, socket.close, socket);
 
-    expect(openCalled).toBe(true);
-    expect(messageCount).toBe(0);
-    task.wait();
-    expect(openCalled).toBe(true);
-    expect(messageCount).toBe(1);
-    
-    socket:send("Test 1");
-    expect(messageCount).toBe(1);
+    expect(socket:isConnected()).toBe(true);
 
-    socket:send("Test 2");
-    expect(messageCount).toBe(1);
+    resume_thread = coroutine.running();
+    coroutine.yield();
 
-    expect(upgradeCalled).toBe(true);
-    expect(socket).toBe(expect.type("userdata"));
+    expect(socket:isConnected()).toBe(false);
 
-    repeat
-        task.wait(0.5);
-    until (not socket.connected)
+    table.remove(events, 2); -- remove echo.websocket.org "Request served by ..."
 
-    expect(closeCalled).toBe(true);
-
-    expect(reqCalled).toBe(false);
+    expect(events).toBe(expect.similar({
+        "accept: 101",
+        "message: Hello",
+        "message: Hello",
+        "message: Hello",
+        "message: Hello",
+        "close: 1000",
+    }));
 end)
 
 return nil;

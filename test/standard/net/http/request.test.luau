@@ -11,7 +11,7 @@ local function warn(message: string)
     print("\27[33m" .. message .. "\27[0m");
 end
 
-local _, version, _ = string.match(_VERSION, "(Zune) (%d+%.%d+%.%d+.*)+(%d+%.%d+)");
+local _, version, _ = string.match(_VERSION, "(zune) (%d+%.%d+%.%d+.*)+(%d+%.%d+)");
 assert(version and #version > 0, "No version");
 
 test("Basic", function()
@@ -55,9 +55,10 @@ test("Basic", function()
         task.wait();
     until (spawned == 0);
 end)
+
 test("TLS", function()
     if (zune.process.args[1] ~= "allow") then
-        warn("Skip TLS test");
+        print(`Skip TLS test`);
         return;
     end
     local res = net.http.request("https://github.com", {

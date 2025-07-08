@@ -123,6 +123,7 @@ pub const Buffers = struct {
         none: void,
         static: [8192 / 2]u8,
         dynamic: []u8,
+        reader: WebSocket.Reader(true, (8192 / 2) - 25, .{ .fast = LuaHelper.MAX_LUAU_SIZE }),
     };
 };
 
@@ -159,13 +160,14 @@ pub fn onClose(
 
     const GL = server.scheduler.global;
     if (self.websocket.ref.hasRef()) {
-        if (self.server.handlers.ws_close.hasRef()) {
+        if (self.server.callbacks.ws_close.hasRef()) {
             const L = GL.newthread();
             defer GL.pop(1);
 
-            if (self.server.handlers.ws_close.push(L)) {
+            if (self.server.callbacks.ws_close.push(L)) {
                 _ = self.websocket.ref.push(L);
-                _ = Scheduler.resumeState(L, null, 1) catch {};
+                L.pushunsigned(self.websocket.ref.value.close_code);
+                _ = Scheduler.resumeState(L, null, 2) catch {};
             }
         }
 
@@ -233,13 +235,14 @@ pub fn onWrite(
         switch (self.buffers.out) {
             .none, .static => {},
             .dynamic => |buf| allocator.free(buf),
+            .reader => unreachable,
         }
         self.buffers.out = .none;
         self.close();
         switch (err) {
             error.BrokenPipe, error.ConnectionResetByPeer => return .disarm,
             else => {
-                std.debug.print("Error writing to client: {}\n", .{err});
+                self.server.emitError(.raw_send, err);
                 return .disarm;
             },
         }
@@ -250,6 +253,7 @@ pub fn onWrite(
         switch (self.buffers.out) {
             .none, .static => {},
             .dynamic => |buf| allocator.free(buf),
+            .reader => unreachable,
         }
         self.buffers.out = .none;
         if (self.state.stage != .closing) {
@@ -274,7 +278,7 @@ pub fn onWrite(
 
                 self.websocket.ref = .init(L, -1, websocket);
 
-                if (self.server.handlers.ws_open.push(L)) {
+                if (self.server.callbacks.ws_open.push(L)) {
                     L.pushvalue(-2);
                     _ = Scheduler.resumeState(L, null, 1) catch {};
                 }
@@ -520,12 +524,6 @@ pub fn ws_upgradeResumed(self: *Self, L: *VM.lua.State, _: *Scheduler) void {
     self.writeAll(upgrade_response);
 }
 
-const WebSocketFrameState = struct {
-    info: u8 = 0,
-    written: usize = 0,
-    allocated: ?[]u8 = null,
-};
-
 pub fn ws_onRecv(
     ud: ?*Self,
     loop: *xev.Loop,
@@ -548,178 +546,102 @@ pub fn ws_onRecv(
             return .disarm;
         },
         else => {
-            std.debug.print("Error reading from client: {}\n", .{err});
+            self.server.emitError(.websocket_raw_receive, err);
             self.ws_close(loop);
             return .disarm;
         },
     };
 
     const allocator = self.parser.arena.allocator();
-    const static = &self.buffers.out.static;
-    const frame_state: *WebSocketFrameState = @ptrCast(@alignCast(static[0..@sizeOf(WebSocketFrameState)]));
-    const frame_buffer = static[@sizeOf(WebSocketFrameState)..];
+
+    var reader = &self.buffers.out.reader;
 
     var pos: usize = 0;
-    var stream = std.io.fixedBufferStream(self.buffers.in[0..read]);
-    const reader = stream.reader();
 
     while (true) {
-        const header: WebSocket.WebsocketHeader = blk: {
-            const stored = frame_state.info;
-            if (stored >= 2)
-                break :blk @bitCast(std.mem.readVarInt(u16, frame_buffer[0..2], .big));
-            const needed = 2 - stored;
-            const amount = reader.read(frame_buffer[stored .. stored + needed]) catch unreachable;
-            frame_state.info += @intCast(amount);
-            if (amount < needed) {
-                return .rearm;
-            }
-            break :blk @bitCast(std.mem.readVarInt(u16, frame_buffer[0..2], .big));
-        };
-
-        if (!header.mask) {
-            if (websocket.closed)
-                continue;
-            static[0] = 0;
-            websocket.sendCloseFrame(loop, 1002) catch |err| {
-                std.debug.print("Failed to send close frame: {}\n", .{err});
-                self.ws_close(loop);
-                return .disarm;
-            };
-        }
-
-        pos = 2;
-
-        var payload: []u8 = undefined;
-        const written: usize = frame_state.written;
-
-        const length: usize = switch (header.len) {
-            126 => blk: {
-                const stored = frame_state.info - 2;
-                if (stored >= 2) {
-                    break :blk @as(usize, @intCast(std.mem.readVarInt(u16, frame_buffer[pos .. pos + 2], .big)));
-                }
-                const needed = 2 - stored;
-                const amount = reader.read(frame_buffer[pos + stored .. pos + stored + needed]) catch unreachable;
-                frame_state.info += @intCast(amount);
-                if (amount < needed) {
-                    return .rearm;
-                }
-                defer pos += 2;
-                break :blk @as(usize, @intCast(std.mem.readVarInt(u16, frame_buffer[pos .. pos + 2], .big)));
-            },
-            127 => blk: {
-                const stored = frame_state.info - 2;
-                if (stored >= 8) {
-                    break :blk @as(usize, @intCast(std.mem.readVarInt(u64, frame_buffer[pos .. pos + 8], .big)));
-                }
-                const needed = 8 - stored;
-                const amount = reader.read(frame_buffer[pos + stored .. pos + stored + needed]) catch unreachable;
-                frame_state.info += @intCast(amount);
-                if (amount < needed) {
-                    return .rearm;
-                }
-                defer pos += 8;
-                break :blk @as(usize, @bitCast(std.mem.readVarInt(u64, frame_buffer[pos .. pos + 8], .big)));
-            },
-            else => header.len,
-        } + 4; // 4 (masked)
-
-        if (length > LuaHelper.MAX_LUAU_SIZE) {
-            websocket.sendCloseFrame(loop, 1009) catch |err| {
-                std.debug.print("Failed to send close frame: {}\n", .{err});
-                self.ws_close(loop);
-                return .disarm;
-            };
-            continue;
-        }
-
-        if (length > frame_buffer.len - pos) {
-            const new_buf = frame_state.allocated orelse allocator.alloc(u8, length) catch |err| {
-                std.debug.print("Failed to allocate websocket frame buffer: {}\n", .{err});
-                self.ws_close(loop);
-                return .disarm;
-            };
-            payload = new_buf;
-            frame_state.allocated = new_buf;
-        } else {
-            payload = frame_buffer[pos .. pos + length];
-        }
-
-        if (written < length) {
-            const needed = length - written;
-            const amount = reader.read(payload[written .. written + needed]) catch unreachable;
-            frame_state.written += @intCast(amount);
-            if (amount < needed) {
-                return .rearm;
-            }
-        }
-
-        const data = payload[4..];
-        const mask = payload[0..4];
-        // Decode data in place
-        for (data, 0..) |_, i| {
-            data[i] ^= mask[i % 4];
-        }
-
-        defer frame_state.info = 0;
-        defer frame_state.written = 0;
-        defer if (frame_state.allocated) |b| {
-            allocator.free(b);
-            frame_state.allocated = null;
-        };
-
-        const scheduler = self.server.scheduler;
-
-        switch (header.opcode) {
-            .Binary, .Text => {},
-            .Ping => {
-                websocket.sendPongFrame(loop) catch |err| {
-                    std.debug.print("Failed to send pong frame: {}\n", .{err});
+        const buf = self.buffers.in[pos..read];
+        if (buf.len == 0)
+            return .rearm;
+        var consumed: usize = 0;
+        defer pos += consumed;
+        if (reader.next(allocator, buf, &consumed) catch |rerr| switch (rerr) {
+            error.UnmaskedMessage => {
+                websocket.sendCloseFrame(loop, 1002) catch |err| {
+                    self.server.emitError(.websocket_receive, err);
                     self.ws_close(loop);
                     return .disarm;
                 };
                 continue;
             },
-            .Pong => continue,
-            .Close => {
-                if (!websocket.closed) jmp: {
-                    websocket.closed = true;
-                    const code = if (data.len >= 2) std.mem.readVarInt(u16, data[0..2], .big) else 1000;
-                    // we received a close frame, we should send a close frame back.
-                    // its possible we might have messages in queue
-                    websocket.sendCloseFrame(loop, code) catch |err| {
-                        std.debug.print("Failed to send close frame: {}\n", .{err});
-                        break :jmp;
-                    };
-                    return .rearm;
-                }
-                self.ws_close(loop);
-                return .disarm;
+            error.MessageTooLarge => {
+                websocket.sendCloseFrame(loop, 1009) catch |err| {
+                    self.server.emitError(.websocket_receive, err);
+                    self.ws_close(loop);
+                    return .disarm;
+                };
+                continue;
             },
-            .Continue => continue,
             else => {
-                std.debug.print("Unknown opcode: {}\n", .{header.opcode});
+                self.server.emitError(.websocket_receive, rerr);
                 self.ws_close(loop);
                 return .disarm;
             },
-        }
+        }) {
+            defer reader.reset(allocator);
+            const scheduler = self.server.scheduler;
 
-        if (self.server.handlers.ws_message.hasRef()) {
-            const GL = scheduler.global;
-            const L = GL.newthread();
-            defer GL.pop(1);
+            const data = reader.getData();
 
-            if (self.server.handlers.ws_message.push(L)) {
-                _ = self.websocket.ref.push(L);
-                switch (header.opcode) {
-                    .Binary => L.Zpushbuffer(data),
-                    .Text => L.pushlstring(data),
-                    else => unreachable,
-                }
-                _ = Scheduler.resumeState(L, null, 2) catch {};
-            } else unreachable;
-        }
+            switch (reader.header.opcode) {
+                .Binary, .Text => {},
+                .Ping => {
+                    websocket.sendPongFrame(loop) catch |err| {
+                        self.server.emitError(.websocket_receive_pong, err);
+                        self.ws_close(loop);
+                        return .disarm;
+                    };
+                    continue;
+                },
+                .Pong => continue,
+                .Close => {
+                    if (!websocket.closed) jmp: {
+                        defer websocket.closed = true;
+                        const code = if (data.len >= 2) std.mem.readVarInt(u16, data[0..2], .big) else 1000;
+                        // we received a close frame, we should send a close frame back.
+                        // its possible we might have messages in queue
+                        websocket.sendCloseFrame(loop, code) catch |err| {
+                            self.server.emitError(.websocket_receive_close, err);
+                            break :jmp;
+                        };
+                        return .rearm;
+                    }
+                    self.ws_close(loop);
+                    return .disarm;
+                },
+                .Continue => continue,
+                inline else => |e| {
+                    self.server.emitError(.websocket_receive, "UnknownOpcode_" ++ @tagName(e));
+                    self.ws_close(loop);
+                    return .disarm;
+                },
+            }
+
+            if (self.server.callbacks.ws_message.hasRef()) {
+                const GL = scheduler.global;
+                const L = GL.newthread();
+                defer GL.pop(1);
+
+                if (self.server.callbacks.ws_message.push(L)) {
+                    _ = self.websocket.ref.push(L);
+                    switch (reader.header.opcode) {
+                        .Binary => L.Zpushbuffer(data),
+                        .Text => L.pushlstring(data),
+                        else => unreachable,
+                    }
+                    _ = Scheduler.resumeState(L, null, 2) catch {};
+                } else unreachable;
+            }
+        } else return .rearm;
     }
 }
 
@@ -776,7 +698,7 @@ pub fn onRecv(
             return .disarm;
         },
         else => {
-            std.debug.print("Error reading from client: {}\n", .{err});
+            self.server.emitError(.raw_receive, err);
             self.close();
             return .disarm;
         },
@@ -809,14 +731,20 @@ pub fn onRecv(
         const GL = scheduler.global;
         const L = GL.newthread();
         defer GL.pop(1);
-        const luau_handlers = &self.server.handlers;
+        const luau_callbacks = &self.server.callbacks;
         if (self.parser.method == .GET) {
             if (self.parser.headers.get("connection")) |connection| jmp: {
                 @branchHint(.unlikely);
-                if (!luau_handlers.hasWebSocket())
-                    break :jmp; // user did not supply websocket handlers
-                if (!std.ascii.eqlIgnoreCase(connection, "upgrade"))
-                    break :jmp;
+                if (!luau_callbacks.hasWebSocket())
+                    break :jmp; // user did not supply websocket callbacks
+                var split_iter = std.mem.splitScalar(u8, connection, ',');
+                cont: {
+                    while (split_iter.next()) |part| {
+                        if (std.ascii.eqlIgnoreCase(std.mem.trim(u8, part, " "), "upgrade"))
+                            break :cont;
+                    }
+                    break :jmp; // no upgrade header
+                }
                 if (self.parser.headers.get("upgrade")) |upgrade| {
                     if (!std.ascii.eqlIgnoreCase(upgrade, "websocket"))
                         break :jmp;
@@ -844,11 +772,7 @@ pub fn onRecv(
                 const protocols = self.parser.headers.get("sec-websocket-protocol");
                 var accept_key: [28]u8 = undefined;
 
-                var hash = std.crypto.hash.Sha1.init(.{});
-                hash.update(key);
-                hash.update("258EAFA5-E914-47DA-95CA-C5AB0DC85B11"); // https://www.rfc-editor.org/rfc/rfc6455
-
-                _ = std.base64.standard.Encoder.encode(&accept_key, &hash.finalResult());
+                WebSocket.acceptHashKey(&accept_key, key);
 
                 const base_response = StaticResponse(.{
                     .status = "101 Switching Protocols",
@@ -867,14 +791,14 @@ pub fn onRecv(
                     if (protocols) |p| p else "",
                     "\r\n\r\n",
                 }) catch |err| {
-                    std.debug.print("Failed to allocate websocket accept response: {}\n", .{err});
+                    self.server.emitError(.response_alloc, err);
                     self.state.stage = .closing;
                     self.writeAll(HTTP_500);
                     return .disarm;
                 };
                 defer allocator.free(accept_response);
                 L.pushlstring(accept_response);
-                if (luau_handlers.ws_upgrade.push(L)) {
+                if (luau_callbacks.ws_upgrade.push(L)) {
                     L.pushvalue(-1);
                     self.parser.push(L) catch |err| switch (err) {
                         error.MaxQueryExceeded => {
@@ -893,7 +817,7 @@ pub fn onRecv(
                 return .disarm;
             }
         }
-        if (luau_handlers.request.push(L)) {
+        if (luau_callbacks.request.push(L)) {
             @branchHint(.likely);
             L.pushvalue(-1);
             self.parser.push(L) catch |err| switch (err) {
@@ -942,13 +866,7 @@ pub fn start(
     if (self.websocket.ref.hasRef()) {
         // write buffer wouldn't be used anymore
         // so we can use it for parsing websocket frames
-        self.buffers.out = .{ .static = undefined };
-        const state: *WebSocketFrameState = @ptrCast(@alignCast(self.buffers.out.static[0..@sizeOf(WebSocketFrameState)]));
-        state.* = .{
-            .info = 0,
-            .written = 0,
-            .allocated = null,
-        };
+        self.buffers.out = .{ .reader = .{} };
         self.socket.read(
             loop,
             &self.completion,

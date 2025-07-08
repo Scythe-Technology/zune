@@ -53,6 +53,7 @@ pub const Timer = struct {
 
 const FnHandlers = struct {
     request: LuaHelper.Ref(void) = .empty,
+    @"error": LuaHelper.Ref(void) = .empty,
     ws_upgrade: LuaHelper.Ref(void) = .empty,
     ws_open: LuaHelper.Ref(void) = .empty,
     ws_message: LuaHelper.Ref(void) = .empty,
@@ -67,6 +68,7 @@ const FnHandlers = struct {
 
     pub fn derefAll(self: *FnHandlers, L: *VM.lua.State) void {
         self.request.deref(L);
+        self.@"error".deref(L);
         self.ws_upgrade.deref(L);
         self.ws_open.deref(L);
         self.ws_message.deref(L);
@@ -80,16 +82,41 @@ arena: std.heap.ArenaAllocator,
 socket: xev.TCP,
 state: State,
 ref: LuaHelper.Ref(void),
-handlers: FnHandlers,
+callbacks: FnHandlers,
 scheduler: *Scheduler,
 
 fn __dtor(self: *Self) void {
     const L = self.scheduler.global;
     defer self.arena.deinit();
 
-    self.handlers.derefAll(L);
+    self.callbacks.derefAll(L);
 
     self.scheduler.async_tasks -= 1;
+}
+
+pub fn emitError(
+    self: *Self,
+    comptime scope: @Type(.enum_literal),
+    err: anytype,
+) void {
+    if (!self.callbacks.@"error".hasRef())
+        return;
+    const GL = self.scheduler.global;
+    const L = GL.newthread();
+    defer GL.pop(1);
+    _ = self.ref.push(L);
+    _ = self.callbacks.@"error".push(L);
+    L.pushfstring("{s}", .{@tagName(scope)});
+    switch (@typeInfo(@TypeOf(err))) {
+        .error_set => {
+            L.pushfstring("{s}", .{@errorName(err)});
+        },
+        .pointer => {
+            L.pushlstring(err);
+        },
+        inline else => |t| @compileError("Unsupported error type for emitError: " ++ @typeName(t)),
+    }
+    _ = Scheduler.resumeState(L, null, 3) catch {};
 }
 
 pub fn onAccept(
@@ -104,12 +131,19 @@ pub fn onAccept(
     const client_socket = r catch |err| switch (err) {
         error.Canceled => return .disarm,
         else => {
-            std.debug.print("Error accepting client: {}\n", .{err});
+            self.emitError(.accept, err);
             return .rearm;
         },
     };
     if (self.state.stage != .accepting)
         return .disarm;
+
+    const write_timeout = std.mem.toBytes(std.posix.timeval{ .sec = 15, .usec = 0 });
+    std.posix.setsockopt(switch (comptime builtin.os.tag) {
+        .linux => client_socket.fd(),
+        .windows => @ptrCast(@alignCast(client_socket.fd)),
+        else => client_socket.fd,
+    }, std.posix.SOL.SOCKET, std.posix.SO.SNDTIMEO, &write_timeout) catch unreachable;
 
     if (self.state.free.len == 0) {
         self.expandFreeSize(
@@ -277,13 +311,20 @@ pub fn lua_serve(L: *VM.lua.State) !i32 {
         clientTimeout: ?u32,
         maxConnections: ?u32,
     }, 1, null);
-    var handlers: FnHandlers = .{};
-    errdefer handlers.derefAll(L);
+    var callbacks: FnHandlers = .{};
+    errdefer callbacks.derefAll(L);
 
     if (L.rawgetfield(1, "request") != .Function)
         return L.Zerror("invalid field 'request' (expected function)");
-    handlers.request = .init(L, -1, undefined);
+    callbacks.request = .init(L, -1, undefined);
     L.pop(1);
+
+    const error_type = L.rawgetfield(1, "error");
+    if (!error_type.isnoneornil()) {
+        if (error_type != .Function)
+            return L.Zerror("Expected field 'error' to be a function");
+        callbacks.@"error" = .init(L, -1, undefined);
+    }
 
     const websocket_type = L.rawgetfield(1, "websocket");
     if (!websocket_type.isnoneornil()) {
@@ -293,28 +334,28 @@ pub fn lua_serve(L: *VM.lua.State) !i32 {
         if (!upgrade_type.isnoneornil()) {
             if (upgrade_type != .Function)
                 return L.Zerror("Expected field 'upgrade' to be a function");
-            handlers.ws_upgrade = .init(L, -1, undefined);
+            callbacks.ws_upgrade = .init(L, -1, undefined);
         }
         L.pop(1);
         const open_type = L.rawgetfield(-1, "open");
         if (!open_type.isnoneornil()) {
             if (open_type != .Function)
                 return L.Zerror("Expected field 'open' to be a function");
-            handlers.ws_open = .init(L, -1, undefined);
+            callbacks.ws_open = .init(L, -1, undefined);
         }
         L.pop(1);
         const message_type = L.rawgetfield(-1, "message");
         if (!message_type.isnoneornil()) {
             if (message_type != .Function)
                 return L.Zerror("Expected field 'message' to be a function");
-            handlers.ws_message = .init(L, -1, undefined);
+            callbacks.ws_message = .init(L, -1, undefined);
         }
         L.pop(1);
         const close_type = L.rawgetfield(-1, "close");
         if (!close_type.isnoneornil()) {
             if (close_type != .Function)
                 return L.Zerror("Expected field 'close' to be a function");
-            handlers.ws_close = .init(L, -1, undefined);
+            callbacks.ws_close = .init(L, -1, undefined);
         }
         L.pop(1);
     }
@@ -366,7 +407,7 @@ pub fn lua_serve(L: *VM.lua.State) !i32 {
         .ref = .init(L, -1, undefined),
         .scheduler = scheduler,
         .socket = .initFd(socket),
-        .handlers = handlers,
+        .callbacks = callbacks,
         .timer = .{
             .completion = .init(),
             .reset_completion = .init(),

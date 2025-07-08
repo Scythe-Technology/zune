@@ -225,12 +225,13 @@ fn buildZune(
         else => optimize,
     };
 
+    const dep_luau = b.dependency("luau", .{ .target = target, .optimize = optimize });
     const dep_xev = b.dependency("libxev", .{ .target = target, .optimize = optimize });
+    const dep_tls = b.dependency("tls", .{ .target = target, .optimize = optimize });
     const dep_json = b.dependency("json", .{ .target = target, .optimize = optimize });
     const dep_yaml = b.dependency("yaml", .{ .target = target, .optimize = optimize });
     const dep_toml = b.dependency("toml", .{ .target = target, .optimize = optimize });
     const dep_datetime = b.dependency("datetime", .{ .target = target, .optimize = optimize });
-    const dep_luau = b.dependency("luau", .{ .target = target, .optimize = optimize });
     const dep_lz4 = b.dependency("lz4", .{ .target = target, .optimize = packed_optimize });
     const dep_zstd = b.dependency("zstd", .{ .target = target, .optimize = packed_optimize });
     const dep_pcre2 = b.dependency("pcre2", .{ .target = target, .optimize = packed_optimize });
@@ -249,6 +250,7 @@ fn buildZune(
 
     const mod_luau = dep_luau.module("luau");
     const mod_xev = dep_xev.module("xev");
+    const mod_tls = dep_tls.module("tls");
     const mod_json = dep_json.module("json");
     const mod_yaml = dep_yaml.module("yaml");
     const mod_toml = dep_toml.module("tomlz");
@@ -263,12 +265,13 @@ fn buildZune(
 
     module.addOptions("zune-info", zune_info);
 
+    module.addImport("luau", mod_luau);
     module.addImport("xev", mod_xev);
+    module.addImport("tls", mod_tls);
     module.addImport("yaml", mod_yaml);
     module.addImport("lz4", mod_lz4);
     module.addImport("zstd", mod_zstd);
     module.addImport("json", mod_json);
-    module.addImport("luau", mod_luau);
     module.addImport("regex", mod_pcre2);
     module.addImport("datetime", mod_datetime);
     module.addImport("toml", mod_toml);

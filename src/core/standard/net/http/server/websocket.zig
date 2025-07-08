@@ -25,7 +25,7 @@ completion: xev.Completion,
 client: *ClientContext,
 closed: bool = false,
 sending: bool = false,
-close_code: u16 = 1000,
+close_code: u16 = 1006,
 message_queue: Lists.DoublyLinkedList = .{},
 allocator: std.mem.Allocator,
 
@@ -123,14 +123,14 @@ pub fn flushMessages(self: *Self, loop: *xev.Loop) void {
     );
 }
 
-pub fn sendFrame(self: *Self, loop: *xev.Loop, dataframe: WebSocket.WebsocketDataFrame) !void {
+pub fn sendFrame(self: *Self, loop: *xev.Loop, dataframe: WebSocket.DataFrame) !void {
     if (self.closed)
         return;
     const web_message = try Message.create(self.allocator, WebSocket.calcWriteSize(dataframe.data.len, false));
     errdefer web_message.destroy(self.allocator);
 
     web_message.opcode = dataframe.header.opcode;
-    try WebSocket.writeDataFrameBuf(web_message.data, dataframe);
+    WebSocket.writeDataFrame(web_message.data, dataframe);
 
     self.message_queue.append(&web_message.node);
 
@@ -153,7 +153,7 @@ pub fn lua_send(self: *Self, L: *VM.lua.State) !i32 {
                 else => unreachable,
             },
             .mask = false,
-            .len = WebSocket.WebsocketHeader.packLength(message.len),
+            .len = WebSocket.Header.packLength(message.len),
         },
         .data = message,
     });
@@ -167,7 +167,7 @@ pub fn sendPongFrame(self: *Self, loop: *xev.Loop) !void {
             .final = true,
             .opcode = .Pong,
             .mask = false,
-            .len = WebSocket.WebsocketHeader.packLength(0),
+            .len = WebSocket.Header.packLength(0),
         },
         .data = &.{},
     });
@@ -188,7 +188,7 @@ pub fn sendCloseFrame(self: *Self, loop: *xev.Loop, code: u16) !void {
             .final = true,
             .opcode = .Close,
             .mask = false,
-            .len = WebSocket.WebsocketHeader.packLength(2),
+            .len = WebSocket.Header.packLength(2),
         },
         .data = &data,
     });
@@ -200,6 +200,11 @@ pub fn lua_close(self: *Self, L: *VM.lua.State) !i32 {
 
     const code = try L.Zcheckvalue(?u16, 2, null) orelse 1000;
 
+    switch (code) {
+        1005, 1006, 1015 => return L.Zerror("invalid close code, cannot be used"),
+        else => {},
+    }
+
     const scheduler = Scheduler.getScheduler(L);
 
     try self.sendCloseFrame(&scheduler.loop, code);
@@ -207,16 +212,24 @@ pub fn lua_close(self: *Self, L: *VM.lua.State) !i32 {
     return 0;
 }
 
+pub fn lua_isConnected(self: *Self, L: *VM.lua.State) !i32 {
+    const client = self.client;
+    L.pushboolean(client.state.stage == .receiving or client.state.stage == .writing);
+    return 1;
+}
+
 pub const __namecall = MethodMap.CreateNamecallMap(Self, null, .{
     .{ "send", lua_send },
     .{ "close", lua_close },
+    .{ "isConnected", lua_isConnected },
 });
 
 pub fn __dtor(self: *Self) void {
     self.closed = true;
     var it: ?*Lists.DoublyLinkedList.Node = self.message_queue.first;
-    while (it) |node| : (it = node.next) {
+    while (it) |node| {
         const message: *Message = @fieldParentPtr("node", node);
-        message.destroy(self.allocator);
+        defer message.destroy(self.allocator);
+        it = node.next;
     }
 }
