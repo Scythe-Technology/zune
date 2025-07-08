@@ -86,6 +86,7 @@ const FEATURES = struct {
     pub var sqlite = true;
     pub var require = true;
     pub var random = true;
+    pub var thread = true;
     pub var ffi = true;
 };
 
@@ -94,6 +95,7 @@ pub const STATE = struct {
     pub var RUN_MODE: RunMode = .Run;
     pub var REQUIRE_MODE: RequireMode = .RelativeToFile;
     pub var CONFIG_CACHE: std.StringArrayHashMap(Resolvers.Config) = .init(DEFAULT_ALLOCATOR);
+    pub var MAIN_THREAD_ID: ?std.Thread.Id = null;
 
     pub const LUAU_OPTIONS = struct {
         pub var DEBUG_LEVEL: u2 = 2;
@@ -269,6 +271,8 @@ pub fn openZune(L: *VM.lua.State, args: []const []const u8, flags: Flags) !void 
             corelib.require.loadLib(L);
         if (FEATURES.random)
             corelib.random.loadLib(L);
+        if (FEATURES.thread and comptime corelib.thread.PlatformSupported())
+            corelib.thread.loadLib(L);
 
         corelib.testing.loadLib(L, STATE.RUN_MODE == .Test);
     }

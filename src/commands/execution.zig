@@ -158,7 +158,7 @@ fn cmdRun(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     try Scheduler.SCHEDULERS.append(&scheduler);
 
-    try Engine.prepAsync(L, &scheduler);
+    Engine.prepAsync(L, &scheduler);
     try Zune.openZune(L, run_args, LOAD_FLAGS);
 
     L.setsafeenv(VM.lua.GLOBALSINDEX, true);
@@ -293,7 +293,7 @@ fn cmdTest(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     try Scheduler.SCHEDULERS.append(&scheduler);
 
-    try Engine.prepAsync(L, &scheduler);
+    Engine.prepAsync(L, &scheduler);
     try Zune.openZune(L, args, LOAD_FLAGS);
 
     L.setsafeenv(VM.lua.GLOBALSINDEX, true);
@@ -350,7 +350,7 @@ fn cmdEval(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     try Scheduler.SCHEDULERS.append(&scheduler);
 
-    try Engine.prepAsync(L, &scheduler);
+    Engine.prepAsync(L, &scheduler);
     try Zune.openZune(L, args, .{});
 
     L.setsafeenv(VM.lua.GLOBALSINDEX, true);
@@ -472,7 +472,7 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
         callbacks.*.debugstep = Debugger.debugstep;
         callbacks.*.debugprotectederror = Debugger.debugprotectederror;
 
-        try Engine.prepAsync(L, &scheduler);
+        Engine.prepAsync(L, &scheduler);
         try Zune.openZune(L, run_args, LOAD_FLAGS);
 
         L.setsafeenv(VM.lua.GLOBALSINDEX, true);

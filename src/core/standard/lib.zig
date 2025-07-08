@@ -7,6 +7,7 @@ pub const luau = @import("luau.zig");
 pub const regex = @import("regex.zig");
 pub const serde = @import("serde/lib.zig");
 pub const sqlite = @import("sqlite.zig");
+pub const thread = @import("thread.zig");
 pub const crypto = @import("crypto/lib.zig");
 pub const random = @import("random.zig");
 pub const process = @import("process.zig");

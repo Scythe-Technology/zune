@@ -2205,6 +2205,29 @@ export type RandomLib = RandomConstructor & {
 }
 --[======[ Random ]======]--
 
+--[======[ Thread ]======]--
+declare class Thread
+    function start(self): ()
+    function join(self): ()
+    function status(self): "ready" | "running" | "dead"
+    function receive(self): (...any)
+    function send(self, ...: any): ()
+end
+
+type ThreadLoadOptions = {
+    chunkName: string?,
+    nativeCodeGen: boolean?,
+}
+
+export type ThreadLib = {
+    fromModule: (module: string) -> Thread,
+    fromBytecode: (bytecode: string | buffer, options: ThreadLoadOptions?) -> Thread,
+    receive: (self: Thread) -> ...any,
+    send: (self: Thread, ...any) -> (),
+    getCpuCount: () -> number,
+}
+--[======[ Thread ]======]--
+
 declare zune: {
     compiled: {
         optimize: number,
@@ -2226,4 +2249,5 @@ declare zune: {
     sqlite: SQLiteLib,
     require: RequireLib,
     random: RandomLib,
+    thread: ThreadLib,
 }

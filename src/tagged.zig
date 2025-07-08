@@ -28,6 +28,8 @@ const TagNames: []const []const u8 = &.{
     // SQLITE
     "SQLITE_DATABASE",
     "SQLITE_STATEMENT",
+    // THREAD
+    "THREAD",
 };
 
 pub const Tags = block_name: {

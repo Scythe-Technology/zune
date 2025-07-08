@@ -28,8 +28,9 @@ pub fn loadModule(L: *VM.lua.State, name: [:0]const u8, content: []const u8, cOp
 }
 
 const FileContext = struct {
-    source: []const u8,
+    source: ?[]const u8,
     main: bool = false,
+    thread: bool = false,
 };
 
 const StackInfo = struct {
@@ -44,6 +45,7 @@ pub fn setLuaFileContext(L: *VM.lua.State, ctx: FileContext) void {
     L.Zpushvalue(.{
         .source = if (Zune.STATE.USE_DETAILED_ERROR or Zune.STATE.RUN_MODE == .Test) ctx.source else null,
         .main = ctx.main,
+        .thread = ctx.thread,
     });
 
     L.setfield(VM.lua.GLOBALSINDEX, "_FILE");
@@ -448,19 +450,19 @@ pub fn checkStatus(L: *VM.lua.State) !VM.lua.Status {
     }
 }
 
-pub fn prep(L: *VM.lua.State) !void {
+pub fn prep(L: *VM.lua.State) void {
     if (luau.CodeGen.Supported() and Zune.STATE.LUAU_OPTIONS.JIT_ENABLED)
         luau.CodeGen.Create(L);
 
     L.Lopenlibs();
 }
 
-pub fn prepAsync(L: *VM.lua.State, sched: *Scheduler) !void {
+pub fn prepAsync(L: *VM.lua.State, sched: *Scheduler) void {
     const GL = L.mainthread();
 
     GL.setthreaddata(*Scheduler, sched);
 
-    try prep(L);
+    prep(L);
 }
 
 pub fn stateCleanUp() void {
@@ -481,6 +483,17 @@ pub fn runAsync(L: *VM.lua.State, sched: *Scheduler, comptime options: RunOption
     defer if (options.cleanUp) stateCleanUp();
     sched.deferThread(L, null, 0);
     sched.run(options.mode);
+    const threadlib = Zune.corelib.thread;
+    var node = threadlib.THREADS.first;
+    while (node) |n| {
+        node = n.next;
+        const runtime = threadlib.Runtime.from(n);
+        if (runtime.thread) |t|
+            t.join();
+        runtime.thread = null;
+        if (runtime.owner == .thread)
+            runtime.deinit();
+    }
     _ = try checkStatus(L);
 }
 

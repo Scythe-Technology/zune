@@ -443,8 +443,6 @@ pub fn loadLib(L: *VM.lua.State) void {
         L.setuserdatametatable(TAG_SQLITE_STATEMENT);
     }
 
-    L.createtable(0, 1);
-
     L.Zpushvalue(.{
         .open = sqlite_open,
     });

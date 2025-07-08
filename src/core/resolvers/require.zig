@@ -25,16 +25,16 @@ const States = enum {
     Loaded,
 };
 
-var ErrorState = States.Error;
-var WaitingState = States.Waiting;
-var PreloadedState = States.Preloaded;
-var LoadedState = States.Loaded;
+const ErrorState = States.Error;
+const WaitingState = States.Waiting;
+const PreloadedState = States.Preloaded;
+const LoadedState = States.Loaded;
 
 const QueueItem = struct {
     state: Scheduler.ThreadRef,
 };
 
-var REQUIRE_QUEUE_MAP = std.StringArrayHashMap(std.ArrayList(QueueItem)).init(Zune.DEFAULT_ALLOCATOR);
+threadlocal var REQUIRE_QUEUE_MAP = std.StringArrayHashMap(std.ArrayList(QueueItem)).init(Zune.DEFAULT_ALLOCATOR);
 
 const RequireContext = struct {
     allocator: std.mem.Allocator,
@@ -60,14 +60,14 @@ fn require_finished(self: *RequireContext, ML: *VM.lua.State, _: *Scheduler) voi
 
     _ = GL.Lfindtable(VM.lua.REGISTRYINDEX, "_MODULES", 1);
     if (outErr != null)
-        GL.pushlightuserdata(@ptrCast(&ErrorState))
+        GL.pushlightuserdata(@constCast(@ptrCast(&ErrorState)))
     else
         ML.xpush(GL, -1);
     if (GL.typeOf(-1) != .Nil) {
         GL.setfield(-2, self.path); // SET: _MODULES[moduleName] = module
     } else {
         GL.pop(1); // drop: nil
-        GL.pushlightuserdata(@ptrCast(&LoadedState));
+        GL.pushlightuserdata(@constCast(@ptrCast(&LoadedState)));
         GL.setfield(-2, self.path); // SET: _MODULES[moduleName] = <tag>
     }
 
@@ -153,16 +153,16 @@ pub fn getFilePath(source: ?[]const u8) []const u8 {
 }
 
 inline fn setErrorState(L: *VM.lua.State, moduleName: [:0]const u8) void {
-    L.pushlightuserdata(@ptrCast(&ErrorState));
+    L.pushlightuserdata(@constCast(@ptrCast(&ErrorState)));
     L.setfield(-2, moduleName);
 }
 
-pub fn zune_require(L: *VM.lua.State) !i32 {
-    const allocator = luau.getallocator(L);
-    const scheduler = Scheduler.getScheduler(L);
-
-    const moduleName = L.Lcheckstring(1);
-
+pub fn resolveScriptPath(
+    allocator: std.mem.Allocator,
+    L: *VM.lua.State,
+    moduleName: []const u8,
+    dir: std.fs.Dir,
+) ![]const u8 {
     var ar: VM.lua.Debug = .{ .ssbuf = undefined };
     {
         var level: i32 = 1;
@@ -174,13 +174,9 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
         }
     }
 
-    const cwd = std.fs.cwd();
-
-    _ = L.Lfindtable(VM.lua.REGISTRYINDEX, "_MODULES", 1);
-
-    const script_path = blk: {
+    return blk: {
         var nav_context: RequireNavigatorContext = .{
-            .dir = cwd,
+            .dir = dir,
             .allocator = allocator,
         };
 
@@ -192,9 +188,55 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
             else => return err,
         };
     };
+}
+
+pub fn checkSearchResult(
+    allocator: std.mem.Allocator,
+    L: *VM.lua.State,
+    path: []const u8,
+    res: File.SearchResult,
+) !void {
+    if (res.count == 0)
+        return L.Zerrorf("module not found: \"{s}\"", .{path});
+
+    if (res.count > 1) {
+        @branchHint(.unlikely);
+
+        var buf: std.ArrayListUnmanaged(u8) = .empty;
+        defer buf.deinit(allocator);
+
+        const writer = buf.writer(allocator);
+
+        try writer.writeAll("module name conflicted.");
+
+        const len = res.count;
+        for (res.slice(), 1..) |entry, i| {
+            if (len == i)
+                try writer.writeAll("\n└─ ")
+            else
+                try writer.writeAll("\n├─ ");
+            try writer.print("{s}{s}", .{ path, entry.ext });
+        }
+
+        L.pushlstring(buf.items);
+        return error.RaiseLuauError;
+    }
+}
+
+pub fn zune_require(L: *VM.lua.State) !i32 {
+    const allocator = luau.getallocator(L);
+    const scheduler = Scheduler.getScheduler(L);
+
+    const moduleName = L.Lcheckstring(1);
+
+    const cwd = std.fs.cwd();
+
+    const script_path = try resolveScriptPath(allocator, L, moduleName, cwd);
     defer allocator.free(script_path);
 
     std.debug.assert(script_path.len <= std.fs.max_path_bytes - File.LARGEST_EXTENSION);
+
+    _ = L.Lfindtable(VM.lua.REGISTRYINDEX, "_MODULES", 1);
 
     const search_result = blk: {
         var src_path_buf: [std.fs.max_path_bytes:0]u8 = undefined;
@@ -237,31 +279,7 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
     };
     defer search_result.deinit();
 
-    if (search_result.count == 0)
-        return L.Zerrorf("module not found: \"{s}\"", .{script_path});
-
-    if (search_result.count > 1) {
-        @branchHint(.unlikely);
-
-        var buf: std.ArrayListUnmanaged(u8) = .empty;
-        defer buf.deinit(allocator);
-
-        const writer = buf.writer(allocator);
-
-        try writer.writeAll("module name conflicted.");
-
-        const len = search_result.count;
-        for (search_result.slice(), 1..) |res, i| {
-            if (len == i)
-                try writer.writeAll("\n└─ ")
-            else
-                try writer.writeAll("\n├─ ");
-            try writer.print("{s}{s}", .{ script_path, res.ext });
-        }
-
-        L.pushlstring(buf.items);
-        return error.RaiseLuauError;
-    }
+    try checkSearchResult(allocator, L, script_path, search_result);
 
     const file = search_result.first();
 
@@ -296,7 +314,7 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
         };
     }
 
-    L.pushlightuserdata(@ptrCast(&PreloadedState));
+    L.pushlightuserdata(@constCast(@ptrCast(&PreloadedState)));
     L.setfield(-3, module_relative_path);
 
     switch (ML.resumethread(L, 0).check() catch |err| {
@@ -322,7 +340,7 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
                 ML.pushnil();
         },
         .Yield => {
-            L.pushlightuserdata(@ptrCast(&WaitingState));
+            L.pushlightuserdata(@constCast(@ptrCast(&WaitingState)));
             L.setfield(-3, module_relative_path);
 
             {
@@ -356,7 +374,7 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
         L.pushvalue(-1);
         L.setfield(-4, module_relative_path); // SET: _MODULES[moduleName] = module
     } else {
-        L.pushlightuserdata(@ptrCast(&LoadedState));
+        L.pushlightuserdata(@constCast(@ptrCast(&LoadedState)));
         L.setfield(-4, module_relative_path); // SET: _MODULES[moduleName] = <tag>
     }
 

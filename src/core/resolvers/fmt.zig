@@ -92,8 +92,8 @@ pub fn printValue(
                 if (asKey) {
                     if (tostring(allocator, L, idx) catch try allocator.dupe(u8, "!ERR!")) |str| {
                         defer allocator.free(str);
-                        try writer.print("<bmagenta><<{s}>><clear>", .{str});
-                    } else try writer.print("<bmagenta><<table>><clear>", .{});
+                        try Zune.debug.writerPrint(writer, "<bmagenta><<{s}>><clear>", .{str});
+                    } else try Zune.debug.writerPrint(writer, "<bmagenta><<table>><clear>", .{});
                     return;
                 }
                 const ptr = @intFromPtr(L.topointer(idx) orelse std.debug.panic("Failed Table to Ptr Conversion", .{}));
@@ -150,6 +150,10 @@ pub fn printValue(
                     try writer.print("0x{x} {X}", .{ ptr, b });
                 }
                 try Zune.debug.writerPrint(writer, ">><clear>", .{});
+            },
+            .Vector => {
+                const v = L.tovector(idx) orelse unreachable;
+                try Zune.debug.writerPrint(writer, "<bmagenta><<vector {d}>><clear>", .{v});
             },
             else => {
                 if (try writeMetamethod__tostring(L, writer, -1))
