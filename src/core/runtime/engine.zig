@@ -485,7 +485,8 @@ pub fn runAsync(L: *VM.lua.State, sched: *Scheduler, comptime options: RunOption
     sched.run(options.mode);
     const threadlib = Zune.corelib.thread;
     var node = threadlib.THREADS.first;
-    while (node) |n| : (node = n.next) {
+    while (node) |n| {
+        node = n.next;
         const runtime = threadlib.Runtime.from(n);
         if (runtime.thread) |t|
             t.join();

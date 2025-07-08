@@ -219,7 +219,8 @@ pub const Runtime = struct {
         defer self.access_mutex.unlock();
 
         var node = self.join_queue.first;
-        while (node) |n| : (node = n.next) {
+        while (node) |n| {
+            node = n.next;
             const sync = Sync.from(n);
             sync.scheduler.synchronize(sync);
         }
