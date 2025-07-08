@@ -141,6 +141,7 @@ pub fn onAccept(
     const write_timeout = std.mem.toBytes(std.posix.timeval{ .sec = 15, .usec = 0 });
     std.posix.setsockopt(switch (comptime builtin.os.tag) {
         .linux => client_socket.fd(),
+        .windows => @ptrCast(@alignCast(client_socket.fd)),
         else => client_socket.fd,
     }, std.posix.SOL.SOCKET, std.posix.SO.SNDTIMEO, &write_timeout) catch unreachable;
 
