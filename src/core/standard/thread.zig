@@ -176,9 +176,7 @@ pub const Transporter = struct {
     }
 
     pub fn pushAndConsumeMessage(self: *Transporter, L: *VM.lua.State, port: *Lists.DoublyLinkedList) ?i32 {
-        if (port.len == 0)
-            return null;
-        const message = MessageNode.from(port.popFirst().?);
+        const message = MessageNode.from(port.popFirst() orelse return null);
         defer self.freeMessage(message);
         return message.push(L);
     }
@@ -296,8 +294,8 @@ const LuaThread = struct {
             runtime.transporter.outgoing_mutex.lock();
             defer runtime.transporter.outgoing_mutex.unlock();
 
-            if (sync_port.len > 0) {
-                const s = Sync.from(sync_port.popFirst().?);
+            if (sync_port.popFirst()) |n| {
+                const s = Sync.from(n);
                 s.message = node;
                 s.scheduler.synchronize(s);
             } else {
@@ -649,8 +647,8 @@ fn lua_selfSend(L: *VM.lua.State) !i32 {
         runtime.transporter.incoming_mutex.lock();
         defer runtime.transporter.incoming_mutex.unlock();
 
-        if (sync_port.len > 0) {
-            const s = Sync.from(sync_port.popFirst().?);
+        if (sync_port.popFirst()) |n| {
+            const s = Sync.from(n);
             s.message = node;
             s.scheduler.synchronize(s);
         } else port.append(&node.node);

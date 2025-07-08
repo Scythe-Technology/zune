@@ -92,7 +92,7 @@ pub fn printValue(
                 if (asKey) {
                     if (tostring(allocator, L, idx) catch try allocator.dupe(u8, "!ERR!")) |str| {
                         defer allocator.free(str);
-                        try writer.print("<bmagenta><<{s}>><clear>", .{str});
+                        try Zune.debug.writerPrint(writer, "<bmagenta><<{s}>><clear>", .{str});
                     } else try Zune.debug.writerPrint(writer, "<bmagenta><<table>><clear>", .{});
                     return;
                 }
