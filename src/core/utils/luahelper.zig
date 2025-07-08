@@ -129,6 +129,13 @@ pub fn Ref(comptime T: type) type {
             return self.ref != null;
         }
 
+        pub fn copy(self: *This, L: *VM.lua.State) This {
+            if (self.push(L)) {
+                defer L.pop(1);
+                return .init(L, -1, self.value);
+            } else return .empty;
+        }
+
         pub fn push(self: *This, L: *VM.lua.State) bool {
             if (self.ref) |r| {
                 switch (r) {

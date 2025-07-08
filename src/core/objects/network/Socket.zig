@@ -1,13 +1,17 @@
 const std = @import("std");
 const xev = @import("xev").Dynamic;
+const tls = @import("tls");
 const luau = @import("luau");
 const builtin = @import("builtin");
 
-const tagged = @import("../../../tagged.zig");
-const MethodMap = @import("../../utils/method_map.zig");
-const luaHelper = @import("../../utils/luahelper.zig");
+const Zune = @import("zune");
 
-const Scheduler = @import("../../runtime/scheduler.zig");
+const Scheduler = Zune.Runtime.Scheduler;
+
+const LuaHelper = Zune.Utils.LuaHelper;
+const MethodMap = Zune.Utils.MethodMap;
+
+const tagged = Zune.tagged;
 
 const VM = luau.VM;
 
@@ -21,11 +25,93 @@ pub fn PlatformSupported() bool {
     };
 }
 
-const SocketRef = luaHelper.Ref(*Socket);
+pub const TlsContext = union(enum) {
+    none: void,
+    server: *Server,
+    client: *Client,
+    server_ref: *ServerRef,
+
+    pub const Client = struct {
+        allocator: std.mem.Allocator,
+        record: std.fifo.LinearFifo(u8, .{ .Static = tls.max_ciphertext_record_len }) = .init(),
+        cleartext: std.fifo.LinearFifo(u8, .{ .Static = tls.max_ciphertext_record_len }) = .init(),
+        ciphertext: std.fifo.LinearFifo(u8, .{ .Static = tls.max_ciphertext_record_len }) = .init(),
+        connection: union(enum) {
+            handshake: struct {
+                GL: *VM.lua.State,
+                ca_ref: LuaHelper.Ref(void),
+                client: tls.nonblock.Client,
+                pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+                    allocator.free(self.client.opt.host);
+                    self.ca_ref.deref(self.GL);
+                }
+            },
+            active: struct {
+                tls: tls.nonblock.Connection,
+            },
+        },
+        connecting: bool = false,
+
+        pub fn deinit(self: *Client) void {
+            const allocator = self.allocator;
+            defer allocator.destroy(self);
+            switch (self.connection) {
+                .handshake => |*c| c.deinit(allocator),
+                .active => {},
+            }
+        }
+    };
+
+    pub const Server = struct {
+        allocator: std.mem.Allocator,
+        record: std.fifo.LinearFifo(u8, .{ .Static = tls.max_ciphertext_record_len }) = .init(),
+        cleartext: std.fifo.LinearFifo(u8, .{ .Static = tls.max_ciphertext_record_len }) = .init(),
+        ciphertext: std.fifo.LinearFifo(u8, .{ .Static = tls.max_ciphertext_record_len }) = .init(),
+        connection: union(enum) {
+            handshake: struct {
+                GL: *VM.lua.State,
+                ca_keypair_ref: LuaHelper.Ref(void),
+                server: tls.nonblock.Server,
+                pub fn deinit(self: *@This()) void {
+                    self.ca_keypair_ref.deref(self.GL);
+                }
+            },
+            active: struct {
+                tls: tls.nonblock.Connection,
+            },
+        },
+        stage: enum { nothing, handshake, completed } = .nothing,
+
+        pub fn deinit(self: *Server) void {
+            const allocator = self.allocator;
+            defer allocator.destroy(self);
+        }
+    };
+
+    pub const ServerRef = struct {
+        GL: *VM.lua.State,
+        ca_keypair_ref: LuaHelper.Ref(void),
+        server: tls.nonblock.Server,
+        pub fn deinit(self: *@This()) void {
+            self.ca_keypair_ref.deref(self.GL);
+        }
+    };
+
+    pub fn deinit(self: *TlsContext) void {
+        switch (self.*) {
+            .none => {},
+            inline else => |o| o.deinit(),
+        }
+        self.* = .none;
+    }
+};
 
 socket: std.posix.socket_t,
-open: bool = true,
+open: OpenCase,
 list: *Scheduler.CompletionLinkedList,
+tls_context: TlsContext = .none,
+
+const OpenCase = enum { created, accepted, closed };
 
 fn closesocket(socket: std.posix.socket_t) void {
     switch (comptime builtin.os.tag) {
@@ -56,6 +142,8 @@ const AsyncSendContext = struct {
     ref: Scheduler.ThreadRef,
     buffer: []u8,
     list: *Scheduler.CompletionLinkedList,
+    consumed: usize = 0,
+    tls: TlsContext,
 
     const This = @This();
 
@@ -91,6 +179,108 @@ const AsyncSendContext = struct {
         _ = Scheduler.resumeState(L, null, 1) catch {};
 
         return .disarm;
+    }
+
+    pub fn resumeWithError(
+        self: *AsyncSendContext,
+        err: anyerror,
+    ) xev.CallbackAction {
+        const L = self.ref.value;
+
+        const allocator = luau.getallocator(L);
+        const scheduler = Scheduler.getScheduler(L);
+
+        defer scheduler.completeAsync(self);
+        defer allocator.free(self.buffer);
+        defer self.ref.deref();
+        defer self.list.remove(&self.completion);
+
+        L.pushlstring(@errorName(err));
+        _ = Scheduler.resumeStateError(L, null) catch {};
+        return .disarm;
+    }
+
+    pub fn write(
+        self: *AsyncSendContext,
+        loop: *xev.Loop,
+        completion: *xev.Completion,
+        tcp: xev.TCP,
+        comptime callback: *const fn (
+            ?*AsyncSendContext,
+            *xev.Loop,
+            *xev.Completion,
+            xev.TCP,
+            xev.WriteBuffer,
+            xev.WriteError!usize,
+        ) xev.CallbackAction,
+    ) void {
+        switch (self.tls) {
+            .none => tcp.write(
+                loop,
+                completion,
+                .{ .slice = self.buffer },
+                AsyncSendContext,
+                self,
+                callback,
+            ),
+            inline .server, .client => |ctx, e| {
+                const res = ctx.connection.active.tls.encrypt(self.buffer, ctx.ciphertext.writableSlice(0)) catch |err| {
+                    _ = self.resumeWithError(err);
+                    return;
+                };
+                self.consumed = res.cleartext_pos;
+                ctx.ciphertext.update(res.ciphertext.len);
+                tcp.write(
+                    loop,
+                    completion,
+                    .{ .slice = ctx.ciphertext.readableSlice(0) },
+                    AsyncSendContext,
+                    self,
+                    struct {
+                        fn inner(
+                            ud: ?*AsyncSendContext,
+                            l: *xev.Loop,
+                            c: *xev.Completion,
+                            inner_tcp: xev.TCP,
+                            _: xev.WriteBuffer,
+                            w: xev.WriteError!usize,
+                        ) xev.CallbackAction {
+                            const inner_self = ud orelse unreachable;
+                            const inner_ctx = @field(inner_self.tls, @tagName(e));
+                            const ciphertext_written = w catch |err| return @call(.always_inline, callback, .{
+                                ud,
+                                l,
+                                c,
+                                inner_tcp,
+                                xev.WriteBuffer{ .slice = inner_self.buffer },
+                                err,
+                            });
+                            inner_ctx.ciphertext.discard(ciphertext_written);
+                            if (inner_ctx.ciphertext.count > 0) {
+                                inner_tcp.write(
+                                    l,
+                                    c,
+                                    .{ .slice = inner_ctx.ciphertext.readableSlice(0) },
+                                    AsyncSendContext,
+                                    inner_self,
+                                    @This().inner,
+                                );
+                                return .disarm;
+                            }
+                            return @call(.always_inline, callback, .{
+                                ud,
+                                l,
+                                c,
+                                inner_tcp,
+                                xev.WriteBuffer{ .slice = inner_self.buffer },
+                                inner_self.consumed,
+                            });
+                        }
+                    }.inner,
+                );
+            },
+            .server_ref => unreachable,
+        }
     }
 };
 
@@ -148,6 +338,7 @@ const AsyncRecvContext = struct {
     ref: Scheduler.ThreadRef,
     buffer: []u8,
     list: *Scheduler.CompletionLinkedList,
+    tls: TlsContext,
 
     const This = @This();
 
@@ -184,6 +375,124 @@ const AsyncRecvContext = struct {
         _ = Scheduler.resumeState(L, null, 1) catch {};
 
         return .disarm;
+    }
+
+    pub fn resumeWithError(
+        self: *AsyncRecvContext,
+        err: anyerror,
+    ) xev.CallbackAction {
+        const L = self.ref.value;
+
+        const allocator = luau.getallocator(L);
+        const scheduler = Scheduler.getScheduler(L);
+
+        defer scheduler.completeAsync(self);
+        defer allocator.free(self.buffer);
+        defer self.ref.deref();
+        defer self.list.remove(&self.completion);
+
+        L.pushlstring(@errorName(err));
+        _ = Scheduler.resumeStateError(L, null) catch {};
+        return .disarm;
+    }
+
+    pub fn read(
+        self: *AsyncRecvContext,
+        loop: *xev.Loop,
+        completion: *xev.Completion,
+        tcp: xev.TCP,
+        comptime callback: *const fn (
+            ?*AsyncRecvContext,
+            *xev.Loop,
+            *xev.Completion,
+            xev.TCP,
+            xev.ReadBuffer,
+            xev.ReadError!usize,
+        ) xev.CallbackAction,
+    ) void {
+        switch (self.tls) {
+            .none => {
+                tcp.read(
+                    loop,
+                    completion,
+                    .{ .slice = self.buffer },
+                    AsyncRecvContext,
+                    self,
+                    callback,
+                );
+            },
+            inline .server, .client => |ctx, e| {
+                if (ctx.cleartext.count > 0) {
+                    const amount = ctx.cleartext.read(self.buffer);
+                    _ = @call(.always_inline, callback, .{
+                        self,
+                        loop,
+                        completion,
+                        tcp,
+                        xev.ReadBuffer{ .slice = self.buffer },
+                        amount,
+                    });
+                    return;
+                }
+
+                tcp.read(
+                    loop,
+                    completion,
+                    .{ .slice = ctx.record.writableSlice(0) },
+                    AsyncRecvContext,
+                    self,
+                    struct {
+                        fn inner(
+                            ud: ?*AsyncRecvContext,
+                            l: *xev.Loop,
+                            c: *xev.Completion,
+                            inner_tcp: xev.TCP,
+                            _: xev.ReadBuffer,
+                            r: xev.ReadError!usize,
+                        ) xev.CallbackAction {
+                            const inner_self = ud orelse unreachable;
+                            const inner_ctx = @field(inner_self.tls, @tagName(e));
+                            inner_ctx.record.update(r catch |err| return @call(.always_inline, callback, .{
+                                ud,
+                                l,
+                                c,
+                                inner_tcp,
+                                xev.ReadBuffer{ .slice = inner_self.buffer },
+                                err,
+                            }));
+                            const res = inner_ctx.connection.active.tls.decrypt(
+                                inner_ctx.record.readableSlice(0),
+                                inner_ctx.cleartext.writableSlice(0),
+                            ) catch |err| return inner_self.resumeWithError(err);
+                            inner_ctx.record.discard(res.ciphertext_pos);
+                            inner_ctx.cleartext.update(res.cleartext.len);
+                            if (res.cleartext.len > 0) {
+                                const amount = inner_ctx.cleartext.read(inner_self.buffer);
+                                _ = @call(.always_inline, callback, .{
+                                    ud,
+                                    l,
+                                    c,
+                                    inner_tcp,
+                                    xev.ReadBuffer{ .slice = inner_self.buffer },
+                                    amount,
+                                });
+                                return .disarm;
+                            }
+                            inner_tcp.read(
+                                l,
+                                c,
+                                .{ .slice = inner_ctx.record.writableSlice(0) },
+                                AsyncRecvContext,
+                                inner_self,
+                                @This().inner,
+                            );
+                            return .disarm;
+                        }
+                    }.inner,
+                );
+            },
+            .server_ref => unreachable,
+        }
     }
 };
 
@@ -248,13 +557,15 @@ const AsyncAcceptContext = struct {
     },
     ref: Scheduler.ThreadRef,
     list: *Scheduler.CompletionLinkedList,
+    tls: TlsContext,
+    accepted_ref: LuaHelper.Ref(void) = .empty,
 
     const This = @This();
 
     pub fn complete(
         ud: ?*This,
-        _: *xev.Loop,
-        _: *xev.Completion,
+        l: *xev.Loop,
+        c: *xev.Completion,
         s: xev.AcceptError!xev.TCP,
     ) xev.CallbackAction {
         const self = ud orelse unreachable;
@@ -262,36 +573,189 @@ const AsyncAcceptContext = struct {
 
         const scheduler = Scheduler.getScheduler(L);
 
+        jmp: {
+            if (L.status() != .Yield)
+                break :jmp;
+
+            const socket = s catch |err| {
+                L.pushlstring(@errorName(err));
+                _ = Scheduler.resumeStateError(L, null) catch {};
+                break :jmp;
+            };
+
+            const accepted_socket = push(
+                L,
+                switch (comptime builtin.os.tag) {
+                    .windows => @ptrCast(@alignCast(socket.fd)),
+                    .ios, .macos, .wasi => socket.fd,
+                    .linux => socket.fd(),
+                    else => @compileError("Unsupported OS"),
+                },
+                .accepted,
+            ) catch |err| {
+                L.pushlstring(@errorName(err));
+                _ = Scheduler.resumeStateError(L, null) catch {};
+                break :jmp;
+            };
+            if (self.tls == .server_ref) {
+                const context = scheduler.allocator.create(TlsContext.Server) catch |err| {
+                    L.pop(1);
+                    L.pushlstring(@errorName(err));
+                    _ = Scheduler.resumeStateError(L, null) catch {};
+                    break :jmp;
+                };
+                context.* = .{
+                    .allocator = scheduler.allocator,
+                    .connection = .{
+                        .handshake = .{
+                            .GL = L.mainthread(),
+                            .ca_keypair_ref = self.tls.server_ref.ca_keypair_ref.copy(L),
+                            .server = self.tls.server_ref.server,
+                        },
+                    },
+                };
+                accepted_socket.tls_context = .{ .server = context };
+                self.tls = accepted_socket.tls_context;
+
+                self.accepted_ref = .init(L, -1, undefined);
+                L.pop(1);
+
+                const server_tls = self.tls.server;
+
+                const tcp = xev.TCP.initFd(accepted_socket.socket);
+
+                tcp.read(
+                    l,
+                    c,
+                    .{ .slice = server_tls.record.writableSlice(0) },
+                    AsyncAcceptContext,
+                    self,
+                    Handshake.onRecvComplete,
+                );
+
+                return .disarm;
+            } else _ = Scheduler.resumeState(L, null, 1) catch {};
+        }
+
         defer scheduler.completeAsync(self);
         defer self.ref.deref();
         defer self.list.remove(&self.completion);
 
-        if (L.status() != .Yield)
-            return .disarm;
-
-        const socket = s catch |err| {
-            L.pushlstring(@errorName(err));
-            _ = Scheduler.resumeStateError(L, null) catch {};
-            return .disarm;
-        };
-
-        push(
-            L,
-            switch (comptime builtin.os.tag) {
-                .windows => @ptrCast(@alignCast(socket.fd)),
-                .ios, .macos, .wasi => socket.fd,
-                .linux => socket.fd(),
-                else => @compileError("Unsupported OS"),
-            },
-        ) catch |err| {
-            L.pushlstring(@errorName(err));
-            _ = Scheduler.resumeStateError(L, null) catch {};
-            return .disarm;
-        };
-        _ = Scheduler.resumeState(L, null, 1) catch {};
-
         return .disarm;
     }
+
+    pub fn resumeWithError(
+        self: *AsyncAcceptContext,
+        err: anyerror,
+    ) xev.CallbackAction {
+        const L = self.ref.value;
+
+        const scheduler = Scheduler.getScheduler(L);
+
+        defer scheduler.completeAsync(self);
+        defer self.ref.deref();
+        defer self.list.remove(&self.completion);
+        defer self.accepted_ref.deref(L);
+
+        L.pushlstring(@errorName(err));
+        _ = Scheduler.resumeStateError(L, null) catch {};
+        return .disarm;
+    }
+
+    const Handshake = struct {
+        pub fn onRecvComplete(
+            ud: ?*AsyncAcceptContext,
+            l: *xev.Loop,
+            c: *xev.Completion,
+            tcp: xev.TCP,
+            _: xev.ReadBuffer,
+            r: xev.ReadError!usize,
+        ) xev.CallbackAction {
+            const self = ud orelse unreachable;
+            const L = self.ref.value;
+            const ctx = self.tls.server;
+            const handshake = &ctx.connection.handshake;
+            const read = r catch |err| return self.resumeWithError(err);
+
+            ctx.record.update(read);
+
+            const result = handshake.server.run(ctx.record.readableSlice(0), ctx.ciphertext.writableSlice(0)) catch |err| return self.resumeWithError(err);
+            ctx.ciphertext.update(result.send.len);
+            ctx.record.discard(result.recv_pos);
+            if (result.send.len > 0) {
+                tcp.write(
+                    l,
+                    c,
+                    .{ .slice = ctx.ciphertext.readableSlice(0) },
+                    AsyncAcceptContext,
+                    self,
+                    onSendComplete,
+                );
+                return .disarm;
+            } else {
+                if (handshake.server.done()) {
+                    const cipher = handshake.server.cipher().?;
+                    handshake.deinit();
+                    ctx.connection = .{ .active = .{ .tls = .init(cipher) } };
+
+                    const scheduler = Scheduler.getScheduler(L);
+
+                    defer scheduler.completeAsync(self);
+                    defer self.ref.deref();
+                    defer self.list.remove(&self.completion);
+
+                    defer self.accepted_ref.deref(L);
+
+                    if (L.status() != .Yield)
+                        return .disarm;
+
+                    if (self.accepted_ref.push(L))
+                        _ = Scheduler.resumeState(L, null, 1) catch {}
+                    else
+                        _ = Scheduler.resumeState(L, null, 0) catch {};
+                } else {
+                    tcp.read(
+                        l,
+                        c,
+                        .{ .slice = ctx.record.writableSlice(0) },
+                        AsyncAcceptContext,
+                        self,
+                        onRecvComplete,
+                    );
+                }
+            }
+            return .disarm;
+        }
+
+        pub fn onSendComplete(
+            ud: ?*AsyncAcceptContext,
+            l: *xev.Loop,
+            c: *xev.Completion,
+            tcp: xev.TCP,
+            _: xev.WriteBuffer,
+            r: xev.WriteError!usize,
+        ) xev.CallbackAction {
+            const self = ud orelse unreachable;
+            const ctx = self.tls.server;
+            const written = r catch |err| return self.resumeWithError(err);
+
+            ctx.ciphertext.discard(written);
+
+            if (ctx.ciphertext.count > 0) {
+                tcp.write(l, c, .{ .slice = ctx.ciphertext.readableSlice(0) }, AsyncAcceptContext, self, onSendComplete);
+                return .disarm;
+            }
+            tcp.read(
+                l,
+                c,
+                .{ .slice = ctx.record.writableSlice(0) },
+                AsyncAcceptContext,
+                self,
+                onRecvComplete,
+            );
+            return .disarm;
+        }
+    };
 };
 
 const AsyncConnectContext = struct {
@@ -300,17 +764,66 @@ const AsyncConnectContext = struct {
     },
     ref: Scheduler.ThreadRef,
     list: *Scheduler.CompletionLinkedList,
+    tls: TlsContext,
 
     const This = @This();
 
     pub fn complete(
         ud: ?*This,
-        _: *xev.Loop,
-        _: *xev.Completion,
-        _: xev.TCP,
-        c: xev.ConnectError!void,
+        l: *xev.Loop,
+        c: *xev.Completion,
+        tcp: xev.TCP,
+        connect_res: xev.ConnectError!void,
     ) xev.CallbackAction {
         const self = ud orelse unreachable;
+        const L = self.ref.value;
+
+        const scheduler = Scheduler.getScheduler(L);
+
+        jmp: {
+            if (L.status() != .Yield)
+                break :jmp;
+
+            connect_res catch |err| {
+                L.pushlstring(@errorName(err));
+                _ = Scheduler.resumeStateError(L, null) catch {};
+                break :jmp;
+            };
+
+            if (self.tls == .client) {
+                const ctx = self.tls.client;
+                const res = ctx.connection.handshake.client.run(&[_]u8{}, ctx.ciphertext.writableSlice(0)) catch |err| {
+                    L.pushlstring(@errorName(err));
+                    _ = Scheduler.resumeStateError(L, null) catch {};
+                    break :jmp;
+                };
+                std.debug.assert(res.send.len > 0);
+                ctx.ciphertext.update(res.send.len);
+                tcp.write(
+                    l,
+                    c,
+                    .{ .slice = ctx.ciphertext.readableSlice(0) },
+                    AsyncConnectContext,
+                    self,
+                    Handshake.onSendComplete,
+                );
+                return .disarm;
+            }
+
+            _ = Scheduler.resumeState(L, null, 0) catch {};
+        }
+
+        defer scheduler.completeAsync(self);
+        defer self.ref.deref();
+        defer self.list.remove(&self.completion);
+
+        return .disarm;
+    }
+
+    pub fn resumeWithError(
+        self: *AsyncConnectContext,
+        err: anyerror,
+    ) xev.CallbackAction {
         const L = self.ref.value;
 
         const scheduler = Scheduler.getScheduler(L);
@@ -319,19 +832,103 @@ const AsyncConnectContext = struct {
         defer self.ref.deref();
         defer self.list.remove(&self.completion);
 
-        if (L.status() != .Yield)
-            return .disarm;
-
-        c catch |err| {
-            L.pushlstring(@errorName(err));
-            _ = Scheduler.resumeStateError(L, null) catch {};
-            return .disarm;
-        };
-
-        _ = Scheduler.resumeState(L, null, 0) catch {};
-
+        L.pushlstring(@errorName(err));
+        _ = Scheduler.resumeStateError(L, null) catch {};
         return .disarm;
     }
+
+    const Handshake = struct {
+        pub fn onRecvComplete(
+            ud: ?*AsyncConnectContext,
+            l: *xev.Loop,
+            c: *xev.Completion,
+            tcp: xev.TCP,
+            _: xev.ReadBuffer,
+            r: xev.ReadError!usize,
+        ) xev.CallbackAction {
+            const self = ud orelse unreachable;
+            const ctx = self.tls.client;
+            const handshake = &ctx.connection.handshake;
+
+            const read = r catch |err| return self.resumeWithError(err);
+
+            ctx.record.update(read);
+
+            const result = handshake.client.run(ctx.record.readableSlice(0), ctx.ciphertext.writableSlice(0)) catch |err| return self.resumeWithError(err);
+            ctx.ciphertext.update(result.send.len);
+            ctx.record.discard(result.recv_pos);
+            if (result.send.len > 0) {
+                tcp.write(
+                    l,
+                    c,
+                    .{ .slice = ctx.ciphertext.readableSlice(0) },
+                    AsyncConnectContext,
+                    self,
+                    onSendComplete,
+                );
+                return .disarm;
+            } else {
+                tcp.read(
+                    l,
+                    c,
+                    .{ .slice = ctx.record.writableSlice(0) },
+                    AsyncConnectContext,
+                    self,
+                    onRecvComplete,
+                );
+                return .disarm;
+            }
+        }
+
+        pub fn onSendComplete(
+            ud: ?*AsyncConnectContext,
+            l: *xev.Loop,
+            c: *xev.Completion,
+            tcp: xev.TCP,
+            _: xev.WriteBuffer,
+            r: xev.WriteError!usize,
+        ) xev.CallbackAction {
+            const self = ud orelse unreachable;
+            const L = self.ref.value;
+            const ctx = self.tls.client;
+            const handshake = &ctx.connection.handshake;
+
+            const written = r catch |err| return self.resumeWithError(err);
+
+            ctx.ciphertext.discard(written);
+
+            if (ctx.ciphertext.count > 0) {
+                tcp.write(l, c, .{ .slice = ctx.ciphertext.readableSlice(0) }, AsyncConnectContext, self, onSendComplete);
+                return .disarm;
+            }
+            if (handshake.client.done()) {
+                const cipher = handshake.client.cipher().?;
+                handshake.deinit(ctx.allocator);
+                ctx.connection = .{ .active = .{ .tls = .init(cipher) } };
+
+                const scheduler = Scheduler.getScheduler(L);
+
+                defer scheduler.completeAsync(self);
+                defer self.ref.deref();
+                defer self.list.remove(&self.completion);
+
+                if (L.status() != .Yield)
+                    return .disarm;
+
+                _ = Scheduler.resumeState(L, null, 0) catch {};
+            } else {
+                tcp.read(
+                    l,
+                    c,
+                    .{ .slice = ctx.record.writableSlice(0) },
+                    AsyncConnectContext,
+                    self,
+                    onRecvComplete,
+                );
+            }
+            return .disarm;
+        }
+    };
 };
 
 fn lua_send(self: *Socket, L: *VM.lua.State) !i32 {
@@ -339,6 +936,12 @@ fn lua_send(self: *Socket, L: *VM.lua.State) !i32 {
     const scheduler = Scheduler.getScheduler(L);
     const buf = try L.Zcheckvalue([]const u8, 2, null);
     const offset = L.Loptunsigned(3, 0);
+
+    switch (self.tls_context) {
+        .none => {},
+        .server_ref => return L.Zerror("socket unable to send"),
+        inline else => |i| if (i.connection == .handshake) return L.Zerror("Incomplete Handshake"),
+    }
 
     if (offset >= buf.len)
         return L.Zerror("Offset is out of bounds");
@@ -352,16 +955,16 @@ fn lua_send(self: *Socket, L: *VM.lua.State) !i32 {
         .buffer = input,
         .ref = Scheduler.ThreadRef.init(L),
         .list = self.list,
+        .tls = self.tls_context,
+        .consumed = 0,
     };
 
     const socket = xev.TCP.initFd(self.socket);
 
-    socket.write(
+    ptr.write(
         &scheduler.loop,
         &ptr.completion.data,
-        .{ .slice = buf },
-        AsyncSendContext,
-        ptr,
+        socket,
         AsyncSendContext.complete,
     );
     self.list.append(&ptr.completion);
@@ -370,6 +973,8 @@ fn lua_send(self: *Socket, L: *VM.lua.State) !i32 {
 }
 
 fn lua_sendMsg(self: *Socket, L: *VM.lua.State) !i32 {
+    if (self.tls_context != .none)
+        return L.Zerror("Not supported with TLS");
     const allocator = luau.getallocator(L);
     const scheduler = Scheduler.getScheduler(L);
     const port = L.Lcheckunsigned(2);
@@ -419,8 +1024,14 @@ fn lua_recv(self: *Socket, L: *VM.lua.State) !i32 {
     const allocator = luau.getallocator(L);
     const scheduler = Scheduler.getScheduler(L);
     const size = L.Loptinteger(2, 8192);
-    if (size > luaHelper.MAX_LUAU_SIZE)
+    if (size > LuaHelper.MAX_LUAU_SIZE)
         return L.Zerror("SizeTooLarge");
+
+    switch (self.tls_context) {
+        .none => {},
+        .server_ref => return L.Zerror("socket unable to receive"),
+        inline else => |i| if (i.connection == .handshake) return L.Zerror("Incomplete Handshake"),
+    }
 
     const buf = try allocator.alloc(u8, @intCast(size));
     errdefer allocator.free(buf);
@@ -431,16 +1042,15 @@ fn lua_recv(self: *Socket, L: *VM.lua.State) !i32 {
         .buffer = buf,
         .ref = Scheduler.ThreadRef.init(L),
         .list = self.list,
+        .tls = self.tls_context,
     };
 
     const socket = xev.TCP.initFd(self.socket);
 
-    socket.read(
+    ptr.read(
         &scheduler.loop,
         &ptr.completion.data,
-        .{ .slice = buf },
-        AsyncRecvContext,
-        ptr,
+        socket,
         AsyncRecvContext.complete,
     );
     self.list.append(&ptr.completion);
@@ -449,10 +1059,12 @@ fn lua_recv(self: *Socket, L: *VM.lua.State) !i32 {
 }
 
 fn lua_recvMsg(self: *Socket, L: *VM.lua.State) !i32 {
+    if (self.tls_context != .none)
+        return L.Zerror("Not supported with TLS");
     const allocator = luau.getallocator(L);
     const scheduler = Scheduler.getScheduler(L);
     const size = L.Loptinteger(2, 8192);
-    if (size > luaHelper.MAX_LUAU_SIZE)
+    if (size > LuaHelper.MAX_LUAU_SIZE)
         return L.Zerror("SizeTooLarge");
 
     const buf = try allocator.alloc(u8, @intCast(size));
@@ -491,6 +1103,7 @@ fn lua_accept(self: *Socket, L: *VM.lua.State) !i32 {
     ptr.* = .{
         .ref = Scheduler.ThreadRef.init(L),
         .list = self.list,
+        .tls = self.tls_context,
     };
 
     const socket = xev.TCP.initFd(self.socket);
@@ -510,6 +1123,17 @@ fn lua_accept(self: *Socket, L: *VM.lua.State) !i32 {
 fn lua_connect(self: *Socket, L: *VM.lua.State) !i32 {
     const scheduler = Scheduler.getScheduler(L);
 
+    switch (self.tls_context) {
+        .none => {},
+        .server => return L.Zerror("socket created with server"),
+        .server_ref => return L.Zerror("socket unable to connect"),
+        .client => |c| if (c.connecting) {
+            return L.Zerror("already connecting");
+        } else if (c.connection != .handshake) {
+            return L.Zerror("already connected");
+        },
+    }
+
     const address_str = try L.Zcheckvalue([:0]const u8, 2, null);
     const port = L.Lcheckunsigned(3);
     if (port > std.math.maxInt(u16))
@@ -527,6 +1151,7 @@ fn lua_connect(self: *Socket, L: *VM.lua.State) !i32 {
     ptr.* = .{
         .ref = Scheduler.ThreadRef.init(L),
         .list = self.list,
+        .tls = self.tls_context,
     };
 
     socket.connect(
@@ -622,8 +1247,8 @@ pub const AsyncCloseContext = struct {
 };
 
 fn lua_close(self: *Socket, L: *VM.lua.State) !i32 {
-    if (self.open) {
-        self.open = false;
+    if (self.open != .closed) {
+        self.open = .closed;
         const scheduler = Scheduler.getScheduler(L);
         const socket = xev.TCP.initFd(self.socket);
 
@@ -651,18 +1276,30 @@ fn lua_close(self: *Socket, L: *VM.lua.State) !i32 {
             AsyncCloseContext.complete,
         );
 
+        self.tls_context.deinit();
+
         return L.yield(0);
     }
     return 0;
 }
 
-fn lua_getOpen(self: *Socket, L: *VM.lua.State) !i32 {
-    L.pushboolean(self.open);
+fn lua_isOpen(self: *Socket, L: *VM.lua.State) !i32 {
+    L.pushboolean(self.open != .closed);
+    return 1;
+}
+
+fn lua_kind(self: *Socket, L: *VM.lua.State) !i32 {
+    switch (self.tls_context) {
+        .none => L.pushlstring("socket"),
+        .client => L.pushlstring("tls_socket:client"),
+        .server => L.pushlstring("tls_socket:server_client"),
+        .server_ref => L.pushlstring("tls_socket:server"),
+    }
     return 1;
 }
 
 fn before_method(self: *Socket, L: *VM.lua.State) !void {
-    if (!self.open)
+    if (self.open == .closed)
         return L.Zerror("SocketClosed");
 }
 
@@ -677,14 +1314,16 @@ const __index = MethodMap.CreateStaticIndexMap(Socket, TAG_NET_SOCKET, .{
     .{ "bindIp", MethodMap.WithFn(Socket, lua_bindIp, before_method) },
     .{ "getName", MethodMap.WithFn(Socket, lua_getName, before_method) },
     .{ "setOption", MethodMap.WithFn(Socket, lua_setOption, before_method) },
+    .{ "kind", MethodMap.WithFn(Socket, lua_kind, before_method) },
     .{ "close", lua_close },
-    .{ "isOpen", lua_getOpen },
+    .{ "isOpen", lua_isOpen },
 });
 
 pub fn __dtor(L: *VM.lua.State, self: *Socket) void {
     const allocator = luau.getallocator(L);
-    if (self.open)
+    if (self.open != .closed)
         closesocket(self.socket);
+    self.tls_context.deinit();
     allocator.destroy(self.list);
 }
 
@@ -699,13 +1338,15 @@ pub inline fn load(L: *VM.lua.State) void {
     L.setuserdatadtor(Socket, TAG_NET_SOCKET, __dtor);
 }
 
-pub fn push(L: *VM.lua.State, value: std.posix.socket_t) !void {
+pub fn push(L: *VM.lua.State, value: std.posix.socket_t, open: OpenCase) !*Socket {
     const allocator = luau.getallocator(L);
     const self = L.newuserdatataggedwithmetatable(Socket, TAG_NET_SOCKET);
     const list = try allocator.create(Scheduler.CompletionLinkedList);
     list.* = .{};
     self.* = .{
+        .open = open,
         .socket = value,
         .list = list,
     };
+    return self;
 }

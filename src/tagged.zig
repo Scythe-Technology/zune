@@ -15,6 +15,8 @@ const TagNames: []const []const u8 = &.{
     "PROCESS_CHILD",
     // CRYPTO
     "CRYPTO_HASHER",
+    "CRYPTO_TLS_CERTBUNDLE",
+    "CRYPTO_TLS_CERTKEYPAIR",
     // RANDOM
     "RANDOM",
     // REGEX

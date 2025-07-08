@@ -1746,6 +1746,12 @@ declare class CryptoHash
     function copy(self): CryptoHash
 end
 
+declare class TlsCertBundle
+end
+
+declare class TlsCertKeyPair
+end
+
 type HashAlgorithms =
     | "sha1"
     | "md5"
@@ -1880,6 +1886,14 @@ type CryptoLib = {
         isap: {
             IsapA128A: Aead,
         },
+    },
+
+    tls: {
+        bundleFromSystem: () -> TlsCertBundle,
+        bundleFromFile: (file: string) -> TlsCertBundle,
+        keyPairFromFile: (certFile: string, keyFile: string) -> TlsCertKeyPair,
+        setupClient: (socket: NetworkSocket, { host: string, ca: TlsCertBundle }) -> (),
+        setupServer: (socket: NetworkSocket, { auth: TlsCertKeyPair }) -> (),
     },
 }
 --[======[ Crypto ]======]--
