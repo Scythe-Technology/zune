@@ -1350,6 +1350,38 @@ export type LoadOptions = {
     nativeCodeGen: boolean?,
 }
 
+export type CoverageData = {
+    name: string,
+    line: number,
+    depth: number,
+    [number]: number,
+};
+
+export type ParseResult = {
+    errors: {
+        {
+            message: string,
+            location: string,
+        }
+    }
+} | {
+    root: {any},
+    lines: number,
+    commentLocations: {
+        {
+            type: string,
+            location: string,
+        }
+    },
+    hotcomments: {
+        {
+            header: boolean,
+            content: string,
+            location: string,
+        }
+    }
+};
+
 type LuauLib = {
     --[[
         Compiles Luau source code.
@@ -1359,7 +1391,7 @@ type LuauLib = {
         @return `string` The compiled code, or an error.
         @error `CompileError`
     ]]
-    compile: (source: string, options: CompileOptions?) -> string,
+    compile: (source: string, opts: CompileOptions?) -> string,
 
     --[[
         Loads Luau source code.
@@ -1374,7 +1406,12 @@ type LuauLib = {
         @param options The options for the load.
         @return `(...any) -> ...any` The loaded function.
     ]]
-    load: (bytecode: string, options: LoadOptions?) -> ((...any) -> ...any),
+    load: (bytecode: string, opts: LoadOptions?) -> ((...any) -> ...any),
+
+    coverage: (fn: (...any) -> ...any) -> {CoverageData},
+
+    parse: (src: string) -> ParseResult,
+    parseExpr: (src: string) -> ParseResult,
 }
 --[======[ Luau ]======]--
 
