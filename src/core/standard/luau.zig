@@ -102,6 +102,30 @@ fn lua_load(L: *VM.lua.State) !i32 {
     return 1;
 }
 
+fn lua_coverage(L: *VM.lua.State) !i32 {
+    try L.Zchecktype(1, .Function);
+
+    L.newtable();
+    L.getcoverage(VM.lua.State, L, 1, struct {
+        fn inner(l: *VM.lua.State, fnname: ?[:0]const u8, line: i32, depth: i32, hits: []const i32) void {
+            l.createtable(0, 3);
+            if (fnname) |name|
+                l.Zsetfield(-1, "name", name);
+            l.Zsetfield(-1, "line", line);
+            l.Zsetfield(-1, "depth", depth);
+            for (hits, 0..) |hit, i| {
+                if (hit != -1) {
+                    l.pushinteger(hit);
+                    l.rawseti(-2, @intCast(i));
+                }
+            }
+            l.rawseti(-2, @intCast(l.objlen(-2) + 1));
+        }
+    }.inner);
+
+    return 1;
+}
+
 fn lua_parse(L: *VM.lua.State) !i32 {
     const allocator = luau.getallocator(L);
 
@@ -302,6 +326,7 @@ pub fn loadLib(L: *VM.lua.State) void {
     L.Zpushvalue(.{
         .compile = lua_compile,
         .load = lua_load,
+        .coverage = lua_coverage,
         .parse = lua_parse,
         .parseExpr = lua_parseExpr,
     });
