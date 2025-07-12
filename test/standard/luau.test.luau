@@ -205,6 +205,30 @@ describe("Load", function()
     end)
 end)
 
+test("Coverage", function()
+    local bytecode = luau.compile([[
+        local function nothing()
+        end
+        local function bar()
+
+        end
+        local function foo()
+            bar()
+        end
+        foo()
+    ]], {coverage_level = 2});
+
+    local load = luau.load(bytecode, {
+        chunkName = "test",
+    });
+
+    load();
+
+    local coverage = luau.coverage(load);
+
+    print(coverage);
+end)
+
 describe("Parse", function()
     test("Basic", function()
         local input = [[
