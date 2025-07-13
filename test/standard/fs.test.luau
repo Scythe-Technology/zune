@@ -12,10 +12,6 @@ local test = testing.test;
 
 assert(fs.isDir(TEMP_DIR), `TEMP_DIR is not a directory, {TEMP_DIR}`);
 
-local function warn(message: string)
-    print("\27[33m" .. message .. "\27[0m");
-end
-
 local function path(dir: string)
     return `{TEMP_DIR}/{dir}`;
 end
@@ -244,14 +240,14 @@ test("Metadata", function()
     local metadata = fs.metadata(path("metadata"));
     expect(metadata).toBe(expect.any("table"));
     expect(metadata).toBe(expect.similar({
-        createdAt = expect.any("number"),
-        modifiedAt = expect.any("number"),
-        accessedAt = expect.any("number"),
+        created_at = expect.any("number"),
+        modified_at = expect.any("number"),
+        accessed_at = expect.any("number"),
         size = expect.any("number"),
         symlink = false,
         kind = "directory",
         permissions = {
-            readOnly = false,
+            read_only = false,
         },
     }));
     expect(fs.removeDir(path("metadata")));
@@ -340,14 +336,14 @@ test("Symlink", function()
         local metadata = fs.metadata(path("sample.txt"));
         expect(metadata).toBe(expect.any("table"));
         expect(metadata).toBe(expect.similar({
-            createdAt = expect.any("number"),
-            modifiedAt = expect.any("number"),
-            accessedAt = expect.any("number"),
+            created_at = expect.any("number"),
+            modified_at = expect.any("number"),
+            accessed_at = expect.any("number"),
             size = expect.any("number"),
             symlink = true,
             kind = "file",
             permissions = {
-                readOnly = false,
+                read_only = false,
             },
         }));
 
@@ -363,14 +359,14 @@ test("Symlink", function()
         local metadata2 = fs.metadata(path("metadata2"));
         expect(metadata2).toBe(expect.any("table"));
         expect(metadata2).toBe(expect.similar({
-            createdAt = expect.any("number"),
-            modifiedAt = expect.any("number"),
-            accessedAt = expect.any("number"),
+            created_at = expect.any("number"),
+            modified_at = expect.any("number"),
+            accessed_at = expect.any("number"),
             size = expect.any("number"),
             symlink = true,
             kind = "directory",
             permissions = {
-                readOnly = false,
+                read_only = false,
             },
         }));
 

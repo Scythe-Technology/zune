@@ -87,7 +87,7 @@ describe("Load", function()
         local bCode = luau.compile("return a()");
         expect(bCode).toBe("\x06\x03\x01\x01a\x00\x01\x01\x00\x00\x01\x02\x00\x05A\x00\x00\x00\f\x00\x01\x00\x00\x00\x00@\x15\x00\x01\x00\x16\x00\x00\x00\x02\x03\x01\x04\x00\x00\x00@\x00\x01\x00\x01\x18\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00");
         local func = luau.load(bCode, {
-            chunkName = "test",
+            chunk_name = "test",
         });
         expect(func).toBe(expect.type("function"));
         expect(func).toThrow(`attempt to call a nil value`);
@@ -111,7 +111,7 @@ describe("Load", function()
         local safeNativeTime = timeFunction(native);
         test("Basic (NCG Enabled)", function()
             local func = luau.load(bCode, {
-                nativeCodeGen = true;
+                native_code_gen = true;
             });
             expect(func).toBe(expect.type("function"));
             expect(timeFunction(func)).toBeCloseTo(safeNativeTime, 1);
@@ -119,7 +119,7 @@ describe("Load", function()
 
         test("New Environment (NCG Enabled)", function()
             local func = luau.load(bCode, {
-                nativeCodeGen = true;
+                native_code_gen = true;
                 env = {
                     buffer = buffer,
                 };
@@ -134,7 +134,7 @@ describe("Load", function()
 
         test("Basic (NCG Disabled)", function()
             local func = luau.load(bCode, {
-                nativeCodeGen = false;
+                native_code_gen = false;
             });
             expect(func).toBe(expect.type("function"));
             expect(timeFunction(func)).toBeCloseTo(UnsafeNativeTime, 0.25);
@@ -142,7 +142,7 @@ describe("Load", function()
 
         test("New Environment (NCG Disabled)", function()
             local func = luau.load(bCode, {
-                nativeCodeGen = false;
+                native_code_gen = false;
                 env = {
                     buffer = buffer,
                 };
@@ -153,7 +153,7 @@ describe("Load", function()
 
         test("Basic (NCG Enabled, Unsafe)", function()
             local func = luau.load(bCode, {
-                nativeCodeGen = true;
+                native_code_gen = true;
             });
             expect(func).toBe(expect.type("function"));
             -- Should be slower than the safe native time, because the global environment is unsafe
@@ -162,7 +162,7 @@ describe("Load", function()
 
         test("New Environment (NCG Enabled, Unsafe)", function()
             local func = luau.load(bCode, {
-                nativeCodeGen = true;
+                native_code_gen = true;
                 env = {
                     buffer = buffer,
                 };
@@ -177,7 +177,7 @@ describe("Load", function()
         local bCode = luau.compile("return require");
         expect(bCode).toBe("\x06\x03\x01\arequire\x00\x01\x01\x00\x00\x01\x02\x00\x04A\x00\x00\x00\f\x00\x01\x00\x00\x00\x00@\x16\x00\x02\x00\x02\x03\x01\x04\x00\x00\x00@\x00\x01\x00\x01\x18\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00");
         local func = luau.load(bCode, {
-            chunkName = "test",
+            chunk_name = "test",
         });
         expect(func).toBe(expect.type("function"));
         expect(getfenv(func)).toBe(getfenv());
@@ -189,7 +189,7 @@ describe("Load", function()
         expect(bCode).toBe("\x06\x03\x01\arequire\x00\x01\x01\x00\x00\x01\x02\x00\x04A\x00\x00\x00\f\x00\x01\x00\x00\x00\x00@\x16\x00\x02\x00\x02\x03\x01\x04\x00\x00\x00@\x00\x01\x00\x01\x18\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00");
         local env = {};
         local func = luau.load(bCode, {
-            chunkName = "test",
+            chunk_name = "test",
             env = env,
         });
         expect(func).toBe(expect.type("function"));
@@ -219,7 +219,7 @@ test("Coverage", function()
     ]], {coverage_level = 2});
 
     local load = luau.load(bytecode, {
-        chunkName = "test",
+        chunk_name = "test",
     });
 
     load();
@@ -262,13 +262,13 @@ describe("Parse", function()
                 }
             },
             lines = 2,
-            commentLocations = {
+            comment_locations = {
                 {
                     location = "0,24 - 0,32",
                     type = "Comment",
                 },
             },
-            hotcomments = {},
+            hot_comments = {},
         }));
     end)
 
@@ -288,7 +288,7 @@ describe("Parse", function()
                 body = {},
             },
             lines = 5,
-            commentLocations = {
+            comment_locations = {
                 {
                     location = "0,0 - 0,9",
                     type = "Comment",
@@ -306,7 +306,7 @@ describe("Parse", function()
                     type = "Comment",
                 }
             },
-            hotcomments = {
+            hot_comments = {
                 {
                     header = true,
                     location = "0,0 - 0,9",
@@ -353,8 +353,8 @@ describe("ParseExpr", function()
                 value = "interp",
             },
             lines = 1,
-            commentLocations = {},
-            hotcomments = {},
+            comment_locations = {},
+            hot_comments = {},
         }));
     end)
 
@@ -378,8 +378,8 @@ describe("ParseExpr", function()
                 op = "Mul",
             },
             lines = 1,
-            commentLocations = {},
-            hotcomments = {},
+            comment_locations = {},
+            hot_comments = {},
         }));
     end)
 

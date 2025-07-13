@@ -60,11 +60,11 @@ describe("Json5", function()
             expect(serde.json5.decode("null")).toBe(nil);
             expect(serde.json5.decode("[null]")).toBe(expect.similar({}));
             expect(serde.json5.decode("null", {
-                preserveNull = true
-            })).toBe(serde.json5.Values.Null);
+                preserve_null = true
+            })).toBe(serde.json5.values.null);
             expect(serde.json5.decode("[null]", {
-                preserveNull = true
-            })).toBe(expect.similar({serde.json5.Values.Null}));
+                preserve_null = true
+            })).toBe(expect.similar({serde.json5.values.null}));
         end)
         test("Object/Array", function()
             expect(serde.json5.decode(`\{\}`)).toBe(expect.similar({}));
@@ -92,7 +92,7 @@ describe("Json5", function()
             expect(function() serde.json5.decode(`\{"a":1,"b":2,"c":3,`); end).toThrow(`UnexpectedTokenError`);
             expect(function() serde.json5.decode(`\{"a":1,"b":2"c":3}`); end).toThrow(`UnexpectedTokenError`);
             expect(function() serde.json5.decode(`\{ "a" :1 , "b"   : 2,       "c"   :    3       `); end).toThrow(`UnexpectedTokenError`);
-            expect(function() serde.json5.Values.Null.a = 2 end).toThrow(`attempt to modify a readonly table`);
+            expect(function() serde.json5.values.null.a = 2 end).toThrow(`attempt to modify a readonly table`);
         end)
     end)
 end)

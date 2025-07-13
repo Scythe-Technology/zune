@@ -24,6 +24,7 @@ const RequestAsyncContext = struct {
     request: std.http.Client.Request,
     payload: ?[]const u8 = null,
     server_header_buffer: []u8,
+    body_type: VM.lua.Type = .String,
     err: anyerror = error.TimedOut,
 
     fn doWork(self: *RequestAsyncContext) !void {
@@ -85,8 +86,8 @@ const RequestAsyncContext = struct {
                 const status = @as(u10, @intFromEnum(self.request.response.status));
                 L.Zpushvalue(.{
                     .ok = status >= 200 and status < 300,
-                    .statusCode = status,
-                    .statusReason = self.request.response.reason,
+                    .status_code = status,
+                    .status_reason = self.request.response.reason,
                 });
                 L.createtable(0, 0);
                 var iter = self.request.response.iterateHeaders();
@@ -101,12 +102,17 @@ const RequestAsyncContext = struct {
                 defer responseBody.deinit();
 
                 self.request.reader().readAllArrayList(&responseBody, LuaHelper.MAX_LUAU_SIZE) catch |err| {
+                    L.pop(1);
                     L.pushstring(@errorName(err));
                     _ = Scheduler.resumeStateError(L, null) catch {};
                     return;
                 };
 
-                L.pushlstring(responseBody.items);
+                switch (self.body_type) {
+                    .String => L.pushlstring(responseBody.items),
+                    .Buffer => L.Zpushbuffer(responseBody.items),
+                    else => unreachable,
+                }
                 L.setfield(-2, "body");
 
                 _ = Scheduler.resumeState(L, null, 1) catch {};
@@ -131,6 +137,7 @@ pub fn lua_request(L: *VM.lua.State) !i32 {
     var method: std.http.Method = .GET;
     var redirectBehavior: ?std.http.Client.Request.RedirectBehavior = null;
     var headers: ?[]const std.http.Header = null;
+    var body_type: VM.lua.Type = .String;
     const server_header_buffer_size: usize = 16 * 1024;
 
     const uri = try std.Uri.parse(uri_string);
@@ -167,15 +174,28 @@ pub fn lua_request(L: *VM.lua.State) !i32 {
         } else if (!headers_type.isnoneornil()) return L.Zerror("invalid headers (expected table)");
         L.pop(1);
 
-        if (try L.Zcheckfield(?bool, 2, "allowRedirects")) |option| {
+        if (try L.Zcheckfield(?bool, 2, "allow_redirects")) |option| {
             if (!option)
                 redirectBehavior = .not_allowed;
         }
 
-        const methodStr = try L.Zcheckfield([]const u8, 2, "method");
-        inline for (@typeInfo(std.http.Method).@"enum".fields) |field| {
-            if (std.mem.eql(u8, methodStr, field.name))
-                method = @field(std.http.Method, field.name);
+        if (try L.Zcheckfield(?[:0]const u8, 2, "response_body_type")) |bodyType| {
+            if (std.mem.eql(u8, bodyType, "string")) {
+                body_type = .String;
+            } else if (std.mem.eql(u8, bodyType, "buffer")) {
+                body_type = .Buffer;
+            } else {
+                return L.Zerror("invalid response_body_type (expected 'string' or 'buffer')");
+            }
+        }
+
+        if (try L.Zcheckfield(?[]const u8, 2, "method")) |methodStr| {
+            inline for (@typeInfo(std.http.Method).@"enum".fields) |field| {
+                if (comptime field.name.len < 3)
+                    continue;
+                if (std.mem.eql(u8, methodStr, field.name))
+                    method = @field(std.http.Method, field.name);
+            }
         }
     }
 
@@ -212,6 +232,7 @@ pub fn lua_request(L: *VM.lua.State) !i32 {
         .ref = .init(L),
         .request = req,
         .client = self.client,
+        .body_type = body_type,
     };
 
     scheduler.asyncWaitForSync(self);

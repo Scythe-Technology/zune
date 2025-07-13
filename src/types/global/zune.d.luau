@@ -21,12 +21,12 @@ export type MetadataKind = "file"
 export type Metadata = {
     kind: MetadataKind,
     symlink: boolean,
-    createdAt: number,
-    modifiedAt: number,
-    accessedAt: number,
+    created_at: number,
+    modified_at: number,
+    accessed_at: number,
     size: number,
     permissions: {
-        readOnly: boolean,
+        read_only: boolean,
     },
 }
 
@@ -932,7 +932,7 @@ export type ServerRequest = {
 }
 
 export type ServerResponse = {
-    statusCode: number,
+    status_code: number,
     headers: {[string]: string}?,
     body: string | buffer,
 }
@@ -983,7 +983,7 @@ export type ServeOptions = {
 
         Default: `false`
     ]]
-    reuseAddress: boolean?,
+    reuse_address: boolean?,
 
     --[[
         The amount of connections to backlog
@@ -995,21 +995,21 @@ export type ServeOptions = {
         The maximum body size to accept.
         - Default: `4096`
     ]]
-    maxBodySize: number?,
+    max_body_size: number?,
 
     --[[
         The amount of seconds to wait before timing a client out.
         - `0` for no timeout.
         - Default: `60`
     ]]
-    clientTimeout: number?,
+    client_timeout: number?,
 
     --[[
         The maximum number of connections to accept at a time.
         - `0` for no limit.
         - Default: `1024`
     ]]
-    maxConnections: number?,
+    max_connections: number?,
 
     --[[
         The function to handle requests.
@@ -1022,38 +1022,20 @@ export type ServeOptions = {
     websocket: ServerWebSocketHandlers?,
 }
 
-export type Response = {
+export type Response<T> = {
     ok: boolean,
-    statusCode: number,
-    statusReason: string,
+    status_code: number,
+    status_reason: string,
     headers: {[string]: string},
-    body: string,
+    body: T,
 }
 
-type BareRequestOptions = {
-    method: "GET",
+export type RequestOptions = {
     headers: {[string]: string}?,
-
-    --[[
-        Whether to follow redirects.
-        - Default: `true`
-    ]]
-    allowRedirects: boolean?,
-
-    --[[
-        The maximum body size to accept.
-        - Default: `2097152`
-    ]]
-    maxBodySize: number?,
+    method: ("GET" | "HEAD" | "POST" | "PUT" | "DELETE" | "CONNECT" | "OPTIONS" | "TRACE" | "PATCH")?,
+    body: (string | buffer)?,
+    allow_redirects: boolean?,
 }
-
-type BodyRequestOptions = {
-    method: "POST" | "PUT" | "DELETE",
-    headers: {[string]: string}?,
-    body: string,
-}
-
-export type RequestOptions = BareRequestOptions | BodyRequestOptions
 
 export type WebSocketOptions = {
     --[[
@@ -1306,7 +1288,7 @@ type NetworkLib = {
             @return `NetHttpServer` The server handle.
             @error `ServerStartError`
         ]]
-        serve: (options: ServeOptions) -> NetHttpServer,
+        serve: (opts: ServeOptions) -> NetHttpServer,
 
         --[[
             Makes a request to the specified host.
@@ -1320,7 +1302,10 @@ type NetworkLib = {
             @return `Response`
             @error `RequestError`
         ]]
-        request: (host: string, options: RequestOptions?) -> Response,
+        request:
+            & ((host: string, opts: (RequestOptions & { response_body_type: "string"? })?) -> Response<string>)
+            & ((host: string, opts: (RequestOptions & { response_body_type: "buffer" })) -> Response<buffer>)
+            & ((host: string, opts: (RequestOptions | { response_body_type: "string" | "buffer" | nil })?) -> Response<string | buffer>),
 
         --[[
             Creates a websocket client.
@@ -1346,8 +1331,8 @@ export type CompileOptions = {
 
 export type LoadOptions = {
     env: {[any]: any}?,
-    chunkName: string?,
-    nativeCodeGen: boolean?,
+    chunk_name: string?,
+    native_code_gen: boolean?,
 }
 
 export type CoverageData = {
@@ -1367,13 +1352,13 @@ export type ParseResult = {
 } | {
     root: {any},
     lines: number,
-    commentLocations: {
+    comment_locations: {
         {
             type: string,
             location: string,
         }
     },
-    hotcomments: {
+    hot_comments: {
         {
             header: boolean,
             content: string,
@@ -1420,7 +1405,7 @@ type JsonEncodeConfig = {
     --[[
         Pretty print indent level
     ]]
-    prettyIndent: number,
+    pretty_indent: number,
 }
 
 
@@ -1428,7 +1413,7 @@ type JsonDecodeConfig = {
     --[[
         Preserve null values
     ]]
-    preserveNull: boolean,
+    preserve_null: boolean,
 }
 
 type JsonEncoder = {
@@ -1452,18 +1437,18 @@ type JsonEncoder = {
     --[[
         IndentKind for Pretty Printing
     ]]
-    Indents: {
-        None: number,
-        TwoSpaces: number,
-        FourSpaces: number,
-        Tabs: number,
+    indents: {
+        none: number,
+        twoSpaces: number,
+        fourSpaces: number,
+        tabs: number,
     },
 
     --[[
         Special values
     ]]
-    Values: {
-        Null: any,
+    values: {
+        null: any,
     }
 }
 
@@ -1530,8 +1515,8 @@ type CompressionFn =
 & ((raw: buffer) -> buffer)
 
 type AdvancedCompressionFn =
-& ((raw: string, options: GenericCompressionOptions?) -> string)
-& ((raw: buffer, options: GenericCompressionOptions?) -> buffer)
+& ((raw: string, opts: GenericCompressionOptions?) -> string)
+& ((raw: buffer, opts: GenericCompressionOptions?) -> buffer)
 
 type DecompressionFn =
 & ((compressed: string) -> string)
@@ -1826,9 +1811,9 @@ type Argon2PasswordOptions = {
     --- Default: "argon2d"
     algorithm: ("argon2d" | "argon2i" | "argon2id")?,
     --- Default: 2
-    timeCost: number?,
+    time_cost: number?,
     --- Default: 65536
-    memoryCost: number?,
+    memory_cost: number?,
     --- Default: 1
     threads: number?,
 }
@@ -1852,7 +1837,7 @@ type CryptoLib = {
         Password hashing function
     ]]
     password: {
-        hash: (password: string, options: PasswordOptions?) -> string,
+        hash: (password: string, opts: PasswordOptions?) -> string,
         verify: (password: string, hash: string) -> boolean,
     },
 
@@ -2173,7 +2158,7 @@ type FFILib = {
 
 export type SQLite3Values = {[string]: number | string | buffer};
 export type SQLite3Result = {
-    lastInsertRowId: number,
+    last_insert_row_id: number,
     changes: number,
 }
 
@@ -2252,13 +2237,13 @@ declare class Thread
 end
 
 type ThreadLoadOptions = {
-    chunkName: string?,
-    nativeCodeGen: boolean?,
+    chunk_name: string?,
+    native_code_gen: boolean?,
 }
 
 export type ThreadLib = {
     fromModule: (module: string) -> Thread,
-    fromBytecode: (bytecode: string | buffer, options: ThreadLoadOptions?) -> Thread,
+    fromBytecode: (bytecode: string | buffer, opts: ThreadLoadOptions?) -> Thread,
     receive: (self: Thread) -> ...any,
     send: (self: Thread, ...any) -> (),
     getCpuCount: () -> number,

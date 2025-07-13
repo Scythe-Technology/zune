@@ -53,9 +53,9 @@ describe("Password", function()
         expect(function()
             crypto.password.hash("blank", {
                 algorithm = "argon2d",
-                timeCost = "abc",
+                time_cost = "abc",
             })
-        end).toThrow("invalid field 'timeCost' (number expected, got string)");
+        end).toThrow("invalid field 'time_cost' (number expected, got string)");
         expect(function()
             crypto.password.hash("blank", {
                 algorithm = "bcrypt",

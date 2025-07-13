@@ -7,31 +7,31 @@ local expect = testing.expect;
 expect(serde.json).toBe(expect.similar({
     encode = expect.type("function"),
     decode = expect.type("function"),
-    Indents = expect.similar({
-        None = expect.type("number"),
-        TwoSpaces = expect.type("number"),
-        FourSpaces = expect.type("number"),
-        Tabs = expect.type("number"),
+    indents = expect.similar({
+        none = expect.type("number"),
+        twoSpaces = expect.type("number"),
+        fourSpaces = expect.type("number"),
+        tabs = expect.type("number"),
     }),
-    Values = expect.similar({
-        Null = expect.type("table"),
+    values = expect.similar({
+        null = expect.type("table"),
     }),
 }));
 expect(serde.json5).toBe(expect.similar({
     encode = expect.type("function"),
     decode = expect.type("function"),
-    Indents = expect.similar({
-        None = expect.type("number"),
-        TwoSpaces = expect.type("number"),
-        FourSpaces = expect.type("number"),
-        Tabs = expect.type("number"),
+    indents = expect.similar({
+        none = expect.type("number"),
+        twoSpaces = expect.type("number"),
+        fourSpaces = expect.type("number"),
+        tabs = expect.type("number"),
     }),
-    Values = expect.similar({
-        Null = expect.type("table"),
+    values = expect.similar({
+        null = expect.type("table"),
     }),
 }));
-expect(serde.json5.Values).toBe(serde.json.Values);
-expect(serde.json5.Indents).toBe(serde.json.Indents);
+expect(serde.json5.values).toBe(serde.json.values);
+expect(serde.json5.indents).toBe(serde.json.indents);
 expect(serde.toml).toBe(expect.similar({
     encode = expect.type("function"),
     decode = expect.type("function"),

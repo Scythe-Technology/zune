@@ -36,9 +36,9 @@ pub var ACTIVE = false;
 
 pub var HISTORY: ?*History = null;
 
-pub threadlocal var BREAKPOINTS = std.StringHashMap(BreakpointState).init(Zune.DEFAULT_ALLOCATOR);
-pub threadlocal var MAPPED_SOURCES = std.StringHashMap([]const u8).init(Zune.DEFAULT_ALLOCATOR);
-threadlocal var CHANGES_COUNT: u32 = 0;
+pub var BREAKPOINTS = std.StringHashMap(BreakpointState).init(Zune.DEFAULT_ALLOCATOR);
+pub var MAPPED_SOURCES = std.StringHashMap([]const u8).init(Zune.DEFAULT_ALLOCATOR);
+var CHANGES_COUNT: u32 = 0;
 
 const DEBUG_TAG = "\x1b[0m(dbg) ";
 const DEBUG_RESULT_TAG = "\x1b[0m(dbg): ";
@@ -1371,6 +1371,10 @@ pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c
                             break;
                         },
                         .restart => {
+                            if (Zune.corelib.thread.THREADS.len > 0) {
+                                printResult("<red>cannot restart while threads are running<clear>\n", .{});
+                                break :out;
+                            }
                             // force a break, ignoring yield status
                             L.curr_status = @intFromEnum(VM.lua.Status.Break);
                             DEBUG.dead = true;

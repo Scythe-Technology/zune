@@ -543,13 +543,10 @@ fn lua_fromBytecode(L: *VM.lua.State) !i32 {
     const bytecode = try L.Zcheckvalue([]const u8, 1, null);
 
     const Options = struct {
-        nativeCodeGen: bool = true,
-        chunkName: [:0]const u8 = "(thread)",
+        native_code_gen: bool = true,
+        chunk_name: [:0]const u8 = "(thread)",
     };
     const opts: Options = try L.Zcheckvalue(?Options, 2, null) orelse .{};
-
-    const useCodeGen = opts.nativeCodeGen;
-    const chunkName = opts.chunkName;
 
     const ML = try createThread(allocator, L);
 
@@ -561,11 +558,11 @@ fn lua_fromBytecode(L: *VM.lua.State) !i32 {
 
     ML.setsafeenv(VM.lua.GLOBALSINDEX, true);
 
-    ML.load(chunkName, bytecode, 0) catch {
+    ML.load(opts.chunk_name, bytecode, 0) catch {
         return L.Zerrorf("load error: {s}", .{ML.tostring(-1) orelse "unknown error"});
     };
 
-    if (luau.CodeGen.Supported() and Zune.STATE.LUAU_OPTIONS.CODEGEN and Zune.STATE.LUAU_OPTIONS.JIT_ENABLED and useCodeGen)
+    if (luau.CodeGen.Supported() and Zune.STATE.LUAU_OPTIONS.CODEGEN and Zune.STATE.LUAU_OPTIONS.JIT_ENABLED and opts.native_code_gen)
         luau.CodeGen.Compile(ML, -1);
 
     return 1;

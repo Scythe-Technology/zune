@@ -58,62 +58,56 @@ pub const RunMode = enum {
     Debug,
 };
 
-pub const RequireMode = enum {
-    RelativeToFile,
-    RelativeToCwd,
-};
-
 pub const Flags = struct {
     limbo: bool = false,
 };
 
-pub var CONFIGURATIONS = .{.format_max_depth};
-
 pub const VERSION = "zune " ++ info.version ++ "+" ++ std.fmt.comptimePrint("{d}.{d}", .{ luau.LUAU_VERSION.major, luau.LUAU_VERSION.minor });
 
-var STD_ENABLED = true;
-const FEATURES = struct {
-    pub var fs = true;
-    pub var io = true;
-    pub var net = true;
-    pub var process = true;
-    pub var task = true;
-    pub var luau = true;
-    pub var serde = true;
-    pub var crypto = true;
-    pub var datetime = true;
-    pub var regex = true;
-    pub var sqlite = true;
-    pub var require = true;
-    pub var random = true;
-    pub var thread = true;
-    pub var ffi = true;
-};
+var FEATURES: struct {
+    fs: bool = true,
+    io: bool = true,
+    net: bool = true,
+    process: bool = true,
+    task: bool = true,
+    luau: bool = true,
+    serde: bool = true,
+    crypto: bool = true,
+    datetime: bool = true,
+    regex: bool = true,
+    sqlite: bool = true,
+    require: bool = true,
+    random: bool = true,
+    thread: bool = true,
+    ffi: bool = true,
+} = .{};
 
-pub const STATE = struct {
-    pub var ENV_MAP: std.process.EnvMap = undefined;
-    pub var RUN_MODE: RunMode = .Run;
-    pub var REQUIRE_MODE: RequireMode = .RelativeToFile;
-    pub var CONFIG_CACHE: std.StringArrayHashMap(Resolvers.Config) = .init(DEFAULT_ALLOCATOR);
-    pub var MAIN_THREAD_ID: ?std.Thread.Id = null;
+pub const ZuneState = struct {
+    ENV_MAP: std.process.EnvMap = undefined,
+    RUN_MODE: RunMode = .Run,
+    CONFIG_CACHE: std.StringArrayHashMap(Resolvers.Config) = .init(DEFAULT_ALLOCATOR),
+    MAIN_THREAD_ID: ?std.Thread.Id = null,
+    LUAU_OPTIONS: LuauOptions = .{},
+    FORMAT: FormatOptions = .{},
+    USE_DETAILED_ERROR: bool = true,
 
-    pub const LUAU_OPTIONS = struct {
-        pub var DEBUG_LEVEL: u2 = 2;
-        pub var OPTIMIZATION_LEVEL: u2 = 1;
-        pub var CODEGEN: bool = true;
-        pub var JIT_ENABLED: bool = true;
+    pub const LuauOptions = struct {
+        DEBUG_LEVEL: u2 = 2,
+        OPTIMIZATION_LEVEL: u2 = 1,
+        CODEGEN: bool = true,
+        JIT_ENABLED: bool = true,
     };
 
-    pub const FORMAT = struct {
-        pub var MAX_DEPTH: u8 = 4;
-        pub var USE_COLOR: bool = true;
-        pub var SHOW_TABLE_ADDRESS: bool = true;
-        pub var SHOW_RECURSIVE_TABLE: bool = false;
-        pub var DISPLAY_BUFFER_CONTENTS_MAX: usize = 48;
+    pub const FormatOptions = struct {
+        MAX_DEPTH: u8 = 4,
+        USE_COLOR: bool = true,
+        SHOW_TABLE_ADDRESS: bool = true,
+        SHOW_RECURSIVE_TABLE: bool = false,
+        DISPLAY_BUFFER_CONTENTS_MAX: usize = 48,
     };
-
-    pub var USE_DETAILED_ERROR: bool = true;
 };
+
+pub var STATE: ZuneState = .{};
 
 pub fn init() !void {
     const allocator = DEFAULT_ALLOCATOR;
@@ -193,21 +187,11 @@ pub fn loadConfiguration(dir: std.fs.Dir) void {
             if (toml.checkOptionInteger(fmt_config, "displayBufferContentsMax")) |max|
                 STATE.FORMAT.DISPLAY_BUFFER_CONTENTS_MAX = @truncate(@as(u64, @bitCast(max)));
         }
-
-        if (toml.checkOptionTable(resolvers_config, "require")) |require_config| {
-            if (toml.checkOptionString(require_config, "mode")) |mode| {
-                if (std.mem.eql(u8, mode, "RelativeToProject")) {
-                    STATE.REQUIRE_MODE = .RelativeToCwd;
-                } else if (!std.mem.eql(u8, mode, "RelativeToFile")) {
-                    std.debug.print("[zune.toml] 'Mode' must be 'RelativeToProject' or 'RelativeToFile'\n", .{});
-                }
-            }
-        }
     }
 
     if (toml.checkOptionTable(zconfig, "features")) |features_config| {
         if (toml.checkOptionTable(features_config, "builtins")) |builtins| {
-            inline for (@typeInfo(FEATURES).@"struct".decls) |decl| {
+            inline for (@typeInfo(@TypeOf(FEATURES)).@"struct".decls) |decl| {
                 if (toml.checkOptionBool(builtins, decl.name)) |enabled|
                     @field(FEATURES, decl.name) = enabled;
             }

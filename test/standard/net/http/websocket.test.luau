@@ -14,7 +14,7 @@ test("Basic", function()
     local server_events = {};
     local server = net.http.serve({
         port = 8080,
-        reuseAddress = true,
+        reuse_address = true,
         request = function(req)
             table.insert(server_events, `request`);
             return "";
@@ -100,7 +100,7 @@ test("Slow server", function()
     local server_events = {};
     local server = net.http.serve({
         port = 8080,
-        reuseAddress = true,
+        reuse_address = true,
         request = function(req)
             table.insert(server_events, `request`);
             return "";
@@ -202,7 +202,7 @@ test("Time out", function()
     local resume_thread: thread? = nil;
     local server = net.http.serve({
         port = 8080,
-        reuseAddress = true,
+        reuse_address = true,
         request = function(req)
             table.insert(server_events, `request`);
             return "";
@@ -270,8 +270,8 @@ test("TLS", function()
         end,
         accept = function(socket, res)
             expect(res).toBe(expect.type("table"));
-            expect(res.statusCode).toBe(101);
-            table.insert(events, `accept: {res.statusCode}`);
+            expect(res.status_code).toBe(101);
+            table.insert(events, `accept: {res.status_code}`);
             return true;
         end,
         message = function(socket, message)

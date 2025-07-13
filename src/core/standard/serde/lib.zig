@@ -43,11 +43,11 @@ pub fn loadLib(L: *VM.lua.State) void {
 
         _ = L.rawgetfield(-2, "json");
 
-        _ = L.rawgetfield(-1, "Indents");
-        L.setfield(-3, "Indents");
+        _ = L.rawgetfield(-1, "indents");
+        L.setfield(-3, "indents");
 
-        _ = L.rawgetfield(-1, "Values");
-        L.setfield(-3, "Values");
+        _ = L.rawgetfield(-1, "values");
+        L.setfield(-3, "values");
 
         L.pop(1);
 

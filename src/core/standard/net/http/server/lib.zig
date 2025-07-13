@@ -305,11 +305,11 @@ pub fn lua_serve(L: *VM.lua.State) !i32 {
     const serve_info = try L.Zcheckvalue(struct {
         port: u16,
         address: ?[:0]const u8,
-        reuseAddress: ?bool,
+        reuse_address: ?bool,
         backlog: ?u31,
-        maxBodySize: ?u32,
-        clientTimeout: ?u32,
-        maxConnections: ?u32,
+        max_body_size: ?u32,
+        client_timeout: ?u32,
+        max_connections: ?u32,
     }, 1, null);
     var callbacks: FnHandlers = .{};
     errdefer callbacks.derefAll(L);
@@ -361,10 +361,6 @@ pub fn lua_serve(L: *VM.lua.State) !i32 {
     }
     L.pop(1);
 
-    const self = L.newuserdatadtor(Self, __dtor);
-    _ = L.Lgetmetatable(@typeName(Self));
-    _ = L.setmetatable(-2);
-
     scheduler.async_tasks += 1;
 
     const address_str = serve_info.address orelse "127.0.0.1";
@@ -378,7 +374,7 @@ pub fn lua_serve(L: *VM.lua.State) !i32 {
     );
     errdefer std.posix.close(socket);
 
-    if (serve_info.reuseAddress orelse false) {
+    if (serve_info.reuse_address orelse false) {
         try std.posix.setsockopt(
             socket,
             std.posix.SOL.SOCKET,
@@ -401,6 +397,10 @@ pub fn lua_serve(L: *VM.lua.State) !i32 {
 
     const final_port = address.getPort();
 
+    const self = L.newuserdatadtor(Self, __dtor);
+    _ = L.Lgetmetatable(@typeName(Self));
+    _ = L.setmetatable(-2);
+
     self.* = .{
         .arena = .init(allocator),
         .completion = .init(),
@@ -414,9 +414,9 @@ pub fn lua_serve(L: *VM.lua.State) !i32 {
         },
         .state = .{
             .port = final_port,
-            .client_timeout = serve_info.clientTimeout orelse 10,
-            .max_body_size = @min(serve_info.maxBodySize orelse 1_048_576, LuaHelper.MAX_LUAU_SIZE),
-            .max_connections = serve_info.maxConnections orelse 1024,
+            .client_timeout = serve_info.client_timeout orelse 10,
+            .max_body_size = @min(serve_info.max_body_size orelse 1_048_576, LuaHelper.MAX_LUAU_SIZE),
+            .max_connections = serve_info.max_connections orelse 1024,
         },
     };
 

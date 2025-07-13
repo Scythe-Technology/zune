@@ -44,7 +44,7 @@ describe("thread", function()
         local bytecode = luau.compile([[
             print("Hello from thread!");
         ]]);
-        local _ = thread.fromBytecode(bytecode, { chunkName = "test" });
+        local _ = thread.fromBytecode(bytecode, { chunk_name = "test" });
         -- since it hasn't started, GC would clean
         -- up the thread automatically
     end)
@@ -53,7 +53,7 @@ describe("thread", function()
         local bytecode = luau.compile([[
             print("Hello from thread!");
         ]]);
-        local t = thread.fromBytecode(bytecode, { chunkName = "test" });
+        local t = thread.fromBytecode(bytecode, { chunk_name = "test" });
         -- Joining a thread that has not been started
         -- should do nothing
         noYield(function()
@@ -66,7 +66,7 @@ describe("thread", function()
         local bytecode = luau.compile([[
             print("Hello from thread!");
         ]]);
-        local t = thread.fromBytecode(bytecode, { chunkName = "test" });
+        local t = thread.fromBytecode(bytecode, { chunk_name = "test" });
         noYield(function()
             -- start should never yield in any case
             t:start();
@@ -82,7 +82,7 @@ describe("thread", function()
             zune.task.wait(0.25);
         ]]);
         local t = thread.fromBytecode(bytecode, {
-            chunkName = "test",
+            chunk_name = "test",
         });
         noYield(function()
             t:start();
@@ -99,7 +99,7 @@ describe("thread", function()
             zune.task.wait(0.25);
         ]]);
         local t = thread.fromBytecode(bytecode, {
-            chunkName = "test",
+            chunk_name = "test",
         });
         noYield(function()
             t:start();
@@ -118,7 +118,7 @@ describe("thread", function()
             zune.thread.send(debug.info(1, "sl"));
         ]]);
         local t = thread.fromBytecode(bytecode, {
-            chunkName = "test",
+            chunk_name = "test",
         });
         t:start();
         t:join();
@@ -138,7 +138,7 @@ describe("thread", function()
             zune.thread.send(debug.info(1, "sl"));
         ]]);
         local t = thread.fromBytecode(bytecode, {
-            chunkName = "test 2",
+            chunk_name = "test 2",
         });
         t:start();
         expectYield(function()
@@ -158,7 +158,7 @@ describe("thread", function()
             print("Received message:", msg);
         ]]);
         local t = thread.fromBytecode(bytecode, {
-            chunkName = "test",
+            chunk_name = "test",
         });
         t:start();
         noYield(function()
@@ -174,7 +174,7 @@ describe("thread", function()
             error("Some error");
         ]]);
         local t = thread.fromBytecode(bytecode, {
-            chunkName = "test",
+            chunk_name = "test",
         });
         t:start();
         t:join();
@@ -194,7 +194,7 @@ describe("thread", function()
             end
         ]]);
         local t = thread.fromBytecode(bytecode, {
-            chunkName = "echo",
+            chunk_name = "echo",
         });
         noYield(function()
             -- should be possible to send data
@@ -222,7 +222,7 @@ describe("thread", function()
             end
         ]]);
         local t = thread.fromBytecode(bytecode, {
-            chunkName = "echo values",
+            chunk_name = "echo values",
         });
 
         local function sendExpect(...)
