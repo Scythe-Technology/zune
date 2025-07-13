@@ -174,7 +174,7 @@ pub fn LuaEncoder(comptime json_kind: JsonKind) fn (L: *VM.lua.State) anyerror!i
             const config_type = L.typeOf(2);
             if (!config_type.isnoneornil()) {
                 try L.Zchecktype(2, .Table);
-                const indent_type = L.rawgetfield(2, "prettyIndent");
+                const indent_type = L.rawgetfield(2, "pretty_indent");
                 if (!indent_type.isnoneornil()) {
                     try L.Zchecktype(-1, .Number);
                     kind = switch (L.tointeger(-1) orelse unreachable) {
@@ -253,7 +253,7 @@ pub fn LuaDecoder(comptime json_kind: JsonKind) fn (L: *VM.lua.State) anyerror!i
             const config_type = L.typeOf(2);
             if (!config_type.isnoneornil()) {
                 try L.Zchecktype(2, .Table);
-                const preserve_null_type = L.rawgetfield(2, "preserveNull");
+                const preserve_null_type = L.rawgetfield(2, "preserve_null");
                 if (!preserve_null_type.isnoneornil()) {
                     try L.Zchecktype(-1, .Boolean);
                     preserve_null = L.toboolean(-1);
@@ -300,17 +300,18 @@ pub fn lua_setprops(L: *VM.lua.State) void {
     L.setfield(VM.lua.REGISTRYINDEX, "_SERDE_JSON_NULL");
     NULL_PTR = L.topointer(-1) orelse unreachable;
 
-    L.setfield(-2, "Null");
-    L.setfield(-2, "Values");
+    L.setfield(-2, "null");
+    L.setreadonly(-1, true);
+    L.setfield(-2, "values");
 
     L.Zpushvalue(.{
-        .None = 0,
-        .TwoSpaces = 1,
-        .FourSpaces = 2,
-        .Tabs = 3,
+        .none = 0,
+        .twoSpaces = 1,
+        .fourSpaces = 2,
+        .tabs = 3,
     });
     L.setreadonly(-1, true);
-    L.setfield(-2, "Indents");
+    L.setfield(-2, "indents");
 
     L.setreadonly(-1, true);
 }

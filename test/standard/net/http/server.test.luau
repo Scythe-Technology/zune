@@ -14,11 +14,11 @@ test("Basic", function()
     local requests: {ServerRequest} = {};
     local server = net.http.serve({
         port = 8080,
-        reuseAddress = true,
+        reuse_address = true,
         request = function(req)
             table.insert(requests, req);
             return {
-                statusCode = 200,
+                status_code = 200,
                 body = "Hello",
             }
         end,
@@ -28,11 +28,11 @@ test("Basic", function()
     local res = net.http.request("http://localhost:8080");
     expect(res).toBe(expect.type("table"));
     expect(res.ok).toBe(true);
-    expect(res.statusCode).toBe(200);
+    expect(res.status_code).toBe(200);
     expect(res.body).toBe("Hello");
     expect(res.headers).toBe(expect.type("table"));
     expect(res.headers["Content-Length"]).toBe("5");
-    expect(res.statusReason).toBe("OK");
+    expect(res.status_reason).toBe("OK");
 
     expect(requests).toHaveLength(1);
 
@@ -68,11 +68,11 @@ test("Other method", function()
     local requests: {ServerRequest} = {};
     local server = net.http.serve({
         port = 8080,
-        reuseAddress = true,
+        reuse_address = true,
         request = function(req)
             table.insert(requests, req);
             return {
-                statusCode = 200,
+                status_code = 200,
                 body = "Hello",
             }
         end,
@@ -91,11 +91,11 @@ test("Other method", function()
     });
     expect(res).toBe(expect.type("table"));
     expect(res.ok).toBe(true);
-    expect(res.statusCode).toBe(200);
+    expect(res.status_code).toBe(200);
     expect(res.body).toBe("Hello");
     expect(res.headers).toBe(expect.type("table"));
     expect(res.headers["Content-Length"]).toBe("5");
-    expect(res.statusReason).toBe("OK");
+    expect(res.status_reason).toBe("OK");
 
     expect(requests).toHaveLength(1);
 
@@ -115,11 +115,11 @@ test("Basic Table Buffer", function()
     local requests = {};
     local server = net.http.serve({
         port = 8080,
-        reuseAddress = true,
+        reuse_address = true,
         request = function(req)
             table.insert(requests, req);
             return {
-                statusCode = 200,
+                status_code = 200,
                 body = buffer.fromstring("Hello Table Buffer"),
             }
         end,
@@ -129,11 +129,11 @@ test("Basic Table Buffer", function()
     local res = net.http.request("http://localhost:8080");
     expect(res).toBe(expect.type("table"));
     expect(res.ok).toBe(true);
-    expect(res.statusCode).toBe(200);
+    expect(res.status_code).toBe(200);
     expect(res.body).toBe("Hello Table Buffer");
     expect(res.headers).toBe(expect.type("table"));
     expect(res.headers["Content-Length"]).toBe("18");
-    expect(res.statusReason).toBe("OK");
+    expect(res.status_reason).toBe("OK");
 
     expect(requests).toHaveLength(1);
 
@@ -154,7 +154,7 @@ test("Basic Buffer", function()
     local requests = {};
     local server = net.http.serve({
         port = 8080,
-        reuseAddress = true,
+        reuse_address = true,
         request = function(req)
             table.insert(requests, req);
             return buffer.fromstring("Hello Buffer");
@@ -165,11 +165,11 @@ test("Basic Buffer", function()
     local res = net.http.request("http://localhost:8080");
     expect(res).toBe(expect.type("table"));
     expect(res.ok).toBe(true);
-    expect(res.statusCode).toBe(200);
+    expect(res.status_code).toBe(200);
     expect(res.body).toBe("Hello Buffer");
     expect(res.headers).toBe(expect.type("table"));
     expect(res.headers["Content-Length"]).toBe("12");
-    expect(res.statusReason).toBe("OK");
+    expect(res.status_reason).toBe("OK");
 
     expect(requests).toHaveLength(1);
 
@@ -190,7 +190,7 @@ test("Long Term", function()
     local requests = {};
     local server = net.http.serve({
         port = 8080,
-        reuseAddress = true,
+        reuse_address = true,
         request = function(req)
             table.insert(requests, req);
             return "Hello: " .. #requests;
@@ -206,11 +206,11 @@ test("Long Term", function()
 
         expect(res).toBe(expect.type("table"));
         expect(res.ok).toBe(true);
-        expect(res.statusCode).toBe(200);
+        expect(res.status_code).toBe(200);
         expect(res.body).toBe("Hello: " .. requestsMade);
         expect(res.headers).toBe(expect.type("table"));
         expect(res.headers["Content-Length"]).toBe(tostring(7 + #tostring(requestsMade)));
-        expect(res.statusReason).toBe("OK");
+        expect(res.status_reason).toBe("OK");
 
         expect(requests).toHaveLength(requestsMade);
 
@@ -247,8 +247,8 @@ test("Short Capacity", function()
     local requests = {};
     local server = net.http.serve({
         port = 8080,
-        reuseAddress = true,
-        maxConnections = 1,
+        reuse_address = true,
+        max_connections = 1,
         request = function(req)
             table.insert(requests, req);
             return "Hello: " .. #requests;
@@ -265,11 +265,11 @@ test("Short Capacity", function()
     
             expect(res).toBe(expect.type("table"));
             expect(res.ok).toBe(true);
-            expect(res.statusCode).toBe(200);
+            expect(res.status_code).toBe(200);
             expect(res.body).toBe("Hello: " .. requestsMade);
             expect(res.headers).toBe(expect.type("table"));
             expect(res.headers["Content-Length"]).toBe(tostring(7 + #tostring(requestsMade)));
-            expect(res.statusReason).toBe("OK");
+            expect(res.status_reason).toBe("OK");
     
             expect(requests).toHaveLength(requestsMade);
     
@@ -310,9 +310,9 @@ test("Fast Timeout", function()
     local requests = {};
     local server = net.http.serve({
         port = 8080,
-        reuseAddress = true,
-        maxConnections = 1,
-        clientTimeout = 1,
+        reuse_address = true,
+        max_connections = 1,
+        client_timeout = 1,
         request = function(req)
             table.insert(requests, req);
             return "Hello: " .. #requests;
@@ -371,7 +371,7 @@ describe("Server Error", function()
     test("Immediate", function()
         local server = net.http.serve({
             port = 8080,
-            reuseAddress = true,
+            reuse_address = true,
             request = function(req)
                 error("Server Error");
             end,
@@ -385,17 +385,17 @@ describe("Server Error", function()
         local res = net.http.request("http://localhost:8080");
         expect(res).toBe(expect.type("table"));
         expect(res.ok).toBe(false);
-        expect(res.statusCode).toBe(500);
+        expect(res.status_code).toBe(500);
         expect(res.body).toBe("An error occurred on the server");
         expect(res.headers).toBe(expect.type("table"));
         expect(res.headers["Content-Length"]).toBe("31");
         expect(res.headers["Content-Type"]).toBe("text/plain");
-        expect(res.statusReason).toBe("Internal Server Error");
+        expect(res.status_reason).toBe("Internal Server Error");
     end)
     test("Yielded", function()
         local server = net.http.serve({
             port = 8080,
-            reuseAddress = true,
+            reuse_address = true,
             request = function(req)
                 task.wait();
                 error("Server Error");
@@ -410,12 +410,12 @@ describe("Server Error", function()
         local res = net.http.request("http://localhost:8080");
         expect(res).toBe(expect.type("table"));
         expect(res.ok).toBe(false);
-        expect(res.statusCode).toBe(500);
+        expect(res.status_code).toBe(500);
         expect(res.body).toBe("An error occurred on the server");
         expect(res.headers).toBe(expect.type("table"));
         expect(res.headers["Content-Length"]).toBe("31");
         expect(res.headers["Content-Type"]).toBe("text/plain");
-        expect(res.statusReason).toBe("Internal Server Error");
+        expect(res.status_reason).toBe("Internal Server Error");
     end)
 end)
 

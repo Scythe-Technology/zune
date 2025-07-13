@@ -35,8 +35,8 @@ pub fn lua_hash(L: *VM.lua.State) !i32 {
             L.pop(1);
             switch (algorithm) {
                 .argon2 => {
-                    cost = try L.Zcheckfield(?u32, 2, "memoryCost") orelse cost;
-                    cost2 = try L.Zcheckfield(?u32, 2, "timeCost") orelse cost2;
+                    cost = try L.Zcheckfield(?u32, 2, "memory_cost") orelse cost;
+                    cost2 = try L.Zcheckfield(?u32, 2, "time_cost") orelse cost2;
                     threads = try L.Zcheckfield(?u24, 2, "threads") orelse threads;
                     L.pop(3);
                 },

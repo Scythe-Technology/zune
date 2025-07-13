@@ -69,15 +69,14 @@ fn lua_load(L: *VM.lua.State) !i32 {
     const bytecode = try L.Zcheckvalue([]const u8, 1, null);
 
     const Options = struct {
-        nativeCodeGen: bool = false,
-        chunkName: [:0]const u8 = "(load)",
+        native_code_gen: bool = false,
+        chunk_name: [:0]const u8 = "(load)",
     };
     const opts: Options = try L.Zcheckvalue(?Options, 2, null) orelse .{};
 
-    var useCodeGen = opts.nativeCodeGen;
-    const chunkName = opts.chunkName;
+    var use_code_gen = opts.native_code_gen;
 
-    try L.load(chunkName, bytecode, 0);
+    try L.load(opts.chunk_name, bytecode, 0);
 
     if (L.typeOf(-1) != .Function)
         return L.Zerror("Luau Error (Bad Load)");
@@ -86,17 +85,17 @@ fn lua_load(L: *VM.lua.State) !i32 {
         if (L.rawgetfield(2, "env") == .Table) {
             // TODO: should allow env to have a metatable?
             if (L.getmetatable(-1)) {
-                useCodeGen = false; // dynamic env, disable codegen
+                use_code_gen = false; // dynamic env, disable codegen
                 L.pop(1); // drop metatable
             }
-            if (useCodeGen)
+            if (use_code_gen)
                 L.setsafeenv(-1, true);
             if (!L.setfenv(-2))
                 return L.Zerror("Luau Error (Bad Env)");
         } else L.pop(1);
     }
 
-    if (useCodeGen and luau.CodeGen.Supported() and Zune.STATE.LUAU_OPTIONS.JIT_ENABLED)
+    if (use_code_gen and luau.CodeGen.Supported() and Zune.STATE.LUAU_OPTIONS.JIT_ENABLED)
         luau.CodeGen.Compile(L, -1);
 
     return 1;
@@ -197,7 +196,7 @@ fn lua_parse(L: *VM.lua.State) !i32 {
                 L.rawseti(-2, count);
             }
         }
-        L.setfield(-2, "commentLocations");
+        L.setfield(-2, "comment_locations");
 
         {
             L.createtable(@truncate(@as(isize, @intCast(parseResult.hotcomments.size()))), 0);
@@ -218,7 +217,7 @@ fn lua_parse(L: *VM.lua.State) !i32 {
                 L.rawseti(-2, count);
             }
         }
-        L.setfield(-2, "hotcomments");
+        L.setfield(-2, "hot_comments");
     }
 
     return 1;
@@ -295,7 +294,7 @@ fn lua_parseExpr(L: *VM.lua.State) !i32 {
                 L.rawseti(-2, count);
             }
         }
-        L.setfield(-2, "commentLocations");
+        L.setfield(-2, "comment_locations");
 
         {
             L.createtable(@truncate(@as(isize, @intCast(parseResult.hotcomments.size()))), 0);
@@ -316,7 +315,7 @@ fn lua_parseExpr(L: *VM.lua.State) !i32 {
                 L.rawseti(-2, count);
             }
         }
-        L.setfield(-2, "hotcomments");
+        L.setfield(-2, "hot_comments");
     }
 
     return 1;

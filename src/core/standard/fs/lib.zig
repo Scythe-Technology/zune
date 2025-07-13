@@ -172,14 +172,14 @@ fn internal_lossyfloat_time(n: i128) f64 {
 
 fn internal_metadata_table(L: *VM.lua.State, metadata: fs.File.Metadata, isSymlink: bool) void {
     L.Zpushvalue(.{
-        .createdAt = internal_lossyfloat_time(metadata.created() orelse 0),
-        .modifiedAt = internal_lossyfloat_time(metadata.modified()),
-        .accessedAt = internal_lossyfloat_time(metadata.accessed()),
+        .created_at = internal_lossyfloat_time(metadata.created() orelse 0),
+        .modified_at = internal_lossyfloat_time(metadata.modified()),
+        .accessed_at = internal_lossyfloat_time(metadata.accessed()),
         .symlink = isSymlink,
         .size = metadata.size(),
         .kind = @tagName(metadata.kind()),
         .permissions = .{
-            .readOnly = metadata.permissions().readOnly(),
+            .read_only = metadata.permissions().readOnly(),
         },
     });
 }

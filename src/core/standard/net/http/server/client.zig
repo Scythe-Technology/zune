@@ -35,7 +35,7 @@ pub fn StaticResponse(comptime res: HttpStaticResponse) []const u8 {
     comptime for (res.headers) |header| {
         part = part ++ header ++ "\r\n";
     };
-    part = part ++ "Server: Zune\r\n";
+    part = part ++ "Server: zune\r\n";
     comptime if (res.body) |body| jmp: {
         if (body.len == 0)
             break :jmp;
@@ -336,9 +336,9 @@ pub fn processResponse(
 ) !void {
     switch (L.typeOf(-1)) {
         .Table => {
-            if (L.rawgetfield(-1, "statusCode") != .Number) {
+            if (L.rawgetfield(-1, "status_code") != .Number) {
                 L.pop(1);
-                L.pushlstring("Field 'statusCode' must be a number");
+                L.pushlstring("Field 'status_code' must be a number");
                 return error.Runtime;
             }
             const statusCode = L.Lcheckinteger(-1);
@@ -347,6 +347,11 @@ pub fn processResponse(
                 L.pushlstring("Status code must be between 100 and 599");
                 return error.Runtime;
             }
+            const statusReason = std.http.Status.phrase(@enumFromInt(statusCode)) orelse {
+                L.pop(1);
+                L.pushlstring("Unknown status code");
+                return error.Runtime;
+            };
 
             var response: std.ArrayListUnmanaged(u8) = try .initCapacity(allocator, 1024 * 2);
             defer response.deinit(allocator);
@@ -355,7 +360,7 @@ pub fn processResponse(
 
             try writer.print("HTTP/1.1 {d} {s}\r\n", .{
                 statusCode,
-                std.http.Status.phrase(@enumFromInt(statusCode)).?,
+                statusReason,
             });
 
             var written_headers: packed struct {
@@ -420,7 +425,7 @@ pub fn processResponse(
                 try response.appendSlice(allocator, "\r\n");
             }
             if (!written_headers.server) {
-                try response.appendSlice(allocator, "Server: Zune\r\n");
+                try response.appendSlice(allocator, "Server: zune\r\n");
             }
 
             const body: ?[]const u8 = switch (L.rawgetfield(-3, "body")) {
@@ -455,7 +460,7 @@ pub fn processResponse(
             try writer.writeAll("Date: ");
             try time.Datetime.nowUTC().toString("%:a, %d %:b %Y %H:%M:%S GMT", writer);
 
-            const response = try std.fmt.allocPrint(allocator, "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n{s}\r\nServer: Zune\r\nContent-Length: {d}\r\n\r\n{s}", .{ stream.getWritten(), content.len, content });
+            const response = try std.fmt.allocPrint(allocator, "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n{s}\r\nServer: zune\r\nContent-Length: {d}\r\n\r\n{s}", .{ stream.getWritten(), content.len, content });
             defer allocator.free(response);
             self.writeAll(response);
         },
@@ -669,8 +674,8 @@ pub fn requestResumed(self: *Self, L: *VM.lua.State, _: *Scheduler) void {
 
     self.processResponse(allocator, L) catch |err| {
         if (err == error.Runtime) {
-            if (L.typeOf(-2) == .Function)
-                Engine.logFnDef(L, -2);
+            if (L.typeOf(-3) == .Function)
+                Engine.logFnDef(L, -3);
         }
         self.state.stage = .closing;
         self.writeAll(HTTP_500);
