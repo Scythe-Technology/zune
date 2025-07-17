@@ -56,19 +56,19 @@ fn require_finished(self: *RequireContext, ML: *VM.lua.State, _: *Scheduler) voi
 
     const GL = ML.mainthread();
 
-    GL.rawcheckstack(2);
+    GL.rawcheckstack(2) catch |e| std.debug.panic("{}", .{e});
 
-    _ = GL.Lfindtable(VM.lua.REGISTRYINDEX, "_MODULES", 1);
+    _ = GL.Lfindtable(VM.lua.REGISTRYINDEX, "_MODULES", 1) catch |e| std.debug.panic("{}", .{e});
     if (outErr != null)
         GL.pushlightuserdata(@constCast(@ptrCast(&ErrorState)))
     else
         ML.xpush(GL, -1);
     if (GL.typeOf(-1) != .Nil) {
-        GL.setfield(-2, self.path); // SET: _MODULES[moduleName] = module
+        GL.rawsetfield(-2, self.path) catch |e| std.debug.panic("{}", .{e}); // SET: _MODULES[moduleName] = module
     } else {
         GL.pop(1); // drop: nil
         GL.pushlightuserdata(@constCast(@ptrCast(&LoadedState)));
-        GL.setfield(-2, self.path); // SET: _MODULES[moduleName] = <tag>
+        GL.rawsetfield(-2, self.path) catch |e| std.debug.panic("{}", .{e}); // SET: _MODULES[moduleName] = <tag>
     }
 
     GL.pop(1); // drop: _MODULES
@@ -77,13 +77,13 @@ fn require_finished(self: *RequireContext, ML: *VM.lua.State, _: *Scheduler) voi
         const L = item.state.value;
         if (i == 0) {
             if (outErr) |msg| {
-                L.pushlstring(msg);
+                L.pushlstring(msg) catch |e| std.debug.panic("{}", .{e});
                 _ = Scheduler.resumeStateError(L, null) catch {};
                 continue;
             }
         }
         if (outErr != null) {
-            L.pushlstring("requested module failed to load");
+            L.pushlstring("requested module failed to load") catch |e| std.debug.panic("{}", .{e});
             _ = Scheduler.resumeStateError(L, null) catch {};
         } else {
             ML.xpush(L, -1);
@@ -152,9 +152,9 @@ pub fn getFilePath(source: ?[]const u8) []const u8 {
     return ".";
 }
 
-inline fn setErrorState(L: *VM.lua.State, moduleName: [:0]const u8) void {
+inline fn setErrorState(L: *VM.lua.State, moduleName: [:0]const u8) !void {
     L.pushlightuserdata(@constCast(@ptrCast(&ErrorState)));
-    L.setfield(-2, moduleName);
+    try L.rawsetfield(-2, moduleName);
 }
 
 pub fn resolveScriptPath(
@@ -218,7 +218,7 @@ pub fn checkSearchResult(
             try writer.print("{s}{s}", .{ path, entry.ext });
         }
 
-        L.pushlstring(buf.items);
+        try L.pushlstring(buf.items);
         return error.RaiseLuauError;
     }
 }
@@ -236,7 +236,7 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
 
     std.debug.assert(script_path.len <= std.fs.max_path_bytes - File.LARGEST_EXTENSION);
 
-    _ = L.Lfindtable(VM.lua.REGISTRYINDEX, "_MODULES", 1);
+    _ = try L.Lfindtable(VM.lua.REGISTRYINDEX, "_MODULES", 1);
 
     const search_result = blk: {
         var src_path_buf: [std.fs.max_path_bytes:0]u8 = undefined;
@@ -289,18 +289,18 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
     const module_relative_path = module_src_path[1..];
 
     const GL = L.mainthread();
-    const ML = GL.newthread();
+    const ML = try GL.newthread();
     GL.xmove(L, 1);
     {
         const file_content = file.handle.readToEndAlloc(allocator, std.math.maxInt(usize)) catch |err| {
-            setErrorState(L, module_relative_path);
+            try setErrorState(L, module_relative_path);
             return L.Zerrorf("could not read file: {}", .{err});
         };
         defer allocator.free(file_content);
 
-        ML.Lsandboxthread();
+        try ML.Lsandboxthread();
 
-        Engine.setLuaFileContext(ML, .{
+        try Engine.setLuaFileContext(ML, .{
             .source = file_content,
             .main = false,
         });
@@ -308,14 +308,14 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
         Engine.loadModule(ML, module_src_path, file_content, null) catch |err| switch (err) {
             error.Syntax => {
                 L.pop(1); // drop: thread
-                setErrorState(L, module_relative_path);
+                try setErrorState(L, module_relative_path);
                 return L.Zerror(ML.tostring(-1) orelse "UnknownError");
             },
         };
     }
 
     L.pushlightuserdata(@constCast(@ptrCast(&PreloadedState)));
-    L.setfield(-3, module_relative_path);
+    try L.setfield(-3, module_relative_path);
 
     switch (ML.resumethread(L, 0).check() catch |err| {
         Engine.logError(ML, err, false);
@@ -327,21 +327,21 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
             }
         }
         L.pop(1); // drop: thread
-        setErrorState(L, module_relative_path);
+        try setErrorState(L, module_relative_path);
         return L.Zerror("requested module failed to load");
     }) {
         .Ok => {
             const t = ML.gettop();
             if (t > 1) {
                 L.pop(1); // drop: thread
-                setErrorState(L, module_relative_path);
+                try setErrorState(L, module_relative_path);
                 return L.Zerror("module must return one value");
             } else if (t == 0)
                 ML.pushnil();
         },
         .Yield => {
             L.pushlightuserdata(@constCast(@ptrCast(&WaitingState)));
-            L.setfield(-3, module_relative_path);
+            try L.rawsetfield(-3, module_relative_path);
 
             {
                 const path = try allocator.dupeZ(u8, module_relative_path);
@@ -372,10 +372,10 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
     ML.xmove(L, 1);
     if (L.typeOf(-1) != .Nil) {
         L.pushvalue(-1);
-        L.setfield(-4, module_relative_path); // SET: _MODULES[moduleName] = module
+        try L.rawsetfield(-4, module_relative_path); // SET: _MODULES[moduleName] = module
     } else {
         L.pushlightuserdata(@constCast(@ptrCast(&LoadedState)));
-        L.setfield(-4, module_relative_path); // SET: _MODULES[moduleName] = <tag>
+        try L.rawsetfield(-4, module_relative_path); // SET: _MODULES[moduleName] = <tag>
     }
 
     return 1;

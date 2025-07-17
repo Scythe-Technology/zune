@@ -16,12 +16,12 @@ fn tostring(allocator: std.mem.Allocator, L: *VM.lua.State, idx: i32) !?[]const 
 }
 
 fn writeMetamethod__tostring(L: *VM.lua.State, writer: anytype, idx: i32) !bool {
-    if (!L.checkstack(2))
+    if (!try L.checkstack(2))
         return error.StackOverflow;
     L.pushvalue(idx);
     defer L.pop(1); // drop: value
     if (L.getmetatable(-1)) {
-        if (!L.checkstack(2))
+        if (!try L.checkstack(2))
             return error.StackOverflow;
         const metaType = L.rawgetfield(-1, "__tostring");
         defer L.pop(2); // drop: field(or result of function), metatable
@@ -114,7 +114,7 @@ pub fn printValue(
                         try Zune.debug.writerPrint(writer, "<dim><<{s}>> {{<clear>\n", .{str});
                     } else try Zune.debug.writerPrint(writer, "<dim><<table>> {{<clear>\n", .{});
                 } else try Zune.debug.writerPrint(writer, "<dim>{{<clear>\n", .{});
-                if (!L.checkstack(3))
+                if (!try L.checkstack(3))
                     return error.StackOverflow;
                 var i: i32 = L.rawiter(idx, 0);
                 while (i >= 0) : (i = L.rawiter(idx, i)) {
@@ -202,7 +202,7 @@ pub fn args(L: *VM.lua.State) !i32 {
     const top = L.gettop();
     const allocator = luau.getallocator(L);
     if (top == 0) {
-        L.pushlstring("");
+        try L.pushlstring("");
         return 1;
     }
     var buffer = std.ArrayList(u8).init(allocator);
@@ -212,7 +212,7 @@ pub fn args(L: *VM.lua.State) !i32 {
 
     try writeBuffer(L, allocator, writer, @intCast(top), Zune.STATE.FORMAT.MAX_DEPTH);
 
-    L.pushlstring(buffer.items);
+    try L.pushlstring(buffer.items);
 
     return 1;
 }
