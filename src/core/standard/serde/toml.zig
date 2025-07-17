@@ -353,13 +353,13 @@ const WHITESPACE_LINE = [_]u8{ 32, '\t', '\r', '\n' };
 const DELIMITER = [_]u8{ 32, '\t', '\r', '\n', '}', ']', ',' };
 const NEWLINE = [_]u8{ '\r', '\n' };
 
-fn decodeGenerateName(L: *VM.lua.State, name: []const u8, comptime includeLast: bool) Error!void {
+fn decodeGenerateName(L: *VM.lua.State, name: []const u8, comptime includeLast: bool) !void {
     var last_pos: usize = 0;
     var p: usize = 0;
     while (p < name.len) switch (name[p]) {
         '"', '\'' => {
             const slice = name[last_pos..];
-            L.newtable();
+            try L.newtable();
             var tempInfo = DecodeInfo{};
             const str_p = try decodeString(L, slice, false, &tempInfo);
             if (slice.len == str_p) {
@@ -368,11 +368,11 @@ fn decodeGenerateName(L: *VM.lua.State, name: []const u8, comptime includeLast: 
             }
             p += str_p;
             L.pushvalue(-1);
-            const ttype = L.gettable(-4);
+            const ttype = L.rawget(-4);
             if (ttype.isnoneornil()) {
                 L.pop(1);
                 L.pushvalue(-2);
-                L.settable(-4);
+                try L.rawset(-4);
             } else if (ttype != .Table) return Error.InvalidTable else {
                 L.remove(-2);
                 L.remove(-2);
@@ -382,15 +382,15 @@ fn decodeGenerateName(L: *VM.lua.State, name: []const u8, comptime includeLast: 
         '.' => {
             const slice = name[last_pos..p];
             p += 1;
-            L.newtable();
+            try L.newtable();
             try validateWord(slice);
-            L.pushlstring(slice);
+            try L.pushlstring(slice);
             L.pushvalue(-1);
-            const ttype = L.gettable(-4);
+            const ttype = L.rawget(-4);
             if (ttype.isnoneornil()) {
                 L.pop(1);
                 L.pushvalue(-2);
-                L.settable(-4);
+                try L.rawset(-4);
             } else if (ttype != .Table) return Error.InvalidTable else {
                 L.remove(-2);
                 L.remove(-2);
@@ -405,21 +405,21 @@ fn decodeGenerateName(L: *VM.lua.State, name: []const u8, comptime includeLast: 
 
     const slice = name[last_pos..];
     if (includeLast)
-        L.newtable();
+        try L.newtable();
     if (slice[0] == '\'' or slice[0] == '"') {
         var tempInfo = DecodeInfo{};
         _ = decodeString(L, slice, false, &tempInfo) catch return Error.InvalidIndexString;
     } else {
         try validateWord(slice);
-        L.pushlstring(slice);
+        try L.pushlstring(slice);
     }
     if (includeLast) {
         L.pushvalue(-1);
-        const ttype = L.gettable(-4);
+        const ttype = L.rawget(-4);
         if (ttype.isnoneornil()) {
             L.pop(1);
             L.pushvalue(-2);
-            L.settable(-4);
+            try L.rawset(-4);
         } else if (ttype != .Table) return Error.InvalidTable else {
             L.remove(-2);
             L.remove(-2);
@@ -427,16 +427,16 @@ fn decodeGenerateName(L: *VM.lua.State, name: []const u8, comptime includeLast: 
     }
 }
 
-fn decodeString(L: *VM.lua.State, string: []const u8, comptime multi: bool, info: *DecodeInfo) Error!usize {
+fn decodeString(L: *VM.lua.State, string: []const u8, comptime multi: bool, info: *DecodeInfo) !usize {
     if (string.len < if (multi) 6 else 2)
         return Error.InvalidString;
     if (multi) {
         if (std.mem.eql(u8, string[0..2], string[3..6])) {
-            L.pushstring("");
+            try L.pushstring("");
             return 6;
         }
     } else if (string[0] == string[1]) {
-        L.pushstring("");
+        try L.pushstring("");
         return 2;
     }
 
@@ -534,14 +534,14 @@ fn decodeString(L: *VM.lua.State, string: []const u8, comptime multi: bool, info
     };
     if (!eof)
         return Error.InvalidStringEof;
-    L.pushlstring(buf.items);
+    try L.pushlstring(buf.items);
     return end;
 }
 
-fn decodeArray(L: *VM.lua.State, string: []const u8, info: *DecodeInfo) Error!usize {
+fn decodeArray(L: *VM.lua.State, string: []const u8, info: *DecodeInfo) !usize {
     if (string.len < 2)
         return Error.MissingArray;
-    L.newtable();
+    try L.newtable();
 
     if (string[0] == string[1])
         return 2;
@@ -564,7 +564,7 @@ fn decodeArray(L: *VM.lua.State, string: []const u8, info: *DecodeInfo) Error!us
 
             end += try decodeValue(L, string[end..], info);
 
-            L.rawseti(-2, size);
+            try L.rawseti(-2, size);
 
             adjustment = Parser.nextNonCharacter(string[end..], &WHITESPACE_LINE);
             end += adjustment;
@@ -586,11 +586,11 @@ fn decodeArray(L: *VM.lua.State, string: []const u8, info: *DecodeInfo) Error!us
     return end;
 }
 
-fn decodeTable(L: *VM.lua.State, string: []const u8, info: *DecodeInfo) Error!usize {
+fn decodeTable(L: *VM.lua.State, string: []const u8, info: *DecodeInfo) !usize {
     if (string.len < 2)
         return Error.MissingTable;
 
-    L.newtable();
+    try L.newtable();
 
     if (string[0] == string[1])
         return 2;
@@ -631,7 +631,7 @@ fn decodeTable(L: *VM.lua.State, string: []const u8, info: *DecodeInfo) Error!us
 
             end += try decodeValue(L, string[end..], info);
 
-            L.settable(-3);
+            try L.settable(-3);
 
             returnTop(L, @intCast(main));
 
@@ -655,7 +655,7 @@ fn decodeTable(L: *VM.lua.State, string: []const u8, info: *DecodeInfo) Error!us
     return end;
 }
 
-fn decodeValue(L: *VM.lua.State, string: []const u8, info: *DecodeInfo) !usize {
+fn decodeValue(L: *VM.lua.State, string: []const u8, info: *DecodeInfo) anyerror!usize {
     switch (string[0]) {
         '"', '\'' => |c| {
             if (string.len > 2 and string[1] == c and string[2] == c)
@@ -667,7 +667,7 @@ fn decodeValue(L: *VM.lua.State, string: []const u8, info: *DecodeInfo) !usize {
         '0'...'9', '-' => {
             const end = Parser.nextCharacter(string, &DELIMITER);
             if (std.mem.indexOfScalar(u8, string[0..end], ':') != null)
-                L.pushlstring(string[0..end])
+                try L.pushlstring(string[0..end])
             else {
                 const num = std.fmt.parseFloat(f64, string[0..end]) catch return Error.InvalidNumber;
                 L.pushnumber(num);
@@ -712,7 +712,7 @@ const DecodeInfo = struct {
 };
 
 fn decode(L: *VM.lua.State, string: []const u8, info: *DecodeInfo) !void {
-    L.newtable();
+    try L.newtable();
     errdefer L.pop(1);
     const main = L.gettop();
     var pos = Parser.nextNonCharacter(string, &WHITESPACE);
@@ -740,7 +740,7 @@ fn decode(L: *VM.lua.State, string: []const u8, info: *DecodeInfo) !void {
             pos += try decodeValue(L, string[pos..], info);
             info.pos = pos;
 
-            L.settable(-3);
+            try L.settable(-3);
 
             returnTop(L, @intCast(last));
 
@@ -787,7 +787,7 @@ pub fn lua_encode(L: *VM.lua.State) !i32 {
 
     try encode(L, allocator, &buf, info);
 
-    L.pushlstring(buf.items);
+    try L.pushlstring(buf.items);
 
     return 1;
 }

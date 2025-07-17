@@ -251,7 +251,7 @@ const LuaPointer = struct {
         if (buf.len < @sizeOf(usize))
             return error.SmallBuffer;
 
-        const ptr = L.newuserdatataggedwithmetatable(LuaPointer, TAG_FFI_POINTER);
+        const ptr = try L.newuserdatataggedwithmetatable(LuaPointer, TAG_FFI_POINTER);
 
         ptr.* = .{
             .ptr = @ptrFromInt(std.mem.bytesToValue(usize, buf[0..@sizeOf(usize)])),
@@ -275,7 +275,7 @@ const LuaPointer = struct {
             break :blk &[0]u8{};
         };
 
-        const ptr = L.newuserdatataggedwithmetatable(LuaPointer, TAG_FFI_POINTER);
+        const ptr = try L.newuserdatataggedwithmetatable(LuaPointer, TAG_FFI_POINTER);
 
         ptr.* = .{
             .ptr = @ptrCast(@alignCast(mem)),
@@ -292,7 +292,7 @@ const LuaPointer = struct {
     }
 
     pub fn newStaticPtr(L: *VM.lua.State, staticPtr: ?*anyopaque, default_retain: bool) !*LuaPointer {
-        const ptr = L.newuserdatataggedwithmetatable(LuaPointer, TAG_FFI_POINTER);
+        const ptr = try L.newuserdatataggedwithmetatable(LuaPointer, TAG_FFI_POINTER);
 
         ptr.* = .{
             .ptr = staticPtr,
@@ -311,7 +311,7 @@ const LuaPointer = struct {
         const ref_ptr = value(L, 1) orelse return error.Failed;
         const allocator = luau.getallocator(L);
 
-        const ptr = L.newuserdatataggedwithmetatable(LuaPointer, TAG_FFI_POINTER);
+        const ptr = try L.newuserdatataggedwithmetatable(LuaPointer, TAG_FFI_POINTER);
 
         const mem = try allocator.create(*anyopaque);
         mem.* = @ptrCast(@alignCast(ref_ptr.ptr));
@@ -334,7 +334,7 @@ const LuaPointer = struct {
             ptr.retained = true;
             return;
         }
-        const local = L.ref(-1) orelse return error.Fail;
+        const local = try L.ref(-1) orelse return error.Fail;
         ptr.retained = true;
         ptr.local_ref = local;
     }
@@ -507,8 +507,8 @@ const LuaPointer = struct {
                             const push = if (comptime i.signedness == .signed) VM.lua.State.pushinteger else VM.lua.State.pushunsigned;
                             push(L, @intCast(std.mem.bytesToValue(T, mem[0..len])));
                         },
-                        8 => L.Zpushbuffer(mem[0..len]),
-                        16 => L.Zpushbuffer(mem[0..len]),
+                        8 => try L.Zpushbuffer(mem[0..len]),
+                        16 => try L.Zpushbuffer(mem[0..len]),
                         else => return error.Unsupported,
                     },
                     .pointer => _ = try LuaPointer.newStaticPtr(L, @ptrFromInt(std.mem.bytesToValue(usize, mem[0..@sizeOf(usize)])), false),
@@ -638,7 +638,7 @@ const LuaPointer = struct {
 
         const bytes: [:0]const u8 = std.mem.span(target[src_offset..]);
 
-        const buf = L.newbuffer(bytes.len + 1);
+        const buf = try L.newbuffer(bytes.len + 1);
         @memcpy(buf[0..bytes.len], bytes);
         buf[bytes.len] = 0;
 
@@ -715,7 +715,7 @@ const LuaPointer = struct {
         const str = try std.fmt.allocPrint(allocator, "<pointer: 0x{x}>", .{@as(usize, @intFromPtr(ptr.ptr))});
         defer allocator.free(str);
 
-        L.pushlstring(str);
+        try L.pushlstring(str);
 
         return 1;
     }
@@ -978,7 +978,7 @@ const LuaDataType = struct {
         if (result.index + 1 > std.math.maxInt(u32))
             return error.MaximumTagExceeded;
 
-        const datatype = L.newuserdatataggedwithmetatable(LuaDataType, TAG_FFI_DATATYPE);
+        const datatype = try L.newuserdatataggedwithmetatable(LuaDataType, TAG_FFI_DATATYPE);
 
         datatype.* = .{
             .type = .{
@@ -1016,8 +1016,8 @@ const LuaDataType = struct {
 
         for (fields_map.keys(), fields_map.values(), 0..) |field, field_value, order| {
             defer L.pop(1);
-            L.pushlstring(field);
-            if (L.gettable(2).isnoneornil())
+            try L.pushlstring(field);
+            if (L.rawget(2).isnoneornil())
                 return error.MissingField;
             const pos = offsets[order];
             const field_type = field_value;
@@ -1047,7 +1047,7 @@ const LuaDataType = struct {
             }
         }
 
-        L.Zpushbuffer(mem);
+        try L.Zpushbuffer(mem);
 
         return 1;
     }
@@ -1201,11 +1201,11 @@ const ffi_c_interface = struct {
                     .Buffer => {
                         const lua_buf = L.tobuffer(index).?;
                         if (lua_buf.len < size)
-                            return L.LerrorL("buffer too small", .{});
+                            return L.LerrorL("buffer too small", .{}) catch |e| std.debug.panic("{}", .{e});
                         return std.mem.bytesToValue(T, lua_buf[0..size]);
                     },
                     .Proto, .UpVal, .Deadkey => unreachable,
-                    inline else => |e| L.LerrorL("invalid argument type (got {s})", .{comptime VM.lapi.typename(e)}),
+                    inline else => |e| L.LerrorL("invalid argument type (got {s})", .{comptime VM.lapi.typename(e)}) catch |err| std.debug.panic("{}", .{err}),
                 }
             }
         }.inner;
@@ -1230,7 +1230,7 @@ const ffi_c_interface = struct {
                         if (isFloat)
                             L.pushnumber(value)
                         else
-                            L.Zpushbuffer(&@as([8]u8, @bitCast(value)));
+                            L.Zpushbuffer(&@as([8]u8, @bitCast(value))) catch |e| std.debug.panic("{}", .{e});
                     },
                     else => @compileError("Unsupported size"),
                 }
@@ -1261,11 +1261,11 @@ const ffi_c_interface = struct {
     pub const pushf64 = FFIArgumentPush(f64);
 
     pub fn pushpointer(L: *VM.lua.State, ptr: ?*anyopaque) callconv(.c) void {
-        _ = LuaPointer.newStaticPtr(L, ptr, false) catch L.LerrorL("Failed to create pointer", .{});
+        _ = LuaPointer.newStaticPtr(L, ptr, false) catch (L.LerrorL("Failed to create pointer", .{}) catch |e| std.debug.panic("{}", .{e}));
     }
 
     pub fn pushmem(L: *VM.lua.State, ptr: [*c]u8, size: usize) callconv(.c) void {
-        L.Zpushbuffer(ptr[0..size]);
+        L.Zpushbuffer(ptr[0..size]) catch |e| std.debug.panic("{}", .{e});
     }
 };
 
@@ -1320,7 +1320,7 @@ fn lua_struct(L: *VM.lua.State) !i32 {
         order += 1;
     }
 
-    const data = L.newuserdatataggedwithmetatable(LuaDataType, TAG_FFI_DATATYPE);
+    const data = try L.newuserdatataggedwithmetatable(LuaDataType, TAG_FFI_DATATYPE);
 
     const datatype, const offsets = try makeStruct(allocator, struct_map.values());
 
@@ -1577,7 +1577,7 @@ fn lua_dlopen(L: *VM.lua.State) !i32 {
         });
     }
 
-    const ptr = L.newuserdatadtor(LuaHandle, LuaHandle.__dtor);
+    const ptr = try L.newuserdatadtor(LuaHandle, LuaHandle.__dtor);
 
     ptr.* = .{
         .lib = undefined,
@@ -1589,9 +1589,9 @@ fn lua_dlopen(L: *VM.lua.State) !i32 {
     ptr.lib = lib;
     ptr.open = true;
 
-    L.createtable(0, 2);
+    try L.createtable(0, 2);
 
-    L.createtable(0, @intCast(func_map.count()));
+    try L.createtable(0, @intCast(func_map.count()));
     while (func_map.pop()) |entry| {
         const key = entry.key;
         const value = entry.value;
@@ -1607,23 +1607,23 @@ fn lua_dlopen(L: *VM.lua.State) !i32 {
         const code = try fetchCallableFunction(value.returns, value.args);
         errdefer code.unref();
 
-        L.pushlstring(key);
-        L.newuserdatadtor(FFIFunction, FFIFunction.__dtor).* = .{
+        try L.pushlstring(key);
+        (try L.newuserdatadtor(FFIFunction, FFIFunction.__dtor)).* = .{
             .lib = ptr,
             .callable = @ptrCast(@alignCast(code.getSymbol())),
             .code = code,
             .ptr = func,
         };
         L.pushvalue(-5);
-        L.pushcclosure(VM.zapi.toCFn(FFIFunction.fn_inner), "ffi_func", 2);
-        L.settable(-3);
+        try L.pushcclosure(VM.zapi.toCFn(FFIFunction.fn_inner), "ffi_func", 2);
+        try L.rawset(-3);
     }
-    L.setfield(-2, luau.Metamethods.index);
+    try L.rawsetfield(-2, luau.Metamethods.index);
 
-    L.Zsetfieldfn(-1, luau.Metamethods.namecall, LuaHandle.__namecall);
-    L.Zsetfield(-1, luau.Metamethods.metatable, "Metatable is locked");
+    try L.Zsetfieldfn(-1, luau.Metamethods.namecall, LuaHandle.__namecall);
+    try L.Zsetfield(-1, luau.Metamethods.metatable, "Metatable is locked");
 
-    _ = L.setmetatable(-2);
+    _ = try L.setmetatable(-2);
 
     return 1;
 }
@@ -1686,7 +1686,7 @@ fn FFIPushPtrType(
         .int => |int| {
             if (int.bits > 32) {
                 const bytes: [@divExact(int.bits, 8)]u8 = @bitCast(@as(*T, @ptrCast(@alignCast(ptr))).*);
-                L.Zpushbuffer(&bytes);
+                L.Zpushbuffer(&bytes) catch |e| std.debug.panic("{}", .{e});
                 return;
             }
             if (int.signedness == .signed)
@@ -1714,10 +1714,10 @@ fn ffi_closure_inner(call_info: *const LuaClosure.CallInfo, extern_args: [*]?*an
 
     const args = extern_args[0..call_info.args];
 
-    if (!call_info.thread.checkstack(1))
+    if (!(call_info.thread.checkstack(1) catch |e| std.debug.panic("{}", .{e})))
         return std.debug.panic("Failed to grow stack for ffi closure", .{});
 
-    const L = call_info.thread.newthread();
+    const L = call_info.thread.newthread() catch |e| std.debug.panic("{}", .{e});
     defer call_info.thread.pop(1);
     var ref: LuaHelper.Ref(void) = .{
         .ref = .{
@@ -1737,7 +1737,7 @@ fn ffi_closure_inner(call_info: *const LuaClosure.CallInfo, extern_args: [*]?*an
             },
             .@"struct" => {
                 const bytes: [*]u8 = @ptrCast(@alignCast(args[i]));
-                L.Zpushbuffer(bytes[0..arg_type.size]);
+                L.Zpushbuffer(bytes[0..arg_type.size]) catch |e| std.debug.panic("{}", .{e});
             },
             inline else => |_, tag| FFIPushPtrType(tag.asType(), L, args[i].?),
         }
@@ -1895,9 +1895,9 @@ fn lua_closure(L: *VM.lua.State) !i32 {
     };
     const callable = state.get_symbol("call_closure_ffi") orelse return error.BadCompilation;
 
-    call_ptr.ref = L.ref(2);
+    call_ptr.ref = try L.ref(2);
 
-    const data = L.newuserdatadtor(LuaClosure, LuaClosure.__dtor);
+    const data = try L.newuserdatadtor(LuaClosure, LuaClosure.__dtor);
 
     data.* = .{
         .allocator = allocator,
@@ -1912,23 +1912,23 @@ fn lua_closure(L: *VM.lua.State) !i32 {
         },
     };
 
-    L.createtable(0, 2);
+    try L.createtable(0, 2);
 
-    L.createtable(0, 1);
+    try L.createtable(0, 1);
     {
         L.pushvalue(2);
-        L.setfield(-2, "callback");
+        try L.rawsetfield(-2, "callback");
     }
-    L.setfield(-2, luau.Metamethods.index);
+    try L.rawsetfield(-2, luau.Metamethods.index);
 
     L.pushvalue(-3);
-    L.setfield(-2, "thread");
+    try L.rawsetfield(-2, "thread");
 
     L.setreadonly(-1, true);
 
-    _ = L.setmetatable(-2);
+    _ = try L.setmetatable(-2);
 
-    _ = L.ref(-1); // permenently reference the closure
+    _ = try L.ref(-1); // permenently reference the closure
 
     const ptr = try LuaPointer.newStaticPtr(L, data.callable, true);
     ptr.size = 0;
@@ -1945,19 +1945,19 @@ const FFIFunction = struct {
 
     pub const FFICallable = *align(8) const fn (lua_State: *anyopaque, fnPtr: *const anyopaque) callconv(.c) void;
 
-    pub fn fn_inner(L: *VM.lua.State) i32 {
+    pub fn fn_inner(L: *VM.lua.State) !i32 {
         const allocator = luau.getallocator(L);
         const self = L.touserdata(FFIFunction, VM.lua.upvalueindex(1)) orelse unreachable;
 
         if (self.lib) |lib|
             if (!lib.open)
-                return L.LerrorL("library is closed", .{});
+                return L.Zerrorf("library is closed", .{});
 
         const callable = self.callable;
 
         const arg_count = L.gettop();
         if (arg_count < self.code.sym.type.args.len)
-            return L.LerrorL("invalid number of arguments (expected {d} args, got {d} args)", .{ self.code.sym.type.args.len, arg_count });
+            return L.Zerrorf("invalid number of arguments (expected {d} args, got {d} args)", .{ self.code.sym.type.args.len, arg_count });
 
         var arena: ?std.heap.ArenaAllocator = null;
         defer if (arena) |a| a.deinit();
@@ -1974,42 +1974,26 @@ const FFIFunction = struct {
                         const idx: i32 = @intCast(i);
                         switch (L.typeOf(idx)) {
                             .Userdata => {
-                                const ptr = LuaPointer.value(L, idx) orelse {
-                                    arena.?.deinit();
-                                    return L.LerrorL("userdata is not a Pointer", .{});
-                                };
-                                if (ptr.destroyed) {
-                                    arena.?.deinit();
-                                    return L.LerrorL("Pointer no address available", .{});
-                                }
-                                if (ptr.data.tag != arg.kind.pointer.tag) {
-                                    arena.?.deinit();
-                                    return L.LerrorL("Pointer tag mismatch", .{});
-                                }
+                                const ptr = LuaPointer.value(L, idx) orelse return L.Zerrorf("userdata is not a Pointer", .{});
+                                if (ptr.destroyed)
+                                    return L.Zerrorf("Pointer no address available", .{});
+                                if (ptr.data.tag != arg.kind.pointer.tag)
+                                    return L.Zerrorf("Pointer tag mismatch", .{});
                                 ptrs[order] = @ptrCast(@alignCast(ptr.ptr));
                             },
                             .String => {
                                 const str: [:0]const u8 = L.tostring(idx).?;
-                                const dup = arena_allocator.dupeZ(u8, str) catch {
-                                    arena.?.deinit();
-                                    return L.LerrorL("OutOfMemory", .{});
-                                };
+                                const dup = arena_allocator.dupeZ(u8, str) catch return L.Zerrorf("OutOfMemory", .{});
                                 ptrs[order] = @ptrCast(@alignCast(dup.ptr));
                             },
                             .Buffer => {
                                 const buf = L.tobuffer(idx).?;
-                                const dup = arena_allocator.dupe(u8, buf) catch {
-                                    arena.?.deinit();
-                                    return L.LerrorL("OutOfMemory", .{});
-                                };
+                                const dup = arena_allocator.dupe(u8, buf) catch return L.Zerrorf("OutOfMemory", .{});
                                 ptrs[order] = @ptrCast(@alignCast(dup.ptr));
                             },
                             .Nil => ptrs[order] = @ptrFromInt(0),
                             .Proto, .UpVal, .Deadkey => unreachable,
-                            inline else => |e| {
-                                arena.?.deinit();
-                                return L.LerrorL("invalid argument type (got {s})", .{comptime VM.lapi.typename(e)});
-                            },
+                            inline else => |e| return L.Zerrorf("invalid argument type (got {s})", .{comptime VM.lapi.typename(e)}),
                         }
                     },
                     .@"struct" => {
@@ -2018,20 +2002,12 @@ const FFIFunction = struct {
                         switch (L.typeOf(idx)) {
                             .Buffer => {},
                             .Proto, .UpVal, .Deadkey => unreachable,
-                            inline else => |e| {
-                                arena.?.deinit();
-                                return L.LerrorL("invalid argument type (expected buffer, got {s})", .{comptime VM.lapi.typename(e)});
-                            },
+                            inline else => |e| return L.Zerrorf("invalid argument type (expected buffer, got {s})", .{comptime VM.lapi.typename(e)}),
                         }
                         const buf = L.tobuffer(idx).?;
-                        if (buf.len != arg.size) {
-                            arena.?.deinit();
-                            return L.LerrorL("invalid buffer size mismatch (expected {d} bytes, got {d} bytes)", .{ arg.size, buf.len });
-                        }
-                        const mem: []u8 = @alignCast((arena_allocator.rawAlloc(arg.size, .fromByteUnits(arg.alignment), @returnAddress()) orelse {
-                            arena.?.deinit();
-                            return L.LerrorL("OutOfMemory", .{});
-                        })[0..arg.size]);
+                        if (buf.len != arg.size)
+                            return L.Zerrorf("invalid buffer size mismatch (expected {d} bytes, got {d} bytes)", .{ arg.size, buf.len });
+                        const mem: []u8 = @alignCast((arena_allocator.rawAlloc(arg.size, .fromByteUnits(arg.alignment), @returnAddress()) orelse return L.Zerrorf("OutOfMemory", .{}))[0..arg.size]);
                         @memcpy(mem, buf);
                         ptrs[order] = @ptrCast(@alignCast(mem.ptr));
                     },
@@ -2111,7 +2087,7 @@ fn lua_fn(L: *VM.lua.State) !i32 {
     const code = try fetchCallableFunction(symbol_returns, args.items);
     errdefer code.unref();
 
-    const data = L.newuserdatadtor(FFIFunction, FFIFunction.__dtor);
+    const data = try L.newuserdatadtor(FFIFunction, FFIFunction.__dtor);
 
     data.* = .{
         .callable = @ptrCast(@alignCast(code.getSymbol())),
@@ -2119,7 +2095,7 @@ fn lua_fn(L: *VM.lua.State) !i32 {
         .ptr = ptr,
     };
 
-    L.pushcclosure(VM.zapi.toCFn(FFIFunction.fn_inner), "ffi_fn", 1);
+    try L.pushcclosure(VM.zapi.toCFn(FFIFunction.fn_inner), "ffi_fn", 1);
 
     return 1;
 }
@@ -2192,7 +2168,7 @@ fn lua_tagName(L: *VM.lua.State) !i32 {
         return 1;
     }
     const name = names[id - 1];
-    L.pushlstring(name);
+    try L.pushlstring(name);
     return 1;
 }
 
@@ -2296,79 +2272,79 @@ fn lua_dupe(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-pub fn loadLib(L: *VM.lua.State) void {
+pub fn loadLib(L: *VM.lua.State) !void {
     {
-        _ = L.Znewmetatable(@typeName(LuaDataType), .{
+        _ = try L.Znewmetatable(@typeName(LuaDataType), .{
             .__metatable = "Metatable is locked",
             .__type = "FFIDataType",
         });
-        LuaDataType.__index(L, -1);
+        try LuaDataType.__index(L, -1);
         L.setreadonly(-1, true);
         L.setuserdatadtor(LuaDataType, TAG_FFI_DATATYPE, LuaDataType.__dtor);
         L.setuserdatametatable(TAG_FFI_DATATYPE);
     }
     {
-        _ = L.Znewmetatable(@typeName(LuaPointer), .{
+        _ = try L.Znewmetatable(@typeName(LuaPointer), .{
             .__eq = LuaPointer.__eq,
             .__tostring = LuaPointer.__tostring,
             .__metatable = "Metatable is locked",
             .__type = "FFIPointer",
         });
-        LuaPointer.__index(L, -1);
+        try LuaPointer.__index(L, -1);
         L.setreadonly(-1, true);
         L.setuserdatadtor(LuaPointer, TAG_FFI_POINTER, LuaPointer.__dtor);
         L.setuserdatametatable(TAG_FFI_POINTER);
     }
 
-    L.createtable(0, 17);
+    try L.createtable(0, 17);
 
-    L.Zsetfieldfn(-1, "dlopen", lua_dlopen);
-    L.Zsetfieldfn(-1, "struct", lua_struct);
-    L.Zsetfieldfn(-1, "closure", lua_closure);
-    L.Zsetfieldfn(-1, "fn", lua_fn);
-    L.Zsetfield(-1, "supported", true);
+    try L.Zsetfieldfn(-1, "dlopen", lua_dlopen);
+    try L.Zsetfieldfn(-1, "struct", lua_struct);
+    try L.Zsetfieldfn(-1, "closure", lua_closure);
+    try L.Zsetfieldfn(-1, "fn", lua_fn);
+    try L.Zsetfield(-1, "supported", true);
 
-    L.Zsetfieldfn(-1, "alloc", lua_alloc);
-    L.Zsetfieldfn(-1, "free", lua_free);
-    L.Zsetfieldfn(-1, "copy", lua_copy);
-    L.Zsetfieldfn(-1, "len", lua_len);
-    L.Zsetfieldfn(-1, "dupe", lua_dupe);
+    try L.Zsetfieldfn(-1, "alloc", lua_alloc);
+    try L.Zsetfieldfn(-1, "free", lua_free);
+    try L.Zsetfieldfn(-1, "copy", lua_copy);
+    try L.Zsetfieldfn(-1, "len", lua_len);
+    try L.Zsetfieldfn(-1, "dupe", lua_dupe);
 
-    L.Zsetfieldfn(-1, "tagName", lua_tagName);
+    try L.Zsetfieldfn(-1, "tagName", lua_tagName);
 
-    L.Zsetfieldfn(-1, "getRef", LuaPointer.getRef);
-    L.Zsetfieldfn(-1, "createPtr", LuaPointer.ptrFromBuffer);
+    try L.Zsetfieldfn(-1, "getRef", LuaPointer.getRef);
+    try L.Zsetfieldfn(-1, "createPtr", LuaPointer.ptrFromBuffer);
 
-    L.Zsetfieldfn(-1, "getLuaState", lua_getLuaState);
+    try L.Zsetfieldfn(-1, "getLuaState", lua_getLuaState);
 
-    L.createtable(0, @intCast(@typeInfo(DataTypes.Types).@"struct".decls.len));
+    try L.createtable(0, @intCast(@typeInfo(DataTypes.Types).@"struct".decls.len));
     inline for (@typeInfo(DataTypes.Types).@"struct".decls, 0..) |decl, i| {
-        L.pushstring(decl.name[5..]);
-        const ptr = L.newuserdatataggedwithmetatable(LuaDataType, TAG_FFI_DATATYPE);
+        try L.pushstring(decl.name[5..]);
+        const ptr = try L.newuserdatataggedwithmetatable(LuaDataType, TAG_FFI_DATATYPE);
         ptr.* = .{
             .type = DataTypes.order[i].*,
         };
-        L.settable(-3);
+        try L.rawset(-3);
     }
     L.setreadonly(-1, true);
-    L.setfield(-2, "types");
+    try L.rawsetfield(-2, "types");
 
     switch (comptime builtin.os.tag) {
-        .linux => L.pushstring("so"),
-        .macos => L.pushstring("dylib"),
-        .windows => L.pushstring("dll"),
-        else => L.pushstring(""),
+        .linux => try L.pushstring("so"),
+        .macos => try L.pushstring("dylib"),
+        .windows => try L.pushstring("dll"),
+        else => try L.pushstring(""),
     }
-    L.setfield(-2, "suffix");
+    try L.rawsetfield(-2, "suffix");
 
     switch (comptime builtin.os.tag) {
-        .windows => L.pushstring(""),
-        else => L.pushstring("lib"),
+        .windows => try L.pushstring(""),
+        else => try L.pushstring("lib"),
     }
-    L.setfield(-2, "prefix");
+    try L.rawsetfield(-2, "prefix");
 
     L.setreadonly(-1, true);
-    LuaHelper.registerModule(L, LIB_NAME);
+    try LuaHelper.registerModule(L, LIB_NAME);
 }
 
 test "ffi" {

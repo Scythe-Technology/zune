@@ -438,7 +438,7 @@ pub fn onClose(
     self.state.stage = .closed;
 
     if (self.callbacks.close.hasRef()) {
-        const L = GL.newthread();
+        const L = GL.newthread() catch |e| std.debug.panic("{}", .{e});
         defer GL.pop(1);
         _ = self.callbacks.close.push(L);
         _ = self.ref.push(L);
@@ -569,14 +569,14 @@ fn onRecv(
 
             if (self.callbacks.message.hasRef()) {
                 const GL = self.lua_ref.value;
-                const L = GL.newthread();
+                const L = GL.newthread() catch |e| std.debug.panic("{}", .{e});
                 defer GL.pop(1);
 
                 _ = self.callbacks.message.push(L);
                 _ = self.ref.push(L);
                 switch (reader.header.opcode) {
-                    .Binary => L.Zpushbuffer(data),
-                    .Text => L.pushlstring(data),
+                    .Binary => L.Zpushbuffer(data) catch |e| std.debug.panic("{}", .{e}),
+                    .Text => L.pushlstring(data) catch |e| std.debug.panic("{}", .{e}),
                     else => unreachable,
                 }
                 _ = Scheduler.resumeState(L, null, 2) catch {};
@@ -714,12 +714,12 @@ pub const UpgradeHandshake = struct {
             var approved = true;
             if (self.callbacks.accept.hasRef()) {
                 const GL = self.lua_ref.value.mainthread();
-                const L = GL.newthread();
+                const L = GL.newthread() catch |e| std.debug.panic("{}", .{e});
                 defer GL.pop(1);
                 _ = self.callbacks.accept.push(L);
                 L.pushvalue(-1);
                 _ = self.ref.push(L);
-                parser.push(L);
+                parser.push(L) catch |e| std.debug.panic("{}", .{e});
                 _ = L.pcall(2, 1, 0).check() catch {
                     Zune.Runtime.Engine.logFnDef(L, 1);
                     return .disarm;
@@ -816,7 +816,7 @@ fn safeResumeWithError(
 
     if (L.status() != .Yield)
         return .disarm;
-    L.pushfstring("{s}", .{@errorName(err)});
+    L.pushfstring("{s}", .{@errorName(err)}) catch |e| std.debug.panic("{}", .{e});
     _ = Scheduler.resumeStateError(L, null) catch {};
     return .disarm;
 }
@@ -829,12 +829,12 @@ fn emitError(
     if (!self.callbacks.@"error".hasRef())
         return;
     const GL = self.lua_ref.value;
-    const L = GL.newthread();
+    const L = GL.newthread() catch |e| std.debug.panic("{}", .{e});
     defer GL.pop(1);
     _ = self.ref.push(L);
     _ = self.callbacks.@"error".push(L);
-    L.pushfstring("{s}", .{@tagName(scope)});
-    L.pushfstring("{s}", .{@errorName(err)});
+    L.pushfstring("{s}", .{@tagName(scope)}) catch |e| std.debug.panic("{}", .{e});
+    L.pushfstring("{s}", .{@errorName(err)}) catch |e| std.debug.panic("{}", .{e});
     _ = Scheduler.resumeState(L, null, 3) catch {};
 }
 
@@ -1311,7 +1311,7 @@ pub fn lua_websocket(L: *VM.lua.State) !i32 {
         };
     }
 
-    const self = L.newuserdatataggedwithmetatable(Self, TAG_NET_HTTP_WEBSOCKET);
+    const self = try L.newuserdatataggedwithmetatable(Self, TAG_NET_HTTP_WEBSOCKET);
 
     self.* = .{
         .allocator = allocator,
@@ -1360,12 +1360,12 @@ pub fn lua_websocket(L: *VM.lua.State) !i32 {
     return L.yield(0);
 }
 
-pub fn lua_load(L: *VM.lua.State) void {
-    _ = L.Znewmetatable(@typeName(Self), .{
+pub fn lua_load(L: *VM.lua.State) !void {
+    _ = try L.Znewmetatable(@typeName(Self), .{
         .__metatable = "Metatable is locked",
         .__type = "ClientWebSocket",
     });
-    __index(L, -1);
+    try __index(L, -1);
     L.setreadonly(-1, true);
     L.setuserdatametatable(TAG_NET_HTTP_WEBSOCKET);
     L.setuserdatadtor(Self, TAG_NET_HTTP_WEBSOCKET, __dtor);

@@ -38,7 +38,7 @@ pub fn lua_compress(L: *VM.lua.State) !i32 {
         .level = @enumFromInt(level),
     });
 
-    if (is_buffer) L.Zpushbuffer(buf.items) else L.pushlstring(buf.items);
+    if (is_buffer) try L.Zpushbuffer(buf.items) else try L.pushlstring(buf.items);
 
     return 1;
 }
@@ -57,7 +57,7 @@ pub fn lua_decompress(L: *VM.lua.State) !i32 {
 
     try std.compress.flate.decompress(stream.reader(), buf.writer());
 
-    if (is_buffer) L.Zpushbuffer(buf.items) else L.pushlstring(buf.items);
+    if (is_buffer) try L.Zpushbuffer(buf.items) else try L.pushlstring(buf.items);
 
     return 1;
 }

@@ -41,7 +41,7 @@ pub const Sync = struct {
         if (L.status() != .Yield)
             return;
 
-        const amt = self.message.push(L);
+        const amt = self.message.push(L) catch |e| std.debug.panic("{}", .{e}); // OOM
 
         _ = Scheduler.resumeState(L, null, amt) catch {};
     }
@@ -66,16 +66,16 @@ pub const LuaValue = union(enum) {
     },
     vector: [VM.lua.config.VECTOR_SIZE]f32,
 
-    pub fn push(self: LuaValue, L: *VM.lua.State) void {
+    pub fn push(self: LuaValue, L: *VM.lua.State) !void {
         switch (self) {
             .nil => L.pushnil(),
             .boolean => |v| L.pushboolean(v),
             .number => |v| L.pushnumber(v),
-            .string => |v| L.pushlstring(v),
-            .buffer => |v| L.Zpushbuffer(v),
+            .string => |v| try L.pushlstring(v),
+            .buffer => |v| try L.Zpushbuffer(v),
             .table => |v| {
-                var narray: i32 = 0;
-                var nrec: i32 = 0;
+                var narray: u32 = 0;
+                var nrec: u32 = 0;
                 for (v.keys[0..v.len]) |key| switch (key) {
                     .number => |n| {
                         if (@as(i32, @intFromFloat(n)) == narray + 1)
@@ -83,11 +83,11 @@ pub const LuaValue = union(enum) {
                     },
                     else => nrec += 1,
                 };
-                L.createtable(narray, nrec);
+                try L.createtable(narray, nrec);
                 for (v.keys[0..v.len], v.values[0..v.len]) |key, value| {
-                    key.push(L);
-                    value.push(L);
-                    L.rawset(-3);
+                    try key.push(L);
+                    try value.push(L);
+                    try L.rawset(-3);
                 }
             },
             .vector => |v| L.pushvector(v[0], v[1], v[2], if (VM.lua.config.VECTOR_SIZE > 3) v[3] else null),
@@ -130,16 +130,16 @@ pub const Transporter = struct {
             },
         },
 
-        pub fn push(self: *MessageNode, L: *VM.lua.State) i32 {
+        pub fn push(self: *MessageNode, L: *VM.lua.State) !i32 {
             switch (self.value) {
                 .none => return 0,
                 .small => |v| {
-                    v.push(L);
+                    try v.push(L);
                     return 1;
                 },
                 .large => |v| {
                     for (v.values[0..v.len]) |value|
-                        value.push(L);
+                        try value.push(L);
                     return @intCast(v.len);
                 },
             }
@@ -175,10 +175,10 @@ pub const Transporter = struct {
         return try allocator.create(MessageNode);
     }
 
-    pub fn pushAndConsumeMessage(self: *Transporter, L: *VM.lua.State, port: *Lists.DoublyLinkedList) ?i32 {
+    pub fn pushAndConsumeMessage(self: *Transporter, L: *VM.lua.State, port: *Lists.DoublyLinkedList) !?i32 {
         const message = MessageNode.from(port.popFirst() orelse return null);
         defer self.freeMessage(message);
-        return message.push(L);
+        return try message.push(L);
     }
 
     pub fn deinit(self: *Transporter) void {
@@ -314,7 +314,7 @@ const LuaThread = struct {
 
         runtime.transporter.incoming_mutex.lock();
         defer runtime.transporter.incoming_mutex.unlock();
-        if (runtime.transporter.pushAndConsumeMessage(L, port)) |amt| {
+        if (try runtime.transporter.pushAndConsumeMessage(L, port)) |amt| {
             return amt;
         } else {
             const scheduler = Scheduler.getScheduler(L);
@@ -355,7 +355,7 @@ const LuaThread = struct {
 
     pub fn lua_status(self: *LuaThread, L: *VM.lua.State) !i32 {
         const runtime = self.runtime;
-        L.pushlstring(@tagName(runtime.status.load(.acquire)));
+        try L.pushlstring(@tagName(runtime.status.load(.acquire)));
         return 1;
     }
 
@@ -471,21 +471,21 @@ fn createThread(allocator: std.mem.Allocator, L: *VM.lua.State) !*VM.lua.State {
     errdefer runtime.L.close();
 
     runtime.L.pushlightuserdata(@ptrCast(runtime));
-    runtime.L.rawsetfield(VM.lua.REGISTRYINDEX, "_THREAD_RUNTIME");
+    try runtime.L.rawsetfield(VM.lua.REGISTRYINDEX, "_THREAD_RUNTIME");
 
     runtime.scheduler = try .init(allocator, runtime.L);
 
-    const self = L.newuserdatataggedwithmetatable(LuaThread, TAG_THREAD);
+    const self = try L.newuserdatataggedwithmetatable(LuaThread, TAG_THREAD);
     self.* = .{ .runtime = runtime };
 
-    Zune.Runtime.Engine.prepAsync(runtime.L, &runtime.scheduler);
+    try Zune.Runtime.Engine.prepAsync(runtime.L, &runtime.scheduler);
     try Zune.openZune(runtime.L, &.{}, .{});
 
     runtime.L.setsafeenv(VM.lua.GLOBALSINDEX, true);
 
-    const ML = runtime.L.newthread();
+    const ML = try runtime.L.newthread();
 
-    ML.Lsandboxthread();
+    try ML.Lsandboxthread();
 
     THREADS.append(&runtime.node);
 
@@ -522,7 +522,7 @@ fn lua_fromModule(L: *VM.lua.State) !i32 {
 
     const ML = try createThread(allocator, L);
 
-    Zune.Runtime.Engine.setLuaFileContext(ML, .{
+    try Zune.Runtime.Engine.setLuaFileContext(ML, .{
         .source = file_content,
         .main = true,
     });
@@ -550,7 +550,7 @@ fn lua_fromBytecode(L: *VM.lua.State) !i32 {
 
     const ML = try createThread(allocator, L);
 
-    Zune.Runtime.Engine.setLuaFileContext(ML, .{
+    try Zune.Runtime.Engine.setLuaFileContext(ML, .{
         .source = null,
         .thread = true,
         .main = true,
@@ -581,7 +581,7 @@ fn lua_selfReceive(L: *VM.lua.State) !i32 {
 
     runtime.transporter.outgoing_mutex.lock();
     defer runtime.transporter.outgoing_mutex.unlock();
-    if (runtime.transporter.pushAndConsumeMessage(L, port)) |amt| {
+    if (try runtime.transporter.pushAndConsumeMessage(L, port)) |amt| {
         return amt;
     } else {
         const scheduler = Scheduler.getScheduler(L);
@@ -659,18 +659,18 @@ fn lua_getCpuCount(L: *VM.lua.State) i32 {
     return 1;
 }
 
-pub fn loadLib(L: *VM.lua.State) void {
+pub fn loadLib(L: *VM.lua.State) !void {
     {
-        _ = L.Znewmetatable(@typeName(LuaThread), .{
+        _ = try L.Znewmetatable(@typeName(LuaThread), .{
             .__metatable = "Metatable is locked",
         });
-        LuaThread.__index(L, -1);
+        try LuaThread.__index(L, -1);
         L.setreadonly(-1, true);
         L.setuserdatametatable(TAG_THREAD);
         L.setuserdatadtor(LuaThread, TAG_THREAD, LuaThread.__dtor);
     }
 
-    L.Zpushvalue(.{
+    try L.Zpushvalue(.{
         .fromModule = lua_fromModule,
         .fromBytecode = lua_fromBytecode,
         .receive = lua_selfReceive,
@@ -679,7 +679,7 @@ pub fn loadLib(L: *VM.lua.State) void {
     });
     L.setreadonly(-1, true);
 
-    LuaHelper.registerModule(L, LIB_NAME);
+    try LuaHelper.registerModule(L, LIB_NAME);
 }
 
 test "thread" {

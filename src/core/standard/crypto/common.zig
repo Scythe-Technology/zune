@@ -32,13 +32,13 @@ pub fn lua_genEncryptFn(comptime algorithm: anytype) VM.zapi.LuaZigFn(anyerror!i
 
             algorithm.encrypt(c, &tag, msg, ad, snonce, skey);
 
-            L.createtable(0, 2);
+            try L.createtable(0, 2);
 
-            L.Zpushbuffer(c);
-            L.setfield(-2, "cipher");
+            try L.Zpushbuffer(c);
+            try L.rawsetfield(-2, "cipher");
 
-            L.Zpushbuffer(&tag);
-            L.setfield(-2, "tag");
+            try L.Zpushbuffer(&tag);
+            try L.rawsetfield(-2, "tag");
 
             return 1;
         }
@@ -80,7 +80,7 @@ pub fn lua_genDecryptFn(comptime algorithm: anytype) VM.zapi.LuaZigFn(anyerror!i
 
             try algorithm.decrypt(msg, cipher, stag, ad, snonce, skey);
 
-            L.pushlstring(msg);
+            try L.pushlstring(msg);
 
             return 1;
         }

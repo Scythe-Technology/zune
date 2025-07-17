@@ -61,7 +61,7 @@ pub fn lua_hash(L: *VM.lua.State) !i32 {
                 .params = .{ .m = cost, .t = cost2, .p = threads },
                 .mode = mode,
             }, &buf);
-            L.pushlstring(hash);
+            try L.pushlstring(hash);
         },
         .bcrypt => {
             const hash = try bcrypt.strHash(password, .{
@@ -69,7 +69,7 @@ pub fn lua_hash(L: *VM.lua.State) !i32 {
                 .params = .{ .rounds_log = @intCast(cost), .silently_truncate_password = false },
                 .encoding = .phc,
             }, &buf);
-            L.pushlstring(hash);
+            try L.pushlstring(hash);
         },
     }
     return 1;

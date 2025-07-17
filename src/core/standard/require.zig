@@ -68,7 +68,7 @@ fn lua_navigate(L: *VM.lua.State) !i32 {
     };
     defer allocator.free(script_path);
 
-    L.pushlstring(script_path);
+    try L.pushlstring(script_path);
 
     return 1;
 }
@@ -76,7 +76,7 @@ fn lua_navigate(L: *VM.lua.State) !i32 {
 fn lua_getCached(L: *VM.lua.State) !i32 {
     const allocator = luau.getallocator(L);
     const resolved_path = try L.Zcheckvalue([]const u8, 1, null);
-    _ = L.Lfindtable(VM.lua.REGISTRYINDEX, "_MODULES", 1);
+    _ = try L.Lfindtable(VM.lua.REGISTRYINDEX, "_MODULES", 1);
 
     for (Zune.Resolvers.File.POSSIBLE_EXTENSIONS) |ext| {
         const path = try std.mem.concatWithSentinel(allocator, u8, &.{ resolved_path, ext }, 0);
@@ -90,13 +90,13 @@ fn lua_getCached(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-pub fn loadLib(L: *VM.lua.State) void {
-    L.Zpushvalue(.{
+pub fn loadLib(L: *VM.lua.State) !void {
+    try L.Zpushvalue(.{
         .navigate = lua_navigate,
         .getCached = lua_getCached,
     });
     L.setreadonly(-1, true);
-    LuaHelper.registerModule(L, LIB_NAME);
+    try LuaHelper.registerModule(L, LIB_NAME);
 }
 
 test "require" {

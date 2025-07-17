@@ -112,13 +112,13 @@ pub fn lua_encode(L: *VM.lua.State) !i32 {
     var buf = std.ArrayList(u8).init(arena.allocator());
     try value.stringify(buf.writer(), .{});
 
-    L.pushlstring(buf.items);
+    try L.pushlstring(buf.items);
 
     return 1;
 }
 
-fn decodeList(L: *VM.lua.State, list: yaml.Yaml.List) void {
-    L.createtable(@intCast(list.len), 0);
+fn decodeList(L: *VM.lua.State, list: yaml.Yaml.List) anyerror!void {
+    try L.createtable(@intCast(list.len), 0);
 
     if (list.len == 0)
         return;
@@ -128,18 +128,18 @@ fn decodeList(L: *VM.lua.State, list: yaml.Yaml.List) void {
             .boolean => |b| L.pushboolean(b),
             .float => |f| L.pushnumber(f),
             .int => |i| L.pushnumber(@floatFromInt(i)),
-            .string => |str| L.pushlstring(str),
-            .map => |m| decodeMap(L, m),
-            .list => |ls| decodeList(L, ls),
+            .string => |str| try L.pushlstring(str),
+            .map => |m| try decodeMap(L, m),
+            .list => |ls| try decodeList(L, ls),
             .empty => continue,
         }
-        L.rawseti(-2, @intCast(key));
+        try L.rawseti(-2, @intCast(key));
     }
 }
 
-fn decodeMap(L: *VM.lua.State, map: yaml.Yaml.Map) void {
+fn decodeMap(L: *VM.lua.State, map: yaml.Yaml.Map) anyerror!void {
     const count = map.count();
-    L.createtable(0, @intCast(count));
+    try L.createtable(0, @intCast(count));
     if (count == 0)
         return;
 
@@ -147,17 +147,17 @@ fn decodeMap(L: *VM.lua.State, map: yaml.Yaml.Map) void {
     while (iter.next()) |k| {
         const key = k.key_ptr.*;
         const value = k.value_ptr.*;
-        L.pushlstring(key);
+        try L.pushlstring(key);
         switch (value) {
             .boolean => |b| L.pushboolean(b),
             .float => |f| L.pushnumber(f),
             .int => |i| L.pushnumber(@floatFromInt(i)),
-            .string => |str| L.pushlstring(str),
-            .map => |m| decodeMap(L, m),
-            .list => |ls| decodeList(L, ls),
+            .string => |str| try L.pushlstring(str),
+            .map => |m| try decodeMap(L, m),
+            .list => |ls| try decodeList(L, ls),
             .empty => continue,
         }
-        L.settable(-3);
+        try L.rawset(-3);
     }
 }
 
@@ -174,7 +174,7 @@ pub fn lua_decode(L: *VM.lua.State) !i32 {
     defer raw.deinit(allocator);
 
     if (raw.docs.items.len == 0) {
-        L.createtable(0, 0);
+        try L.createtable(0, 0);
         return 1;
     }
 
@@ -182,9 +182,9 @@ pub fn lua_decode(L: *VM.lua.State) !i32 {
         .boolean => |b| L.pushboolean(b),
         .float => |f| L.pushnumber(f),
         .int => |i| L.pushnumber(@floatFromInt(i)),
-        .string => |str| L.pushlstring(str),
-        .map => |m| decodeMap(L, m),
-        .list => |ls| decodeList(L, ls),
+        .string => |str| try L.pushlstring(str),
+        .map => |m| try decodeMap(L, m),
+        .list => |ls| try decodeList(L, ls),
         .empty => return 0,
     }
 

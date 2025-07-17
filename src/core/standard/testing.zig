@@ -130,11 +130,11 @@ pub const TestResult = struct {
     total: i32,
 };
 
-pub fn finish_testing(L: *VM.lua.State, rawstart: f64) TestResult {
+pub fn finish_testing(L: *VM.lua.State, rawstart: f64) !TestResult {
     const allocator = luau.getallocator(L);
     const end = VM.lperf.clock();
 
-    _ = L.Lfindtable(VM.lua.REGISTRYINDEX, "_LIBS", 1);
+    _ = try L.Lfindtable(VM.lua.REGISTRYINDEX, "_LIBS", 1);
     if (L.rawgetfield(-1, LIB_NAME) != .Table)
         std.debug.panic("No test framework loaded", .{});
 
@@ -210,25 +210,25 @@ pub fn runTestAsync(L: *VM.lua.State, sched: *Scheduler) !TestResult {
         .mode = .Test,
     });
 
-    return finish_testing(L, start);
+    return try finish_testing(L, start);
 }
 
-pub fn loadLib(L: *VM.lua.State, enabled: bool) void {
+pub fn loadLib(L: *VM.lua.State, enabled: bool) !void {
     const allocator = luau.getallocator(L);
     if (enabled) {
         const GL = L.mainthread();
-        const ML = GL.newthread();
+        const ML = try GL.newthread();
         GL.xmove(L, 1);
-        ML.Lsandboxthread();
+        try ML.Lsandboxthread();
 
         if (L.rawgetfield(VM.lua.GLOBALSINDEX, "_testing_stdOut") == .Boolean and !L.toboolean(-1)) {
-            ML.Zsetfieldfn(VM.lua.GLOBALSINDEX, "print", empty);
-        } else ML.Zsetfieldfn(VM.lua.GLOBALSINDEX, "print", testing_debug);
+            try ML.Zsetfieldfn(VM.lua.GLOBALSINDEX, "print", empty);
+        } else try ML.Zsetfieldfn(VM.lua.GLOBALSINDEX, "print", testing_debug);
         L.pop(1);
-        ML.Zsetfieldfn(VM.lua.GLOBALSINDEX, "declare_safeEnv", testing_declareSafeEnv);
-        ML.Zsetfieldfn(VM.lua.GLOBALSINDEX, "stepcheck_references", testing_checkLeakedReferences);
-        ML.Zsetfieldfn(VM.lua.GLOBALSINDEX, "scheduler_droptasks", testing_droptasks);
-        ML.Zsetfield(VM.lua.GLOBALSINDEX, "_FILE", false);
+        try ML.Zsetfieldfn(VM.lua.GLOBALSINDEX, "declare_safeEnv", testing_declareSafeEnv);
+        try ML.Zsetfieldfn(VM.lua.GLOBALSINDEX, "stepcheck_references", testing_checkLeakedReferences);
+        try ML.Zsetfieldfn(VM.lua.GLOBALSINDEX, "scheduler_droptasks", testing_droptasks);
+        try ML.Zsetfield(VM.lua.GLOBALSINDEX, "_FILE", false);
 
         const bytecode_buf = allocator.alloc(u8, test_lib_size) catch |err| std.debug.panic("Unable to allocate space for testing framework: {}", .{err});
         defer allocator.free(bytecode_buf);
@@ -248,15 +248,15 @@ pub fn loadLib(L: *VM.lua.State, enabled: bool) void {
 
         L.remove(-2);
     } else {
-        L.createtable(0, 4);
-        L.Zsetfield(-1, "running", false);
-        L.Zsetfieldfn(-1, "describe", empty);
-        L.Zsetfieldfn(-1, "test", empty);
-        L.Zsetfieldfn(-1, "expect", empty);
+        try L.createtable(0, 4);
+        try L.Zsetfield(-1, "running", false);
+        try L.Zsetfieldfn(-1, "describe", empty);
+        try L.Zsetfieldfn(-1, "test", empty);
+        try L.Zsetfieldfn(-1, "expect", empty);
         L.setreadonly(-1, true);
     }
 
-    LuaHelper.registerModule(L, LIB_NAME);
+    try LuaHelper.registerModule(L, LIB_NAME);
 }
 
 test "Test" {

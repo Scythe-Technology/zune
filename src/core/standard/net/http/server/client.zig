@@ -161,7 +161,7 @@ pub fn onClose(
     const GL = server.scheduler.global;
     if (self.websocket.ref.hasRef()) {
         if (self.server.callbacks.ws_close.hasRef()) {
-            const L = GL.newthread();
+            const L = GL.newthread() catch @panic("OutOfMemory");
             defer GL.pop(1);
 
             if (self.server.callbacks.ws_close.push(L)) {
@@ -260,12 +260,12 @@ pub fn onWrite(
             if (self.websocket.active) {
                 @branchHint(.cold); // we only get here once, when client upgrades.
                 const GL = self.server.scheduler.global;
-                const L = GL.newthread();
+                const L = GL.newthread() catch |e| std.debug.panic("{}", .{e});
                 defer GL.pop(1);
 
-                const websocket = L.newuserdatadtor(ClientWebSocket, ClientWebSocket.__dtor);
-                _ = L.Lgetmetatable(@typeName(ClientWebSocket));
-                _ = L.setmetatable(-2);
+                const websocket = L.newuserdatadtor(ClientWebSocket, ClientWebSocket.__dtor) catch |e| std.debug.panic("{}", .{e});
+                _ = L.Lgetmetatable(@typeName(ClientWebSocket)) catch |e| std.debug.panic("{}", .{e});
+                _ = L.setmetatable(-2) catch |e| std.debug.panic("{}", .{e});
 
                 websocket.* = .{
                     .client = self,
@@ -338,18 +338,18 @@ pub fn processResponse(
         .Table => {
             if (L.rawgetfield(-1, "status_code") != .Number) {
                 L.pop(1);
-                L.pushlstring("Field 'status_code' must be a number");
+                try L.pushlstring("Field 'status_code' must be a number");
                 return error.Runtime;
             }
             const statusCode = L.Lcheckinteger(-1);
             if (statusCode < 100 or statusCode > 599) {
                 L.pop(1);
-                L.pushlstring("Status code must be between 100 and 599");
+                try L.pushlstring("Status code must be between 100 and 599");
                 return error.Runtime;
             }
             const statusReason = std.http.Status.phrase(@enumFromInt(statusCode)) orelse {
                 L.pop(1);
-                L.pushlstring("Unknown status code");
+                try L.pushlstring("Unknown status code");
                 return error.Runtime;
             };
 
@@ -374,7 +374,7 @@ pub fn processResponse(
             if (!headersType.isnoneornil()) {
                 if (headersType != .Table) {
                     L.pop(1);
-                    L.pushlstring("invalid field 'headers' (expected table)");
+                    try L.pushlstring("invalid field 'headers' (expected table)");
                     return error.Runtime;
                 }
                 if (!L.rawgetfield(-1, "Content-Type").isnoneornil()) {
@@ -397,12 +397,12 @@ pub fn processResponse(
                 while (i >= 0) : (i = L.rawiter(-1, i)) {
                     if (L.typeOf(-2) != .String) {
                         L.pop(1);
-                        L.pushlstring("invalid header key (expected string)");
+                        try L.pushlstring("invalid header key (expected string)");
                         return error.Runtime;
                     }
                     if (L.typeOf(-1) != .String) {
                         L.pop(1);
-                        L.pushlstring("invalid header value (expected string)");
+                        try L.pushlstring("invalid header value (expected string)");
                         return error.Runtime;
                     }
                     const header_value = L.tostring(-1).?;
@@ -434,7 +434,7 @@ pub fn processResponse(
                 .Nil => null,
                 else => {
                     L.pop(1);
-                    L.pushlstring("invalid field 'body' must be a string or buffer");
+                    try L.pushlstring("invalid field 'body' must be a string or buffer");
                     return error.Runtime;
                 },
             };
@@ -466,7 +466,7 @@ pub fn processResponse(
         },
         else => {
             L.pop(1);
-            L.pushlstring("Serve response must be a table, string or buffer");
+            try L.pushlstring("Serve response must be a table, string or buffer");
             return error.Runtime;
         },
     }
@@ -483,7 +483,7 @@ pub fn ws_upgradeResumed(self: *Self, L: *VM.lua.State, _: *Scheduler) void {
     std.debug.assert(top >= 2);
     if (top < 3) { // only a lua function could have less than 3 on top
         @branchHint(.unlikely);
-        L.pushlstring("Upgrade must return a boolean");
+        L.pushlstring("Upgrade must return a boolean") catch |e| std.debug.panic("{}", .{e});
         if (L.typeOf(-2) == .Function)
             Engine.logFnDef(L, -2);
         self.state.stage = .closing;
@@ -492,7 +492,7 @@ pub fn ws_upgradeResumed(self: *Self, L: *VM.lua.State, _: *Scheduler) void {
     } else if (top > 3) {
         @branchHint(.unlikely);
         L.pop(@intCast(top - 2));
-        L.pushlstring("Upgrade returned too many values");
+        L.pushlstring("Upgrade returned too many values") catch |e| std.debug.panic("{}", .{e});
         if (L.typeOf(-2) == .Function)
             Engine.logFnDef(L, -2);
         self.state.stage = .closing;
@@ -504,7 +504,7 @@ pub fn ws_upgradeResumed(self: *Self, L: *VM.lua.State, _: *Scheduler) void {
         .Boolean => L.toboolean(-1),
         else => {
             L.pop(1);
-            L.pushlstring("Upgrade must return a boolean");
+            L.pushlstring("Upgrade must return a boolean") catch |e| std.debug.panic("{}", .{e});
             if (L.typeOf(-2) == .Function)
                 Engine.logFnDef(L, -2);
             self.state.stage = .closing;
@@ -633,14 +633,14 @@ pub fn ws_onRecv(
 
             if (self.server.callbacks.ws_message.hasRef()) {
                 const GL = scheduler.global;
-                const L = GL.newthread();
+                const L = GL.newthread() catch @panic("OutOfMemory");
                 defer GL.pop(1);
 
                 if (self.server.callbacks.ws_message.push(L)) {
                     _ = self.websocket.ref.push(L);
                     switch (reader.header.opcode) {
-                        .Binary => L.Zpushbuffer(data),
-                        .Text => L.pushlstring(data),
+                        .Binary => L.Zpushbuffer(data) catch |e| std.debug.panic("{}", .{e}),
+                        .Text => L.pushlstring(data) catch |e| std.debug.panic("{}", .{e}),
                         else => unreachable,
                     }
                     _ = Scheduler.resumeState(L, null, 2) catch {};
@@ -664,7 +664,7 @@ pub fn requestResumed(self: *Self, L: *VM.lua.State, _: *Scheduler) void {
     if (top > 2) {
         @branchHint(.unlikely);
         L.pop(@intCast(top - 1));
-        L.pushlstring("Request returned too many values");
+        L.pushlstring("Request returned too many values") catch |e| std.debug.panic("{}", .{e});
         if (L.typeOf(-2) == .Function)
             Engine.logFnDef(L, -2);
         self.state.stage = .closing;
@@ -734,7 +734,7 @@ pub fn onRecv(
         self.state.stage = .writing;
         const scheduler = self.server.scheduler;
         const GL = scheduler.global;
-        const L = GL.newthread();
+        const L = GL.newthread() catch @panic("OutOfMemory");
         defer GL.pop(1);
         const luau_callbacks = &self.server.callbacks;
         if (self.parser.method == .GET) {
@@ -802,7 +802,7 @@ pub fn onRecv(
                     return .disarm;
                 };
                 defer allocator.free(accept_response);
-                L.pushlstring(accept_response);
+                L.pushlstring(accept_response) catch @panic("OutOfMemory");
                 if (luau_callbacks.ws_upgrade.push(L)) {
                     L.pushvalue(-1);
                     self.parser.push(L) catch |err| switch (err) {

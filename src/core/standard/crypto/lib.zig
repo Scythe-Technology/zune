@@ -199,18 +199,18 @@ const LuaCryptoHasher = struct {
                     switch (enc) {
                         .hex => {
                             const hex = std.fmt.bytesToHex(&buf, .lower);
-                            L.pushlstring(&hex);
+                            try L.pushlstring(&hex);
                         },
                         .base64 => {
                             const allocator = luau.getallocator(L);
                             const base64_buf = try allocator.alloc(u8, std.base64.standard.Encoder.calcSize(buf.len));
                             defer allocator.free(base64_buf);
-                            L.pushlstring(std.base64.standard.Encoder.encode(base64_buf, &buf));
+                            try L.pushlstring(std.base64.standard.Encoder.encode(base64_buf, &buf));
                         },
-                        .binary => L.Zpushbuffer(&buf),
+                        .binary => try L.Zpushbuffer(&buf),
                     }
                 } else {
-                    L.Zpushbuffer(&buf);
+                    try L.Zpushbuffer(&buf);
                 }
             },
         }
@@ -222,7 +222,7 @@ const LuaCryptoHasher = struct {
             return L.Zerror("Hasher already used");
         const allocator = luau.getallocator(L);
 
-        const hasher = L.newuserdatataggedwithmetatable(LuaCryptoHasher, TAG_CRYPTO_HASHER);
+        const hasher = try L.newuserdatataggedwithmetatable(LuaCryptoHasher, TAG_CRYPTO_HASHER);
 
         const state = try allocator.dupe(u8, self.state);
         errdefer allocator.free(state);
@@ -264,7 +264,7 @@ fn lua_createHash(L: *VM.lua.State) !i32 {
     const block_length = algo.block_length();
     const digest_length = algo.digest_length();
 
-    const ptr = L.newuserdatataggedwithmetatable(LuaCryptoHasher, TAG_CRYPTO_HASHER);
+    const ptr = try L.newuserdatataggedwithmetatable(LuaCryptoHasher, TAG_CRYPTO_HASHER);
 
     const state = try allocator.alloc(u8, algo.size());
     errdefer allocator.free(state);
@@ -309,64 +309,64 @@ fn lua_createHash(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-pub fn loadLib(L: *VM.lua.State) void {
+pub fn loadLib(L: *VM.lua.State) !void {
     {
-        _ = L.Znewmetatable(@typeName(LuaCryptoHasher), .{
+        _ = try L.Znewmetatable(@typeName(LuaCryptoHasher), .{
             .__metatable = "Metatable is locked",
         });
-        LuaCryptoHasher.__index(L, -1);
+        try LuaCryptoHasher.__index(L, -1);
         L.setreadonly(-1, true);
         L.setuserdatadtor(LuaCryptoHasher, TAG_CRYPTO_HASHER, LuaCryptoHasher.__dtor);
         L.setuserdatametatable(TAG_CRYPTO_HASHER);
     }
 
-    L.createtable(0, 5);
+    try L.createtable(0, 5);
 
-    L.Zsetfieldfn(-1, "createHash", lua_createHash);
+    try L.Zsetfieldfn(-1, "createHash", lua_createHash);
 
     { // password
-        L.Zpushvalue(.{
+        try L.Zpushvalue(.{
             .hash = password.lua_hash,
             .verify = password.lua_verify,
         });
         L.setreadonly(-1, true);
-        L.setfield(-2, "password");
+        try L.rawsetfield(-2, "password");
     }
 
     { // random
-        L.Zpushvalue(.{
+        try L.Zpushvalue(.{
             .nextNumber = random.lua_nextnumber,
             .nextInteger = random.lua_nextinteger,
             .nextBoolean = random.lua_boolean,
             .fill = random.lua_fill,
         });
         L.setreadonly(-1, true);
-        L.setfield(-2, "random");
+        try L.rawsetfield(-2, "random");
     }
 
     { // aead
-        L.createtable(0, @typeInfo(aead).@"struct".decls.len);
+        try L.createtable(0, @typeInfo(aead).@"struct".decls.len);
         inline for (@typeInfo(aead).@"struct".decls) |algo_decl| {
             const algo = @field(aead, algo_decl.name);
-            L.createtable(0, @typeInfo(algo).@"struct".decls.len);
+            try L.createtable(0, @typeInfo(algo).@"struct".decls.len);
             inline for (@typeInfo(algo).@"struct".decls) |varient| {
                 const enc = @field(algo, varient.name);
-                L.Zpushvalue(.{
+                try L.Zpushvalue(.{
                     .encrypt = common.lua_genEncryptFn(enc),
                     .decrypt = common.lua_genDecryptFn(enc),
                 });
                 L.setreadonly(-1, true);
-                L.setfield(-2, varient.name);
+                try L.rawsetfield(-2, varient.name);
             }
             L.setreadonly(-1, true);
-            L.setfield(-2, algo_decl.name);
+            try L.rawsetfield(-2, algo_decl.name);
         }
         L.setreadonly(-1, true);
-        L.setfield(-2, "aead");
+        try L.rawsetfield(-2, "aead");
     }
 
     { // tls
-        L.Zpushvalue(.{
+        try L.Zpushvalue(.{
             .keyPairFromFile = tls.lua_keyPairFromFile,
             .bundleFromFile = tls.lua_bundleFromFile,
             .bundleFromSystem = tls.lua_bundleFromSystem,
@@ -374,11 +374,11 @@ pub fn loadLib(L: *VM.lua.State) void {
             .setupServer = tls.lua_setupServer,
         });
         L.setreadonly(-1, true);
-        L.setfield(-2, "tls");
+        try L.rawsetfield(-2, "tls");
     }
 
     L.setreadonly(-1, true);
-    LuaHelper.registerModule(L, LIB_NAME);
+    try LuaHelper.registerModule(L, LIB_NAME);
 }
 
 test {

@@ -12,11 +12,13 @@ const VM = luau.VM;
 
 pub const LIB_NAME = "task";
 
-fn lua_wait(L: *VM.lua.State) i32 {
+fn lua_wait(L: *VM.lua.State) !i32 {
+    if (!L.isyieldable())
+        return L.Zerror("attempt to yield across metamethod/C-call boundary");
     const scheduler = Scheduler.getScheduler(L);
     const time = L.tonumber(1) orelse 0;
     scheduler.sleepThread(L, null, time, 0, true);
-    return L.yield(0);
+    return L.yield(0) catch unreachable; // error is only when context is not yieldable and OOM
 }
 
 fn lua_cancel(L: *VM.lua.State) !i32 {
@@ -27,7 +29,7 @@ fn lua_cancel(L: *VM.lua.State) !i32 {
     const status = L.costatus(thread);
     if (status != .Finished and status != .FinishedErr and status != .Suspended)
         return L.Zerrorf("Cannot close {s} coroutine", .{@tagName(status)});
-    thread.resetthread();
+    try thread.resetthread();
     return 0;
 }
 
@@ -41,7 +43,7 @@ fn lua_spawn(L: *VM.lua.State) !i32 {
 
     const thread = th: {
         if (fnType == .Function) {
-            const TL = L.newthread();
+            const TL = try L.newthread();
             L.xpush(TL, 1);
             break :th TL;
         } else {
@@ -71,7 +73,7 @@ fn lua_defer(L: *VM.lua.State) !i32 {
 
     const thread = th: {
         if (fnType == .Function) {
-            const TL = L.newthread();
+            const TL = try L.newthread();
             L.xpush(TL, 1);
             break :th TL;
         } else {
@@ -102,7 +104,7 @@ fn lua_delay(L: *VM.lua.State) !i32 {
 
     const thread = th: {
         if (fnType == .Function) {
-            const TL = L.newthread();
+            const TL = try L.newthread();
             L.xpush(TL, 2);
             break :th TL;
         } else {
@@ -170,8 +172,8 @@ fn lua_count(L: *VM.lua.State) !i32 {
     return out;
 }
 
-pub fn loadLib(L: *VM.lua.State) void {
-    L.Zpushvalue(.{
+pub fn loadLib(L: *VM.lua.State) !void {
+    try L.Zpushvalue(.{
         .wait = lua_wait,
         .spawn = lua_spawn,
         .@"defer" = lua_defer,
@@ -181,7 +183,7 @@ pub fn loadLib(L: *VM.lua.State) void {
     });
     L.setreadonly(-1, true);
 
-    LuaHelper.registerModule(L, LIB_NAME);
+    try LuaHelper.registerModule(L, LIB_NAME);
 }
 
 const TestResult = struct {

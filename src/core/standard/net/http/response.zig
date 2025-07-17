@@ -338,28 +338,28 @@ pub const Parser = struct {
         return false;
     }
 
-    pub fn push(self: *Parser, L: *VM.lua.State) void {
-        L.createtable(0, 3);
+    pub fn push(self: *Parser, L: *VM.lua.State) !void {
+        try L.createtable(0, 3);
 
-        L.Zsetfield(-1, "statusCode", self.status_code);
+        try L.Zsetfield(-1, "statusCode", self.status_code);
         if (self.status_message) |msg| {
-            L.Zsetfield(-1, "statusReason", msg);
+            try L.Zsetfield(-1, "statusReason", msg);
         } else {
-            L.Zsetfield(-1, "statusReason", "");
+            try L.Zsetfield(-1, "statusReason", "");
         }
 
-        L.createtable(0, @intCast(self.headers.size));
+        try L.createtable(0, @intCast(self.headers.size));
         var iter = self.headers.iterator();
         while (iter.next()) |header| {
-            L.pushlstring(header.key_ptr.*);
-            L.pushlstring(header.value_ptr.*);
-            L.rawset(-3);
+            try L.pushlstring(header.key_ptr.*);
+            try L.pushlstring(header.value_ptr.*);
+            try L.rawset(-3);
         }
-        L.setfield(-2, "headers");
+        try L.rawsetfield(-2, "headers");
 
         if (self.body) |body|
             switch (body) {
-                inline else => |bytes| L.Zsetfield(-1, "body", bytes),
+                inline else => |bytes| try L.Zsetfield(-1, "body", bytes),
             };
     }
 };
