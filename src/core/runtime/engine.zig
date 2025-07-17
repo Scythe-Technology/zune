@@ -41,14 +41,14 @@ const StackInfo = struct {
     current_line: ?u32 = null,
 };
 
-pub fn setLuaFileContext(L: *VM.lua.State, ctx: FileContext) void {
-    L.Zpushvalue(.{
+pub fn setLuaFileContext(L: *VM.lua.State, ctx: FileContext) !void {
+    try L.Zpushvalue(.{
         .source = if (Zune.STATE.USE_DETAILED_ERROR or Zune.STATE.RUN_MODE == .Test) ctx.source else null,
         .main = ctx.main,
         .thread = ctx.thread,
     });
 
-    L.setfield(VM.lua.GLOBALSINDEX, "_FILE");
+    try L.rawsetfield(VM.lua.GLOBALSINDEX, "_FILE");
 }
 
 pub fn printSpacedPadding(padding: []u8) void {
@@ -100,18 +100,18 @@ pub fn logDetailedDef(L: *VM.lua.State, idx: i32) !void {
     switch (L.typeOf(-1)) {
         .String, .Number => err_msg = L.tostring(-1).?,
         else => jmp: {
-            if (!L.checkstack(2)) {
+            if (!try L.checkstack(2)) {
                 err_msg = "StackOverflow";
                 break :jmp;
             }
-            const TL = L.newthread();
+            const TL = try L.newthread();
             defer L.pop(1); // drop: thread
-            defer TL.resetthread();
+            defer TL.resetthread() catch {};
             L.xpush(TL, -2);
             error_buf = try allocator.dupe(u8, TL.Ztolstring(1) catch |e| str: {
                 switch (e) {
-                    error.BadReturnType => break :str TL.Ztolstringk(1),
-                    error.Runtime => break :str TL.Ztolstringk(1),
+                    error.BadReturnType => break :str try TL.Ztolstringk(1),
+                    error.Runtime => break :str try TL.Ztolstringk(1),
                     else => std.debug.panic("{}\n", .{e}),
                 }
                 return;
@@ -122,7 +122,7 @@ pub fn logDetailedDef(L: *VM.lua.State, idx: i32) !void {
 
     if (stackInfo != null and stackInfo.?.what == .lua and stackInfo.?.source_line != null) {
         const info = stackInfo.?;
-        if (!L.checkstack(4)) {
+        if (!try L.checkstack(4)) {
             Zune.debug.print("Failed to show detailed error: StackOverflow\n", .{});
             Zune.debug.print("<red>error<clear>: {s}\n", .{err_msg});
             Zune.debug.print("{s}\n", .{L.debugtrace()});
@@ -245,18 +245,18 @@ pub fn logDetailedError(L: *VM.lua.State) !void {
     switch (L.typeOf(-1)) {
         .String, .Number => err_msg = L.tostring(-1).?,
         else => jmp: {
-            if (!L.checkstack(2)) {
+            if (!try L.checkstack(2)) {
                 err_msg = "StackOverflow";
                 break :jmp;
             }
-            const TL = L.newthread();
+            const TL = try L.newthread();
             defer L.pop(1); // drop: thread
-            defer TL.resetthread();
+            defer TL.resetthread() catch {};
             L.xpush(TL, -2);
             error_buf = try allocator.dupe(u8, TL.Ztolstring(1) catch |e| str: {
                 switch (e) {
-                    error.BadReturnType => break :str TL.Ztolstringk(1),
-                    error.Runtime => break :str TL.Ztolstringk(1),
+                    error.BadReturnType => break :str try TL.Ztolstringk(1),
+                    error.Runtime => break :str try TL.Ztolstringk(1),
                     else => std.debug.panic("{}\n", .{e}),
                 }
                 return;
@@ -271,7 +271,7 @@ pub fn logDetailedError(L: *VM.lua.State) !void {
         return;
     }
 
-    if (!L.checkstack(5)) {
+    if (!try L.checkstack(5)) {
         Zune.debug.print("Failed to show detailed error: StackOverflow\n", .{});
         Zune.debug.print("<green>error<clear>: {s}\n", .{err_msg});
         Zune.debug.print("{s}\n", .{L.debugtrace()});
@@ -413,17 +413,17 @@ pub fn logError(L: *VM.lua.State, err: anyerror, forceDetailed: bool) void {
                 switch (L.typeOf(-1)) {
                     .String, .Number => Zune.debug.print("{s}\n", .{L.tostring(-1).?}),
                     else => jmp: {
-                        if (!L.checkstack(2)) {
+                        if (!(L.checkstack(2) catch |e| std.debug.panic("{}", .{e}))) {
                             Zune.debug.print("StackOverflow\n", .{});
                         }
-                        const TL = L.newthread();
+                        const TL = L.newthread() catch |e| std.debug.panic("{}", .{e});
                         defer L.pop(1); // drop: thread
-                        defer TL.resetthread();
+                        defer TL.resetthread() catch {};
                         L.xpush(TL, -2);
                         const str = TL.Ztolstring(1) catch |e| str: {
                             switch (e) {
-                                error.BadReturnType => break :str TL.Ztolstringk(1),
-                                error.Runtime => break :str TL.Ztolstringk(1),
+                                error.BadReturnType => break :str TL.Ztolstringk(1) catch |er| std.debug.panic("{}", .{er}),
+                                error.Runtime => break :str TL.Ztolstringk(1) catch |er| std.debug.panic("{}", .{er}),
                                 else => std.debug.panic("{}\n", .{e}),
                             }
                             break :jmp;
@@ -450,19 +450,19 @@ pub fn checkStatus(L: *VM.lua.State) !VM.lua.Status {
     }
 }
 
-pub fn prep(L: *VM.lua.State) void {
+pub fn prep(L: *VM.lua.State) !void {
     if (luau.CodeGen.Supported() and Zune.STATE.LUAU_OPTIONS.JIT_ENABLED)
         luau.CodeGen.Create(L);
 
-    L.Lopenlibs();
+    try L.Lopenlibs();
 }
 
-pub fn prepAsync(L: *VM.lua.State, sched: *Scheduler) void {
+pub fn prepAsync(L: *VM.lua.State, sched: *Scheduler) !void {
     const GL = L.mainthread();
 
     GL.setthreaddata(*Scheduler, sched);
 
-    prep(L);
+    try prep(L);
 }
 
 pub fn stateCleanUp() void {
@@ -508,7 +508,7 @@ test "Run Basic" {
     defer L.deinit();
     if (luau.CodeGen.Supported())
         luau.CodeGen.Create(L);
-    L.Lopenlibs();
+    try L.Lopenlibs();
     try loadModule(L, "test", "tostring(\"Hello, World!\")\n", null);
     try run(L);
 }
@@ -519,7 +519,7 @@ test "Run Basic Syntax Error" {
     defer L.deinit();
     if (luau.CodeGen.Supported())
         luau.CodeGen.Create(L);
-    L.Lopenlibs();
+    try L.Lopenlibs();
     try std.testing.expectError(error.Syntax, loadModule(L, "test", "print('Hello, World!'\n", null));
     try std.testing.expectEqualStrings("[string \"test\"]:2: Expected ')' (to close '(' at line 1), got <eof>", L.tostring(-1) orelse "UnknownError");
 }
