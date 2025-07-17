@@ -46,7 +46,7 @@ zig build -Doptimize=ReleaseFast
 ```
 3. Use
 ```sh
-./zig-out/bin/zune version
+./zig-out/bin/zune --version
 ```
 From this point, you can add the binary to your path.
 
