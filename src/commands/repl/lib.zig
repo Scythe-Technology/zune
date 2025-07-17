@@ -49,10 +49,10 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     try Scheduler.SCHEDULERS.append(&scheduler);
 
-    Engine.prepAsync(L, &scheduler);
+    try Engine.prepAsync(L, &scheduler);
     try Zune.openZune(L, args, .{});
 
-    Engine.setLuaFileContext(L, .{
+    try Engine.setLuaFileContext(L, .{
         .source = "",
         .main = true,
     });
@@ -82,7 +82,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
     try terminal.setRawMode();
     try terminal.setOutputMode();
 
-    switch (L.getglobal("_VERSION")) {
+    switch (L.rawgetfield(luau.VM.lua.GLOBALSINDEX, "_VERSION")) {
         .String => try out.print("{s}\n", .{L.tostring(-1).?}),
         else => try out.writeAll("Unknown Zune version\n"),
     }
@@ -197,7 +197,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
                 history.save(buffer.items);
 
-                const ML = L.newthread();
+                const ML = try L.newthread();
 
                 if (Engine.loadModule(ML, "CLI", buffer.items, null)) {
                     try terminal.setNormalMode();

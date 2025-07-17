@@ -158,16 +158,16 @@ fn cmdRun(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     try Scheduler.SCHEDULERS.append(&scheduler);
 
-    Engine.prepAsync(L, &scheduler);
+    try Engine.prepAsync(L, &scheduler);
     try Zune.openZune(L, run_args, LOAD_FLAGS);
 
     L.setsafeenv(VM.lua.GLOBALSINDEX, true);
 
-    const ML = L.newthread();
+    const ML = try L.newthread();
 
-    ML.Lsandboxthread();
+    try ML.Lsandboxthread();
 
-    Engine.setLuaFileContext(ML, .{
+    try Engine.setLuaFileContext(ML, .{
         .source = file_content,
         .main = true,
     });
@@ -293,16 +293,16 @@ fn cmdTest(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     try Scheduler.SCHEDULERS.append(&scheduler);
 
-    Engine.prepAsync(L, &scheduler);
+    try Engine.prepAsync(L, &scheduler);
     try Zune.openZune(L, args, LOAD_FLAGS);
 
     L.setsafeenv(VM.lua.GLOBALSINDEX, true);
 
-    const ML = L.newthread();
+    const ML = try L.newthread();
 
-    ML.Lsandboxthread();
+    try ML.Lsandboxthread();
 
-    Engine.setLuaFileContext(ML, .{
+    try Engine.setLuaFileContext(ML, .{
         .source = file_content,
         .main = true,
     });
@@ -321,7 +321,7 @@ fn cmdTest(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     Engine.runAsync(ML, &scheduler, .{ .cleanUp = true }) catch std.process.exit(1);
 
-    const reuslt = Zune.corelib.testing.finish_testing(L, start);
+    const reuslt = try Zune.corelib.testing.finish_testing(L, start);
 
     if (reuslt.failed > 0) {
         std.process.exit(1);
@@ -350,16 +350,16 @@ fn cmdEval(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     try Scheduler.SCHEDULERS.append(&scheduler);
 
-    Engine.prepAsync(L, &scheduler);
+    try Engine.prepAsync(L, &scheduler);
     try Zune.openZune(L, args, .{});
 
     L.setsafeenv(VM.lua.GLOBALSINDEX, true);
 
-    const ML = L.newthread();
+    const ML = try L.newthread();
 
-    ML.Lsandboxthread();
+    try ML.Lsandboxthread();
 
-    Engine.setLuaFileContext(ML, .{
+    try Engine.setLuaFileContext(ML, .{
         .source = fileContent,
         .main = true,
     });
@@ -472,7 +472,7 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
         callbacks.*.debugstep = Debugger.debugstep;
         callbacks.*.debugprotectederror = Debugger.debugprotectederror;
 
-        Engine.prepAsync(L, &scheduler);
+        try Engine.prepAsync(L, &scheduler);
         try Zune.openZune(L, run_args, LOAD_FLAGS);
 
         L.setsafeenv(VM.lua.GLOBALSINDEX, true);
@@ -486,11 +486,11 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
         try terminal.saveSettings();
 
-        const ML = L.newthread();
+        const ML = try L.newthread();
 
-        ML.Lsandboxthread();
+        try ML.Lsandboxthread();
 
-        Engine.setLuaFileContext(ML, .{
+        try Engine.setLuaFileContext(ML, .{
             .source = file_content,
             .main = true,
         });

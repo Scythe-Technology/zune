@@ -200,65 +200,65 @@ pub fn loadConfiguration(dir: std.fs.Dir) void {
 }
 
 pub fn openZune(L: *VM.lua.State, args: []const []const u8, flags: Flags) !void {
-    L.Zsetglobalfn("require", @import("core/resolvers/require.zig").zune_require);
+    try L.Zsetglobalfn("require", @import("core/resolvers/require.zig").zune_require);
 
-    objects.load(L);
+    try objects.load(L);
 
-    L.createtable(0, 0);
-    L.Zpushvalue(.{
+    try L.createtable(0, 0);
+    try L.Zpushvalue(.{
         .__index = struct {
             fn inner(l: *VM.lua.State) !i32 {
-                _ = l.Lfindtable(VM.lua.REGISTRYINDEX, "_LIBS", 1);
+                _ = try l.Lfindtable(VM.lua.REGISTRYINDEX, "_LIBS", 1);
                 l.pushvalue(2);
-                _ = l.gettable(-2);
+                _ = l.rawget(-2);
                 return 1;
             }
         }.inner,
         .__metatable = "This metatable is locked",
     });
     L.setreadonly(-1, true);
-    _ = L.setmetatable(-2);
+    _ = try L.setmetatable(-2);
     L.setreadonly(-1, true);
-    L.setglobal("zune");
+    try L.setglobal("zune");
 
-    L.Zpushfunction(Resolvers.Fmt.print, "zune_fmt_print");
-    L.setglobal("print");
+    try L.Zpushfunction(Resolvers.Fmt.print, "zune_fmt_print");
+    try L.setglobal("print");
 
-    L.Zsetglobal("_VERSION", VERSION);
+    try L.Zsetglobal("_VERSION", VERSION);
 
     if (!flags.limbo) {
         if (FEATURES.fs)
-            corelib.fs.loadLib(L);
+            try corelib.fs.loadLib(L);
         if (FEATURES.task)
-            corelib.task.loadLib(L);
+            try corelib.task.loadLib(L);
         if (FEATURES.luau)
-            corelib.luau.loadLib(L);
+            try corelib.luau.loadLib(L);
         if (FEATURES.serde)
-            corelib.serde.loadLib(L);
+            try corelib.serde.loadLib(L);
         if (FEATURES.io)
-            corelib.io.loadLib(L);
+            try corelib.io.loadLib(L);
         if (FEATURES.crypto)
-            corelib.crypto.loadLib(L);
+            try corelib.crypto.loadLib(L);
         if (FEATURES.regex)
-            corelib.regex.loadLib(L);
+            try corelib.regex.loadLib(L);
         if (FEATURES.net and comptime corelib.net.PlatformSupported())
-            corelib.net.loadLib(L);
+            try corelib.net.loadLib(L);
         if (FEATURES.datetime and comptime corelib.datetime.PlatformSupported())
-            corelib.datetime.loadLib(L);
+            try corelib.datetime.loadLib(L);
         if (FEATURES.process and comptime corelib.process.PlatformSupported())
             try corelib.process.loadLib(L, args);
         if (FEATURES.ffi and comptime corelib.ffi.PlatformSupported())
-            corelib.ffi.loadLib(L);
+            try corelib.ffi.loadLib(L);
         if (FEATURES.sqlite)
-            corelib.sqlite.loadLib(L);
+            try corelib.sqlite.loadLib(L);
         if (FEATURES.require)
-            corelib.require.loadLib(L);
+            try corelib.require.loadLib(L);
         if (FEATURES.random)
-            corelib.random.loadLib(L);
+            try corelib.random.loadLib(L);
         if (FEATURES.thread and comptime corelib.thread.PlatformSupported())
-            corelib.thread.loadLib(L);
+            try corelib.thread.loadLib(L);
 
-        corelib.testing.loadLib(L, STATE.RUN_MODE == .Test);
+        try corelib.testing.loadLib(L, STATE.RUN_MODE == .Test);
     }
 }
 
@@ -304,7 +304,7 @@ fn shutdown() void {
     } else if (corelib.process.SIGINT_LUA) |handler| {
         const L = handler.state;
         if (L.rawgeti(luau.VM.lua.REGISTRYINDEX, handler.ref) == .Function) {
-            const ML = L.newthread();
+            const ML = L.newthread() catch |err| std.debug.panic("{}", .{err});
             L.xpush(ML, -2);
             if (ML.pcall(0, 0, 0).check()) |_| {
                 L.pop(2); // drop: thread, function
