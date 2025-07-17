@@ -170,7 +170,7 @@ const AsyncSendContext = struct {
             return .disarm;
 
         const len = w catch |err| {
-            L.pushlstring(@errorName(err));
+            L.pushlstring(@errorName(err)) catch |e| std.debug.panic("{}", .{e});
             _ = Scheduler.resumeStateError(L, null) catch {};
             return .disarm;
         };
@@ -195,7 +195,7 @@ const AsyncSendContext = struct {
         defer self.ref.deref();
         defer self.list.remove(&self.completion);
 
-        L.pushlstring(@errorName(err));
+        L.pushlstring(@errorName(err)) catch |e| std.debug.panic("{}", .{e});
         _ = Scheduler.resumeStateError(L, null) catch {};
         return .disarm;
     }
@@ -319,7 +319,7 @@ const AsyncSendMsgContext = struct {
             return .disarm;
 
         const len = w catch |err| {
-            L.pushlstring(@errorName(err));
+            L.pushlstring(@errorName(err)) catch |e| std.debug.panic("{}", .{e});
             _ = Scheduler.resumeStateError(L, null) catch {};
             return .disarm;
         };
@@ -365,12 +365,12 @@ const AsyncRecvContext = struct {
             return .disarm;
 
         const len = r catch |err| {
-            L.pushlstring(@errorName(err));
+            L.pushlstring(@errorName(err)) catch |e| std.debug.panic("{}", .{e});
             _ = Scheduler.resumeStateError(L, null) catch {};
             return .disarm;
         };
 
-        L.Zpushbuffer(self.buffer[0..len]);
+        L.Zpushbuffer(self.buffer[0..len]) catch |e| std.debug.panic("{}", .{e});
 
         _ = Scheduler.resumeState(L, null, 1) catch {};
 
@@ -391,7 +391,7 @@ const AsyncRecvContext = struct {
         defer self.ref.deref();
         defer self.list.remove(&self.completion);
 
-        L.pushlstring(@errorName(err));
+        L.pushlstring(@errorName(err)) catch |e| std.debug.panic("{}", .{e});
         _ = Scheduler.resumeStateError(L, null) catch {};
         return .disarm;
     }
@@ -532,18 +532,18 @@ const AsyncRecvMsgContext = struct {
             return .disarm;
 
         const len = r catch |err| {
-            L.pushlstring(@errorName(err));
+            L.pushlstring(@errorName(err)) catch |e| std.debug.panic("{}", .{e});
             _ = Scheduler.resumeStateError(L, null) catch {};
             return .disarm;
         };
 
-        L.createtable(0, 3);
-        L.Zsetfield(-1, "family", address.any.family);
-        L.Zsetfield(-1, "port", address.getPort());
+        L.createtable(0, 3) catch |e| std.debug.panic("{}", .{e});
+        L.Zsetfield(-1, "family", address.any.family) catch |e| std.debug.panic("{}", .{e});
+        L.Zsetfield(-1, "port", address.getPort()) catch |e| std.debug.panic("{}", .{e});
         var buf: [LONGEST_ADDRESS]u8 = undefined;
-        L.pushlstring(AddressToString(&buf, address));
-        L.setfield(-2, "address");
-        L.Zpushbuffer(self.buffer[0..len]);
+        L.pushlstring(AddressToString(&buf, address)) catch |e| std.debug.panic("{}", .{e});
+        L.rawsetfield(-2, "address") catch |e| std.debug.panic("{}", .{e});
+        L.Zpushbuffer(self.buffer[0..len]) catch |e| std.debug.panic("{}", .{e});
 
         _ = Scheduler.resumeState(L, null, 2) catch {};
 
@@ -578,7 +578,7 @@ const AsyncAcceptContext = struct {
                 break :jmp;
 
             const socket = s catch |err| {
-                L.pushlstring(@errorName(err));
+                L.pushlstring(@errorName(err)) catch |e| std.debug.panic("{}", .{e});
                 _ = Scheduler.resumeStateError(L, null) catch {};
                 break :jmp;
             };
@@ -593,14 +593,14 @@ const AsyncAcceptContext = struct {
                 },
                 .accepted,
             ) catch |err| {
-                L.pushlstring(@errorName(err));
+                L.pushlstring(@errorName(err)) catch |e| std.debug.panic("{}", .{e});
                 _ = Scheduler.resumeStateError(L, null) catch {};
                 break :jmp;
             };
             if (self.tls == .server_ref) {
                 const context = scheduler.allocator.create(TlsContext.Server) catch |err| {
                     L.pop(1);
-                    L.pushlstring(@errorName(err));
+                    L.pushlstring(@errorName(err)) catch |e| std.debug.panic("{}", .{e});
                     _ = Scheduler.resumeStateError(L, null) catch {};
                     break :jmp;
                 };
@@ -657,7 +657,7 @@ const AsyncAcceptContext = struct {
         defer self.list.remove(&self.completion);
         defer self.accepted_ref.deref(L);
 
-        L.pushlstring(@errorName(err));
+        L.pushlstring(@errorName(err)) catch |e| std.debug.panic("{}", .{e});
         _ = Scheduler.resumeStateError(L, null) catch {};
         return .disarm;
     }
@@ -785,7 +785,7 @@ const AsyncConnectContext = struct {
                 break :jmp;
 
             connect_res catch |err| {
-                L.pushlstring(@errorName(err));
+                L.pushlstring(@errorName(err)) catch |e| std.debug.panic("{}", .{e});
                 _ = Scheduler.resumeStateError(L, null) catch {};
                 break :jmp;
             };
@@ -793,7 +793,7 @@ const AsyncConnectContext = struct {
             if (self.tls == .client) {
                 const ctx = self.tls.client;
                 const res = ctx.connection.handshake.client.run(&[_]u8{}, ctx.ciphertext.writableSlice(0)) catch |err| {
-                    L.pushlstring(@errorName(err));
+                    L.pushlstring(@errorName(err)) catch |e| std.debug.panic("{}", .{e});
                     _ = Scheduler.resumeStateError(L, null) catch {};
                     break :jmp;
                 };
@@ -832,7 +832,7 @@ const AsyncConnectContext = struct {
         defer self.ref.deref();
         defer self.list.remove(&self.completion);
 
-        L.pushlstring(@errorName(err));
+        L.pushlstring(@errorName(err)) catch |e| std.debug.panic("{}", .{e});
         _ = Scheduler.resumeStateError(L, null) catch {};
         return .disarm;
     }
@@ -1192,12 +1192,12 @@ fn lua_getName(self: *Socket, L: *VM.lua.State) !i32 {
     var address: std.net.Address = undefined;
     var len: std.posix.socklen_t = @sizeOf(std.posix.sockaddr);
     try std.posix.getsockname(self.socket, &address.any, &len);
-    L.createtable(0, 3);
-    L.Zsetfield(-1, "family", address.any.family);
-    L.Zsetfield(-1, "port", address.getPort());
+    try L.createtable(0, 3);
+    try L.Zsetfield(-1, "family", address.any.family);
+    try L.Zsetfield(-1, "port", address.getPort());
     var buf: [LONGEST_ADDRESS]u8 = undefined;
-    L.pushlstring(AddressToString(&buf, address));
-    L.setfield(-2, "address");
+    try L.pushlstring(AddressToString(&buf, address));
+    try L.rawsetfield(-2, "address");
     return 1;
 }
 
@@ -1289,12 +1289,12 @@ fn lua_isOpen(self: *Socket, L: *VM.lua.State) !i32 {
 }
 
 fn lua_kind(self: *Socket, L: *VM.lua.State) !i32 {
-    switch (self.tls_context) {
+    try switch (self.tls_context) {
         .none => L.pushlstring("socket"),
         .client => L.pushlstring("tls_socket:client"),
         .server => L.pushlstring("tls_socket:server_client"),
         .server_ref => L.pushlstring("tls_socket:server"),
-    }
+    };
     return 1;
 }
 
@@ -1327,12 +1327,12 @@ pub fn __dtor(L: *VM.lua.State, self: *Socket) void {
     allocator.destroy(self.list);
 }
 
-pub inline fn load(L: *VM.lua.State) void {
-    _ = L.Znewmetatable(@typeName(@This()), .{
+pub inline fn load(L: *VM.lua.State) !void {
+    _ = try L.Znewmetatable(@typeName(@This()), .{
         .__metatable = "Metatable is locked",
         .__type = "SocketHandle",
     });
-    __index(L, -1);
+    try __index(L, -1);
     L.setreadonly(-1, true);
     L.setuserdatametatable(TAG_NET_SOCKET);
     L.setuserdatadtor(Socket, TAG_NET_SOCKET, __dtor);
@@ -1340,7 +1340,7 @@ pub inline fn load(L: *VM.lua.State) void {
 
 pub fn push(L: *VM.lua.State, value: std.posix.socket_t, open: OpenCase) !*Socket {
     const allocator = luau.getallocator(L);
-    const self = L.newuserdatataggedwithmetatable(Socket, TAG_NET_SOCKET);
+    const self = try L.newuserdatataggedwithmetatable(Socket, TAG_NET_SOCKET);
     const list = try allocator.create(Scheduler.CompletionLinkedList);
     list.* = .{};
     self.* = .{

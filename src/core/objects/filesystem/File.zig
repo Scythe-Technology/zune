@@ -118,13 +118,13 @@ pub const AsyncReadContext = struct {
             l.remove(&self.completion);
 
         if (self.err) |e| {
-            L.pushstring(@errorName(e));
+            L.pushstring(@errorName(e)) catch |err| std.debug.panic("{}", .{err});
             _ = Scheduler.resumeStateError(L, null) catch {};
         } else {
             self.array.shrinkAndFree(@min(self.buffer_len, self.limit));
             switch (self.lua_type) {
-                .Buffer => L.Zpushbuffer(self.array.items),
-                .String => L.pushlstring(self.array.items),
+                .Buffer => L.Zpushbuffer(self.array.items) catch |e| std.debug.panic("{}", .{e}),
+                .String => L.pushlstring(self.array.items) catch |e| std.debug.panic("{}", .{e}),
                 else => unreachable,
             }
             _ = Scheduler.resumeState(L, null, 1) catch {};
@@ -299,7 +299,7 @@ pub const AsyncWriteContext = struct {
             l.remove(&self.completion);
 
         if (self.err) |e| {
-            L.pushstring(@errorName(e));
+            L.pushstring(@errorName(e)) catch |err| std.debug.panic("{}", .{err});
             _ = Scheduler.resumeStateError(L, null) catch {};
         } else _ = Scheduler.resumeState(L, null, 0) catch {};
         return .disarm;
@@ -560,9 +560,9 @@ fn lua_readSync(self: *File, L: *VM.lua.State) !i32 {
             defer allocator.free(data);
 
             if (useBuffer)
-                L.Zpushbuffer(data)
+                try L.Zpushbuffer(data)
             else
-                L.pushlstring(data);
+                try L.pushlstring(data);
         },
         .Tty => blk: {
             var fds = [1]sysfd.context.pollfd{.{
@@ -575,7 +575,7 @@ fn lua_readSync(self: *File, L: *VM.lua.State) !i32 {
             if (poll < 0)
                 std.debug.panic("InternalError (Bad Poll)", .{});
             if (poll == 0) {
-                L.pushlstring("");
+                try L.pushlstring("");
                 break :blk;
             }
 
@@ -586,9 +586,9 @@ fn lua_readSync(self: *File, L: *VM.lua.State) !i32 {
 
             const data = buffer[0..amount];
             if (useBuffer)
-                L.Zpushbuffer(data)
+                try L.Zpushbuffer(data)
             else
-                L.pushlstring(data);
+                try L.pushlstring(data);
         },
     }
     return 1;
@@ -781,12 +781,12 @@ pub fn __dtor(L: *VM.lua.State, self: *File) void {
     allocator.destroy(self.list);
 }
 
-pub inline fn load(L: *VM.lua.State) void {
-    _ = L.Znewmetatable(@typeName(@This()), .{
+pub inline fn load(L: *VM.lua.State) !void {
+    _ = try L.Znewmetatable(@typeName(@This()), .{
         .__metatable = "Metatable is locked",
         .__type = "FileHandle",
     });
-    __index(L, -1);
+    try __index(L, -1);
     L.setreadonly(-1, true);
     L.setuserdatametatable(TAG_FS_FILE);
     L.setuserdatadtor(File, TAG_FS_FILE, __dtor);
@@ -794,7 +794,7 @@ pub inline fn load(L: *VM.lua.State) void {
 
 pub fn push(L: *VM.lua.State, file: std.fs.File, kind: FileKind, mode: OpenMode) !void {
     const allocator = luau.getallocator(L);
-    const self = L.newuserdatataggedwithmetatable(File, TAG_FS_FILE);
+    const self = try L.newuserdatataggedwithmetatable(File, TAG_FS_FILE);
     const list = try allocator.create(Scheduler.CompletionLinkedList);
     list.* = .{};
     self.* = .{

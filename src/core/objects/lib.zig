@@ -14,22 +14,22 @@ pub const process = struct {
     pub const Child = @import("process/Child.zig");
 };
 
-fn loadNamespace(comptime ns: type, L: *VM.lua.State) void {
+fn loadNamespace(comptime ns: type, L: *VM.lua.State) !void {
     inline for (@typeInfo(ns).@"struct".decls) |field| {
         const object = @field(ns, field.name);
         if (comptime !object.PlatformSupported())
             continue;
         if (@hasDecl(object, "load")) {
-            object.load(L);
+            try object.load(L);
         }
     }
 }
 
-pub fn load(L: *VM.lua.State) void {
+pub fn load(L: *VM.lua.State) !void {
     inline for (@typeInfo(@This()).@"struct".decls) |field| {
         const ns = @field(@This(), field.name);
         switch (@typeInfo(@TypeOf(ns))) {
-            .type => loadNamespace(ns, L),
+            .type => try loadNamespace(ns, L),
             else => continue,
         }
     }
