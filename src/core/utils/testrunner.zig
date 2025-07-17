@@ -36,7 +36,7 @@ pub fn runTest(comptime testFile: TestFile, args: []const []const u8, comptime o
     defer L.deinit();
 
     if (!options.std_out)
-        L.Zsetfield(VM.lua.GLOBALSINDEX, "_testing_stdOut", false);
+        try L.Zsetfield(VM.lua.GLOBALSINDEX, "_testing_stdOut", false);
 
     var scheduler = try Scheduler.init(allocator, L);
     defer scheduler.deinit();
@@ -52,7 +52,7 @@ pub fn runTest(comptime testFile: TestFile, args: []const []const u8, comptime o
         &temporaryDir.sub_path,
     });
     defer allocator.free(tempPath);
-    L.Zsetglobal("__test_tempdir", tempPath);
+    try L.Zsetglobal("__test_tempdir", tempPath);
 
     const cwd = std.fs.cwd();
 
@@ -67,18 +67,18 @@ pub fn runTest(comptime testFile: TestFile, args: []const []const u8, comptime o
 
     Zune.loadConfiguration(dir);
 
-    Engine.prepAsync(L, &scheduler);
+    try Engine.prepAsync(L, &scheduler);
     const current_top = L.gettop();
     try Zune.openZune(L, args, .{});
     std.debug.assert(L.gettop() == current_top); // zune should not leave anything on the stack
 
     L.setsafeenv(VM.lua.GLOBALSINDEX, true);
 
-    const ML = L.newthread();
+    const ML = try L.newthread();
 
-    ML.Lsandboxthread();
+    try ML.Lsandboxthread();
 
-    Engine.setLuaFileContext(ML, .{
+    try Engine.setLuaFileContext(ML, .{
         .source = content,
         .main = true,
     });
