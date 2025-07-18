@@ -273,12 +273,12 @@ const ProcessAsyncRunContext = struct {
                 .ok = code == 0,
                 .stdout = stdout,
                 .stderr = stderr,
-            });
+            }) catch |e| std.debug.panic("{}", .{e});
         } else {
             L.Zpushvalue(.{
                 .code = code,
                 .ok = code == 0,
-            });
+            }) catch |e| std.debug.panic("{}", .{e});
         }
 
         _ = Scheduler.resumeState(L, null, 1) catch {};
@@ -402,7 +402,7 @@ fn decodeString(L: *VM.lua.State, slice: []const u8) !usize {
     if (slice.len < 2)
         return DotEnvError.InvalidString;
     if (slice[0] == slice[1]) {
-        L.pushstring("");
+        try L.pushstring("");
         return 2;
     }
 
@@ -432,9 +432,9 @@ fn decodeString(L: *VM.lua.State, slice: []const u8) !usize {
         pos += 1;
     }
     if (eof) {
-        L.pushlstring(buf.items);
+        try L.pushlstring(buf.items);
         return pos;
-    } else L.pushstring("");
+    } else try L.pushstring("");
     return 0;
 }
 
@@ -467,14 +467,14 @@ fn decodeEnvironment(L: *VM.lua.State, string: []const u8) !void {
                 break;
             try validateWord(variableName);
             pos += Parser.nextNonCharacter(string[pos..], &WHITESPACE);
-            L.pushlstring(variableName);
+            try L.pushlstring(variableName);
             errdefer L.pop(1);
             if (string[pos] == '"' or string[pos] == '\'' or string[pos] == '`') {
                 const stringEof = try decodeString(L, string[pos..]);
                 const remaining_slice = string[pos + stringEof ..];
                 const eof = Parser.nextCharacter(remaining_slice, &DECODE_BREAK);
                 if (Parser.trimSpace(remaining_slice[0..eof]).len == 0) {
-                    L.settable(-3);
+                    try L.rawset(-3);
                     pos += stringEof;
                     pos += eof;
                     continue;
@@ -482,8 +482,8 @@ fn decodeEnvironment(L: *VM.lua.State, string: []const u8) !void {
                 L.pop(1);
             }
             const eof = Parser.nextCharacter(string[pos..], &DECODE_BREAK);
-            L.pushlstring(Parser.trimSpace(string[pos .. pos + eof]));
-            L.settable(-3);
+            try L.pushlstring(Parser.trimSpace(string[pos .. pos + eof]));
+            try L.rawset(-3);
             pos += eof;
         },
         else => pos += 1,
@@ -502,13 +502,13 @@ fn loadEnvironment(L: *VM.lua.State, allocator: std.mem.Allocator, file: []const
 
 fn process_loadEnv(L: *VM.lua.State) !i32 {
     const allocator = luau.getallocator(L);
-    L.newtable();
+    try L.newtable();
 
     var iterator = Zune.STATE.ENV_MAP.iterator();
     while (iterator.next()) |entry| {
         const zkey = try allocator.dupeZ(u8, entry.key_ptr.*);
         defer allocator.free(zkey);
-        L.Zsetfield(-1, zkey, entry.value_ptr.*);
+        try L.Zsetfield(-1, zkey, entry.value_ptr.*);
     }
 
     try loadEnvironment(L, allocator, ".env");
@@ -537,7 +537,7 @@ fn process_onsignal(L: *VM.lua.State) !i32 {
         if (GL != L)
             L.xpush(GL, 2);
 
-        const ref = GL.ref(if (GL != L) -1 else 2) orelse return L.Zerror("Failed to create reference");
+        const ref = (GL.ref(if (GL != L) -1 else 2) catch @panic("OutOfMemory")) orelse return L.Zerror("Failed to create reference");
         if (GL != L)
             GL.pop(1);
 
@@ -557,35 +557,35 @@ fn process_getCwd(L: *VM.lua.State) !i32 {
     const allocator = luau.getallocator(L);
     const path = try std.fs.cwd().realpathAlloc(allocator, ".");
     defer allocator.free(path);
-    L.pushlstring(path);
+    try L.pushlstring(path);
     return 1;
 }
 
 pub fn loadLib(L: *VM.lua.State, args: []const []const u8) !void {
-    L.createtable(0, 10);
+    try L.createtable(0, 10);
 
-    L.Zsetfield(-1, "arch", @tagName(builtin.cpu.arch));
-    L.Zsetfield(-1, "os", @tagName(native_os));
+    try L.Zsetfield(-1, "arch", @tagName(builtin.cpu.arch));
+    try L.Zsetfield(-1, "os", @tagName(native_os));
 
     {
-        L.Zpushvalue(args);
-        L.setfield(-2, "args");
+        try L.Zpushvalue(args);
+        try L.rawsetfield(-2, "args");
     }
 
     _ = try process_loadEnv(L);
-    L.setfield(-2, "env");
-    L.Zsetfieldfn(-1, "loadEnv", process_loadEnv);
+    try L.rawsetfield(-2, "env");
+    try L.Zsetfieldfn(-1, "loadEnv", process_loadEnv);
 
-    L.Zsetfieldfn(-1, "getCwd", process_getCwd);
+    try L.Zsetfieldfn(-1, "getCwd", process_getCwd);
 
-    L.Zsetfieldfn(-1, "exit", process_exit);
-    L.Zsetfieldfn(-1, "run", process_run);
-    L.Zsetfieldfn(-1, "create", process_create);
-    L.Zsetfieldfn(-1, "onSignal", process_onsignal);
+    try L.Zsetfieldfn(-1, "exit", process_exit);
+    try L.Zsetfieldfn(-1, "run", process_run);
+    try L.Zsetfieldfn(-1, "create", process_create);
+    try L.Zsetfieldfn(-1, "onSignal", process_onsignal);
 
     L.setreadonly(-1, true);
 
-    LuaHelper.registerModule(L, LIB_NAME);
+    try LuaHelper.registerModule(L, LIB_NAME);
 }
 
 test "process" {

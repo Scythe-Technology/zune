@@ -48,7 +48,7 @@ pub const LuaDatetime = struct {
         else
             datetime;
 
-        L.pushfstring("{}Z", .{utc});
+        try L.pushfstring("{}Z", .{utc});
 
         return 1;
     }
@@ -65,7 +65,7 @@ pub const LuaDatetime = struct {
             datetime;
         const local = try date.tzConvert(.{ .tz = &tz });
 
-        L.Zpushvalue(.{
+        try L.Zpushvalue(.{
             .year = local.year,
             .month = local.month,
             .day = local.day,
@@ -85,7 +85,7 @@ pub const LuaDatetime = struct {
         else
             try datetime.tzLocalize(.{ .tz = &time.Timezone.UTC });
 
-        L.Zpushvalue(.{
+        try L.Zpushvalue(.{
             .year = utc.year,
             .month = utc.month,
             .day = utc.day,
@@ -116,7 +116,7 @@ pub const LuaDatetime = struct {
 
         try local.toString(format_str, buf.writer());
 
-        L.pushlstring(buf.items);
+        try L.pushlstring(buf.items);
 
         return 1;
     }
@@ -136,7 +136,7 @@ pub const LuaDatetime = struct {
 
         try utc.toString(format_str, buf.writer());
 
-        L.pushlstring(buf.items);
+        try L.pushlstring(buf.items);
 
         return 1;
     }
@@ -179,7 +179,7 @@ pub const LuaDatetime = struct {
 };
 
 fn lua_now(L: *VM.lua.State) !i32 {
-    const self = L.newuserdatataggedwithmetatable(LuaDatetime, TAG_DATETIME);
+    const self = try L.newuserdatataggedwithmetatable(LuaDatetime, TAG_DATETIME);
     self.* = .{
         .datetime = try time.Datetime.now(null),
         .timezone = null,
@@ -190,7 +190,7 @@ fn lua_now(L: *VM.lua.State) !i32 {
 fn lua_fromUnixTimestamp(L: *VM.lua.State) !i32 {
     const timestamp = L.Lchecknumber(1);
 
-    const self = L.newuserdatataggedwithmetatable(LuaDatetime, TAG_DATETIME);
+    const self = try L.newuserdatataggedwithmetatable(LuaDatetime, TAG_DATETIME);
     self.* = .{
         .datetime = try time.Datetime.fromUnix(@intFromFloat(timestamp), .second, null),
         .timezone = null,
@@ -201,7 +201,7 @@ fn lua_fromUnixTimestamp(L: *VM.lua.State) !i32 {
 fn lua_fromUnixTimestampMillis(L: *VM.lua.State) !i32 {
     const timestamp = L.Lchecknumber(1);
 
-    const self = L.newuserdatataggedwithmetatable(LuaDatetime, TAG_DATETIME);
+    const self = try L.newuserdatataggedwithmetatable(LuaDatetime, TAG_DATETIME);
     self.* = .{
         .datetime = try time.Datetime.fromUnix(@intFromFloat(timestamp), .millisecond, null),
         .timezone = null,
@@ -218,7 +218,7 @@ fn lua_fromUniversalTime(L: *VM.lua.State) !i32 {
     const second = L.Loptinteger(6, 0);
     const millisecond = L.Loptinteger(7, 0);
 
-    const self = L.newuserdatataggedwithmetatable(LuaDatetime, TAG_DATETIME);
+    const self = try L.newuserdatataggedwithmetatable(LuaDatetime, TAG_DATETIME);
     self.* = .{
         .datetime = try time.Datetime.fromFields(.{
             .year = @intCast(year),
@@ -245,7 +245,7 @@ fn lua_fromLocalTime(L: *VM.lua.State) !i32 {
 
     const allocator = luau.getallocator(L);
 
-    const self = L.newuserdatataggedwithmetatable(LuaDatetime, TAG_DATETIME);
+    const self = try L.newuserdatataggedwithmetatable(LuaDatetime, TAG_DATETIME);
     self.timezone = try time.Timezone.tzLocal(allocator);
     errdefer {
         self.timezone.?.deinit();
@@ -267,7 +267,7 @@ fn lua_fromLocalTime(L: *VM.lua.State) !i32 {
 fn lua_fromIsoDate(L: *VM.lua.State) !i32 {
     const iso_date = L.Lcheckstring(1);
 
-    const self = L.newuserdatataggedwithmetatable(LuaDatetime, TAG_DATETIME);
+    const self = try L.newuserdatataggedwithmetatable(LuaDatetime, TAG_DATETIME);
     self.* = .{
         .datetime = try time.Datetime.fromISO8601(iso_date),
         .timezone = null,
@@ -279,15 +279,15 @@ fn lua_parse(L: *VM.lua.State) !i32 {
     const allocator = luau.getallocator(L);
     const date_string = L.Lcheckstring(1);
 
-    const self = L.newuserdatataggedwithmetatable(LuaDatetime, TAG_DATETIME);
+    const self = try L.newuserdatataggedwithmetatable(LuaDatetime, TAG_DATETIME);
     try parse.parse(self, allocator, date_string);
 
     return 1;
 }
 
-pub fn loadLib(L: *VM.lua.State) void {
+pub fn loadLib(L: *VM.lua.State) !void {
     {
-        _ = L.Znewmetatable(@typeName(LuaDatetime), .{
+        _ = try L.Znewmetatable(@typeName(LuaDatetime), .{
             .__index = LuaDatetime.__index,
             .__namecall = LuaDatetime.__namecall,
             .__metatable = "Metatable is locked",
@@ -297,7 +297,7 @@ pub fn loadLib(L: *VM.lua.State) void {
         L.setuserdatadtor(LuaDatetime, TAG_DATETIME, LuaDatetime.__dtor);
     }
 
-    L.Zpushvalue(.{
+    try L.Zpushvalue(.{
         .now = lua_now,
         .parse = lua_parse,
         .fromIsoDate = lua_fromIsoDate,
@@ -308,7 +308,7 @@ pub fn loadLib(L: *VM.lua.State) void {
     });
     L.setreadonly(-1, true);
 
-    LuaHelper.registerModule(L, LIB_NAME);
+    try LuaHelper.registerModule(L, LIB_NAME);
 }
 
 test {

@@ -20,103 +20,103 @@ const VM = luau.VM;
 
 pub const LIB_NAME = "serde";
 
-pub fn loadLib(L: *VM.lua.State) void {
-    L.createtable(0, 10);
+pub fn loadLib(L: *VM.lua.State) !void {
+    try L.createtable(0, 10);
 
     { // Json
-        L.createtable(0, 4);
+        try L.createtable(0, 4);
 
-        L.Zsetfieldfn(-1, "encode", json.LuaEncoder(.JSON));
-        L.Zsetfieldfn(-1, "decode", json.LuaDecoder(.JSON));
+        try L.Zsetfieldfn(-1, "encode", json.LuaEncoder(.JSON));
+        try L.Zsetfieldfn(-1, "decode", json.LuaDecoder(.JSON));
 
-        json.lua_setprops(L);
+        try json.lua_setprops(L);
 
         L.setreadonly(-1, true);
-        L.setfield(-2, "json");
+        try L.rawsetfield(-2, "json");
     }
 
     { // Json5
-        L.createtable(0, 4);
+        try L.createtable(0, 4);
 
-        L.Zsetfieldfn(-1, "encode", json.LuaEncoder(.JSON5));
-        L.Zsetfieldfn(-1, "decode", json.LuaDecoder(.JSON5));
+        try L.Zsetfieldfn(-1, "encode", json.LuaEncoder(.JSON5));
+        try L.Zsetfieldfn(-1, "decode", json.LuaDecoder(.JSON5));
 
         _ = L.rawgetfield(-2, "json");
 
         _ = L.rawgetfield(-1, "indents");
-        L.setfield(-3, "indents");
+        try L.rawsetfield(-3, "indents");
 
         _ = L.rawgetfield(-1, "values");
-        L.setfield(-3, "values");
+        try L.rawsetfield(-3, "values");
 
         L.pop(1);
 
         L.setreadonly(-1, true);
-        L.setfield(-2, "json5");
+        try L.rawsetfield(-2, "json5");
     }
 
     { // Toml
-        L.Zpushvalue(.{
+        try L.Zpushvalue(.{
             .encode = toml.lua_encode,
             .decode = toml.lua_decode,
         });
         L.setreadonly(-1, true);
 
-        L.setfield(-2, "toml");
+        try L.rawsetfield(-2, "toml");
     }
 
     { // Yaml
-        L.Zpushvalue(.{
+        try L.Zpushvalue(.{
             .encode = yaml.lua_encode,
             .decode = yaml.lua_decode,
         });
         L.setreadonly(-1, true);
 
-        L.setfield(-2, "yaml");
+        try L.rawsetfield(-2, "yaml");
     }
 
     { // Base64
-        L.Zpushvalue(.{
+        try L.Zpushvalue(.{
             .encode = base64.lua_encode,
             .decode = base64.lua_decode,
         });
         L.setreadonly(-1, true);
 
-        L.setfield(-2, "base64");
+        try L.rawsetfield(-2, "base64");
     }
 
     { // Gzip
-        L.Zpushvalue(.{
+        try L.Zpushvalue(.{
             .compress = gzip.lua_compress,
             .decompress = gzip.lua_decompress,
         });
         L.setreadonly(-1, true);
 
-        L.setfield(-2, "gzip");
+        try L.rawsetfield(-2, "gzip");
     }
 
     { // Zlib
-        L.Zpushvalue(.{
+        try L.Zpushvalue(.{
             .compress = zlib.lua_compress,
             .decompress = zlib.lua_decompress,
         });
         L.setreadonly(-1, true);
 
-        L.setfield(-2, "zlib");
+        try L.rawsetfield(-2, "zlib");
     }
 
     { // Flate
-        L.Zpushvalue(.{
+        try L.Zpushvalue(.{
             .compress = flate.lua_compress,
             .decompress = flate.lua_decompress,
         });
         L.setreadonly(-1, true);
 
-        L.setfield(-2, "flate");
+        try L.rawsetfield(-2, "flate");
     }
 
     { // Lz4
-        L.Zpushvalue(.{
+        try L.Zpushvalue(.{
             .compress = lz4.lua_compress,
             .compressFrame = lz4.lua_frame_compress,
             .decompress = lz4.lua_decompress,
@@ -124,22 +124,22 @@ pub fn loadLib(L: *VM.lua.State) void {
         });
         L.setreadonly(-1, true);
 
-        L.setfield(-2, "lz4");
+        try L.rawsetfield(-2, "lz4");
     }
 
     { // Zstd
-        L.Zpushvalue(.{
+        try L.Zpushvalue(.{
             .compress = zstd.lua_compress,
             .decompress = zstd.lua_decompress,
         });
         L.setreadonly(-1, true);
 
-        L.setfield(-2, "zstd");
+        try L.rawsetfield(-2, "zstd");
     }
 
     L.setreadonly(-1, true);
 
-    LuaHelper.registerModule(L, LIB_NAME);
+    try LuaHelper.registerModule(L, LIB_NAME);
 }
 
 test {

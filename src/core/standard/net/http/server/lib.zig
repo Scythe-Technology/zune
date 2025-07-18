@@ -102,17 +102,17 @@ pub fn emitError(
     if (!self.callbacks.@"error".hasRef())
         return;
     const GL = self.scheduler.global;
-    const L = GL.newthread();
+    const L = GL.newthread() catch @panic("OutOfMemory");
     defer GL.pop(1);
     _ = self.ref.push(L);
     _ = self.callbacks.@"error".push(L);
-    L.pushfstring("{s}", .{@tagName(scope)});
+    L.pushfstring("{s}", .{@tagName(scope)}) catch @panic("OutOfMemory");
     switch (@typeInfo(@TypeOf(err))) {
         .error_set => {
-            L.pushfstring("{s}", .{@errorName(err)});
+            L.pushfstring("{s}", .{@errorName(err)}) catch @panic("OutOfMemory");
         },
         .pointer => {
-            L.pushlstring(err);
+            L.pushlstring(err) catch @panic("OutOfMemory");
         },
         inline else => |t| @compileError("Unsupported error type for emitError: " ++ @typeName(t)),
     }
@@ -397,9 +397,9 @@ pub fn lua_serve(L: *VM.lua.State) !i32 {
 
     const final_port = address.getPort();
 
-    const self = L.newuserdatadtor(Self, __dtor);
-    _ = L.Lgetmetatable(@typeName(Self));
-    _ = L.setmetatable(-2);
+    const self = try L.newuserdatadtor(Self, __dtor);
+    _ = try L.Lgetmetatable(@typeName(Self));
+    _ = try L.setmetatable(-2);
 
     self.* = .{
         .arena = .init(allocator),
@@ -556,15 +556,15 @@ pub const __namecall = MethodMap.CreateNamecallMap(Self, null, .{
     .{ "isRunning", lua_isRunning },
 });
 
-pub fn lua_load(L: *VM.lua.State) void {
-    _ = L.Znewmetatable(@typeName(Self), .{
+pub fn lua_load(L: *VM.lua.State) !void {
+    _ = try L.Znewmetatable(@typeName(Self), .{
         .__namecall = __namecall,
         .__metatable = "Metatable is locked",
     });
     L.setreadonly(-1, true);
     L.pop(1);
 
-    _ = L.Znewmetatable(@typeName(ClientWebSocket), .{
+    _ = try L.Znewmetatable(@typeName(ClientWebSocket), .{
         .__namecall = ClientWebSocket.__namecall,
         .__metatable = "Metatable is locked",
     });

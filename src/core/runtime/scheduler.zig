@@ -49,7 +49,7 @@ pub const ThreadRef = struct {
             L.pop(1);
             return .{ .value = L, .ref = null };
         }
-        const ref = L.ref(-1) orelse std.debug.panic("Task Scheduler failed to create thread ref\n", .{});
+        const ref = (L.ref(-1) catch |err| std.debug.panic("{}", .{err})) orelse std.debug.panic("Task Scheduler failed to create thread ref\n", .{});
         L.pop(1);
         return .{ .value = L, .ref = ref };
     }

@@ -22,14 +22,14 @@ pub const RefTable = struct {
     table_ref: Ref(void),
     free: i32 = 0,
 
-    pub fn init(L: *VM.lua.State, comptime weak: bool) RefTable {
-        L.newtable();
+    pub fn init(L: *VM.lua.State, comptime weak: bool) !RefTable {
+        try L.newtable();
         defer L.pop(1);
 
         if (weak) {
-            L.Zpushvalue(.{ .__mode = "v" });
+            try L.Zpushvalue(.{ .__mode = "v" });
             L.setreadonly(-1, true);
-            _ = L.setmetatable(-2);
+            _ = try L.setmetatable(-2);
         }
 
         return .{ .table_ref = .init(L, -1, undefined) };
@@ -39,7 +39,7 @@ pub const RefTable = struct {
         self.table_ref.deref(L);
     }
 
-    pub fn ref(self: *RefTable, L: *VM.lua.State, idx: i32) ?i32 {
+    pub fn ref(self: *RefTable, L: *VM.lua.State, idx: i32) !?i32 {
         L.pushvalue(idx);
         defer L.pop(1);
         if (!self.table_ref.push(L))
@@ -59,7 +59,7 @@ pub const RefTable = struct {
         }
 
         L.pushvalue(-2);
-        L.rawseti(-2, id);
+        try L.rawseti(-2, id);
         L.pop(1);
         return id;
     }
@@ -68,7 +68,7 @@ pub const RefTable = struct {
         if (self.table_ref.push(L)) {
             defer L.pop(1);
             L.pushinteger(self.free);
-            L.rawseti(-2, id);
+            L.rawseti(-2, id) catch unreachable; // the node at this id should exist and not readonly
             self.free = id;
         }
     }
@@ -104,7 +104,7 @@ pub fn Ref(comptime T: type) type {
         const This = @This();
 
         pub fn init(L: *VM.lua.State, idx: i32, value: T) This {
-            const ref = L.ref(idx) orelse std.debug.panic("Failed to create ref\n", .{});
+            const ref = (L.ref(idx) catch |e| std.debug.panic("{}", .{e})) orelse std.debug.panic("Failed to create ref\n", .{});
             return .{
                 .value = value,
                 .ref = .{ .registry = ref },
@@ -113,7 +113,7 @@ pub fn Ref(comptime T: type) type {
 
         pub fn initWithTable(L: *VM.lua.State, idx: i32, value: T, reftable: *RefTable) This {
             std.debug.assert(reftable.table_ref.ref != null);
-            const ref = reftable.ref(L, idx) orelse unreachable;
+            const ref = reftable.ref(L, idx) catch |e| std.debug.panic("{}", .{e}) orelse unreachable;
             return .{
                 .value = value,
                 .ref = .{
@@ -169,12 +169,12 @@ pub fn Ref(comptime T: type) type {
 
 /// Register a table in the registry.
 /// Pops the module from the stack.
-pub fn registerModule(L: *VM.lua.State, comptime libName: [:0]const u8) void {
-    _ = L.Lfindtable(VM.lua.REGISTRYINDEX, "_LIBS", 1);
+pub fn registerModule(L: *VM.lua.State, comptime libName: [:0]const u8) !void {
+    _ = try L.Lfindtable(VM.lua.REGISTRYINDEX, "_LIBS", 1);
     if (L.rawgetfield(-1, libName) != .Table) {
         L.pop(1);
         L.pushvalue(-2);
-        L.setfield(-2, libName);
+        try L.rawsetfield(-2, libName);
     } else L.pop(1);
     L.pop(2);
 }

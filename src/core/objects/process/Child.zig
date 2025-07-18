@@ -78,7 +78,7 @@ pub const WaitAsyncContext = struct {
         L.Zpushvalue(.{
             .code = code,
             .ok = code == 0,
-        });
+        }) catch |e| std.debug.panic("{}", .{e});
         _ = Scheduler.resumeState(L, null, 1) catch {};
 
         return .disarm;
@@ -87,7 +87,7 @@ pub const WaitAsyncContext = struct {
 
 fn lua_kill(self: *Child, L: *VM.lua.State) !i32 {
     if (self.dead) {
-        L.Zpushvalue(.{
+        try L.Zpushvalue(.{
             .code = self.code,
             .ok = self.code == 0,
         });
@@ -136,7 +136,7 @@ fn lua_kill(self: *Child, L: *VM.lua.State) !i32 {
 
 fn lua_wait(self: *Child, L: *VM.lua.State) !i32 {
     if (self.dead) {
-        L.Zpushvalue(.{
+        try L.Zpushvalue(.{
             .code = self.code,
             .ok = self.code == 0,
         });
@@ -221,8 +221,8 @@ pub fn __dtor(L: *VM.lua.State, self: *Child) void {
     self.stderr_file.deref(L);
 }
 
-pub inline fn load(L: *VM.lua.State) void {
-    _ = L.Znewmetatable(@typeName(@This()), .{
+pub inline fn load(L: *VM.lua.State) !void {
+    _ = try L.Znewmetatable(@typeName(@This()), .{
         .__index = __index,
         .__namecall = __namecall,
         .__metatable = "Metatable is locked",
@@ -234,7 +234,7 @@ pub inline fn load(L: *VM.lua.State) void {
 }
 
 pub fn push(L: *VM.lua.State, child: std.process.Child) !void {
-    const self = L.newuserdatataggedwithmetatable(Child, TAG_PROCESS_CHILD);
+    const self = try L.newuserdatataggedwithmetatable(Child, TAG_PROCESS_CHILD);
 
     self.* = .{
         .child = child,

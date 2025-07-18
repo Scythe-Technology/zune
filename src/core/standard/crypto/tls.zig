@@ -17,7 +17,7 @@ const VM = luau.VM;
 pub fn lua_bundleFromSystem(L: *VM.lua.State) !i32 {
     const allocator = luau.getallocator(L);
 
-    const self = L.newuserdatatagged(tls.config.CertBundle, TAG_CRYPTO_TLS_CERTBUNDLE);
+    const self = try L.newuserdatatagged(tls.config.CertBundle, TAG_CRYPTO_TLS_CERTBUNDLE);
 
     self.* = try tls.config.CertBundle.fromSystem(allocator);
 
@@ -30,7 +30,7 @@ pub fn lua_bundleFromFile(L: *VM.lua.State) !i32 {
     const path = try L.Zcheckvalue([]const u8, 1, null);
     const dir = std.fs.cwd();
 
-    const self = L.newuserdatatagged(tls.config.CertBundle, TAG_CRYPTO_TLS_CERTBUNDLE);
+    const self = try L.newuserdatatagged(tls.config.CertBundle, TAG_CRYPTO_TLS_CERTBUNDLE);
 
     self.* = try tls.config.CertBundle.fromFile(allocator, dir, path);
 
@@ -45,7 +45,7 @@ pub fn lua_keyPairFromFile(L: *VM.lua.State) !i32 {
 
     const dir = std.fs.cwd();
 
-    const self = L.newuserdatatagged(tls.config.CertKeyPair, TAG_CRYPTO_TLS_CERTKEYPAIR);
+    const self = try L.newuserdatatagged(tls.config.CertKeyPair, TAG_CRYPTO_TLS_CERTKEYPAIR);
 
     self.* = try tls.config.CertKeyPair.load(allocator, dir, cert_path, key_path);
 

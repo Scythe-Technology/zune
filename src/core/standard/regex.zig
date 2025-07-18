@@ -24,10 +24,10 @@ const LuaRegex = struct {
         const input = try L.Zcheckvalue([]const u8, 2, null);
         if (try self.code.match(allocator, input)) |m| {
             defer m.free(allocator);
-            L.createtable(@intCast(m.captures.len), 0);
+            try L.createtable(@intCast(m.captures.len), 0);
             for (m.captures, 1..) |capture, i| {
                 if (capture) |c| {
-                    L.Zpushvalue(.{
+                    try L.Zpushvalue(.{
                         .index = 1 + c.index,
                         .string = c.slice,
                         .name = c.name,
@@ -35,7 +35,7 @@ const LuaRegex = struct {
                 } else {
                     L.pushnil();
                 }
-                L.rawseti(-2, @intCast(i));
+                try L.rawseti(-2, @intCast(i));
             }
             return 1;
         }
@@ -48,10 +48,10 @@ const LuaRegex = struct {
         const input = try L.Zcheckvalue([]const u8, 2, null);
         if (try self.code.search(allocator, input)) |m| {
             defer m.free(allocator);
-            L.createtable(@intCast(m.captures.len), 0);
+            try L.createtable(@intCast(m.captures.len), 0);
             for (m.captures, 1..) |capture, i| {
                 if (capture) |c| {
-                    L.Zpushvalue(.{
+                    try L.Zpushvalue(.{
                         .index = 1 + c.index,
                         .string = c.slice,
                         .name = c.name,
@@ -59,7 +59,7 @@ const LuaRegex = struct {
                 } else {
                     L.pushnil();
                 }
-                L.rawseti(-2, @intCast(i));
+                try L.rawseti(-2, @intCast(i));
             }
             return 1;
         }
@@ -72,17 +72,17 @@ const LuaRegex = struct {
         const input = try L.Zcheckvalue([]const u8, 2, null);
         const global = L.Loptboolean(3, false);
 
-        L.newtable();
+        try L.newtable();
 
         var iter = try self.code.searchIterator(input);
         defer iter.free();
         var captures_count: i32 = 1;
         while (try iter.next(allocator)) |m| {
             defer m.free(allocator);
-            L.createtable(@intCast(m.captures.len), 0);
+            try L.createtable(@intCast(m.captures.len), 0);
             for (m.captures, 1..) |capture, i| {
                 if (capture) |c| {
-                    L.Zpushvalue(.{
+                    try L.Zpushvalue(.{
                         .index = 1 + c.index,
                         .string = c.slice,
                         .name = c.name,
@@ -90,9 +90,9 @@ const LuaRegex = struct {
                 } else {
                     L.pushnil();
                 }
-                L.rawseti(-2, @intCast(i));
+                try L.rawseti(-2, @intCast(i));
             }
-            L.rawseti(-2, captures_count);
+            try L.rawseti(-2, captures_count);
             captures_count += 1;
             if (!global)
                 break;
@@ -114,7 +114,7 @@ const LuaRegex = struct {
         const fmt = try L.Zcheckvalue([:0]const u8, 3, null);
         const formatted = try self.code.allocFormat(allocator, input, fmt);
         defer allocator.free(formatted);
-        L.pushlstring(formatted);
+        try L.pushlstring(formatted);
         return 1;
     }
 
@@ -125,7 +125,7 @@ const LuaRegex = struct {
         const fmt = try L.Zcheckvalue([:0]const u8, 3, null);
         const formatted = try self.code.allocReplace(allocator, input, fmt);
         defer allocator.free(formatted);
-        L.pushlstring(formatted);
+        try L.pushlstring(formatted);
         return 1;
     }
 
@@ -136,7 +136,7 @@ const LuaRegex = struct {
         const fmt = try L.Zcheckvalue([:0]const u8, 3, null);
         const formatted = try self.code.allocReplaceAll(allocator, input, fmt);
         defer allocator.free(formatted);
-        L.pushlstring(formatted);
+        try L.pushlstring(formatted);
         return 1;
     }
 
@@ -172,28 +172,28 @@ fn regex_create(L: *VM.lua.State) !i32 {
 
     var pos: usize = 0;
     const r = try pcre2.compile(try L.Zcheckvalue([]const u8, 1, null), flag, &pos);
-    const ptr = L.newuserdatataggedwithmetatable(*pcre2.Code, TAG_REGEX_COMPILED);
+    const ptr = try L.newuserdatataggedwithmetatable(*pcre2.Code, TAG_REGEX_COMPILED);
     ptr.* = r;
     return 1;
 }
 
-pub fn loadLib(L: *VM.lua.State) void {
+pub fn loadLib(L: *VM.lua.State) !void {
     {
-        _ = L.Znewmetatable(@typeName(LuaRegex), .{
+        _ = try L.Znewmetatable(@typeName(LuaRegex), .{
             .__metatable = "Metatable is locked",
         });
-        LuaRegex.__index(L, -1);
+        try LuaRegex.__index(L, -1);
         L.setreadonly(-1, true);
         L.setuserdatametatable(TAG_REGEX_COMPILED);
         L.setuserdatadtor(*pcre2.Code, TAG_REGEX_COMPILED, LuaRegex.__dtor);
     }
 
-    L.Zpushvalue(.{
+    try L.Zpushvalue(.{
         .create = regex_create,
     });
     L.setreadonly(-1, true);
 
-    LuaHelper.registerModule(L, LIB_NAME);
+    try LuaHelper.registerModule(L, LIB_NAME);
 }
 
 test "regex" {

@@ -90,7 +90,7 @@ const LuaRandom = struct {
     }
 
     fn lua_clone(self: *LuaRandom, L: *VM.lua.State) !i32 {
-        const random = L.newuserdatataggedwithmetatable(LuaRandom, TAG_RANDOM);
+        const random = try L.newuserdatataggedwithmetatable(LuaRandom, TAG_RANDOM);
         random.* = .{
             .algorithm = self.algorithm,
         };
@@ -120,7 +120,7 @@ fn lua_newLuauPcg32(L: *VM.lua.State) !i32 {
     pcg32.s += seed;
     pcg32.fill(&dummy);
 
-    const hasher = L.newuserdatataggedwithmetatable(LuaRandom, TAG_RANDOM);
+    const hasher = try L.newuserdatataggedwithmetatable(LuaRandom, TAG_RANDOM);
     hasher.* = .{ .algorithm = .{ .LuauPcg32 = pcg32 } };
     return 1;
 }
@@ -129,25 +129,25 @@ fn NewGenerator(comptime name: []const u8) fn (L: *VM.lua.State) anyerror!i32 {
     return struct {
         fn inner(L: *VM.lua.State) !i32 {
             const seed = try L.Zcheckvalue(u32, 1, null);
-            const hasher = L.newuserdatataggedwithmetatable(LuaRandom, TAG_RANDOM);
+            const hasher = try L.newuserdatataggedwithmetatable(LuaRandom, TAG_RANDOM);
             hasher.* = .{ .algorithm = @unionInit(LuaRandom.Algorithm, name, .init(@intCast(seed))) };
             return 1;
         }
     }.inner;
 }
 
-pub fn loadLib(L: *VM.lua.State) void {
+pub fn loadLib(L: *VM.lua.State) !void {
     {
-        _ = L.Znewmetatable(@typeName(LuaRandom), .{
+        _ = try L.Znewmetatable(@typeName(LuaRandom), .{
             .__metatable = "Metatable is locked",
             .__type = "Random",
         });
-        LuaRandom.__index(L, -1);
+        try LuaRandom.__index(L, -1);
         L.setreadonly(-1, true);
         L.setuserdatametatable(TAG_RANDOM);
     }
 
-    L.Zpushvalue(.{
+    try L.Zpushvalue(.{
         .new = lua_newLuauPcg32,
         .LuauPcg32 = .{ .new = lua_newLuauPcg32 },
         .Pcg32 = .{ .new = NewGenerator("Pcg32") },
@@ -158,7 +158,7 @@ pub fn loadLib(L: *VM.lua.State) void {
         .RomuTrio = .{ .new = NewGenerator("RomuTrio") },
     });
     L.setreadonly(-1, true);
-    LuaHelper.registerModule(L, LIB_NAME);
+    try LuaHelper.registerModule(L, LIB_NAME);
 }
 
 test "random" {

@@ -53,10 +53,10 @@ const LuaTerminal = struct {
 
     pub fn lua_getCurrentMode(L: *VM.lua.State) !i32 {
         const term = &(TERMINAL orelse return L.Zerror("Terminal not initialized"));
-        switch (term.mode) {
+        try switch (term.mode) {
             .Plain => L.pushstring("normal"),
             .Virtual => L.pushstring("raw"),
-        }
+        };
         return 1;
     }
 };
@@ -160,9 +160,9 @@ const Stream = struct {
         const use_buffer = L.Loptboolean(3, true);
         const data = try self.vtable.read.?(self.ref.value, amount, false) orelse return error.EOF;
         if (use_buffer)
-            L.Zpushbuffer(data)
+            try L.Zpushbuffer(data)
         else
-            L.pushlstring(data);
+            try L.pushlstring(data);
         return 1;
     }
 
@@ -318,7 +318,7 @@ const BufferSink = struct {
             return 1;
 
         const ref = LuaHelper.Ref(*anyopaque).init(L, 1, @ptrCast(@alignCast(self)));
-        const stream = L.newuserdatataggedwithmetatable(Stream, TAG_IO_STREAM);
+        const stream = try L.newuserdatataggedwithmetatable(Stream, TAG_IO_STREAM);
 
         stream.* = .{
             .vtable = &StreamImpl,
@@ -340,9 +340,9 @@ const BufferSink = struct {
         const buf = self.buf.items;
         defer self.buf.clearAndFree(self.alloc);
         if (use_buffer)
-            L.Zpushbuffer(buf)
+            try L.Zpushbuffer(buf)
         else
-            L.pushlstring(buf);
+            try L.pushlstring(buf);
         return 1;
     }
 
@@ -401,9 +401,9 @@ const BufferStream = struct {
         const use_buffer = L.Loptboolean(3, true);
         const data = try self.stream_read(amount, false) orelse return error.EOF;
         if (use_buffer)
-            L.Zpushbuffer(data)
+            try L.Zpushbuffer(data)
         else
-            L.pushlstring(data);
+            try L.pushlstring(data);
         return 1;
     }
 
@@ -427,7 +427,7 @@ const BufferStream = struct {
         if (self.stream_writer.push(L))
             return 1;
         const ref = LuaHelper.Ref(*anyopaque).init(L, 1, @ptrCast(@alignCast(self)));
-        const stream = L.newuserdatataggedwithmetatable(Stream, TAG_IO_STREAM);
+        const stream = try L.newuserdatataggedwithmetatable(Stream, TAG_IO_STREAM);
 
         stream.* = .{
             .vtable = &BufferStream.Impl,
@@ -444,7 +444,7 @@ const BufferStream = struct {
         if (self.stream_reader.push(L))
             return 1;
         const ref = LuaHelper.Ref(*anyopaque).init(L, 1, @ptrCast(@alignCast(self)));
-        const stream = L.newuserdatataggedwithmetatable(Stream, TAG_IO_STREAM);
+        const stream = try L.newuserdatataggedwithmetatable(Stream, TAG_IO_STREAM);
 
         stream.* = .{
             .vtable = &BufferStream.Impl,
@@ -530,14 +530,14 @@ pub fn lua_createBufferSink(L: *VM.lua.State) !i32 {
         limit: ?u32,
     }, 1, null);
 
-    const self = L.newuserdatataggedwithmetatable(BufferSink, TAG_IO_BUFFERSINK);
+    const self = try L.newuserdatataggedwithmetatable(BufferSink, TAG_IO_BUFFERSINK);
 
     self.* = .{
         .alloc = allocator,
         .buf = .{},
         .limit = if (opts) |o| o.limit orelse MAX_LUAU_SIZE else MAX_LUAU_SIZE,
         .closed = false,
-        .ref_table = .init(L, true),
+        .ref_table = try .init(L, true),
     };
 
     return 1;
@@ -546,12 +546,12 @@ pub fn lua_createBufferSink(L: *VM.lua.State) !i32 {
 pub fn lua_createFixedBufferStream(L: *VM.lua.State) !i32 {
     const buffer = try L.Zcheckvalue([]u8, 1, null);
 
-    const self = L.newuserdatataggedwithmetatable(BufferStream, TAG_IO_BUFFERSTREAM);
+    const self = try L.newuserdatataggedwithmetatable(BufferStream, TAG_IO_BUFFERSTREAM);
 
     self.* = .{
         .pos = 0,
+        .ref_table = try .init(L, true),
         .buf = .init(L, 1, buffer),
-        .ref_table = .init(L, true),
     };
 
     return 1;
@@ -559,9 +559,9 @@ pub fn lua_createFixedBufferStream(L: *VM.lua.State) !i32 {
 
 pub var TERMINAL: ?Terminal = null;
 
-pub fn loadLib(L: *VM.lua.State) void {
+pub fn loadLib(L: *VM.lua.State) !void {
     {
-        _ = L.Znewmetatable(@typeName(BufferSink), .{
+        _ = try L.Znewmetatable(@typeName(BufferSink), .{
             .__index = BufferSink.__index,
             .__namecall = BufferSink.__namecall,
             .__metatable = "Metatable is locked",
@@ -572,28 +572,28 @@ pub fn loadLib(L: *VM.lua.State) void {
         L.setuserdatadtor(BufferSink, TAG_IO_BUFFERSINK, BufferSink.__dtor);
     }
     {
-        _ = L.Znewmetatable(@typeName(Stream), .{
+        _ = try L.Znewmetatable(@typeName(Stream), .{
             .__metatable = "Metatable is locked",
             .__type = "Stream",
         });
-        Stream.__index(L, -1);
+        try Stream.__index(L, -1);
         L.setreadonly(-1, true);
         L.setuserdatametatable(TAG_IO_STREAM);
         L.setuserdatadtor(Stream, TAG_IO_STREAM, Stream.__dtor);
     }
     {
-        _ = L.Znewmetatable(@typeName(BufferStream), .{
+        _ = try L.Znewmetatable(@typeName(BufferStream), .{
             .__metatable = "Metatable is locked",
             .__type = "BufferStream",
         });
-        BufferStream.__index(L, -1);
+        try BufferStream.__index(L, -1);
         L.setreadonly(-1, true);
         L.setuserdatametatable(TAG_IO_BUFFERSTREAM);
         L.setuserdatadtor(BufferStream, TAG_IO_BUFFERSTREAM, BufferStream.__dtor);
     }
-    L.createtable(0, 16);
+    try L.createtable(0, 16);
 
-    L.Zsetfield(-1, "MAX_READ", MAX_LUAU_SIZE);
+    try L.Zsetfield(-1, "MAX_READ", MAX_LUAU_SIZE);
 
     const stdIn = std.io.getStdIn();
     const stdOut = std.io.getStdOut();
@@ -601,41 +601,41 @@ pub fn loadLib(L: *VM.lua.State) void {
 
     // StdIn
     File.push(L, stdIn, .Tty, .readable(.none)) catch |err| std.debug.panic("{}", .{err});
-    L.setfield(-2, "stdin");
+    try L.rawsetfield(-2, "stdin");
 
     // StdOut
     File.push(L, stdOut, .Tty, .writable(.none)) catch |err| std.debug.panic("{}", .{err});
-    L.setfield(-2, "stdout");
+    try L.rawsetfield(-2, "stdout");
 
     // StdErr
     File.push(L, stdErr, .Tty, .writable(.none)) catch |err| std.debug.panic("{}", .{err});
-    L.setfield(-2, "stderr");
+    try L.rawsetfield(-2, "stderr");
 
     // Terminal
     TERMINAL = Terminal.init(stdIn, stdOut);
     {
-        L.newtable();
+        try L.newtable();
 
-        L.Zsetfieldfn(-1, "enableRawMode", LuaTerminal.lua_enableRawMode);
-        L.Zsetfieldfn(-1, "restoreMode", LuaTerminal.lua_restoreMode);
-        L.Zsetfieldfn(-1, "getSize", LuaTerminal.lua_getSize);
-        L.Zsetfieldfn(-1, "getCurrentMode", LuaTerminal.lua_getCurrentMode);
+        try L.Zsetfieldfn(-1, "enableRawMode", LuaTerminal.lua_enableRawMode);
+        try L.Zsetfieldfn(-1, "restoreMode", LuaTerminal.lua_restoreMode);
+        try L.Zsetfieldfn(-1, "getSize", LuaTerminal.lua_getSize);
+        try L.Zsetfieldfn(-1, "getCurrentMode", LuaTerminal.lua_getCurrentMode);
 
-        L.Zsetfield(-1, "isTTY", TERMINAL.?.stdin_istty and TERMINAL.?.stdout_istty);
+        try L.Zsetfield(-1, "isTTY", TERMINAL.?.stdin_istty and TERMINAL.?.stdout_istty);
 
         L.setreadonly(-1, true);
     }
-    L.setfield(-2, "terminal");
+    try L.rawsetfield(-2, "terminal");
 
     TERMINAL.?.setOutputMode() catch std.debug.print("[Win32] Failed to set output codepoint\n", .{});
 
-    L.Zsetfieldfn(-1, "format", Fmt.args);
+    try L.Zsetfieldfn(-1, "format", Fmt.args);
 
-    L.Zsetfieldfn(-1, "createBufferSink", lua_createBufferSink);
-    L.Zsetfieldfn(-1, "createFixedBufferStream", lua_createFixedBufferStream);
+    try L.Zsetfieldfn(-1, "createBufferSink", lua_createBufferSink);
+    try L.Zsetfieldfn(-1, "createFixedBufferStream", lua_createFixedBufferStream);
 
     L.setreadonly(-1, true);
-    LuaHelper.registerModule(L, LIB_NAME);
+    try LuaHelper.registerModule(L, LIB_NAME);
 }
 
 test "io" {

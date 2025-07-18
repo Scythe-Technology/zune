@@ -60,7 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     local udp = net.udpSocket({
       port = 8080,
       data = function(socket, msg, port, address)
-        print(msg, port, address) -- print datagram recieved.
+        print(msg, port, address) -- print datagram received.
       end
     })
 
@@ -78,7 +78,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
         print("Client connected")
       end,
       data = function(socket, msg)
-        print(msg) -- print message recieved.
+        print(msg) -- print message received.
       end,
       close = function(socket)
         print("Client disconnected")
@@ -93,7 +93,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
         socket:send("Hello World!")
       end,
       data = function(socket, msg)
-        print(msg) -- print message recieved.
+        print(msg) -- print message received.
       end,
       close = function(socket)
         print("Disconnected from server")

@@ -56,11 +56,11 @@ fn lua_compile(L: *VM.lua.State) !i32 {
     const version = bytecode[0];
     const success = version != 0;
     if (!success) {
-        L.pushlstring(bytecode[1..]);
+        try L.pushlstring(bytecode[1..]);
         return error.RaiseLuauError;
     }
 
-    L.pushlstring(bytecode);
+    try L.pushlstring(bytecode);
 
     return 1;
 }
@@ -101,24 +101,28 @@ fn lua_load(L: *VM.lua.State) !i32 {
     return 1;
 }
 
+fn getcoverage(L: *VM.lua.State, fnname: ?[:0]const u8, line: i32, depth: i32, hits: []const i32) !void {
+    try L.createtable(0, 3);
+    if (fnname) |name|
+        try L.Zsetfield(-1, "name", name);
+    try L.Zsetfield(-1, "line", line);
+    try L.Zsetfield(-1, "depth", depth);
+    for (hits, 0..) |hit, i| {
+        if (hit != -1) {
+            L.pushinteger(hit);
+            try L.rawseti(-2, @intCast(i));
+        }
+    }
+    try L.rawseti(-2, @intCast(L.objlen(-2) + 1));
+}
+
 fn lua_coverage(L: *VM.lua.State) !i32 {
     try L.Zchecktype(1, .Function);
 
-    L.newtable();
+    try L.newtable();
     L.getcoverage(VM.lua.State, L, 1, struct {
         fn inner(l: *VM.lua.State, fnname: ?[:0]const u8, line: i32, depth: i32, hits: []const i32) void {
-            l.createtable(0, 3);
-            if (fnname) |name|
-                l.Zsetfield(-1, "name", name);
-            l.Zsetfield(-1, "line", line);
-            l.Zsetfield(-1, "depth", depth);
-            for (hits, 0..) |hit, i| {
-                if (hit != -1) {
-                    l.pushinteger(hit);
-                    l.rawseti(-2, @intCast(i));
-                }
-            }
-            l.rawseti(-2, @intCast(l.objlen(-2) + 1));
+            getcoverage(l, fnname, line, depth, hits) catch luau.VM.ldo.throw(l, .ErrMem); // only memory errors would occur
         }
     }.inner);
 
@@ -145,9 +149,9 @@ fn lua_parse(L: *VM.lua.State) !i32 {
 
     var static_loc_buf: [256]u8 = undefined;
     if (!parseResult.errors.empty()) {
-        L.createtable(0, 1);
+        try L.createtable(0, 1);
         {
-            L.createtable(@truncate(@as(isize, @intCast(parseResult.errors.size()))), 0);
+            try L.createtable(@truncate(parseResult.errors.size()), 0);
             var iter = parseResult.errors.iterator();
             var count: i32 = 1;
             while (iter.next()) |err| : (count += 1) {
@@ -157,14 +161,14 @@ fn lua_parse(L: *VM.lua.State) !i32 {
                     err.value.location.end.line,
                     err.value.location.end.column,
                 });
-                L.Zpushvalue(.{
+                try L.Zpushvalue(.{
                     .message = err.value.message.slice(),
                     .location = loc_str,
                 });
-                L.rawseti(-2, count);
+                try L.rawseti(-2, count);
             }
         }
-        L.setfield(-2, "errors");
+        try L.rawsetfield(-2, "errors");
     } else {
         const json_str = try luau.Analysis.AstJsonEncoder.toJson(allocator, @ptrCast(@alignCast(parseResult.root)));
         defer allocator.free(json_str);
@@ -172,14 +176,14 @@ fn lua_parse(L: *VM.lua.State) !i32 {
         var root = try json.parse(allocator, json_str);
         defer root.deinit();
 
-        L.createtable(0, 3);
+        try L.createtable(0, 3);
         try SerdeJson.decodeValue(L, root.value, false);
-        L.setfield(-2, "root");
+        try L.setfield(-2, "root");
 
-        L.Zsetfield(-1, "lines", @as(f64, @floatFromInt(parseResult.lines)));
+        try L.Zsetfield(-1, "lines", @as(f64, @floatFromInt(parseResult.lines)));
 
         {
-            L.createtable(@truncate(@as(isize, @intCast(parseResult.commentLocations.size()))), 0);
+            try L.createtable(@truncate(parseResult.commentLocations.size()), 0);
             var iter = parseResult.commentLocations.iterator();
             var count: i32 = 1;
             while (iter.next()) |loc| : (count += 1) {
@@ -189,17 +193,17 @@ fn lua_parse(L: *VM.lua.State) !i32 {
                     loc.location.end.line,
                     loc.location.end.column,
                 });
-                L.Zpushvalue(.{
+                try L.Zpushvalue(.{
                     .type = @tagName(loc.type),
                     .location = loc_str,
                 });
-                L.rawseti(-2, count);
+                try L.rawseti(-2, count);
             }
         }
-        L.setfield(-2, "comment_locations");
+        try L.rawsetfield(-2, "comment_locations");
 
         {
-            L.createtable(@truncate(@as(isize, @intCast(parseResult.hotcomments.size()))), 0);
+            try L.createtable(@truncate(parseResult.hotcomments.size()), 0);
             var iter = parseResult.hotcomments.iterator();
             var count: i32 = 1;
             while (iter.next()) |hc| : (count += 1) {
@@ -209,15 +213,15 @@ fn lua_parse(L: *VM.lua.State) !i32 {
                     hc.location.end.line,
                     hc.location.end.column,
                 });
-                L.Zpushvalue(.{
+                try L.Zpushvalue(.{
                     .header = hc.header,
                     .content = hc.content.slice(),
                     .location = loc_str,
                 });
-                L.rawseti(-2, count);
+                try L.rawseti(-2, count);
             }
         }
-        L.setfield(-2, "hot_comments");
+        try L.rawsetfield(-2, "hot_comments");
     }
 
     return 1;
@@ -243,9 +247,9 @@ fn lua_parseExpr(L: *VM.lua.State) !i32 {
 
     var static_loc_buf: [256]u8 = undefined;
     if (!parseResult.errors.empty()) {
-        L.createtable(0, 1);
+        try L.createtable(0, 1);
         {
-            L.createtable(@truncate(@as(isize, @intCast(parseResult.errors.size()))), 0);
+            try L.createtable(@truncate(parseResult.errors.size()), 0);
             var iter = parseResult.errors.iterator();
             var count: i32 = 1;
             while (iter.next()) |err| : (count += 1) {
@@ -255,14 +259,14 @@ fn lua_parseExpr(L: *VM.lua.State) !i32 {
                     err.value.location.end.line,
                     err.value.location.end.column,
                 });
-                L.Zpushvalue(.{
+                try L.Zpushvalue(.{
                     .message = err.value.message.slice(),
                     .location = loc_str,
                 });
-                L.rawseti(-2, count);
+                try L.rawseti(-2, count);
             }
         }
-        L.setfield(-2, "errors");
+        try L.rawsetfield(-2, "errors");
     } else {
         const json_str = try luau.Analysis.AstJsonEncoder.toJson(allocator, @ptrCast(@alignCast(parseResult.expr)));
         defer allocator.free(json_str);
@@ -270,14 +274,14 @@ fn lua_parseExpr(L: *VM.lua.State) !i32 {
         var root = try json.parse(allocator, json_str);
         defer root.deinit();
 
-        L.createtable(0, 3);
+        try L.createtable(0, 3);
         try SerdeJson.decodeValue(L, root.value, false);
-        L.setfield(-2, "root");
+        try L.rawsetfield(-2, "root");
 
-        L.Zsetfield(-1, "lines", @as(f64, @floatFromInt(parseResult.lines)));
+        try L.Zsetfield(-1, "lines", @as(f64, @floatFromInt(parseResult.lines)));
 
         {
-            L.createtable(@truncate(@as(isize, @intCast(parseResult.commentLocations.size()))), 0);
+            try L.createtable(@truncate(parseResult.commentLocations.size()), 0);
             var iter = parseResult.commentLocations.iterator();
             var count: i32 = 1;
             while (iter.next()) |loc| : (count += 1) {
@@ -287,17 +291,17 @@ fn lua_parseExpr(L: *VM.lua.State) !i32 {
                     loc.location.end.line,
                     loc.location.end.column,
                 });
-                L.Zpushvalue(.{
+                try L.Zpushvalue(.{
                     .type = @tagName(loc.type),
                     .location = loc_str,
                 });
-                L.rawseti(-2, count);
+                try L.rawseti(-2, count);
             }
         }
-        L.setfield(-2, "comment_locations");
+        try L.rawsetfield(-2, "comment_locations");
 
         {
-            L.createtable(@truncate(@as(isize, @intCast(parseResult.hotcomments.size()))), 0);
+            try L.createtable(@truncate(parseResult.hotcomments.size()), 0);
             var iter = parseResult.hotcomments.iterator();
             var count: i32 = 1;
             while (iter.next()) |hc| : (count += 1) {
@@ -307,22 +311,22 @@ fn lua_parseExpr(L: *VM.lua.State) !i32 {
                     hc.location.end.line,
                     hc.location.end.column,
                 });
-                L.Zpushvalue(.{
+                try L.Zpushvalue(.{
                     .header = hc.header,
                     .content = hc.content.slice(),
                     .location = loc_str,
                 });
-                L.rawseti(-2, count);
+                try L.rawseti(-2, count);
             }
         }
-        L.setfield(-2, "hot_comments");
+        try L.rawsetfield(-2, "hot_comments");
     }
 
     return 1;
 }
 
-pub fn loadLib(L: *VM.lua.State) void {
-    L.Zpushvalue(.{
+pub fn loadLib(L: *VM.lua.State) !void {
+    try L.Zpushvalue(.{
         .compile = lua_compile,
         .load = lua_load,
         .coverage = lua_coverage,
@@ -330,7 +334,7 @@ pub fn loadLib(L: *VM.lua.State) void {
         .parseExpr = lua_parseExpr,
     });
     L.setreadonly(-1, true);
-    LuaHelper.registerModule(L, LIB_NAME);
+    try LuaHelper.registerModule(L, LIB_NAME);
 }
 
 test "luau" {

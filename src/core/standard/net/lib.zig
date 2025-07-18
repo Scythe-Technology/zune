@@ -51,49 +51,49 @@ fn lua_getAddressList(L: *VM.lua.State) !i32 {
     defer list.deinit();
     if (list.addrs.len > std.math.maxInt(i32))
         return L.Zerror("AddressListTooLarge");
-    L.createtable(@intCast(list.addrs.len), 0);
+    try L.createtable(@intCast(list.addrs.len), 0);
     for (list.addrs, 1..) |address, i| {
         var buf: [Socket.LONGEST_ADDRESS]u8 = undefined;
-        L.Zpushvalue(.{
+        try L.Zpushvalue(.{
             .family = address.any.family,
             .port = address.getPort(),
             .address = Socket.AddressToString(&buf, address),
         });
-        L.rawseti(-2, @intCast(i));
+        try L.rawseti(-2, @intCast(i));
     }
     return 1;
 }
 
-fn ImportConstants(L: *VM.lua.State, namespace: anytype, comptime name: [:0]const u8) void {
-    L.createtable(0, @typeInfo(namespace).@"struct".decls.len);
+fn ImportConstants(L: *VM.lua.State, namespace: anytype, comptime name: [:0]const u8) !void {
+    try L.createtable(0, @typeInfo(namespace).@"struct".decls.len);
 
     inline for (@typeInfo(namespace).@"struct".decls) |field|
-        L.Zsetfield(-1, field.name, @as(i32, @field(namespace, field.name)));
+        try L.Zsetfield(-1, field.name, @as(i32, @field(namespace, field.name)));
 
     L.setreadonly(-1, true);
-    L.setfield(-2, name);
+    try L.rawsetfield(-2, name);
 }
 
-pub fn loadLib(L: *VM.lua.State) void {
-    L.createtable(0, 8);
+pub fn loadLib(L: *VM.lua.State) !void {
+    try L.createtable(0, 8);
 
-    L.Zsetfieldfn(-1, "createSocket", lua_createSocket);
-    L.Zsetfieldfn(-1, "getAddressList", lua_getAddressList);
+    try L.Zsetfieldfn(-1, "createSocket", lua_createSocket);
+    try L.Zsetfieldfn(-1, "getAddressList", lua_getAddressList);
 
-    ImportConstants(L, std.posix.AF, "ADDRF");
-    ImportConstants(L, std.posix.SOCK, "SOCKF");
-    ImportConstants(L, std.posix.IPPROTO, "IPPROTO");
-    ImportConstants(L, std.posix.SO, "SOCKOPT");
-    ImportConstants(L, std.posix.SOL, "SOCKOPTLV");
+    try ImportConstants(L, std.posix.AF, "ADDRF");
+    try ImportConstants(L, std.posix.SOCK, "SOCKF");
+    try ImportConstants(L, std.posix.IPPROTO, "IPPROTO");
+    try ImportConstants(L, std.posix.SO, "SOCKOPT");
+    try ImportConstants(L, std.posix.SOL, "SOCKOPTLV");
 
     {
-        @import("http/lib.zig").load(L);
-        L.setfield(-2, "http");
+        try @import("http/lib.zig").load(L);
+        try L.rawsetfield(-2, "http");
     }
 
     L.setreadonly(-1, true);
 
-    LuaHelper.registerModule(L, LIB_NAME);
+    try LuaHelper.registerModule(L, LIB_NAME);
 }
 
 test {

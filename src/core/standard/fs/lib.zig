@@ -64,9 +64,9 @@ fn lua_readFileSync(L: *VM.lua.State) !i32 {
     defer allocator.free(data);
 
     if (useBuffer)
-        L.Zpushbuffer(data)
+        try L.Zpushbuffer(data)
     else
-        L.pushlstring(data);
+        try L.pushlstring(data);
 
     return 1;
 }
@@ -78,12 +78,12 @@ fn lua_readDir(L: *VM.lua.State) !i32 {
     });
     defer dir.close();
     var iter = dir.iterate();
-    L.newtable();
+    try L.newtable();
     var i: i32 = 1;
     while (try iter.next()) |entry| {
         L.pushinteger(i);
-        L.pushlstring(entry.name);
-        L.settable(-3);
+        try L.pushlstring(entry.name);
+        try L.rawset(-3);
         i += 1;
     }
     return 1;
@@ -170,8 +170,8 @@ fn internal_lossyfloat_time(n: i128) f64 {
     return @as(f64, @floatFromInt(n)) / 1_000_000_000.0;
 }
 
-fn internal_metadata_table(L: *VM.lua.State, metadata: fs.File.Metadata, isSymlink: bool) void {
-    L.Zpushvalue(.{
+fn internal_metadata_table(L: *VM.lua.State, metadata: fs.File.Metadata, isSymlink: bool) !void {
+    try L.Zpushvalue(.{
         .created_at = internal_lossyfloat_time(metadata.created() orelse 0),
         .modified_at = internal_lossyfloat_time(metadata.modified()),
         .accessed_at = internal_lossyfloat_time(metadata.accessed()),
@@ -205,7 +205,7 @@ fn lua_metadata(L: *VM.lua.State) !i32 {
                     isLink = false;
                 },
             };
-        internal_metadata_table(L, metadata, isLink);
+        try internal_metadata_table(L, metadata, isLink);
     } else {
         var file = try cwd.openFile(path, fs.File.OpenFlags{
             .mode = .read_only,
@@ -219,7 +219,7 @@ fn lua_metadata(L: *VM.lua.State) !i32 {
                     isLink = false;
                 },
             };
-        internal_metadata_table(L, metadata, isLink);
+        try internal_metadata_table(L, metadata, isLink);
     }
     return 1;
 }
@@ -417,7 +417,7 @@ fn lua_getExePath(L: *VM.lua.State) !i32 {
 
     var buf: [std.fs.max_path_bytes]u8 = undefined;
     const path = try std.fs.selfExePath(&buf);
-    L.pushlstring(path);
+    try L.pushlstring(path);
     return 1;
 }
 
@@ -430,7 +430,7 @@ fn lua_realPath(L: *VM.lua.State) !i32 {
     const path = L.Lcheckstring(1);
     var buf: [std.fs.max_path_bytes]u8 = undefined;
     const real_path = try std.fs.realpath(path, &buf);
-    L.pushlstring(real_path);
+    try L.pushlstring(real_path);
     return 1;
 }
 
@@ -472,9 +472,9 @@ const WatchState = struct {
             defer info.deinit();
             for (info.list.items) |item| {
                 if (self.callback.hasRef()) {
-                    const ML = scheduler.global.newthread();
+                    const ML = scheduler.global.newthread() catch @panic("OutOfMemory");
                     _ = self.callback.push(ML);
-                    ML.pushlstring(item.name);
+                    ML.pushlstring(item.name) catch @panic("OutOfMemory");
                     var count: u32 = 0;
                     var values: [6][]const u8 = undefined;
                     if (item.event.created) {
@@ -501,10 +501,10 @@ const WatchState = struct {
                         values[count] = "moved";
                         count += 1;
                     }
-                    ML.createtable(@intCast(count), 0);
+                    ML.createtable(@intCast(count), 0) catch @panic("OutOfMemory");
                     for (values[0..count], 1..) |value, i| {
-                        ML.pushlstring(value);
-                        ML.rawseti(-2, @intCast(i));
+                        ML.pushlstring(value) catch @panic("OutOfMemory");
+                        ML.rawseti(-2, @intCast(i)) catch @panic("OutOfMemory");
                     }
 
                     scheduler.global.pop(1);
@@ -546,7 +546,7 @@ fn lua_watch(L: *VM.lua.State) !i32 {
 
     const allocator = luau.getallocator(L);
 
-    const ref = L.ref(2) orelse unreachable;
+    const ref = try L.ref(2) orelse unreachable;
     errdefer L.unref(ref);
 
     var dir = fs.cwd().openDir(path, .{}) catch |err| switch (err) {
@@ -566,7 +566,7 @@ fn lua_watch(L: *VM.lua.State) !i32 {
         .callback = .{ .ref = .{ .registry = ref }, .value = undefined },
     };
 
-    const ptr = L.newuserdatataggedwithmetatable(LuaWatch, TAG_FS_WATCHER);
+    const ptr = try L.newuserdatataggedwithmetatable(LuaWatch, TAG_FS_WATCHER);
     ptr.state = state;
 
     const thread = try std.Thread.spawn(.{ .allocator = allocator }, WatchState.threadLoop, .{ state, scheduler });
@@ -594,7 +594,7 @@ const Path = struct {
         const resolved = try fs.path.join(allocator, paths.items);
         defer allocator.free(resolved);
 
-        L.pushlstring(resolved);
+        try L.pushlstring(resolved);
 
         return 1;
     }
@@ -607,7 +607,7 @@ const Path = struct {
         const resolved = try fs.path.relative(allocator, from, to);
         defer allocator.free(resolved);
 
-        L.pushlstring(resolved);
+        try L.pushlstring(resolved);
 
         return 1;
     }
@@ -627,7 +627,7 @@ const Path = struct {
         const resolved = try fs.path.resolve(allocator, paths.items);
         defer allocator.free(resolved);
 
-        L.pushlstring(resolved);
+        try L.pushlstring(resolved);
 
         return 1;
     }
@@ -635,7 +635,7 @@ const Path = struct {
     pub fn lua_dirname(L: *VM.lua.State) !i32 {
         const path = try L.Zcheckvalue([:0]const u8, 1, null);
         if (fs.path.dirname(path)) |dirname|
-            L.pushlstring(dirname)
+            try L.pushlstring(dirname)
         else
             L.pushnil();
         return 1;
@@ -643,19 +643,19 @@ const Path = struct {
 
     pub fn lua_basename(L: *VM.lua.State) !i32 {
         const path = try L.Zcheckvalue([:0]const u8, 1, null);
-        L.pushlstring(fs.path.basename(path));
+        try L.pushlstring(fs.path.basename(path));
         return 1;
     }
 
     pub fn lua_stem(L: *VM.lua.State) !i32 {
         const path = try L.Zcheckvalue([:0]const u8, 1, null);
-        L.pushlstring(fs.path.stem(path));
+        try L.pushlstring(fs.path.stem(path));
         return 1;
     }
 
     pub fn lua_extension(L: *VM.lua.State) !i32 {
         const path = try L.Zcheckvalue([:0]const u8, 1, null);
-        L.pushlstring(fs.path.extension(path));
+        try L.pushlstring(fs.path.extension(path));
         return 1;
     }
 
@@ -675,18 +675,18 @@ const Path = struct {
     }
 };
 
-pub fn loadLib(L: *VM.lua.State) void {
+pub fn loadLib(L: *VM.lua.State) !void {
     {
-        _ = L.Znewmetatable(@typeName(LuaWatch), .{
+        _ = try L.Znewmetatable(@typeName(LuaWatch), .{
             .__metatable = "Metatable is locked",
         });
-        LuaWatch.__index(L, -1);
+        try LuaWatch.__index(L, -1);
         L.setreadonly(-1, true);
         L.setuserdatametatable(TAG_FS_WATCHER);
         L.setuserdatadtor(LuaWatch, TAG_FS_WATCHER, LuaWatch.__dtor);
     }
 
-    L.Zpushvalue(.{
+    try L.Zpushvalue(.{
         .createFile = lua_createFile,
         .openFile = lua_openFile,
         .readFile = lua_readFileAsync,
@@ -707,7 +707,7 @@ pub fn loadLib(L: *VM.lua.State) void {
         .watch = lua_watch,
     });
 
-    L.Zpushvalue(.{
+    try L.Zpushvalue(.{
         .join = Path.lua_join,
         .relative = Path.lua_relative,
         .resolve = Path.lua_resolve,
@@ -719,11 +719,11 @@ pub fn loadLib(L: *VM.lua.State) void {
         .globMatch = Path.lua_globMatch,
     });
     L.setreadonly(-1, true);
-    L.setfield(-2, "path");
+    try L.rawsetfield(-2, "path");
 
     L.setreadonly(-1, true);
 
-    LuaHelper.registerModule(L, LIB_NAME);
+    try LuaHelper.registerModule(L, LIB_NAME);
 }
 
 test {

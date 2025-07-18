@@ -207,15 +207,18 @@ end)
 
 test("Coverage", function()
     local bytecode = luau.compile([[
-        local function nothing()
+        local function nothing() --*hit* (main)
+            local a = 0        --_____ (nothing)
+            a += 1             --_____ (nothing)
         end
-        local function bar()
-
+        local function bar()     --*hit* (main)
+            local a = 0        --*hit* (bar)
+            a += 1             --*hit* (bar)
         end
-        local function foo()
-            bar()
+        local function foo()     --*hit* (main)
+            bar()              --*hit* (foo)
         end
-        foo()
+        foo()                    --*hit* (main)
     ]], {coverage_level = 2});
 
     local load = luau.load(bytecode, {
@@ -226,7 +229,36 @@ test("Coverage", function()
 
     local coverage = luau.coverage(load);
 
-    print(coverage);
+    expect(coverage).toBe(expect.similar({
+        [1] = { -- main
+            line = 1,
+            depth = 0,
+            [1] = 1,
+            [5] = 1,
+            [9] = 1,
+            [12] = 1,
+        },
+        [2] = { -- nothing
+            name = "nothing",
+            line = 1,
+            depth = 1,
+            [2] = 0, -- no hits
+            [3] = 0,
+        },
+        [3] = { -- bar
+            name = "bar",
+            line = 5,
+            depth = 1,
+            [6] = 1,
+            [7] = 1,
+        },
+        [4] = { -- foo
+            name = "foo",
+            line = 9,
+            depth = 1,
+            [10] = 1,
+        },
+    }));
 end)
 
 describe("Parse", function()

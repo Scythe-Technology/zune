@@ -88,37 +88,37 @@ const RequestAsyncContext = struct {
                     .ok = status >= 200 and status < 300,
                     .status_code = status,
                     .status_reason = self.request.response.reason,
-                });
-                L.createtable(0, 0);
+                }) catch |e| std.debug.panic("{}", .{e});
+                L.createtable(0, 0) catch |e| std.debug.panic("{}", .{e});
                 var iter = self.request.response.iterateHeaders();
                 while (iter.next()) |header| {
-                    L.pushlstring(header.name);
-                    L.pushlstring(header.value);
-                    L.settable(-3);
+                    L.pushlstring(header.name) catch |e| std.debug.panic("{}", .{e});
+                    L.pushlstring(header.value) catch |e| std.debug.panic("{}", .{e});
+                    L.rawset(-3) catch |e| std.debug.panic("{}", .{e});
                 }
-                L.setfield(-2, "headers");
+                L.rawsetfield(-2, "headers") catch |e| std.debug.panic("{}", .{e});
 
                 var responseBody = std.ArrayList(u8).init(allocator);
                 defer responseBody.deinit();
 
                 self.request.reader().readAllArrayList(&responseBody, LuaHelper.MAX_LUAU_SIZE) catch |err| {
                     L.pop(1);
-                    L.pushstring(@errorName(err));
+                    L.pushstring(@errorName(err)) catch |e| std.debug.panic("{}", .{e});
                     _ = Scheduler.resumeStateError(L, null) catch {};
                     return;
                 };
 
                 switch (self.body_type) {
-                    .String => L.pushlstring(responseBody.items),
-                    .Buffer => L.Zpushbuffer(responseBody.items),
+                    .String => L.pushlstring(responseBody.items) catch |e| std.debug.panic("{}", .{e}),
+                    .Buffer => L.Zpushbuffer(responseBody.items) catch |e| std.debug.panic("{}", .{e}),
                     else => unreachable,
                 }
-                L.setfield(-2, "body");
+                L.rawsetfield(-2, "body") catch |e| std.debug.panic("{}", .{e});
 
                 _ = Scheduler.resumeState(L, null, 1) catch {};
             },
             else => {
-                L.pushstring(@errorName(self.err));
+                L.pushstring(@errorName(self.err)) catch |e| std.debug.panic("{}", .{e});
                 _ = Scheduler.resumeStateError(L, null) catch {};
             },
         }

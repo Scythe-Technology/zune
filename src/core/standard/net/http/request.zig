@@ -486,43 +486,43 @@ pub const Parser = struct {
     }
 
     pub fn push(self: *Parser, L: *VM.lua.State) !void {
-        L.createtable(0, 2);
+        try L.createtable(0, 2);
 
-        L.Zsetfield(-1, "method", @tagName(self.method));
+        try L.Zsetfield(-1, "method", @tagName(self.method));
 
         if (self.url) |url| {
             const parsed = Url.parse(url);
-            L.Zsetfield(-1, "path", parsed.path);
+            try L.Zsetfield(-1, "path", parsed.path);
             const queries = try self.parseQuery(parsed.query, 24);
             if (queries.len > 0) {
-                L.createtable(0, @intCast(queries.len));
+                try L.createtable(0, @intCast(queries.len));
                 var order: i32 = 1;
                 for (queries) |query| {
-                    L.pushlstring(query.key);
+                    try L.pushlstring(query.key);
                     if (query.value) |value| {
-                        L.pushlstring(value);
-                        L.rawset(-3);
+                        try L.pushlstring(value);
+                        try L.rawset(-3);
                     } else {
-                        L.rawseti(-2, order);
+                        try L.rawseti(-2, order);
                         order += 1;
                     }
                 }
-                L.setfield(-2, "query");
+                try L.rawsetfield(-2, "query");
             }
         }
 
-        L.createtable(0, @intCast(self.headers.size));
+        try L.createtable(0, @intCast(self.headers.size));
         var iter = self.headers.iterator();
         while (iter.next()) |header| {
-            L.pushlstring(header.key_ptr.*);
-            L.pushlstring(header.value_ptr.*);
-            L.rawset(-3);
+            try L.pushlstring(header.key_ptr.*);
+            try L.pushlstring(header.value_ptr.*);
+            try L.rawset(-3);
         }
-        L.setfield(-2, "headers");
+        try L.rawsetfield(-2, "headers");
 
         if (self.body) |body|
             switch (body) {
-                inline else => |bytes| L.Zsetfield(-1, "body", bytes),
+                inline else => |bytes| try L.Zsetfield(-1, "body", bytes),
             };
     }
 };

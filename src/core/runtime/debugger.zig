@@ -71,7 +71,7 @@ pub fn fileSourceOr(maybeSrc: ?[]const u8) ?[]const u8 {
 pub fn updateBreakpoints(L: *VM.lua.State) !void {
     if (CHANGES_COUNT == 0)
         return;
-    L.rawcheckstack(1);
+    try L.rawcheckstack(1);
     var ar: VM.lua.Debug = .{ .ssbuf = undefined };
     {
         var level: i32 = 0;
@@ -293,13 +293,13 @@ const LOCALS_COMMAND_MAP = std.StaticStringMap(enum {
 
 fn tostring(L: *VM.lua.State, idx: i32) []const u8 {
     switch (L.typeOf(idx)) {
-        .Nil => L.pushlstring("nil"),
-        .Boolean => L.pushlstring(if (L.toboolean(idx)) "true" else "false"),
+        .Nil => L.pushlstring("nil") catch |e| std.debug.panic("{}", .{e}),
+        .Boolean => L.pushlstring(if (L.toboolean(idx)) "true" else "false") catch |e| std.debug.panic("{}", .{e}),
         .Number => {
             const number = L.tonumber(idx).?;
             var s: [std.fmt.format_float.bufferSize(.decimal, f64)]u8 = undefined;
             const buf = std.fmt.bufPrint(&s, "{d}", .{number}) catch unreachable; // should be able to fit
-            L.pushlstring(buf);
+            L.pushlstring(buf) catch |e| std.debug.panic("{}", .{e});
         },
         .Vector => {
             const vec = L.tovector(idx).?;
@@ -308,7 +308,7 @@ fn tostring(L: *VM.lua.State, idx: i32) []const u8 {
                 std.fmt.bufPrint(&s, "{d}, {d}, {d}", .{ vec[0], vec[1], vec[2] }) catch unreachable // should be able to fit
             else
                 std.fmt.bufPrint(&s, "{d}, {d}, {d}, {d}", .{ vec[0], vec[1], vec[2], vec[3] }) catch unreachable; // should be able to fit
-            L.pushlstring(buf);
+            L.pushlstring(buf) catch |e| std.debug.panic("{}", .{e});
         },
         .String => L.pushvalue(idx),
         else => {
@@ -321,7 +321,7 @@ fn tostring(L: *VM.lua.State, idx: i32) []const u8 {
             };
             var s: [20 + size]u8 = undefined; // 16 + 2 + 2(extra) + size
             const buf = std.fmt.bufPrint(&s, "{s}: 0x{x:016}", .{ VM.lapi.typename(L.typeOf(idx)), @intFromPtr(ptr) }) catch unreachable; // should be able to fit
-            L.pushlstring(buf);
+            L.pushlstring(buf) catch |e| std.debug.panic("{}", .{e});
         },
     }
     return L.tolstring(-1).?;
@@ -536,7 +536,7 @@ fn promptOpLocals(L: *VM.lua.State, allocator: std.mem.Allocator, locals_args: [
             }
             switch (DEBUG.output) {
                 .Readable => {
-                    L.rawcheckstack(2);
+                    try L.rawcheckstack(2);
                     var i: i32 = 1;
                     var showed: bool = false;
                     while (true) : (i += 1) {
@@ -562,7 +562,7 @@ fn promptOpLocals(L: *VM.lua.State, allocator: std.mem.Allocator, locals_args: [
                         printResult("No locals found.\n", .{});
                 },
                 .Json => {
-                    L.rawcheckstack(6);
+                    try L.rawcheckstack(6);
                     var iter = std.mem.splitScalar(u8, std.mem.trimLeft(u8, args_rest, " "), ',');
 
                     var buf = std.ArrayList(u8).init(allocator);
@@ -640,7 +640,7 @@ fn promptOpParams(L: *VM.lua.State, allocator: std.mem.Allocator, params_args: [
             var ar: VM.lua.Debug = .{ .ssbuf = undefined };
             switch (DEBUG.output) {
                 .Readable => {
-                    L.rawcheckstack(2);
+                    try L.rawcheckstack(2);
                     if (!L.getinfo(level, "a", &ar))
                         return printResult("no function found.\n", .{}); // nothing
                     var i: i32 = 1;
@@ -671,7 +671,7 @@ fn promptOpParams(L: *VM.lua.State, allocator: std.mem.Allocator, params_args: [
                         printResult("No params found.\n", .{});
                 },
                 .Json => {
-                    L.rawcheckstack(6);
+                    try L.rawcheckstack(6);
                     if (!L.getinfo(level, "a", &ar))
                         return printResult("[]\n", .{}); // nothing
                     var iter = std.mem.splitScalar(u8, std.mem.trimLeft(u8, args_rest, " "), ',');
@@ -758,12 +758,12 @@ fn promptOpUpvalues(L: *VM.lua.State, allocator: std.mem.Allocator, params_args:
             var ar: VM.lua.Debug = .{ .ssbuf = undefined };
             switch (DEBUG.output) {
                 .Readable => {
-                    L.rawcheckstack(3);
+                    try L.rawcheckstack(3);
                     if (!L.getinfo(level, "af", &ar))
                         return printResult("no function found.\n", .{}); // nothing
                     defer L.pop(1); // remove function
                     const fn_idx = L.gettop();
-                    var i: i32 = 1;
+                    var i: u32 = 1;
                     var showed: bool = false;
                     while (true) : (i += 1) {
                         if (L.getupvalue(@intCast(fn_idx), i)) |name| {
@@ -788,7 +788,7 @@ fn promptOpUpvalues(L: *VM.lua.State, allocator: std.mem.Allocator, params_args:
                         printResult("No upvalue found.\n", .{});
                 },
                 .Json => {
-                    L.rawcheckstack(7);
+                    try L.rawcheckstack(7);
                     if (!L.getinfo(level, "af", &ar))
                         return printResult("[]\n", .{}); // nothing
                     defer L.pop(1); // remove function
@@ -812,7 +812,7 @@ fn promptOpUpvalues(L: *VM.lua.State, allocator: std.mem.Allocator, params_args:
                         if (!try variableJsonDisassemble(allocator, L, &iter, writer))
                             return;
                     } else {
-                        var i: i32 = 1;
+                        var i: u32 = 1;
                         var first = false;
                         while (true) : (i += 1) {
                             if (L.getupvalue(@intCast(fn_idx), i)) |name| {
@@ -870,7 +870,7 @@ fn promptOpGlobals(L: *VM.lua.State, allocator: std.mem.Allocator, globals_args:
             var ar: VM.lua.Debug = .{ .ssbuf = undefined };
             switch (DEBUG.output) {
                 .Readable => {
-                    L.rawcheckstack(4);
+                    try L.rawcheckstack(4);
                     if (!L.getinfo(level, "af", &ar))
                         return printResult("no function found.\n", .{}); // nothing
                     L.getfenv(-1);
@@ -902,7 +902,7 @@ fn promptOpGlobals(L: *VM.lua.State, allocator: std.mem.Allocator, globals_args:
                         printResult("No globals found.\n", .{});
                 },
                 .Json => {
-                    L.rawcheckstack(7);
+                    try L.rawcheckstack(7);
                     if (!L.getinfo(level, "af", &ar))
                         return printResult("[]\n", .{}); // nothing
                     L.getfenv(-1);
@@ -1283,8 +1283,8 @@ pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c
                         },
                         .@"break" => try promptOpBreak(allocator, rest),
                         .modules => {
-                            L.rawcheckstack(3);
-                            _ = L.Lfindtable(VM.lua.REGISTRYINDEX, "_MODULES", 1);
+                            try L.rawcheckstack(3);
+                            _ = try L.Lfindtable(VM.lua.REGISTRYINDEX, "_MODULES", 1);
                             defer L.pop(1); // pop table
                             switch (DEBUG.output) {
                                 .Readable => {
@@ -1411,7 +1411,7 @@ pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c
                                     .Readable => {
                                         if (kind == .UnhandledException or kind == .HandledException) {
                                             if (L.gettop() > 0) {
-                                                L.rawcheckstack(1);
+                                                try L.rawcheckstack(1);
                                                 const err = tostring(L, -1);
                                                 defer L.pop(1);
                                                 break :out printResult("<red>error<clear>: {s}\n", .{err});
@@ -1422,7 +1422,7 @@ pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c
                                     .Json => {
                                         if (kind == .UnhandledException or kind == .HandledException) {
                                             if (L.gettop() > 0) {
-                                                L.rawcheckstack(1);
+                                                try L.rawcheckstack(1);
                                                 const typename = VM.lapi.typename(L.typeOf(-1));
                                                 const err = tostring(L, -1);
                                                 defer L.pop(1);
