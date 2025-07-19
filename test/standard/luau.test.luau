@@ -268,36 +268,91 @@ describe("Parse", function()
         ]];
         local result = luau.parse(input);
         expect(result).toBe(expect.similar({
-            root = {
-                location = "0,0 - 1,8",
-                type = "AstStatBlock",
-                hasEnd = true,
-                body = {
-                    {
-                        location = "0,12 - 0,23",
-                        type = "AstStatLocal",
-                        values = {
-                            {
-                                location = "0,22 - 0,23",
-                                type = "AstExprConstantNumber",
-                                value = 1,
-                            }
-                        },
-                        vars = {
-                            {
-                                location = "0,18 - 0,19",
-                                type = "AstLocal",
-                                name = "a",
-                            }
-                        },
-                    }
-                }
-            },
+            tag = "block",
             lines = 2,
-            comment_locations = {
-                {
-                    location = "0,24 - 0,32",
-                    type = "Comment",
+            root = {
+                statements = {
+                    tag = "local",
+                    [1] = {
+                        variables = {
+                            [1] = {
+                                node = {
+                                    name = {
+                                        text = "a",
+                                        position = {
+                                            line = 0,
+                                            column = 18,
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                        values = {
+                            [1] = {
+                                node = {
+                                    tag = "number",
+                                    text = "1",
+                                    value = 1,
+                                    position = {
+                                        line = 0,
+                                        column = 22,
+                                    },
+                                    location = {
+                                        begin = {
+                                            line = 0,
+                                            column = 22,
+                                        },
+                                        ["end"] = {
+                                            line = 0,
+                                            column = 23,
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                        equals = {
+                            text = "=",
+                            position = {
+                                line = 0,
+                                column = 20,
+                            },
+                        }
+                    },
+                    location = {
+                        begin = {
+                            line = 0,
+                            column = 12,
+                        },
+                        ["end"] = {
+                            line = 0,
+                            column = 23,
+                        },
+                    },
+                    localKeyword = {
+                        text = "local",
+                        position = {
+                            line = 0,
+                            column = 12,
+                        },
+                    },
+                },
+            },
+            eof = {
+                tag = "eof",
+                text = "",
+                position = {
+                    line = 1,
+                    column = 8,
+                },
+            },
+            location = {
+                begin = {
+                    line = 0,
+                    column = 0,
+                },
+                ["end"] = {
+                    line = 1,
+                    column = 8,
                 },
             },
             hot_comments = {},
@@ -314,45 +369,70 @@ describe("Parse", function()
         local result = luau.parse(input);
         expect(result).toBe(expect.similar({
             root = {
-                location = "0,0 - 4,8",
-                type = "AstStatBlock",
-                hasEnd = true,
-                body = {},
+                tag = "block",
+                location = {
+                    begin = {
+                        line = 0,
+                        column = 0,
+                    },
+                    ["end"] = {
+                        line = 4,
+                        column = 8,
+                    },
+                },
+                statements = {},
+            },
+            eof = {
+                tag = "eof",
+                text = "",
+                position = {
+                    line = 4,
+                    column = 8,
+                },
             },
             lines = 5,
-            comment_locations = {
-                {
-                    location = "0,0 - 0,9",
-                    type = "Comment",
-                },
-                {
-                    location = "1,0 - 1,9",
-                    type = "Comment",
-                },
-                {
-                    location = "2,0 - 2,8",
-                    type = "Comment",
-                },
-                {
-                    location = "3,0 - 3,10",
-                    type = "Comment",
-                }
-            },
             hot_comments = {
                 {
                     header = true,
-                    location = "0,0 - 0,9",
                     content = "native",
+                    location = {
+                        begin = {
+                            line = 0,
+                            column = 0,
+                        },
+                        ["end"] = {
+                            line = 0,
+                            column = 9,
+                        },
+                    },
                 },
                 {
                     header = true,
-                    location = "1,0 - 1,9",
                     content = "unsafe",
+                    location = {
+                        begin = {
+                            line = 1,
+                            column = 0,
+                        },
+                        ["end"] = {
+                            line = 1,
+                            column = 9,
+                        },
+                    },
                 },
                 {
                     header = true,
-                    location = "3,0 - 3,10",
                     content = "unknown",
+                    location = {
+                        begin = {
+                            line = 3,
+                            column = 0,
+                        },
+                        ["end"] = {
+                            line = 3,
+                            column = 10,
+                        },
+                    },
                 }
             },
         }));
@@ -367,7 +447,16 @@ describe("Parse", function()
             errors = {
                 {
                     message = "Expected identifier when parsing expression, got `interp`",
-                    location = "0,12 - 0,20",
+                    location = {
+                        begin = {
+                            line = 0,
+                            column = 12,
+                        },
+                        ["end"] = {
+                            line = 0,
+                            column = 20,
+                        },
+                    },
                 }
             },
         }));
@@ -379,14 +468,24 @@ describe("ParseExpr", function()
         local input = [[`interp`]];
         local result = luau.parseExpr(input);
         expect(result).toBe(expect.similar({
-            root = {
-                location = "0,0 - 0,8",
-                type = "AstExprConstantString",
-                value = "interp",
+            tag = "string",
+            text = "interp",
+            quoteStyle = "interp",
+            blockDepth = 0,
+            position = {
+                line = 0,
+                column = 0,
             },
-            lines = 1,
-            comment_locations = {},
-            hot_comments = {},
+            location = {
+                begin = {
+                    line = 0,
+                    column = 0,
+                },
+                ["end"] = {
+                    line = 0,
+                    column = 8,
+                },
+            },
         }));
     end)
 
@@ -394,24 +493,62 @@ describe("ParseExpr", function()
         local input = [[1 * 2]];
         local result = luau.parseExpr(input);
         expect(result).toBe(expect.similar({
-            root = {
-                location = "0,0 - 0,5",
-                type = "AstExprBinary",
-                left = {
-                    location = "0,0 - 0,1",
-                    type = "AstExprConstantNumber",
-                    value = 1,
+            tag = "binary",
+            lhsoperand = {
+                tag = "number",
+                value = 1,
+                text = "1",
+                position = {
+                    line = 0,
+                    column = 0,
                 },
-                right = {
-                    location = "0,4 - 0,5",
-                    type = "AstExprConstantNumber",
-                    value = 2,
+                location = {
+                    begin = {
+                        line = 0,
+                        column = 0,
+                    },
+                    ["end"] = {
+                        line = 0,
+                        column = 1,
+                    },
                 },
-                op = "Mul",
             },
-            lines = 1,
-            comment_locations = {},
-            hot_comments = {},
+            rhsoperand = {
+                tag = "number",
+                value = 2,
+                text = "2",
+                position = {
+                    line = 0,
+                    column = 4,
+                },
+                location = {
+                    begin = {
+                        line = 0,
+                        column = 4,
+                    },
+                    ["end"] = {
+                        line = 0,
+                        column = 5,
+                    },
+                },
+            },
+            operator = {
+                text = "*",
+                position = {
+                    line = 0,
+                    column = 2,
+                },
+            },
+            location = {
+                begin = {
+                    line = 0,
+                    column = 0,
+                },
+                ["end"] = {
+                    line = 0,
+                    column = 5,
+                },
+            },
         }));
     end)
 
@@ -422,7 +559,16 @@ describe("ParseExpr", function()
             errors = {
                 {
                     message = "Expected identifier when parsing expression, got 'local'",
-                    location = "0,0 - 0,5",
+                    location = {
+                        begin = {
+                            line = 0,
+                            column = 0,
+                        },
+                        ["end"] = {
+                            line = 0,
+                            column = 5,
+                        },
+                    },
                 }
             },
         }));
