@@ -1402,6 +1402,8 @@ type LuauLib = {
 
     parse: (src: string) -> ParseResult,
     parseExpr: (src: string) -> any,
+
+    garbagecollect: () -> (),
 }
 --[======[ Luau ]======]--
 

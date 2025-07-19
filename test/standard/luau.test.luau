@@ -574,3 +574,13 @@ describe("ParseExpr", function()
         }));
     end)
 end)
+
+describe("GarbageCollect", function()
+    test("Basic", function()
+        local value: any? = {};
+        local weak = setmetatable({value}, {__mode = "v"});
+        value = nil;
+        luau.garbagecollect();
+        expect(weak[1]).toBeNil();
+    end)
+end)

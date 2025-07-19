@@ -1870,6 +1870,11 @@ fn lua_parseExpr(L: *VM.lua.State) !i32 {
     return 1;
 }
 
+fn lua_garbagecollect(L: *VM.lua.State) !i32 {
+    _ = L.gc(.Collect, 0);
+    return 0;
+}
+
 pub fn loadLib(L: *VM.lua.State) !void {
     try L.Zpushvalue(.{
         .compile = lua_compile,
@@ -1877,6 +1882,7 @@ pub fn loadLib(L: *VM.lua.State) !void {
         .coverage = lua_coverage,
         .parse = lua_parse,
         .parseExpr = lua_parseExpr,
+        .garbagecollect = lua_garbagecollect,
     });
     L.setreadonly(-1, true);
     try LuaHelper.registerModule(L, LIB_NAME);
