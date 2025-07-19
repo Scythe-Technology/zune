@@ -1342,27 +1342,32 @@ export type CoverageData = {
     [number]: number,
 };
 
+type Position = {
+    line: number,
+    column: number,
+}
+
+export type Location = {
+    begin: Position,
+    ["end"]: Position,
+}
+
 export type ParseResult = {
     errors: {
         {
             message: string,
-            location: string,
+            location: Location,
         }
     }
 } | {
     root: {any},
+    eof: { text: "", position: Position, tag: "eof" },
     lines: number,
-    comment_locations: {
-        {
-            type: string,
-            location: string,
-        }
-    },
     hot_comments: {
         {
             header: boolean,
             content: string,
-            location: string,
+            location: Location,
         }
     }
 };
@@ -1396,7 +1401,7 @@ type LuauLib = {
     coverage: (fn: (...any) -> ...any) -> {CoverageData},
 
     parse: (src: string) -> ParseResult,
-    parseExpr: (src: string) -> ParseResult,
+    parseExpr: (src: string) -> any,
 }
 --[======[ Luau ]======]--
 
