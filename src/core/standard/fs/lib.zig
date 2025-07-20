@@ -440,7 +440,7 @@ const WatchState = struct {
     mutex: std.Thread.Mutex = .{},
     cond: std.Thread.Condition = .{},
     info: ?Watch.WatchInfo = null,
-    state: std.atomic.Value(LoopState) = .{ .raw = .Alive },
+    state: std.atomic.Value(LoopState) align(std.atomic.cache_line) = .{ .raw = .Alive },
 
     pub const LoopState = enum(u8) { Alive, Terminating, Dead };
 
