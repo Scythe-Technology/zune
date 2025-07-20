@@ -370,12 +370,13 @@ const LuaThread = struct {
     pub fn __dtor(L: *VM.lua.State, self: *LuaThread) void {
         _ = L;
         const runtime = self.runtime;
+        runtime.access_mutex.lock();
         if (runtime.status.load(.acquire) == .running) {
-            runtime.access_mutex.lock();
             defer runtime.access_mutex.unlock();
-            runtime.owner = .thread;
+            runtime.owner = .thread; // TODO: maybe atomic owner?
             return;
         }
+        runtime.access_mutex.unlock();
         THREADS.remove(&runtime.node);
         if (runtime.thread) |t|
             t.join();
