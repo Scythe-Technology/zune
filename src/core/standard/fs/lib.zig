@@ -317,6 +317,61 @@ fn lua_symlink(L: *VM.lua.State) !i32 {
     return 0;
 }
 
+fn lua_embedFile(L: *VM.lua.State) !i32 {
+    const allocator = luau.getallocator(L);
+    const path = L.Lcheckstring(1);
+    var ar: VM.lua.Debug = .{ .ssbuf = undefined };
+    {
+        var level: i32 = 1;
+        while (true) : (level += 1) {
+            if (!L.getinfo(level, "s", &ar))
+                return L.Zerror("could not get source");
+            if (ar.what == .lua)
+                break;
+        }
+    }
+
+    const from = Zune.Resolvers.Require.getFilePath(ar.source);
+
+    const dirname = std.fs.path.dirname(from) orelse ".";
+
+    const resolved_path = try std.fs.path.resolve(allocator, &.{ dirname, path });
+    defer allocator.free(resolved_path);
+
+    if (Zune.STATE.BUNDLE) |*b| {
+        try L.pushlstring(try b.loadFile(resolved_path));
+    } else {
+        const contents = try fs.cwd().readFileAlloc(allocator, resolved_path, std.math.maxInt(usize));
+        defer allocator.free(contents);
+        try L.pushlstring(contents);
+    }
+
+    return 1;
+}
+fn listEmbedded(L: *VM.lua.State, comptime kind: enum { script, file }) !i32 {
+    try L.createtable(0, 0);
+    if (Zune.STATE.BUNDLE) |b| {
+        var iter = b.map.iterator();
+        var count: i32 = 1;
+        while (iter.next()) |entry| {
+            if (kind == .file and entry.value_ptr.* == .file or
+                kind == .script and entry.value_ptr.* == .script)
+            {
+                defer count += 1;
+                try L.pushlstring(entry.key_ptr.*);
+                try L.rawseti(-2, count);
+            }
+        }
+    }
+    return 1;
+}
+fn lua_embeddedScripts(L: *VM.lua.State) !i32 {
+    return try listEmbedded(L, .script);
+}
+fn lua_embeddedFiles(L: *VM.lua.State) !i32 {
+    return try listEmbedded(L, .file);
+}
+
 const LuaWatch = struct {
     state: *WatchState,
 
@@ -705,6 +760,9 @@ pub fn loadLib(L: *VM.lua.State) !void {
         .getExePath = lua_getExePath,
         .realPath = lua_realPath,
         .watch = lua_watch,
+        .embedFile = lua_embedFile,
+        .embeddedScripts = lua_embeddedScripts,
+        .embeddedFiles = lua_embeddedFiles,
     });
 
     try L.Zpushvalue(.{

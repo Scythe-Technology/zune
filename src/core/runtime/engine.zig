@@ -16,6 +16,11 @@ pub inline fn loadAndCompileModule(L: *VM.lua.State, moduleName: [:0]const u8, c
     luau.Compiler.Compiler.compileLoad(L, moduleName, content, compileOptions, 0) catch return error.Syntax;
 }
 
+pub fn loadNative(L: *VM.lua.State) void {
+    if (luau.CodeGen.Supported() and Zune.STATE.LUAU_OPTIONS.CODEGEN and Zune.STATE.LUAU_OPTIONS.JIT_ENABLED)
+        luau.CodeGen.Compile(L, -1);
+}
+
 pub fn loadModule(L: *VM.lua.State, name: [:0]const u8, content: []const u8, cOpts: ?luau.CompileOptions) !void {
     var script = content;
     if (std.mem.startsWith(u8, content, "#!")) {
@@ -23,8 +28,7 @@ pub fn loadModule(L: *VM.lua.State, name: [:0]const u8, content: []const u8, cOp
         script = content[pos..];
     }
     try loadAndCompileModule(L, name, script, cOpts);
-    if (luau.CodeGen.Supported() and Zune.STATE.LUAU_OPTIONS.CODEGEN and Zune.STATE.LUAU_OPTIONS.JIT_ENABLED)
-        luau.CodeGen.Compile(L, -1);
+    loadNative(L);
 }
 
 const FileContext = struct {
@@ -150,6 +154,10 @@ pub fn logDetailedDef(L: *VM.lua.State, idx: i32) !void {
 
         Zune.debug.print("<red>error<clear>: {s}\n", .{err_msg});
 
+        if (Zune.STATE.BUNDLE) |b|
+            if (b.mode.compiled == .release)
+                return;
+
         const padded_string = try allocator.alloc(u8, padding + 1);
         defer allocator.free(padded_string);
         @memset(padded_string, ' ');
@@ -267,6 +275,9 @@ pub fn logDetailedError(L: *VM.lua.State) !void {
 
     if (list.items.len < 1) {
         Zune.debug.print("<green>error<clear>: {s}\n", .{err_msg});
+        if (Zune.STATE.BUNDLE) |b|
+            if (b.mode.compiled == .release)
+                return;
         Zune.debug.print("{s}\n", .{L.debugtrace()});
         return;
     }
@@ -274,6 +285,9 @@ pub fn logDetailedError(L: *VM.lua.State) !void {
     if (!try L.checkstack(5)) {
         Zune.debug.print("Failed to show detailed error: StackOverflow\n", .{});
         Zune.debug.print("<green>error<clear>: {s}\n", .{err_msg});
+        if (Zune.STATE.BUNDLE) |b|
+            if (b.mode.compiled == .release)
+                return;
         Zune.debug.print("{s}\n", .{L.debugtrace()});
         return;
     }
@@ -304,6 +318,12 @@ pub fn logDetailedError(L: *VM.lua.State) !void {
         err_msg = err_trimmed[line_number.len..];
     }
 
+    Zune.debug.print("<red>error<clear>: {s}\n", .{err_msg});
+
+    if (Zune.STATE.BUNDLE) |b|
+        if (b.mode.compiled == .release)
+            return;
+
     var largest_line: usize = 0;
     for (list.items) |info| {
         if (info.current_line) |line|
@@ -314,8 +334,6 @@ pub fn logDetailedError(L: *VM.lua.State) !void {
         }
     }
     const padding = std.math.log10(largest_line) + 1;
-
-    Zune.debug.print("<red>error<clear>: {s}\n", .{err_msg});
 
     const padded_string = try allocator.alloc(u8, padding + 1);
     defer allocator.free(padded_string);

@@ -1,10 +1,15 @@
 const std = @import("std");
 
+const Bundle = @import("bundle.zig");
+
 const fs = std.fs;
 
 const LuauFile = struct {
     ext: []const u8,
-    handle: std.fs.File,
+    val: union(enum) {
+        handle: std.fs.File,
+        contents: []const u8,
+    },
 };
 
 const LuaFileType = enum {
@@ -62,7 +67,7 @@ pub fn findLuauFile(dir: std.fs.Dir, fileName: []const u8) !?LuauFile {
         }
 
         return .{
-            .handle = file,
+            .val = .{ .handle = file },
             .ext = ext,
         };
     }
@@ -85,7 +90,10 @@ pub const SearchResult = struct {
 
     pub fn deinit(self: SearchResult) void {
         for (self.results[0..self.count]) |file| {
-            file.handle.close();
+            switch (file.val) {
+                .handle => |h| h.close(),
+                .contents => {},
+            }
         }
     }
 };
@@ -118,7 +126,37 @@ pub fn searchLuauFile(buf: []u8, dir: std.fs.Dir, fileName: []const u8) !SearchR
         }
 
         results.results[results.count] = .{
-            .handle = file,
+            .val = .{ .handle = file },
+            .ext = ext,
+        };
+        results.count += 1;
+    }
+
+    return results;
+}
+
+pub fn searchLuauFileBundle(buf: []u8, b: *const Bundle.Map, fileName: []const u8) !SearchResult {
+    if (getLuaFileType(fileName)) |_|
+        return error.RedundantFileExtension;
+
+    if (fileName.len > buf.len - LARGEST_EXTENSION)
+        return error.PathTooLong;
+
+    var results: SearchResult = .{
+        .results = undefined,
+    };
+
+    for (POSSIBLE_EXTENSIONS) |ext| {
+        @memcpy(buf[0..fileName.len], fileName);
+        @memcpy(buf[fileName.len..][0..ext.len], ext);
+        const result = buf[0 .. fileName.len + ext.len];
+
+        const contents = b.loadScript(result) catch |err| switch (err) {
+            else => continue,
+        };
+
+        results.results[results.count] = .{
+            .val = .{ .contents = contents },
             .ext = ext,
         };
         results.count += 1;
@@ -161,14 +199,4 @@ pub fn resolve(
     }
 
     return try fs.path.resolve(allocator, resolvedPaths[0..paths.len]);
-}
-
-pub fn resolveZ(
-    allocator: std.mem.Allocator,
-    envMap: std.process.EnvMap,
-    paths: []const []const u8,
-) ![:0]u8 {
-    const resolved = try resolve(allocator, envMap, paths);
-    defer allocator.free(resolved);
-    return try allocator.dupeZ(u8, resolved);
 }

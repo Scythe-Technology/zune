@@ -33,6 +33,7 @@ pub const Resolvers = struct {
     pub const Config = @import("core/resolvers/config.zig");
     pub const Require = @import("core/resolvers/require.zig");
     pub const Navigator = @import("core/resolvers/navigator.zig");
+    pub const Bundle = @import("core/resolvers/bundle.zig");
 };
 
 pub const Utils = struct {
@@ -90,6 +91,7 @@ pub const ZuneState = struct {
     LUAU_OPTIONS: LuauOptions = .{},
     FORMAT: FormatOptions = .{},
     USE_DETAILED_ERROR: bool = true,
+    BUNDLE: ?Resolvers.Bundle.Map = null,
 
     pub const LuauOptions = struct {
         DEBUG_LEVEL: u2 = 2,
@@ -103,7 +105,7 @@ pub const ZuneState = struct {
         USE_COLOR: bool = true,
         SHOW_TABLE_ADDRESS: bool = true,
         SHOW_RECURSIVE_TABLE: bool = false,
-        DISPLAY_BUFFER_CONTENTS_MAX: usize = 48,
+        DISPLAY_BUFFER_CONTENTS_MAX: u15 = 48,
     };
 };
 
@@ -259,6 +261,15 @@ pub fn openZune(L: *VM.lua.State, args: []const []const u8, flags: Flags) !void 
             try corelib.thread.loadLib(L);
 
         try corelib.testing.loadLib(L, STATE.RUN_MODE == .Test);
+
+        if (STATE.BUNDLE) |b| {
+            try L.Zpushvalue(.{
+                .optimize = STATE.LUAU_OPTIONS.OPTIMIZATION_LEVEL,
+                .debug = STATE.LUAU_OPTIONS.DEBUG_LEVEL,
+                .mode = @tagName(b.mode.compiled),
+            });
+            try Utils.LuaHelper.registerModule(L, "compiled");
+        }
     }
 }
 
@@ -292,7 +303,61 @@ pub fn main() !void {
 
     try init();
 
-    try cli.start();
+    const allocator = DEFAULT_ALLOCATOR;
+    const args = try std.process.argsAlloc(allocator);
+    defer std.process.argsFree(allocator, args);
+
+    if (try Resolvers.Bundle.get(allocator)) |b| {
+        STATE.BUNDLE = b;
+
+        var L = try luau.init(&allocator);
+        defer L.deinit();
+        var scheduler = try Runtime.Scheduler.init(allocator, L);
+        defer scheduler.deinit();
+
+        try Runtime.Scheduler.SCHEDULERS.append(&scheduler);
+
+        try Runtime.Engine.prepAsync(L, &scheduler);
+        try openZune(L, args, .{ .limbo = b.mode.limbo });
+
+        L.setsafeenv(VM.lua.GLOBALSINDEX, true);
+
+        const ML = try L.newthread();
+
+        try ML.Lsandboxthread();
+
+        try Runtime.Engine.setLuaFileContext(ML, .{
+            .source = if (b.mode.compiled == .debug) b.entry.data else null,
+            .main = true,
+        });
+
+        ML.setsafeenv(VM.lua.GLOBALSINDEX, true);
+
+        switch (b.mode.compiled) {
+            .debug => Runtime.Engine.loadModule(ML, b.entry.name, b.entry.data, null) catch |err| switch (err) {
+                error.Syntax => {
+                    std.debug.print("SyntaxError: {s}\n", .{ML.tostring(-1) orelse "UnknownError"});
+                    std.process.exit(1);
+                },
+                else => return err,
+            },
+            .release => {
+                ML.load(b.entry.name, b.entry.data, 0) catch |err| switch (err) {
+                    error.Fail => {
+                        std.debug.print("SyntaxError: {s}\n", .{ML.tostring(-1) orelse "UnknownError"});
+                        std.process.exit(1);
+                    },
+                    else => unreachable,
+                };
+                Runtime.Engine.loadNative(ML);
+            },
+        }
+
+        Runtime.Engine.runAsync(ML, &scheduler, .{ .cleanUp = true }) catch std.process.exit(1);
+        return;
+    }
+
+    try cli.start(args);
 }
 
 fn shutdown() void {

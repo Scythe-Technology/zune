@@ -638,3 +638,17 @@ test("Watch", function()
         {path = "foo", events = {"deleted"}},
     }));
 end)
+
+test("Embedded", function()
+    local contents = fs.embedFile("fs.test.luau");
+    expect(contents).toBe(expect.any("string"));
+    expect(contents:sub(1, 9)).toBe("--!strict");
+
+    local files = fs.embeddedFiles();
+    expect(files).toBe(expect.any("table"));
+    expect(files).toHaveLength(0);
+
+    local scripts = fs.embeddedScripts();
+    expect(scripts).toBe(expect.any("table"));
+    expect(scripts).toHaveLength(0);
+end)
