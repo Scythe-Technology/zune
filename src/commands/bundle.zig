@@ -76,12 +76,12 @@ fn scanDir(
     while (try iter.next()) |entry| {
         const entry_path = try std.fs.path.join(allocator, &.{ path, entry.name });
         errdefer allocator.free(entry_path);
-        switch (entry.kind) {
+        blk: switch (entry.kind) {
             .file => {
                 if (!Glob.match(opts.glob, entry_path).matches())
-                    continue;
+                    break :blk;
                 if (opts.kind == .script and File.getLuaFileType(entry.name) == null)
-                    continue;
+                    break :blk;
                 if (try map.fetchPut(allocator, entry_path, undefined)) |key_entry|
                     allocator.free(key_entry.key);
                 continue;
@@ -111,6 +111,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
     defer dir.close();
     const module = bundle_args[0];
     const cwd_path = try dir.realpathAlloc(allocator, ".");
+    defer allocator.free(cwd_path);
 
     const entry_file, const contents = try getFile(allocator, dir, module);
     defer allocator.free(entry_file);
@@ -193,6 +194,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
                     }, cwd_path);
                 } else if (std.mem.startsWith(u8, flag, "--files=") and flag.len > 8) {
                     const glob = try std.fs.path.resolve(allocator, &.{ cwd_path, flag[8..] });
+                    defer allocator.free(glob);
                     try scanDir(allocator, &FILES, dir, .{
                         .dir = dir,
                         .glob = glob,
@@ -261,7 +263,12 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
     }
 
     for (FILES.keys()) |file| {
+        if (SCRIPTS.get(file)) |_| {
+            std.debug.print("Warning: attempted to bundle an existing script '{s}' as file, skipping...\n", .{file});
+            continue;
+        }
         const name = try std.fs.path.relative(allocator, cwd_path, file);
+        defer allocator.free(name);
         const file_contents = try std.fs.cwd().readFileAlloc(allocator, name, std.math.maxInt(usize));
         defer allocator.free(file_contents);
         try Bundle.Section.writeFile(allocator, writer, name, file_contents, .none);
@@ -316,3 +323,30 @@ pub const Command = command.Command{
     .name = "bundle",
     .execute = Execute,
 };
+
+test "cmdBundle" {
+    const allocator = std.testing.allocator;
+    var temporaryDir = std.testing.tmpDir(std.fs.Dir.OpenDirOptions{
+        .access_sub_paths = true,
+    });
+    defer temporaryDir.cleanup();
+
+    {
+        const exe_path = try std.fs.path.join(allocator, &.{ ".zig-cache/tmp", &temporaryDir.sub_path, "test" });
+        defer allocator.free(exe_path);
+        const sub_path = try std.mem.concat(allocator, u8, &.{ "--out=", exe_path });
+        defer allocator.free(sub_path);
+        const args: []const []const u8 = &.{ sub_path, "--files=test/runner.zig", "test/cli/bundle.luau" };
+
+        try Execute(allocator, args);
+
+        const file = try std.fs.cwd().openFile(exe_path, .{ .mode = .read_only });
+        defer file.close();
+
+        var map = (try Bundle.getFromFile(allocator, file)) orelse unreachable;
+        defer map.deinit();
+
+        _ = map.loadScript("test/cli/bundle.luau") catch unreachable;
+        _ = map.loadFile("test/runner.zig") catch unreachable;
+    }
+}

@@ -159,10 +159,12 @@ pub const Map = struct {
         name: [:0]const u8,
         data: Section.Script,
     },
+    allocated: []const u8,
 
     pub fn deinit(self: *Map) void {
         self.map.deinit(self.allocator);
         self.allocator.free(self.entry.name);
+        self.allocator.free(self.allocated);
     }
 
     fn unpackFile(self: *Map, file: *Section.File) ![]const u8 {
@@ -296,13 +298,11 @@ pub fn loadBundle(allocator: std.mem.Allocator, exe_header: ExeHeader, bundle: [
             .name = entry.?.name,
             .data = entry.?.data,
         },
+        .allocated = bundle,
     };
 }
 
-pub fn get(allocator: std.mem.Allocator) !?Map {
-    const exe = try std.fs.openSelfExe(.{ .mode = .read_only });
-    defer exe.close();
-
+pub fn getFromFile(allocator: std.mem.Allocator, exe: std.fs.File) !?Map {
     const HEADER_SIZE = @sizeOf(ExeHeader) + @sizeOf(u64) + TAG.len;
 
     const end = try exe.getEndPos();
@@ -332,4 +332,11 @@ pub fn get(allocator: std.mem.Allocator) !?Map {
         return error.CorruptBundle;
 
     return try loadBundle(allocator, header, allocated);
+}
+
+pub fn get(allocator: std.mem.Allocator) !?Map {
+    const exe = try std.fs.openSelfExe(.{ .mode = .read_only });
+    defer exe.close();
+
+    return try getFromFile(allocator, exe);
 }

@@ -1,0 +1,1 @@
+zune.io.stdout:writeSync(`from bundled: {#zune.fs.embeddedScripts()}+{#zune.fs.embeddedFiles()}`);
