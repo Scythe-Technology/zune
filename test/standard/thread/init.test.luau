@@ -297,4 +297,8 @@ describe("thread", function()
     test("Cpu Count", function()
         expect(thread.getCpuCount()).toBeGreaterThan(0);
     end)
+
+    test("isThread", function()
+        expect(thread.isThread).toBeFalsy();
+    end)
 end)
