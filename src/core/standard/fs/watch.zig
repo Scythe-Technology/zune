@@ -444,63 +444,66 @@ pub const FileSystemWatcher = struct {
         var nbytes: std.os.windows.DWORD = 0;
         var key: std.os.windows.ULONG_PTR = 0;
         var overlapped: ?*std.os.windows.OVERLAPPED = null;
-        const rc = std.os.windows.kernel32.GetQueuedCompletionStatus(iocp, &nbytes, &key, &overlapped, 1000);
-        if (rc == 0) {
-            const err = std.os.windows.kernel32.GetLastError();
-            if (err == .TIMEOUT or err == .WAIT_TIMEOUT) return null else {
-                std.debug.print("[Win32] Status failed: {s}\n", .{@tagName(err)});
-                return error.UnknownError;
+        while (true) {
+            const rc = std.os.windows.kernel32.GetQueuedCompletionStatus(iocp, &nbytes, &key, &overlapped, 1000);
+            if (rc == 0) {
+                const err = std.os.windows.kernel32.GetLastError();
+                if (err == .TIMEOUT or err == .WAIT_TIMEOUT) return null else {
+                    std.debug.print("[Win32] Status failed: {s}\n", .{@tagName(err)});
+                    return error.UnknownError;
+                }
+            }
+
+            self.backend.windows.monitoring = false;
+
+            if (overlapped) |ptr| {
+                if (ptr != &self.backend.windows.overlapped)
+                    continue;
+                if (nbytes == 0) {
+                    self.backend.windows.active = false;
+                    return error.Shutdown;
+                }
+                var watchInfo: WatchInfo = .{
+                    .allocator = self.allocator,
+                    .list = std.ArrayList(WatchEvent).init(self.allocator),
+                };
+                errdefer watchInfo.deinit();
+
+                var n = true;
+                var offset: usize = 0;
+                while (n) {
+                    const info: *std.os.windows.FILE_NOTIFY_INFORMATION = @alignCast(@ptrCast(self.backend.windows.buf[offset..].ptr));
+                    const name_ptr: [*]u16 = @alignCast(@ptrCast(self.backend.windows.buf[offset + @sizeOf(std.os.windows.FILE_NOTIFY_INFORMATION) ..].ptr));
+                    const filename: []u16 = name_ptr[0 .. info.FileNameLength / @sizeOf(u16)];
+
+                    const name = try std.unicode.utf16LeToUtf8Alloc(self.allocator, filename);
+                    errdefer self.allocator.free(name);
+
+                    const action: WindowsAttributes.Action = @enumFromInt(info.Action);
+
+                    if (info.NextEntryOffset == 0)
+                        n = false
+                    else
+                        offset += @as(usize, info.NextEntryOffset);
+
+                    try watchInfo.list.append(.{
+                        .event = WatchEvent.Event{
+                            .created = action == .Added,
+                            .delete = action == .Removed,
+                            .modify = action == .Modified,
+                            .rename = action == .RenamedOld or action == .RenamedNew,
+                        },
+                        .name = name,
+                    });
+                    if (watchInfo.list.items.len >= MAX_EVENTS)
+                        break;
+                }
+
+                return watchInfo;
+            } else {
+                return error.INVAL;
             }
         }
-
-        self.backend.windows.monitoring = false;
-
-        if (overlapped) |ptr| {
-            if (ptr != &self.backend.windows.overlapped)
-                return null;
-            if (nbytes == 0) {
-                self.backend.windows.active = false;
-                return error.Shutdown;
-            }
-            var watchInfo: WatchInfo = .{
-                .allocator = self.allocator,
-                .list = std.ArrayList(WatchEvent).init(self.allocator),
-            };
-            errdefer watchInfo.deinit();
-
-            var n = true;
-            var offset: usize = 0;
-            while (n) {
-                const info: *std.os.windows.FILE_NOTIFY_INFORMATION = @alignCast(@ptrCast(self.backend.windows.buf[offset..].ptr));
-                const name_ptr: [*]u16 = @alignCast(@ptrCast(self.backend.windows.buf[offset + @sizeOf(std.os.windows.FILE_NOTIFY_INFORMATION) ..].ptr));
-                const filename: []u16 = name_ptr[0 .. info.FileNameLength / @sizeOf(u16)];
-
-                const name = try std.unicode.utf16LeToUtf8Alloc(self.allocator, filename);
-                errdefer self.allocator.free(name);
-
-                const action: WindowsAttributes.Action = @enumFromInt(info.Action);
-
-                if (info.NextEntryOffset == 0)
-                    n = false
-                else
-                    offset += @as(usize, info.NextEntryOffset);
-
-                try watchInfo.list.append(.{
-                    .event = WatchEvent.Event{
-                        .created = action == .Added,
-                        .delete = action == .Removed,
-                        .modify = action == .Modified,
-                        .rename = action == .RenamedOld or action == .RenamedNew,
-                    },
-                    .name = name,
-                });
-                if (watchInfo.list.items.len >= MAX_EVENTS)
-                    break;
-            }
-
-            return watchInfo;
-        }
-        return error.INVAL;
     }
 
     fn startLinux(self: *FileSystemWatcher) !void {

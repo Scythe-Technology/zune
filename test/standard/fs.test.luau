@@ -619,6 +619,7 @@ test("Watch", function()
     task.wait(0.5);
     h:write("Some text\n");
     h:sync();
+    h:close();
     task.wait(0.5);
     fs.removeFile(path("sample2.txt"));
     task.wait(0.5);
