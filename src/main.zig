@@ -335,19 +335,12 @@ pub fn main() !void {
 
         switch (b.mode.compiled) {
             .debug => Runtime.Engine.loadModule(ML, b.entry.name, b.entry.data, null) catch |err| switch (err) {
-                error.Syntax => {
-                    std.debug.print("SyntaxError: {s}\n", .{ML.tostring(-1) orelse "UnknownError"});
-                    std.process.exit(1);
-                },
+                error.Syntax => unreachable, // should not happen
                 else => return err,
             },
             .release => {
                 ML.load(b.entry.name, b.entry.data, 0) catch |err| switch (err) {
-                    error.Fail => {
-                        std.debug.print("SyntaxError: {s}\n", .{ML.tostring(-1) orelse "UnknownError"});
-                        std.process.exit(1);
-                    },
-                    else => unreachable,
+                    else => unreachable, // should not happen
                 };
                 Runtime.Engine.loadNative(ML);
             },

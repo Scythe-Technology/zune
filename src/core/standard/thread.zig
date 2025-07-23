@@ -540,8 +540,7 @@ fn lua_fromModule(L: *VM.lua.State) !i32 {
         };
     } else {
         ML.load(module_src_path, file_content, 0) catch |err| switch (err) {
-            error.Fail => return L.Zerror(ML.tostring(-1) orelse "UnknownError"),
-            else => unreachable,
+            else => unreachable, // should not happen
         };
         Zune.Runtime.Engine.loadNative(ML);
     }

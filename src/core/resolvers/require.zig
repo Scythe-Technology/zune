@@ -322,12 +322,7 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
             };
         } else {
             ML.load(module_src_path, file_content, 0) catch |err| switch (err) {
-                error.Fail => {
-                    L.pop(1); // drop: thread
-                    try setErrorState(L, module_relative_path);
-                    return L.Zerror(ML.tostring(-1) orelse "UnknownError");
-                },
-                else => unreachable,
+                else => unreachable, // should not happen
             };
             Engine.loadNative(ML);
         }
