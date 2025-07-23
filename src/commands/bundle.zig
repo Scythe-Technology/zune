@@ -300,11 +300,11 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
             const dir_path = std.fs.path.dirname(path);
             if (dir_path != null and dir_path.?.len > 0)
                 try std.fs.cwd().makePath(dir_path.?);
-            const file_name = if (comptime builtin.os.tag == .windows and OUTPUT != .default)
-                std.mem.concat(allocator, u8, &.{ path, "exe" })
+            const file_name = if (comptime builtin.os.tag == .windows)
+                if (OUTPUT != .default) try std.mem.concat(allocator, u8, &.{ path, "exe" }) else path
             else
                 path;
-            defer if (comptime builtin.os.tag == .windows and OUTPUT != .default) allocator.free(file_name);
+            defer if (comptime builtin.os.tag == .windows) if (OUTPUT != .default) allocator.free(file_name);
             const handle = try std.fs.cwd().createFile(file_name, .{
                 .truncate = true,
                 .mode = switch (comptime builtin.os.tag) {
