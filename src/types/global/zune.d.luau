@@ -316,7 +316,7 @@ type FileSystemLib = {
 
     watch: (path: string, callback: (path: string, events: {"created" | "modified" | "moved" | "renamed" | "deleted" | "metadata"}) -> ()) -> FileWatcher,
 
-    embedFile: (path: string) -> string,
+    embedFile: (path: string) -> buffer,
     embeddedFiles: () -> { string },
     embeddedScripts: () -> { string },
 
