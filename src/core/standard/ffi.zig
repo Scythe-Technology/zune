@@ -246,7 +246,7 @@ const LuaPointer = struct {
         Static,
     };
 
-    pub fn ptrFromBuffer(L: *VM.lua.State) !i32 {
+    pub fn ptrFromAddress(L: *VM.lua.State) !i32 {
         const buf = L.Lcheckbuffer(1);
         if (buf.len < @sizeOf(usize))
             return error.SmallBuffer;
@@ -307,7 +307,7 @@ const LuaPointer = struct {
         return ptr;
     }
 
-    pub fn getRef(L: *VM.lua.State) !i32 {
+    pub fn allocPtr(L: *VM.lua.State) !i32 {
         const ref_ptr = value(L, 1) orelse return error.Failed;
         const allocator = luau.getallocator(L);
 
@@ -2312,8 +2312,8 @@ pub fn loadLib(L: *VM.lua.State) !void {
 
     try L.Zsetfieldfn(-1, "tagName", lua_tagName);
 
-    try L.Zsetfieldfn(-1, "getRef", LuaPointer.getRef);
-    try L.Zsetfieldfn(-1, "createPtr", LuaPointer.ptrFromBuffer);
+    try L.Zsetfieldfn(-1, "ptr", LuaPointer.allocPtr);
+    try L.Zsetfieldfn(-1, "ptrFromAddress", LuaPointer.ptrFromAddress);
 
     try L.Zsetfieldfn(-1, "getLuaState", lua_getLuaState);
 

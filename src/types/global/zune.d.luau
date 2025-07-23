@@ -2145,8 +2145,8 @@ type FFILib = {
         pointer: FFIPointerType,
     },
 
-    createPtr: (src: buffer) -> FFIPointer,
-    getRef: (src: FFIPointer) -> FFIPointer,
+    ptr: (src: FFIPointer) -> FFIPointer,
+    ptrFromAddress: (src: buffer) -> FFIPointer,
 
     getLuaState: (mainthread: boolean?) -> FFIPointer,
 
