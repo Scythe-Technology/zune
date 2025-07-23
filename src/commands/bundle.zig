@@ -140,6 +140,8 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
     for (bundle_args[1..]) |arg| {
         const glob = try std.fs.path.resolve(allocator, &.{ cwd_path, arg });
         if (std.mem.indexOfScalar(u8, glob, '*')) |i| {
+            if (comptime builtin.os.tag == .windows)
+                std.mem.replaceScalar(u8, glob, '\\', '/');
             defer allocator.free(glob);
             var d = if (i > 0) try dir.openDir(glob[0..i], .{ .iterate = true }) else dir;
             defer if (i > 0) d.close();
@@ -209,6 +211,8 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
                 } else if (std.mem.startsWith(u8, flag, "--files=") and flag.len > 8) {
                     const glob = try std.fs.path.resolve(allocator, &.{ cwd_path, flag[8..] });
                     if (std.mem.indexOfScalar(u8, glob, '*')) |i| {
+                        if (comptime builtin.os.tag == .windows)
+                            std.mem.replaceScalar(u8, glob, '\\', '/');
                         defer allocator.free(glob);
                         var d = if (i > 0) try dir.openDir(glob[0..i], .{ .iterate = true }) else dir;
                         defer if (i > 0) d.close();
@@ -332,10 +336,10 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
             if (dir_path != null and dir_path.?.len > 0)
                 try std.fs.cwd().makePath(dir_path.?);
             const file_name = if (comptime builtin.os.tag == .windows)
-                if (OUTPUT != .default) try std.mem.concat(allocator, u8, &.{ path, "exe" }) else path
+                if (OUTPUT == .default) try std.mem.concat(allocator, u8, &.{ path, ".exe" }) else path
             else
                 path;
-            defer if (comptime builtin.os.tag == .windows) if (OUTPUT != .default) allocator.free(file_name);
+            defer if (comptime builtin.os.tag == .windows) if (OUTPUT == .default) allocator.free(file_name);
             const handle = try std.fs.cwd().createFile(file_name, .{
                 .truncate = true,
                 .exclusive = OUTPUT == .default,
