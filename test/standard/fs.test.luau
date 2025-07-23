@@ -615,7 +615,11 @@ test("Watch", function()
         watcher:stop();
     end)
 
-    fs.writeFile(path("sample2.txt"), "Some text\n");
+    local h = fs.createFile(path("sample2.txt"));
+    task.wait(0.5);
+    h:write("Some text\n");
+    h:sync();
+    h:close();
     task.wait(0.5);
     fs.removeFile(path("sample2.txt"));
     task.wait(0.5);
@@ -637,4 +641,18 @@ test("Watch", function()
         {path = "foo", events = {"created"}},
         {path = "foo", events = {"deleted"}},
     }));
+end)
+
+test("Embedded", function()
+    local contents = fs.embedFile("fs.test.luau");
+    expect(contents).toBe(expect.any("buffer"));
+    expect(buffer.readstring(contents, 0, 9)).toBe("--!strict");
+
+    local files = fs.embeddedFiles();
+    expect(files).toBe(expect.any("table"));
+    expect(files).toHaveLength(0);
+
+    local scripts = fs.embeddedScripts();
+    expect(scripts).toBe(expect.any("table"));
+    expect(scripts).toHaveLength(0);
 end)

@@ -504,7 +504,7 @@ fn lua_fromModule(L: *VM.lua.State) !i32 {
     defer allocator.free(script_path);
 
     var src_path_buf: [std.fs.max_path_bytes:0]u8 = undefined;
-    const search_result = try Zune.Resolvers.File.searchLuauFile(&src_path_buf, cwd, script_path);
+    const search_result = if (Zune.STATE.BUNDLE) |*b| try Zune.Resolvers.File.searchLuauFileBundle(&src_path_buf, b, script_path) else try Zune.Resolvers.File.searchLuauFile(&src_path_buf, cwd, script_path);
     defer search_result.deinit();
 
     try Zune.Resolvers.Require.checkSearchResult(allocator, L, script_path, search_result);
@@ -516,25 +516,34 @@ fn lua_fromModule(L: *VM.lua.State) !i32 {
 
     const module_relative_path = module_src_path[1..];
 
-    const file_content = file.handle.readToEndAlloc(allocator, std.math.maxInt(usize)) catch |err| {
-        return L.Zerrorf("could not read module file '{s}': {}", .{ module_relative_path, err });
+    const file_content: []const u8 = switch (file.val) {
+        .contents => |c| c,
+        .handle => |h| h.readToEndAlloc(allocator, std.math.maxInt(usize)) catch |err| {
+            return L.Zerrorf("could not read module file '{s}': {}", .{ module_relative_path, err });
+        },
     };
-    defer allocator.free(file_content);
+    defer if (file.val == .handle) allocator.free(file_content);
 
     const ML = try createThread(allocator, L);
 
     try Zune.Runtime.Engine.setLuaFileContext(ML, .{
-        .source = file_content,
-        .main = true,
+        .source = if (Zune.STATE.BUNDLE == null or Zune.STATE.BUNDLE.?.mode.compiled == .debug) file_content else null,
+        .main = false,
     });
 
     ML.setsafeenv(VM.lua.GLOBALSINDEX, true);
 
-    Zune.Runtime.Engine.loadModule(ML, module_src_path, file_content, null) catch |err| switch (err) {
-        error.Syntax => {
-            return L.Zerror(ML.tostring(-1) orelse "UnknownError");
-        },
-    };
+    if (Zune.STATE.BUNDLE == null or Zune.STATE.BUNDLE.?.mode.compiled == .debug) {
+        @branchHint(.likely);
+        Zune.Runtime.Engine.loadModule(ML, module_src_path, file_content, null) catch |err| switch (err) {
+            error.Syntax => return L.Zerror(ML.tostring(-1) orelse "UnknownError"),
+        };
+    } else {
+        ML.load(module_src_path, file_content, 0) catch |err| switch (err) {
+            else => unreachable, // should not happen
+        };
+        Zune.Runtime.Engine.loadNative(ML);
+    }
     return 1;
 }
 
@@ -671,12 +680,16 @@ pub fn loadLib(L: *VM.lua.State) !void {
         L.setuserdatadtor(LuaThread, TAG_THREAD, LuaThread.__dtor);
     }
 
+    const is_thread = L.rawgetfield(VM.lua.REGISTRYINDEX, "_THREAD_RUNTIME") == .LightUserdata;
+    L.pop(1);
+
     try L.Zpushvalue(.{
         .fromModule = lua_fromModule,
         .fromBytecode = lua_fromBytecode,
         .receive = lua_selfReceive,
         .send = lua_selfSend,
         .getCpuCount = lua_getCpuCount,
+        .isThread = is_thread,
     });
     L.setreadonly(-1, true);
 

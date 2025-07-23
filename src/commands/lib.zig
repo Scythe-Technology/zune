@@ -42,6 +42,7 @@ pub const CommandMap = initCommands(&.{
     @import("repl/lib.zig").Command,
     @import("init.zig").Command,
     // @import("check.zig").Command,
+    @import("bundle.zig").Command,
 
     @import("luau.zig").Command,
     @import("help.zig").Command,

@@ -316,6 +316,10 @@ type FileSystemLib = {
 
     watch: (path: string, callback: (path: string, events: {"created" | "modified" | "moved" | "renamed" | "deleted" | "metadata"}) -> ()) -> FileWatcher,
 
+    embedFile: (path: string) -> buffer,
+    embeddedFiles: () -> { string },
+    embeddedScripts: () -> { string },
+
     path: {
         join: (...string) -> string,
         relative: (from: string, to: string) -> string,
@@ -2254,6 +2258,7 @@ export type ThreadLib = {
     receive: (self: Thread) -> ...any,
     send: (self: Thread, ...any) -> (),
     getCpuCount: () -> number,
+    isThread: boolean,
 }
 --[======[ Thread ]======]--
 
@@ -2261,6 +2266,7 @@ declare zune: {
     compiled: {
         optimize: number,
         debug: number,
+        mode: "debug" | "release",
     }?,
 
     fs: FileSystemLib,

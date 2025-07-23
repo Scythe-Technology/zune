@@ -119,7 +119,7 @@ const RequireNavigatorContext = struct {
         if (Zune.STATE.CONFIG_CACHE.get(path)) |cached|
             return cached;
 
-        const contents = self.dir.readFileAlloc(allocator, path, std.math.maxInt(usize)) catch |err| switch (err) {
+        const contents = if (Zune.STATE.BUNDLE) |*bundle| try bundle.loadFileAlloc(allocator, path) else self.dir.readFileAlloc(allocator, path, std.math.maxInt(usize)) catch |err| switch (err) {
             error.AccessDenied, error.FileNotFound => return error.NotPresent,
             else => return err,
         };
@@ -139,7 +139,7 @@ const RequireNavigatorContext = struct {
         // the config is stored in cache.
     }
     pub fn resolvePathAlloc(_: *This, allocator: std.mem.Allocator, from: []const u8, to: []const u8) ![]u8 {
-        return try Zune.Resolvers.File.resolve(allocator, Zune.STATE.ENV_MAP, &.{ from, to });
+        return try Zune.Resolvers.File.resolveBundled(allocator, Zune.STATE.ENV_MAP, &.{ from, to }, Zune.STATE.BUNDLE);
     }
 };
 
@@ -274,7 +274,8 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
             }
             L.pop(1); // drop: nil
         }
-
+        if (Zune.STATE.BUNDLE) |*bundle|
+            break :blk try File.searchLuauFileBundle(&src_path_buf, bundle, script_path);
         break :blk try File.searchLuauFile(&src_path_buf, cwd, script_path);
     };
     defer search_result.deinit();
@@ -292,26 +293,37 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
     const ML = try GL.newthread();
     GL.xmove(L, 1);
     {
-        const file_content = file.handle.readToEndAlloc(allocator, std.math.maxInt(usize)) catch |err| {
-            try setErrorState(L, module_relative_path);
-            return L.Zerrorf("could not read file: {}", .{err});
+        const file_content: []const u8 = switch (file.val) {
+            .contents => |c| c,
+            .handle => |h| h.readToEndAlloc(allocator, std.math.maxInt(usize)) catch |err| {
+                try setErrorState(L, module_relative_path);
+                return L.Zerrorf("could not read file: {}", .{err});
+            },
         };
-        defer allocator.free(file_content);
+        defer if (file.val == .handle) allocator.free(file_content);
 
         try ML.Lsandboxthread();
 
         try Engine.setLuaFileContext(ML, .{
-            .source = file_content,
+            .source = if (Zune.STATE.BUNDLE == null or Zune.STATE.BUNDLE.?.mode.compiled == .debug) file_content else null,
             .main = false,
         });
 
-        Engine.loadModule(ML, module_src_path, file_content, null) catch |err| switch (err) {
-            error.Syntax => {
-                L.pop(1); // drop: thread
-                try setErrorState(L, module_relative_path);
-                return L.Zerror(ML.tostring(-1) orelse "UnknownError");
-            },
-        };
+        if (Zune.STATE.BUNDLE == null or Zune.STATE.BUNDLE.?.mode.compiled == .debug) {
+            @branchHint(.likely);
+            Engine.loadModule(ML, module_src_path, file_content, null) catch |err| switch (err) {
+                error.Syntax => {
+                    L.pop(1); // drop: thread
+                    try setErrorState(L, module_relative_path);
+                    return L.Zerror(ML.tostring(-1) orelse "UnknownError");
+                },
+            };
+        } else {
+            ML.load(module_src_path, file_content, 0) catch |err| switch (err) {
+                else => unreachable, // should not happen
+            };
+            Engine.loadNative(ML);
+        }
     }
 
     L.pushlightuserdata(@constCast(@ptrCast(&PreloadedState)));

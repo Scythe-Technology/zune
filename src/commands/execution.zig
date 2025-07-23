@@ -27,7 +27,7 @@ fn getFile(allocator: std.mem.Allocator, dir: std.fs.Dir, input: []const u8) !st
         maybe_content = try std.io.getStdIn().readToEndAlloc(allocator, std.math.maxInt(usize));
         maybe_src = try allocator.dupeZ(u8, "@STDIN");
     } else {
-        const path = try File.resolveZ(allocator, Zune.STATE.ENV_MAP, &.{input});
+        const path = try File.resolve(allocator, Zune.STATE.ENV_MAP, &.{input});
         defer allocator.free(path);
         if (dir.readFileAlloc(allocator, path, std.math.maxInt(usize)) catch null) |content| {
             maybe_content = content;
@@ -37,7 +37,7 @@ fn getFile(allocator: std.mem.Allocator, dir: std.fs.Dir, input: []const u8) !st
                 error.RedundantFileExtension => return error.FileNotFound,
                 else => return err,
             } orelse return error.FileNotFound;
-            maybe_content = try result.handle.readToEndAlloc(allocator, std.math.maxInt(usize));
+            maybe_content = try result.val.handle.readToEndAlloc(allocator, std.math.maxInt(usize));
             maybe_src = try std.mem.concatWithSentinel(allocator, u8, &.{ "@", path, result.ext }, 0);
         }
     }
