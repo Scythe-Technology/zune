@@ -60,8 +60,6 @@ fn splitArgs(args: []const []const u8) struct { []const []const u8, ?[]const []c
 
 const ScanOptions = struct {
     glob: []const u8,
-    relativeTo: ?[]const u8 = null,
-    dir: std.fs.Dir,
     kind: enum { script, file } = .script,
 };
 
@@ -73,6 +71,7 @@ fn scanDir(
     path: []const u8,
 ) !void {
     var iter = dir.iterate();
+    const recursive = std.mem.indexOf(u8, opts.glob, "**") != null;
     while (try iter.next()) |entry| {
         const entry_path = try std.fs.path.join(allocator, &.{ path, entry.name });
         errdefer allocator.free(entry_path);
@@ -87,6 +86,8 @@ fn scanDir(
                 continue;
             },
             .directory => {
+                if (!recursive)
+                    break :blk;
                 var entry_dir = try dir.openDir(entry.name, .{ .iterate = true });
                 defer entry_dir.close();
                 try scanDir(allocator, map, entry_dir, opts, entry_path);
@@ -101,15 +102,19 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
     const bundle_args, const flags = splitArgs(args);
 
     if (bundle_args.len < 1) {
-        std.debug.print("Usage: bundle <luau file>\n", .{});
+        std.debug.print("Usage: bundle [flags] <luau file> [...luau files]\n", .{});
         return;
     }
 
     Zune.loadConfiguration(std.fs.cwd());
 
+    const home_dir = File.getHomeDir(Zune.STATE.ENV_MAP) orelse "";
+
     var dir = try std.fs.cwd().openDir(".", .{ .iterate = true });
     defer dir.close();
+
     const module = bundle_args[0];
+
     const cwd_path = try dir.realpathAlloc(allocator, ".");
     defer allocator.free(cwd_path);
 
@@ -126,10 +131,27 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
     defer FILES.deinit(allocator);
     defer for (FILES.keys()) |file| allocator.free(file);
 
+    const abs_entry_file = try std.fs.path.resolve(allocator, &.{ cwd_path, file_path });
     {
-        const abs_entry_file = try std.fs.path.resolve(allocator, &.{ cwd_path, file_path });
         errdefer allocator.free(abs_entry_file);
         try SCRIPTS.put(allocator, abs_entry_file, undefined);
+    }
+
+    for (bundle_args[1..]) |arg| {
+        const glob = try std.fs.path.resolve(allocator, &.{ cwd_path, arg });
+        if (std.mem.indexOfScalar(u8, glob, '*')) |i| {
+            defer allocator.free(glob);
+            var d = if (i > 0) try dir.openDir(glob[0..i], .{ .iterate = true }) else dir;
+            defer if (i > 0) d.close();
+            try scanDir(allocator, &SCRIPTS, d, .{
+                .glob = glob,
+                .kind = .script,
+            }, glob[0..i]);
+        } else {
+            errdefer allocator.free(glob);
+            if (try SCRIPTS.fetchPut(allocator, glob, undefined)) |key_entry|
+                allocator.free(key_entry.key);
+        }
     }
 
     var BUILD_MODE: enum(u1) { debug, release } = .debug;
@@ -184,23 +206,21 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
                     BUILD_MODE = .debug;
                 } else if (std.mem.startsWith(u8, flag, "--out=") and flag.len > 6) {
                     OUTPUT = .{ .path = flag[6..] };
-                } else if (std.mem.startsWith(u8, flag, "--scripts=") and flag.len > 10) {
-                    const glob = try std.fs.path.resolve(allocator, &.{ cwd_path, flag[10..] });
-                    try scanDir(allocator, &SCRIPTS, dir, .{
-                        .dir = dir,
-                        .glob = glob,
-                        .relativeTo = null,
-                        .kind = .script,
-                    }, cwd_path);
                 } else if (std.mem.startsWith(u8, flag, "--files=") and flag.len > 8) {
                     const glob = try std.fs.path.resolve(allocator, &.{ cwd_path, flag[8..] });
-                    defer allocator.free(glob);
-                    try scanDir(allocator, &FILES, dir, .{
-                        .dir = dir,
-                        .glob = glob,
-                        .relativeTo = null,
-                        .kind = .file,
-                    }, cwd_path);
+                    if (std.mem.indexOfScalar(u8, glob, '*')) |i| {
+                        defer allocator.free(glob);
+                        var d = if (i > 0) try dir.openDir(glob[0..i], .{ .iterate = true }) else dir;
+                        defer if (i > 0) d.close();
+                        try scanDir(allocator, &FILES, d, .{
+                            .glob = glob,
+                            .kind = .file,
+                        }, glob[0..i]);
+                    } else {
+                        errdefer allocator.free(glob);
+                        if (try FILES.fetchPut(allocator, glob, undefined)) |key_entry|
+                            allocator.free(key_entry.key);
+                    }
                 },
                 else => {
                     std.debug.print("Unknown flag: {s}\n", .{flag});
@@ -242,10 +262,21 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
         },
     });
 
+    {
+        const home_relative = if (home_dir.len > 0) try std.fs.path.relative(allocator, cwd_path, home_dir) else "";
+        defer allocator.free(home_relative);
+        if (std.mem.indexOfAny(u8, home_relative, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789") != null) {
+            Zune.debug.print("<yellow>Warning<clear>: resolved home directory relative path '{s}' contains normal characters\n", .{home_relative});
+            Zune.debug.print("The bundled application may contain unwanted path names\n", .{});
+        }
+        try writer.writeInt(u16, @intCast(home_relative.len), .big);
+        try writer.writeAll(home_relative);
+    }
+
     for (SCRIPTS.keys()) |script| {
         const name = try std.fs.path.relative(allocator, cwd_path, script);
         defer allocator.free(name);
-        const script_contents = try std.fs.cwd().readFileAlloc(allocator, name, std.math.maxInt(usize));
+        const script_contents = try std.fs.cwd().readFileAlloc(allocator, script, std.math.maxInt(usize));
         defer allocator.free(script_contents);
         const bytecode = try luau.Compiler.luacode.compile(allocator, script_contents, .{
             .optimizationLevel = Zune.STATE.LUAU_OPTIONS.OPTIMIZATION_LEVEL,
@@ -264,12 +295,12 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     for (FILES.keys()) |file| {
         if (SCRIPTS.get(file)) |_| {
-            std.debug.print("Warning: attempted to bundle an existing script '{s}' as file, skipping...\n", .{file});
+            Zune.debug.print("<yellow>Warning<clear>: attempted to bundle an existing script '{s}' as file, skipping...\n", .{file});
             continue;
         }
         const name = try std.fs.path.relative(allocator, cwd_path, file);
         defer allocator.free(name);
-        const file_contents = try std.fs.cwd().readFileAlloc(allocator, name, std.math.maxInt(usize));
+        const file_contents = try std.fs.cwd().readFileAlloc(allocator, file, std.math.maxInt(usize));
         defer allocator.free(file_contents);
         try Bundle.Section.writeFile(allocator, writer, name, file_contents, .none);
     }
@@ -307,6 +338,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
             defer if (comptime builtin.os.tag == .windows) if (OUTPUT != .default) allocator.free(file_name);
             const handle = try std.fs.cwd().createFile(file_name, .{
                 .truncate = true,
+                .exclusive = OUTPUT == .default,
                 .mode = switch (comptime builtin.os.tag) {
                     .wasi, .windows => 0,
                     else => 0o755,
@@ -323,6 +355,15 @@ pub const Command = command.Command{
     .name = "bundle",
     .execute = Execute,
 };
+
+fn OSPath(comptime path: []const u8) []const u8 {
+    var iter = std.mem.splitScalar(u8, path, '/');
+    var static: []const u8 = iter.first();
+    while (iter.next()) |component| {
+        static = static ++ std.fs.path.sep_str ++ component;
+    }
+    return static;
+}
 
 test "cmdBundle" {
     const allocator = std.testing.allocator;
@@ -346,7 +387,28 @@ test "cmdBundle" {
         var map = (try Bundle.getFromFile(allocator, file)) orelse unreachable;
         defer map.deinit();
 
-        _ = map.loadScript("test/cli/bundle.luau") catch unreachable;
-        _ = map.loadFile("test/runner.zig") catch unreachable;
+        _ = map.loadScript(comptime OSPath("test/cli/bundle.luau")) catch unreachable;
+        _ = map.loadFile(comptime OSPath("test/runner.zig")) catch unreachable;
+        try std.testing.expect(map.map.count() == 2);
+    }
+
+    {
+        const exe_path = try std.fs.path.join(allocator, &.{ ".zig-cache/tmp", &temporaryDir.sub_path, "test" });
+        defer allocator.free(exe_path);
+        const sub_path = try std.mem.concat(allocator, u8, &.{ "--out=", exe_path });
+        defer allocator.free(sub_path);
+        const args: []const []const u8 = &.{ sub_path, "--files=test/*.zig", "test/cli/bundle.luau" };
+
+        try Execute(allocator, args);
+
+        const file = try std.fs.cwd().openFile(exe_path, .{ .mode = .read_only });
+        defer file.close();
+
+        var map = (try Bundle.getFromFile(allocator, file)) orelse unreachable;
+        defer map.deinit();
+
+        _ = map.loadScript(comptime OSPath("test/cli/bundle.luau")) catch unreachable;
+        _ = map.loadFile(comptime OSPath("test/runner.zig")) catch unreachable;
+        try std.testing.expect(map.map.count() == 2);
     }
 }

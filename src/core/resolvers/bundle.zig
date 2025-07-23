@@ -159,6 +159,7 @@ pub const Map = struct {
         name: [:0]const u8,
         data: Section.Script,
     },
+    home_dir: []const u8,
     allocated: []const u8,
 
     pub fn deinit(self: *Map) void {
@@ -237,13 +238,18 @@ pub fn loadBundle(allocator: std.mem.Allocator, exe_header: ExeHeader, bundle: [
     errdefer map.deinit(allocator);
 
     const state: PackedState = @bitCast(std.mem.readVarInt(u40, bundle[0..@divExact(@bitSizeOf(PackedState), 8)], .big));
+    var pos: usize = @divExact(@bitSizeOf(PackedState), 8);
+
+    const home_dir_len = std.mem.readInt(u16, bundle[@divExact(@bitSizeOf(PackedState), 8)..][0..2], .big);
+    pos += 2;
+    const home_dir = bundle[pos..][0..home_dir_len];
+    pos += home_dir_len;
 
     var entry: ?struct {
         name: [:0]const u8,
         data: Section.Script,
     } = null;
 
-    var pos: usize = @divExact(@bitSizeOf(PackedState), 8);
     for (0..exe_header.sections) |_| {
         const header: Section.Header = @bitCast(std.mem.readVarInt(u56, bundle[pos..][0..@divExact(@bitSizeOf(Section.Header), 8)], .big));
         pos += @divExact(@bitSizeOf(Section.Header), 8);
@@ -298,6 +304,7 @@ pub fn loadBundle(allocator: std.mem.Allocator, exe_header: ExeHeader, bundle: [
             .name = entry.?.name,
             .data = entry.?.data,
         },
+        .home_dir = home_dir,
         .allocated = bundle,
     };
 }

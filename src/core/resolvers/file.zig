@@ -200,3 +200,35 @@ pub fn resolve(
 
     return try fs.path.resolve(allocator, resolvedPaths[0..paths.len]);
 }
+
+pub fn resolveBundled(
+    allocator: std.mem.Allocator,
+    envMap: std.process.EnvMap,
+    paths: []const []const u8,
+    map: ?Bundle.Map,
+) ![]u8 {
+    std.debug.assert(paths.len <= 2);
+    var resolvedPaths: [2][]const u8 = undefined;
+    var allocated: [2]bool = undefined;
+    @memset(allocated[0..], false);
+    std.debug.assert(paths.len <= resolvedPaths.len);
+
+    defer for (resolvedPaths[0..paths.len], 0..) |path, i| {
+        if (allocated[i])
+            allocator.free(path);
+    };
+
+    for (paths, 0..) |path, i| {
+        if (shouldFetchHomeDir(path)) {
+            const homeDir = if (map) |b|
+                b.home_dir
+            else
+                getHomeDir(envMap) orelse return error.HomeDirNotFound;
+            const new_path = try fs.path.join(allocator, &.{ homeDir, path[@min(path.len, 2)..] });
+            resolvedPaths[i] = new_path;
+            allocated[i] = true;
+        } else resolvedPaths[i] = path;
+    }
+
+    return try fs.path.resolve(allocator, resolvedPaths[0..paths.len]);
+}

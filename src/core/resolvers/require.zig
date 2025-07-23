@@ -139,9 +139,7 @@ const RequireNavigatorContext = struct {
         // the config is stored in cache.
     }
     pub fn resolvePathAlloc(_: *This, allocator: std.mem.Allocator, from: []const u8, to: []const u8) ![]u8 {
-        if (Zune.STATE.BUNDLE != null)
-            return std.fs.path.resolve(allocator, &.{ from, to });
-        return try Zune.Resolvers.File.resolve(allocator, Zune.STATE.ENV_MAP, &.{ from, to });
+        return try Zune.Resolvers.File.resolveBundled(allocator, Zune.STATE.ENV_MAP, &.{ from, to }, Zune.STATE.BUNDLE);
     }
 };
 
