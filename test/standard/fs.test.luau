@@ -615,7 +615,10 @@ test("Watch", function()
         watcher:stop();
     end)
 
-    fs.writeFile(path("sample2.txt"), "Some text\n");
+    local h = fs.createFile(path("sample2.txt"));
+    task.wait(0.5);
+    h:write("Some text\n");
+    h:sync();
     task.wait(0.5);
     fs.removeFile(path("sample2.txt"));
     task.wait(0.5);
