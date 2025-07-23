@@ -225,7 +225,7 @@ fn buildZune(
         else => optimize,
     };
 
-    const dep_luau = b.dependency("luau", .{ .target = target, .optimize = optimize });
+    const dep_luau = b.dependency("luau", .{ .target = target, .optimize = optimize, .Analysis = false });
     const dep_xev = b.dependency("libxev", .{ .target = target, .optimize = optimize });
     const dep_tls = b.dependency("tls", .{ .target = target, .optimize = optimize });
     const dep_json = b.dependency("json", .{ .target = target, .optimize = optimize });
