@@ -51,43 +51,26 @@ const ProcessEnvError = error{
     InvalidValueType,
 };
 
-fn internal_process_getargs(L: *VM.lua.State, array: *std.ArrayList([]const u8), idx: i32) !void {
+fn getProcessArgs(L: *VM.lua.State, array: *std.ArrayList([]const u8), idx: i32) !void {
     try L.Zchecktype(idx, .Table);
-    var i: i32 = L.rawiter(idx, 0);
-    while (i >= 0) : (i = L.rawiter(idx, i)) {
-        defer L.pop(2);
-        const keyType = L.typeOf(-2);
-        const valueType = L.typeOf(-1);
-        if (keyType != .Number)
-            return ProcessArgsError.NotArray;
-
-        const num = L.tointeger(-2) orelse return ProcessArgsError.NotArray;
-        if (num != i)
-            return ProcessArgsError.NotArray;
-        if (valueType != .String)
-            return ProcessArgsError.InvalidArgType;
-
-        const value = L.tostring(-1) orelse return ProcessArgsError.InvalidArgType;
-
-        try array.append(value);
-    }
+    var iter: LuaHelper.ArrayIterator = .{ .L = L, .idx = idx };
+    while (try iter.next()) |i| switch (i) {
+        .String => try array.append(L.tostring(-1).?),
+        else => return L.Zerrorf("invalid process argument type (string expected, got {s})", .{VM.lapi.typename(L.typeOf(-1))}),
+    };
 }
 
-fn internal_process_envmap(L: *VM.lua.State, envMap: *std.process.EnvMap, idx: i32) !void {
+fn writeProcessEnvMap(L: *VM.lua.State, envMap: *std.process.EnvMap, idx: i32) !void {
     try L.Zchecktype(idx, .Table);
-    var i: i32 = L.rawiter(idx, 0);
-    while (i >= 0) : (i = L.rawiter(idx, i)) {
-        defer L.pop(2);
-        const keyType = L.typeOf(-2);
-        const valueType = L.typeOf(-1);
-        if (keyType != .String)
-            return ProcessEnvError.InvalidKeyType;
-        if (valueType != .String)
-            return ProcessEnvError.InvalidValueType;
-        const key = L.tostring(-2) orelse return ProcessEnvError.InvalidKeyType;
-        const value = L.tostring(-1) orelse return ProcessEnvError.InvalidValueType;
-        try envMap.put(key, value);
-    }
+    var iter: LuaHelper.TableIterator = .{ .L = L, .idx = idx };
+    while (iter.next()) |t| switch (t) {
+        .String => {
+            if (L.typeOf(-1) != .String)
+                return L.Zerrorf("invalid process environment value type (string expected, got {s})", .{VM.lapi.typename(L.typeOf(-1))});
+            try envMap.put(L.tostring(-2).?, L.tostring(-1).?);
+        },
+        else => return L.Zerrorf("invalid process environment key type (string expected, got {s})", .{VM.lapi.typename(L.typeOf(-2))}),
+    };
 }
 
 const ProcessChildOptions = struct {
@@ -116,16 +99,11 @@ const ProcessChildOptions = struct {
 
             childOptions.cwd = try L.Zcheckfield(?[]const u8, 3, "cwd");
 
-            const envType = L.rawgetfield(3, "env");
-            if (!envType.isnoneornil()) {
-                if (envType == .Table) {
-                    childOptions.env = std.process.EnvMap.init(allocator);
-                    internal_process_envmap(L, &childOptions.env.?, -1) catch |err| switch (err) {
-                        ProcessEnvError.InvalidKeyType => return L.Zerror("Invalid environment key"),
-                        ProcessEnvError.InvalidValueType => return L.Zerror("Invalid environment value"),
-                        else => return L.Zerror("Unknown Error"),
-                    };
-                } else return L.Zerrorf("Invalid environment (table expected, got {s})", .{VM.lapi.typename(envType)});
+            if (LuaHelper.maybeKnownType(L.rawgetfield(3, "env"))) |@"type"| {
+                if (@"type" != .Table)
+                    return L.Zerrorf("invalid environment (table expected, got {s})", .{VM.lapi.typename(@"type")});
+                childOptions.env = std.process.EnvMap.init(allocator);
+                try writeProcessEnvMap(L, &childOptions.env.?, -1);
             }
             L.pop(1);
 
@@ -139,9 +117,9 @@ const ProcessChildOptions = struct {
                         childOptions.stdio = .pipe;
                     } else if (std.mem.eql(u8, stdioOption, "ignore")) {
                         childOptions.stdio = .ignore;
-                    } else return L.Zerrorf("Invalid stdio option (inherit/pipe/ignore expected, got {s})", .{stdioOption});
+                    } else return L.Zerrorf("invalid stdio option (inherit/pipe/ignore expected, got {s})", .{stdioOption});
                 },
-                else => return L.Zerrorf("Invalid stdio option (string expected, got {s})", .{VM.lapi.typename(L.typeOf(-1))}),
+                else => return L.Zerrorf("invalid stdio option (string expected, got {s})", .{VM.lapi.typename(L.typeOf(-1))}),
             }
             L.pop(1);
 
@@ -180,7 +158,7 @@ const ProcessChildOptions = struct {
                         }
                     }
                 },
-                else => |t| return L.Zerrorf("Invalid shell (string or boolean expected, got {s})", .{VM.lapi.typename(t)}),
+                else => |t| return L.Zerrorf("invalid shell (string or boolean expected, got {s})", .{VM.lapi.typename(t)}),
             }
             L.pop(1);
         }
@@ -188,7 +166,7 @@ const ProcessChildOptions = struct {
         try childOptions.argArray.append(cmd);
 
         if (L.typeOf(2) == .Table)
-            try internal_process_getargs(L, &childOptions.argArray, 2);
+            try getProcessArgs(L, &childOptions.argArray, 2);
 
         if (shell) |s| {
             const joined = try std.mem.join(allocator, " ", childOptions.argArray.items);
@@ -287,7 +265,7 @@ const ProcessAsyncRunContext = struct {
     }
 };
 
-fn process_run(L: *VM.lua.State) !i32 {
+fn lua_run(L: *VM.lua.State) !i32 {
     if (comptime !std.process.can_spawn)
         return error.UnsupportedPlatform;
     const scheduler = Scheduler.getScheduler(L);
@@ -351,7 +329,7 @@ fn process_run(L: *VM.lua.State) !i32 {
     return L.yield(0);
 }
 
-fn process_create(L: *VM.lua.State) !i32 {
+fn lua_create(L: *VM.lua.State) !i32 {
     if (comptime !std.process.can_spawn)
         return error.UnsupportedPlatform;
     const allocator = luau.getallocator(L);
@@ -382,7 +360,7 @@ fn process_create(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn process_exit(L: *VM.lua.State) i32 {
+fn lua_exit(L: *VM.lua.State) i32 {
     const code = L.Lcheckunsigned(1);
     Scheduler.KillSchedulers();
     Engine.stateCleanUp();
@@ -500,7 +478,7 @@ fn loadEnvironment(L: *VM.lua.State, allocator: std.mem.Allocator, file: []const
     decodeEnvironment(L, bytes) catch {};
 }
 
-fn process_loadEnv(L: *VM.lua.State) !i32 {
+fn lua_loadEnv(L: *VM.lua.State) !i32 {
     const allocator = luau.getallocator(L);
     try L.newtable();
 
@@ -526,7 +504,7 @@ fn process_loadEnv(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn process_onsignal(L: *VM.lua.State) !i32 {
+fn lua_onsignal(L: *VM.lua.State) !i32 {
     const sig = try L.Zcheckvalue([:0]const u8, 1, null);
     try L.Zchecktype(2, .Function);
 
@@ -553,7 +531,7 @@ fn process_onsignal(L: *VM.lua.State) !i32 {
     return 0;
 }
 
-fn process_getCwd(L: *VM.lua.State) !i32 {
+fn lua_getCwd(L: *VM.lua.State) !i32 {
     const allocator = luau.getallocator(L);
     const path = try std.fs.cwd().realpathAlloc(allocator, ".");
     defer allocator.free(path);
@@ -572,16 +550,16 @@ pub fn loadLib(L: *VM.lua.State, args: []const []const u8) !void {
         try L.rawsetfield(-2, "args");
     }
 
-    _ = try process_loadEnv(L);
+    _ = try lua_loadEnv(L);
     try L.rawsetfield(-2, "env");
-    try L.Zsetfieldfn(-1, "loadEnv", process_loadEnv);
+    try L.Zsetfieldfn(-1, "loadEnv", lua_loadEnv);
 
-    try L.Zsetfieldfn(-1, "getCwd", process_getCwd);
+    try L.Zsetfieldfn(-1, "getCwd", lua_getCwd);
 
-    try L.Zsetfieldfn(-1, "exit", process_exit);
-    try L.Zsetfieldfn(-1, "run", process_run);
-    try L.Zsetfieldfn(-1, "create", process_create);
-    try L.Zsetfieldfn(-1, "onSignal", process_onsignal);
+    try L.Zsetfieldfn(-1, "exit", lua_exit);
+    try L.Zsetfieldfn(-1, "run", lua_run);
+    try L.Zsetfieldfn(-1, "create", lua_create);
+    try L.Zsetfieldfn(-1, "onSignal", lua_onsignal);
 
     L.setreadonly(-1, true);
 
