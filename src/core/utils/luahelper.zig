@@ -167,6 +167,52 @@ pub fn Ref(comptime T: type) type {
     };
 }
 
+pub fn maybeKnownType(T: VM.lua.Type) ?VM.lua.Type {
+    if (T.isnoneornil())
+        return null;
+    return T;
+}
+
+pub const ArrayIterator = struct {
+    L: *VM.lua.State,
+    idx: i32,
+    iter: i32 = 0,
+
+    /// Returns the next type in the array, or null if there are no more elements.
+    /// The return type is the value type of the next element in the array.
+    /// Both index and value are pushed to the stack and automatically popped after the next call to `next`.
+    ///
+    /// This function will return an error if the table is not an array.
+    pub fn next(self: *ArrayIterator) !?VM.lua.Type {
+        if (self.iter > 0)
+            self.L.pop(2);
+        self.iter = self.L.rawiter(self.idx, self.iter);
+        if (self.iter < 0)
+            return null;
+        if ((self.L.tointeger(-2) orelse return self.L.Zerror("index must be an array")) != self.iter)
+            return self.L.Zerror("table must be an array");
+        return self.L.typeOf(-1);
+    }
+};
+
+pub const TableIterator = struct {
+    L: *VM.lua.State,
+    idx: i32,
+    iter: i32 = 0,
+
+    /// Returns the next type in the table, or null if there are no more elements.
+    /// The return type is the key type of the next element in the table.
+    /// Both key and value are pushed to the stack and automatically popped after the next call to `next`.
+    pub fn next(self: *TableIterator) ?VM.lua.Type {
+        if (self.iter > 0)
+            self.L.pop(2);
+        self.iter = self.L.rawiter(self.idx, self.iter);
+        if (self.iter < 0)
+            return null;
+        return self.L.typeOf(-2);
+    }
+};
+
 /// Register a table in the registry.
 /// Pops the module from the stack.
 pub fn registerModule(L: *VM.lua.State, comptime libName: [:0]const u8) !void {
