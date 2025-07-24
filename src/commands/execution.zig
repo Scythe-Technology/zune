@@ -146,11 +146,6 @@ fn cmdRun(allocator: std.mem.Allocator, args: []const []const u8) !void {
     defer allocator.free(file_src_path);
     defer allocator.free(file_content);
 
-    if (file_content.len == 0) {
-        std.debug.print("File is empty: {s}\n", .{run_args[0]});
-        std.process.exit(1);
-    }
-
     var L = try luau.init(&allocator);
     defer L.deinit();
     var scheduler = try Scheduler.init(allocator, L);
@@ -266,11 +261,6 @@ fn cmdTest(allocator: std.mem.Allocator, args: []const []const u8) !void {
     defer allocator.free(file_src_path);
     defer allocator.free(file_content);
 
-    if (file_content.len == 0) {
-        std.debug.print("File is empty: {s}\n", .{args[0]});
-        std.process.exit(1);
-    }
-
     var gpa = std.heap.DebugAllocator(.{
         .safety = true,
         .stack_trace_frames = 8,
@@ -337,11 +327,6 @@ fn cmdEval(allocator: std.mem.Allocator, args: []const []const u8) !void {
     Zune.loadConfiguration(std.fs.cwd());
 
     const fileContent = args[0];
-
-    if (fileContent.len == 0) {
-        std.debug.print("Eval is empty\n", .{});
-        std.process.exit(1);
-    }
 
     var L = try luau.init(&allocator);
     defer L.deinit();
