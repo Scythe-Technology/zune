@@ -48,6 +48,9 @@ expect(ffi).toBe(
             double = expect.type("userdata"),
             pointer = expect.type("userdata"),
         }),
+        c = expect.similar({
+            compile = expect.type("function"),
+        }),
     })
 )
 
@@ -1321,5 +1324,54 @@ describe("FFI", function()
 
         expect(L == L2).toBe(true);
         expect(L == GL).toBe(false);
+    end)
+
+    describe("C", function()
+        describe("Compile", function()
+            test("Basic", function()
+                local compiled = ffi.c.compile([[
+                    int hello() {
+                        return 50;
+                    }
+                    int add(int a) {
+                        return a + 5;
+                    }
+                    double add_double(double a) {
+                        return a + 2.5;
+                    }
+                ]]);
+
+                local hellofn = ffi.fn({ returns = ffi.types.i32, args = {} }, compiled:getSymbol("hello"));
+                local addfn = ffi.fn({ returns = ffi.types.i32, args = {ffi.types.i32} }, compiled:getSymbol("add"));
+                local add_doublefn = ffi.fn({ returns = ffi.types.double, args = {ffi.types.double} }, compiled:getSymbol("add_double"));
+
+                expect(hellofn()).toBe(50);
+                expect(addfn(25)).toBe(30);
+                expect(add_doublefn(62.5)).toBe(65);
+            end)
+            test("Complex", function()
+                local compiled = ffi.c.compile((if (process.os == "windows") then "__declspec(dllimport) " else "extern") .. " void blank();\n\nvoid blank2() { blank(); }", {
+                    files = {`./zig-out/lib/{ffi.prefix}sample.{static_suffix}`},
+                });
+
+                local blank2fn = ffi.fn({ returns = ffi.types.void, args = {} }, compiled:getSymbol("blank2"));
+
+                blank2fn();
+            end)
+            test("Error", function()
+                expect(function()
+                    ffi.c.compile([[
+                        double add_double(
+                    ]]);
+                end).toThrow("error: identifier expected");
+                expect(function()
+                    ffi.c.compile([[
+                        double add_double(double a) {
+                            return a + 2.5;
+                        }
+                    ]], { files = {`unknown_nothing`} });
+                end).toThrow("tcc: error: file 'unknown_nothing' not found");
+            end)
+        end)
     end)
 end)

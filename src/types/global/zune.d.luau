@@ -2063,6 +2063,10 @@ export type FFILibrary = {
     [string]: (...any) -> any,
 }
 
+declare class FFICompiled
+    function getSymbol(self, symbol: string): FFIPointer
+end
+
 declare class FFIDataType
     function size(self): number
     function alignment(self): number
@@ -2124,6 +2128,15 @@ export type FFIPointer = {
     span: (self: FFIPointer, offset: number?) -> buffer,
 }
 
+type FFICompileOptions = {
+    options: string?,
+    files: {string}?,
+    libraries: {string}?,
+    includes: {string}?,
+    sysincludes: {string}?,
+    symbols: {[string]: string}?,
+}
+
 type FFILib = {
     supported: boolean,
 
@@ -2143,6 +2156,10 @@ type FFILib = {
         float: FFIDataType,
         double: FFIDataType,
         pointer: FFIPointerType,
+    },
+
+    c: {
+        compile: (src: string, opts: FFICompileOptions?) -> FFICompiled,
     },
 
     ptr: (src: FFIPointer) -> FFIPointer,

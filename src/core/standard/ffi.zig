@@ -2039,7 +2039,7 @@ const FFIFunction = struct {
 
 fn lua_fn(L: *VM.lua.State) !i32 {
     try L.Zchecktype(1, .Table);
-    const src = LuaPointer.value(L, 2) orelse return error.Failed;
+    const src = LuaPointer.value(L, 2) orelse return L.Zerror("invalid pointer");
     switch (src.type) {
         .Allocated => return error.PointerNotCallable,
         else => {},
@@ -2272,6 +2272,148 @@ fn lua_dupe(L: *VM.lua.State) !i32 {
     return 1;
 }
 
+const LuaCompiled = struct {
+    state: *tinycc.TCCState,
+
+    pub fn deinit(self: *LuaCompiled) void {
+        self.state.deinit();
+    }
+
+    pub fn lua_getSymbol(self: *LuaCompiled, L: *VM.lua.State) !i32 {
+        if (self.state.get_symbol(L.Lcheckstring(2))) |ptr| {
+            _ = try LuaPointer.newStaticPtr(L, ptr, false);
+            return 1;
+        }
+        return 0;
+    }
+
+    pub const __namecall = MethodMap.CreateNamecallMap(LuaCompiled, null, .{
+        .{ "getSymbol", lua_getSymbol },
+    });
+};
+
+fn lua_compile(L: *VM.lua.State) !i32 {
+    const allocator = luau.getallocator(L);
+    const source_code = L.Lcheckstring(1);
+
+    const state = try tinycc.new();
+    errdefer state.deinit();
+
+    state.set_output_type(tinycc.TCC_OUTPUT_MEMORY);
+    state.set_options("-std=c11 -nostdlib -Wl,--export-all-symbols");
+
+    var error_output: std.ArrayList(u8) = .init(allocator);
+    defer error_output.deinit();
+
+    state.set_error_func(@ptrCast(@alignCast(&error_output)), struct {
+        fn inner(ud: ?*anyopaque, msg: [*:0]const u8) callconv(.c) void {
+            const o = @as(*std.ArrayList(u8), @ptrCast(@alignCast(ud.?)));
+            o.appendSlice(std.mem.span(msg)) catch |err| @panic(@errorName(err));
+        }
+    }.inner);
+
+    if (try L.Zcheckvalue(?struct {
+        options: ?[:0]const u8 = null,
+    }, 2, null)) |opts| {
+        if (opts.options) |o|
+            state.set_options(o);
+
+        const type_files = L.rawgetfield(2, "files");
+        if (!type_files.isnoneornil()) {
+            if (type_files != .Table)
+                return L.Zerror("files must be a table");
+            var i: i32 = L.rawiter(-1, 0);
+            while (i >= 0) : (i = L.rawiter(-1, i)) {
+                defer L.pop(2);
+                if ((L.tointeger(-2) orelse return L.Zerror("index must be an array")) != i)
+                    return L.Zerror("list must be an array");
+                const path = L.tostring(-1) orelse return L.Zerror("library must be a string");
+                try state.add_file(path);
+            }
+        }
+        L.pop(1);
+
+        const type_libs = L.rawgetfield(2, "libraries");
+        if (!type_libs.isnoneornil()) {
+            if (type_libs != .Table)
+                return L.Zerror("libraries must be a table");
+            var i: i32 = L.rawiter(-1, 0);
+            while (i >= 0) : (i = L.rawiter(-1, i)) {
+                if ((L.tointeger(-2) orelse return L.Zerror("index must be an array")) != i)
+                    return L.Zerror("list must be an array");
+                const path = L.tostring(-1) orelse return L.Zerror("library must be a string");
+                try state.add_library(path);
+                L.pop(2);
+            }
+        }
+        L.pop(1);
+
+        const type_includes = L.rawgetfield(2, "includes");
+        if (!type_includes.isnoneornil()) {
+            if (type_includes != .Table)
+                return L.Zerror("includes must be a table");
+            var i: i32 = L.rawiter(-1, 0);
+            while (i >= 0) : (i = L.rawiter(-1, i)) {
+                defer L.pop(2);
+                if ((L.tointeger(-2) orelse return L.Zerror("index must be an array")) != i)
+                    return L.Zerror("list must be an array");
+                const path = L.tostring(-1) orelse return L.Zerror("include path must be a string");
+                _ = state.add_include_path(path);
+            }
+        }
+        L.pop(1);
+
+        const type_sysincludes = L.rawgetfield(2, "sysincludes");
+        if (!type_sysincludes.isnoneornil()) {
+            if (type_sysincludes != .Table)
+                return L.Zerror("sysincludes must be a table");
+            var i: i32 = L.rawiter(-1, 0);
+            while (i >= 0) : (i = L.rawiter(-1, i)) {
+                defer L.pop(2);
+                if ((L.tointeger(-2) orelse return L.Zerror("index must be an array")) != i)
+                    return L.Zerror("list must be an array");
+                const path = L.tostring(-1) orelse return L.Zerror("sysinclude path must be a string");
+                _ = state.add_sysinclude_path(path);
+            }
+        }
+        L.pop(1);
+
+        const type_symbols = L.rawgetfield(2, "symbols");
+        if (!type_symbols.isnoneornil()) {
+            if (type_symbols != .Table)
+                return L.Zerror("symbols must be a table");
+            var i: i32 = L.rawiter(-1, 0);
+            while (i >= 0) : (i = L.rawiter(-1, i)) {
+                defer L.pop(2);
+                const name = L.tostring(-2) orelse return L.Zerror("symbol name must be a string");
+                const ptr = LuaPointer.value(L, -1) orelse return L.Zerror("include path must be a pointer");
+                _ = state.add_symbol(name, @ptrCast(@alignCast(ptr.ptr)));
+            }
+        }
+        L.pop(1);
+    }
+
+    state.compile_string(source_code) catch {
+        return L.Zerror(if (error_output.items.len > 0) error_output.items else "CompilationError");
+    };
+    if (error_output.items.len > 0)
+        return L.Zerror(error_output.items);
+
+    state.set_error_func(null, struct {
+        fn inner(_: ?*anyopaque, _: [*:0]const u8) callconv(.c) void {}
+    }.inner);
+
+    try state.relocate();
+
+    const obj = try L.newuserdatadtor(LuaCompiled, LuaCompiled.deinit);
+    obj.* = .{
+        .state = state,
+    };
+    std.debug.assert(!(try L.Lgetmetatable(@typeName(LuaCompiled))).isnoneornil());
+    _ = try L.setmetatable(-2);
+    return 1;
+}
+
 pub fn loadLib(L: *VM.lua.State) !void {
     {
         _ = try L.Znewmetatable(@typeName(LuaDataType), .{
@@ -2295,8 +2437,17 @@ pub fn loadLib(L: *VM.lua.State) !void {
         L.setuserdatadtor(LuaPointer, TAG_FFI_POINTER, LuaPointer.__dtor);
         L.setuserdatametatable(TAG_FFI_POINTER);
     }
+    {
+        _ = try L.Znewmetatable(@typeName(LuaCompiled), .{
+            .__namecall = LuaCompiled.__namecall,
+            .__metatable = "Metatable is locked",
+            .__type = "FFICompiled",
+        });
+        L.setreadonly(-1, true);
+        L.pop(1);
+    }
 
-    try L.createtable(0, 17);
+    try L.createtable(0, 18);
 
     try L.Zsetfieldfn(-1, "dlopen", lua_dlopen);
     try L.Zsetfieldfn(-1, "struct", lua_struct);
@@ -2316,6 +2467,10 @@ pub fn loadLib(L: *VM.lua.State) !void {
     try L.Zsetfieldfn(-1, "ptrFromAddress", LuaPointer.ptrFromAddress);
 
     try L.Zsetfieldfn(-1, "getLuaState", lua_getLuaState);
+
+    try L.Zsetfield(-1, "c", .{
+        .compile = lua_compile,
+    });
 
     try L.createtable(0, @intCast(@typeInfo(DataTypes.Types).@"struct".decls.len));
     inline for (@typeInfo(DataTypes.Types).@"struct".decls, 0..) |decl, i| {
