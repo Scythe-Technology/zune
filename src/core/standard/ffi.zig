@@ -2242,58 +2242,58 @@ fn lua_compile(L: *VM.lua.State) !i32 {
 
         if (LuaHelper.maybeKnownType(L.rawgetfield(2, "files"))) |@"type"| {
             if (@"type" != .Table)
-                return L.Zerror("files must be a table");
+                return L.Zerrorf("files must be a table (got {s})", .{VM.lapi.typename(@"type")});
             var iter: LuaHelper.ArrayIterator = .{ .L = L, .idx = -1 };
             while (try iter.next()) |t| switch (t) {
                 .String => try state.add_file(L.tostring(-1).?),
-                else => return L.Zerror("file must be a string"),
+                else => return L.Zerrorf("file must be a string (got {s})", .{VM.lapi.typename(t)}),
             };
         }
         L.pop(1);
 
         if (LuaHelper.maybeKnownType(L.rawgetfield(2, "libraries"))) |@"type"| {
             if (@"type" != .Table)
-                return L.Zerror("libraries must be a table");
+                return L.Zerrorf("libraries must be a table (got {s})", .{VM.lapi.typename(@"type")});
             var iter: LuaHelper.ArrayIterator = .{ .L = L, .idx = -1 };
             while (try iter.next()) |t| switch (t) {
                 .String => try state.add_library(L.tostring(-1).?),
-                else => return L.Zerror("library must be a string"),
+                else => return L.Zerrorf("library must be a string (got {s})", .{VM.lapi.typename(t)}),
             };
         }
         L.pop(1);
 
         if (LuaHelper.maybeKnownType(L.rawgetfield(2, "includes"))) |@"type"| {
             if (@"type" != .Table)
-                return L.Zerror("includes must be a table");
+                return L.Zerrorf("includes must be a table (got {s})", .{VM.lapi.typename(@"type")});
             var iter: LuaHelper.ArrayIterator = .{ .L = L, .idx = -1 };
             while (try iter.next()) |t| switch (t) {
                 .String => _ = state.add_include_path(L.tostring(-1).?),
-                else => return L.Zerror("include path must be a string"),
+                else => return L.Zerrorf("include path must be a string (got {s})", .{VM.lapi.typename(t)}),
             };
         }
         L.pop(1);
 
         if (LuaHelper.maybeKnownType(L.rawgetfield(2, "sysincludes"))) |@"type"| {
             if (@"type" != .Table)
-                return L.Zerror("sysincludes must be a table");
+                return L.Zerrorf("sysincludes must be a table (got {s})", .{VM.lapi.typename(@"type")});
             var iter: LuaHelper.ArrayIterator = .{ .L = L, .idx = -1 };
             while (try iter.next()) |t| switch (t) {
                 .String => _ = state.add_sysinclude_path(L.tostring(-1).?),
-                else => return L.Zerror("sysinclude path must be a string"),
+                else => return L.Zerrorf("sysinclude path must be a string (got {s})", .{VM.lapi.typename(t)}),
             };
         }
         L.pop(1);
 
         if (LuaHelper.maybeKnownType(L.rawgetfield(2, "symbols"))) |@"type"| {
             if (@"type" != .Table)
-                return L.Zerror("symbols must be a table");
+                return L.Zerrorf("symbols must be a table (got {s})", .{VM.lapi.typename(@"type")});
             var iter: LuaHelper.TableIterator = .{ .L = L, .idx = -1 };
             while (iter.next()) |t| switch (t) {
                 .String => {
                     const ptr = LuaPointer.value(L, -1) orelse return L.Zerror("include path must be a pointer");
                     _ = state.add_symbol(L.tostring(-2).?, @ptrCast(@alignCast(ptr.ptr)));
                 },
-                else => return L.Zerror("symbol name must be a string"),
+                else => return L.Zerrorf("symbol name must be a string (got {s})", .{VM.lapi.typename(t)}),
             };
         }
         L.pop(1);
