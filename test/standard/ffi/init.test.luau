@@ -22,8 +22,8 @@ expect(ffi).toBe(
         struct = expect.type("function"),
         closure = expect.type("function"),
         fn = expect.type("function"),
-        createPtr = expect.type("function"),
-        getRef = expect.type("function"),
+        ptr = expect.type("function"),
+        ptrFromAddress = expect.type("function"),
         getLuaState = expect.type("function"),
         alloc = expect.type("function"),
         free = expect.type("function"),
@@ -47,6 +47,9 @@ expect(ffi).toBe(
             float = expect.type("userdata"),
             double = expect.type("userdata"),
             pointer = expect.type("userdata"),
+        }),
+        c = expect.similar({
+            compile = expect.type("function"),
         }),
     })
 )
@@ -93,7 +96,7 @@ describe("FFI", function()
         test("Span From Pointer", function()
             local src = ffi.dupe(buffer.fromstring("terminated string\0")):release();
 
-            local ptr = ffi.getRef(src):release();
+            local ptr = ffi.ptr(src):release();
             local unknown = ptr:readPtr():release();
 
             local buf = unknown:span(0);
@@ -143,14 +146,14 @@ describe("FFI", function()
 
             local mem = ffi.dupe(src);
             mem:release();
-            local ptr = ffi.getRef(mem):release():readPtr();
-            local ptr2 = ffi.getRef(mem):release():readPtr();
+            local ptr = ffi.ptr(mem):release():readPtr();
+            local ptr2 = ffi.ptr(mem):release():readPtr();
 
             expect(ptr == ptr2).toBe(true);
 
             expect(mem:readi32()).toBe(42);
 
-            local null_ptr = ffi.createPtr(buffer.create(ffi.types.pointer:size()));
+            local null_ptr = ffi.ptrFromAddress(buffer.create(ffi.types.pointer:size()));
 
             expect(null_ptr:isNull()).toBe(true);
             expect(null_ptr == ptr).toBe(false);
@@ -199,15 +202,15 @@ describe("FFI", function()
 
         test("Static Offset", function()
             local address = buffer.create(ffi.types.pointer:size());
-            local base = ffi.createPtr(address);
+            local base = ffi.ptrFromAddress(address);
             
-            expect(base == ffi.createPtr(address)).toBe(true);
+            expect(base == ffi.ptrFromAddress(address)).toBe(true);
             expect(base:isNull()).toBe(true);
 
             for i = 1, 3 do
                 local ptr = base:offset(i);
                 buffer.writeu8(address, 0, i);
-                local located_ptr = ffi.createPtr(address);
+                local located_ptr = ffi.ptrFromAddress(address);
                 expect(ptr == base).toBe(false);
                 expect(ptr == located_ptr).toBe(true);
                 expect(ffi.len(ptr)).toBe(nil);
@@ -646,7 +649,7 @@ describe("FFI", function()
                 local out = ffi.alloc(ffi.types.i32:size());
                 out:release();
 
-                local ptr = ffi.getRef(out):release();
+                local ptr = ffi.ptr(out):release();
 
                 lib.add_ptr_ptr(ptr, 1);
                 
@@ -665,7 +668,7 @@ describe("FFI", function()
                 local out = ffi.alloc(ffi.types.i32:size());
                 out:release();
 
-                local ptr = ffi.getRef(out):release();
+                local ptr = ffi.ptr(out):release();
 
                 add_ptr_ptr(ptr, 1);
                 
@@ -1090,12 +1093,12 @@ describe("FFI", function()
             test("Library Fn", function()
                 expect(lib.check_nullptr(nil)).toBe(1);
             
-                local null_ptr = ffi.createPtr(buffer.create(ffi.types.pointer:size()));
+                local null_ptr = ffi.ptrFromAddress(buffer.create(ffi.types.pointer:size()));
                 expect(lib.check_nullptr(null_ptr)).toBe(1);
 
                 local dummy_value = ffi.dupe(buffer.create(0));
                 dummy_value:release();
-                local ptr = ffi.getRef(dummy_value):release();
+                local ptr = ffi.ptr(dummy_value):release();
                 expect(lib.check_nullptr(ptr)).toBe(0);
                 expect(lib.check_nullptr("")).toBe(0);
             end)
@@ -1104,12 +1107,12 @@ describe("FFI", function()
 
                 expect(check_nullptr(nil)).toBe(1);
             
-                local null_ptr = ffi.createPtr(buffer.create(ffi.types.pointer:size()));
+                local null_ptr = ffi.ptrFromAddress(buffer.create(ffi.types.pointer:size()));
                 expect(check_nullptr(null_ptr)).toBe(1);
 
                 local dummy_value = ffi.dupe(buffer.create(0));
                 dummy_value:release();
-                local ptr = ffi.getRef(dummy_value):release();
+                local ptr = ffi.ptr(dummy_value):release();
                 expect(check_nullptr(ptr)).toBe(0);
                 expect(check_nullptr("")).toBe(0);
             end)
@@ -1205,13 +1208,13 @@ describe("FFI", function()
                 buffer.writei32(temp, 12, -10);
                 ffi.copy(mem, 0, temp, 0, 24);
 
-                ffi.copy(block_address, 0, ffi.getRef(mem):release(), 0, ffi.types.pointer:size());
+                ffi.copy(block_address, 0, ffi.ptr(mem):release(), 0, ffi.types.pointer:size());
 
                 mem:drop();
             end)
 
             test("Leaky Unknown Block, Free", function()
-                local mem = ffi.createPtr(block_address);
+                local mem = ffi.ptrFromAddress(block_address);
                 expect(mem:isNull()).toBe(false);
                 expect(ffi.len(mem)).toBe(nil); -- unknown size
                 
@@ -1321,5 +1324,54 @@ describe("FFI", function()
 
         expect(L == L2).toBe(true);
         expect(L == GL).toBe(false);
+    end)
+
+    describe("C", function()
+        describe("Compile", function()
+            test("Basic", function()
+                local compiled = ffi.c.compile([[
+                    int hello() {
+                        return 50;
+                    }
+                    int add(int a) {
+                        return a + 5;
+                    }
+                    double add_double(double a) {
+                        return a + 2.5;
+                    }
+                ]]);
+
+                local hellofn = ffi.fn({ returns = ffi.types.i32, args = {} }, compiled:getSymbol("hello"));
+                local addfn = ffi.fn({ returns = ffi.types.i32, args = {ffi.types.i32} }, compiled:getSymbol("add"));
+                local add_doublefn = ffi.fn({ returns = ffi.types.double, args = {ffi.types.double} }, compiled:getSymbol("add_double"));
+
+                expect(hellofn()).toBe(50);
+                expect(addfn(25)).toBe(30);
+                expect(add_doublefn(62.5)).toBe(65);
+            end)
+            test("Complex", function()
+                local compiled = ffi.c.compile((if (process.os == "windows") then "__declspec(dllimport) " else "extern") .. " void blank();\n\nvoid blank2() { blank(); }", {
+                    files = {`./zig-out/lib/{ffi.prefix}sample.{static_suffix}`},
+                });
+
+                local blank2fn = ffi.fn({ returns = ffi.types.void, args = {} }, compiled:getSymbol("blank2"));
+
+                blank2fn();
+            end)
+            test("Error", function()
+                expect(function()
+                    ffi.c.compile([[
+                        double add_double(
+                    ]]);
+                end).toThrow("error: identifier expected");
+                expect(function()
+                    ffi.c.compile([[
+                        double add_double(double a) {
+                            return a + 2.5;
+                        }
+                    ]], { files = {`unknown_nothing`} });
+                end).toThrow("tcc: error: file 'unknown_nothing' not found");
+            end)
+        end)
     end)
 end)
