@@ -65,7 +65,7 @@ pub const Flags = struct {
 
 pub const VERSION = "zune " ++ info.version ++ "+" ++ std.fmt.comptimePrint("{d}.{d}", .{ luau.LUAU_VERSION.major, luau.LUAU_VERSION.minor });
 
-var FEATURES: struct {
+pub var FEATURES: struct {
     fs: bool = true,
     io: bool = true,
     net: bool = true,
@@ -193,9 +193,9 @@ pub fn loadConfiguration(dir: std.fs.Dir) void {
 
     if (toml.checkOptionTable(zconfig, "features")) |features_config| {
         if (toml.checkOptionTable(features_config, "builtins")) |builtins| {
-            inline for (@typeInfo(@TypeOf(FEATURES)).@"struct".decls) |decl| {
-                if (toml.checkOptionBool(builtins, decl.name)) |enabled|
-                    @field(FEATURES, decl.name) = enabled;
+            inline for (@typeInfo(@TypeOf(FEATURES)).@"struct".fields) |field| {
+                if (toml.checkOptionBool(builtins, field.name)) |enabled|
+                    @field(FEATURES, field.name) = enabled;
             }
         }
     }

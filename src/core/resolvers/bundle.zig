@@ -120,6 +120,36 @@ pub const Section = union(enum) {
     }
 };
 
+pub const Features = packed struct(u16) {
+    fs: bool = true,
+    io: bool = true,
+    net: bool = true,
+    process: bool = true,
+    task: bool = true,
+    luau: bool = true,
+    serde: bool = true,
+    crypto: bool = true,
+    datetime: bool = true,
+    regex: bool = true,
+    sqlite: bool = true,
+    require: bool = true,
+    random: bool = true,
+    thread: bool = true,
+    ffi: bool = true,
+    _: u1 = 0, // reserved bit
+
+    pub fn write(writer: anytype, features: Features) !void {
+        try writer.writeInt(u16, @bitCast(features), .big);
+    }
+
+    comptime {
+        std.debug.assert(@typeInfo(@TypeOf(Zune.FEATURES)).@"struct".fields.len == @typeInfo(Features).@"struct".fields.len - 1);
+        for (@typeInfo(@TypeOf(Zune.FEATURES)).@"struct".fields) |field| {
+            std.debug.assert(@hasField(Features, field.name));
+        }
+    }
+};
+
 pub const PackedState = packed struct(u40) {
     mode: Mode,
     luau: Luau,
@@ -240,7 +270,10 @@ pub fn loadBundle(allocator: std.mem.Allocator, exe_header: ExeHeader, bundle: [
     const state: PackedState = @bitCast(std.mem.readVarInt(u40, bundle[0..@divExact(@bitSizeOf(PackedState), 8)], .big));
     var pos: usize = @divExact(@bitSizeOf(PackedState), 8);
 
-    const home_dir_len = std.mem.readInt(u16, bundle[@divExact(@bitSizeOf(PackedState), 8)..][0..2], .big);
+    const features: Features = @bitCast(std.mem.readVarInt(u16, bundle[pos..][0..2], .big));
+    pos += 2;
+
+    const home_dir_len = std.mem.readInt(u16, bundle[pos..][0..2], .big);
     pos += 2;
     const home_dir = bundle[pos..][0..home_dir_len];
     pos += home_dir_len;
@@ -295,6 +328,10 @@ pub fn loadBundle(allocator: std.mem.Allocator, exe_header: ExeHeader, bundle: [
     Zune.STATE.FORMAT.SHOW_RECURSIVE_TABLE = state.format.show_recursive_table;
     Zune.STATE.FORMAT.MAX_DEPTH = state.format.max_depth;
     Zune.STATE.FORMAT.DISPLAY_BUFFER_CONTENTS_MAX = state.format.display_buffer_contents_max;
+
+    inline for (@typeInfo(@TypeOf(Zune.FEATURES)).@"struct".fields) |field| {
+        @field(Zune.FEATURES, field.name) = @field(features, field.name);
+    }
 
     return .{
         .allocator = allocator,
