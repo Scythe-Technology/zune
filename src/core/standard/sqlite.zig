@@ -142,7 +142,7 @@ const LuaStatement = struct {
                 allocator.free(res);
 
             try L.Zpushvalue(.{
-                .lastInsertRowId = @as(i32, @truncate(ptr.db.db.getLastInsertRowId())),
+                .last_insert_row_id = @as(i32, @truncate(ptr.db.db.getLastInsertRowId())),
                 .changes = @as(i32, @truncate(ptr.db.db.countChanges())),
             });
 
