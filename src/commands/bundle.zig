@@ -266,6 +266,12 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
         },
     });
 
+    var features: Bundle.Features = .{};
+    inline for (@typeInfo(@TypeOf(Zune.FEATURES)).@"struct".fields) |field|
+        @field(features, field.name) = @field(Zune.FEATURES, field.name);
+
+    try Bundle.Features.write(writer, features);
+
     {
         const home_relative = if (home_dir.len > 0) try std.fs.path.relative(allocator, cwd_path, home_dir) else "";
         defer allocator.free(home_relative);
