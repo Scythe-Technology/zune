@@ -69,9 +69,9 @@ fn scanDir(
     dir: std.fs.Dir,
     opts: ScanOptions,
     path: []const u8,
+    recursive: bool,
 ) !void {
     var iter = dir.iterate();
-    const recursive = std.mem.indexOf(u8, opts.glob, "**") != null;
     while (try iter.next()) |entry| {
         const entry_path = try std.fs.path.join(allocator, &.{ path, entry.name });
         errdefer allocator.free(entry_path);
@@ -81,8 +81,8 @@ fn scanDir(
                     break :blk;
                 if (opts.kind == .script and File.getLuaFileType(entry.name) == null)
                     break :blk;
-                if (try map.fetchPut(allocator, entry_path, undefined)) |key_entry|
-                    allocator.free(key_entry.key);
+                if (try map.fetchPut(allocator, entry_path, undefined)) |_|
+                    allocator.free(entry_path);
                 continue;
             },
             .directory => {
@@ -90,7 +90,7 @@ fn scanDir(
                     break :blk;
                 var entry_dir = try dir.openDir(entry.name, .{ .iterate = true });
                 defer entry_dir.close();
-                try scanDir(allocator, map, entry_dir, opts, entry_path);
+                try scanDir(allocator, map, entry_dir, opts, entry_path, recursive);
             },
             else => {},
         }
@@ -108,7 +108,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     Zune.loadConfiguration(std.fs.cwd());
 
-    const home_dir = File.getHomeDir(Zune.STATE.ENV_MAP) orelse "";
+    var home_dir = File.getHomeDir(Zune.STATE.ENV_MAP) orelse "";
 
     var dir = try std.fs.cwd().openDir(".", .{ .iterate = true });
     defer dir.close();
@@ -131,8 +131,8 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
     defer FILES.deinit(allocator);
     defer for (FILES.keys()) |file| allocator.free(file);
 
-    const abs_entry_file = try std.fs.path.resolve(allocator, &.{ cwd_path, file_path });
     {
+        const abs_entry_file = try std.fs.path.resolve(allocator, &.{ cwd_path, file_path });
         errdefer allocator.free(abs_entry_file);
         try SCRIPTS.put(allocator, abs_entry_file, undefined);
     }
@@ -140,22 +140,23 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
     for (bundle_args[1..]) |arg| {
         const glob = try std.fs.path.resolve(allocator, &.{ cwd_path, arg });
         if (std.mem.indexOfScalar(u8, glob, '*')) |i| {
+            defer allocator.free(glob);
             if (comptime builtin.os.tag == .windows)
                 std.mem.replaceScalar(u8, glob, '\\', '/');
-            defer allocator.free(glob);
             var d = if (i > 0) try dir.openDir(glob[0..i], .{ .iterate = true }) else dir;
             defer if (i > 0) d.close();
             try scanDir(allocator, &SCRIPTS, d, .{
                 .glob = glob,
                 .kind = .script,
-            }, glob[0..i]);
+            }, glob[0..i], std.mem.indexOf(u8, glob[i..], "**") != null);
         } else {
             errdefer allocator.free(glob);
-            if (try SCRIPTS.fetchPut(allocator, glob, undefined)) |key_entry|
-                allocator.free(key_entry.key);
+            if (try SCRIPTS.fetchPut(allocator, glob, undefined)) |_|
+                allocator.free(glob);
         }
     }
 
+    var EXEC: ?[]const u8 = null;
     var BUILD_MODE: enum(u1) { debug, release } = .debug;
     var OUTPUT: union(enum) {
         stdout: void,
@@ -206,8 +207,14 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
                     BUILD_MODE = .release;
                 } else if (std.mem.eql(u8, flag, "--debug")) {
                     BUILD_MODE = .debug;
+                } else if (std.mem.eql(u8, flag, "--no_home")) {
+                    home_dir = cwd_path;
+                } else if (std.mem.startsWith(u8, flag, "--exe=") and flag.len > 6) {
+                    EXEC = flag[6..];
                 } else if (std.mem.startsWith(u8, flag, "--out=") and flag.len > 6) {
                     OUTPUT = .{ .path = flag[6..] };
+                } else if (std.mem.startsWith(u8, flag, "--home=") and flag.len > 7) {
+                    home_dir = flag[7..];
                 } else if (std.mem.startsWith(u8, flag, "--files=") and flag.len > 8) {
                     const glob = try std.fs.path.resolve(allocator, &.{ cwd_path, flag[8..] });
                     if (std.mem.indexOfScalar(u8, glob, '*')) |i| {
@@ -219,11 +226,11 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
                         try scanDir(allocator, &FILES, d, .{
                             .glob = glob,
                             .kind = .file,
-                        }, glob[0..i]);
+                        }, glob[0..i], std.mem.indexOf(u8, glob[i..], "**") != null);
                     } else {
                         errdefer allocator.free(glob);
-                        if (try FILES.fetchPut(allocator, glob, undefined)) |key_entry|
-                            allocator.free(key_entry.key);
+                        if (try FILES.fetchPut(allocator, glob, undefined)) |_|
+                            allocator.free(glob);
                     }
                 },
                 else => {
@@ -235,7 +242,20 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
         }
     };
 
-    const exe = try std.fs.openSelfExe(.{ .mode = .read_only });
+    const exe = if (EXEC) |path|
+        std.fs.cwd().openFile(path, .{ .mode = .read_only }) catch |err| switch (err) {
+            error.FileNotFound => {
+                Zune.debug.print("<red>error<clear>: executable '{s}' was not found\n", .{path});
+                std.process.exit(1);
+            },
+            error.IsDir => {
+                Zune.debug.print("<red>error<clear>: '{s}' is a directory, expected an executable file\n", .{path});
+                std.process.exit(1);
+            },
+            else => |e| return e,
+        }
+    else
+        try std.fs.openSelfExe(.{ .mode = .read_only });
     defer exe.close();
 
     const zune_build = try exe.readToEndAlloc(allocator, std.math.maxInt(usize));
@@ -276,7 +296,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
         const home_relative = if (home_dir.len > 0) try std.fs.path.relative(allocator, cwd_path, home_dir) else "";
         defer allocator.free(home_relative);
         if (std.mem.indexOfAny(u8, home_relative, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789") != null) {
-            Zune.debug.print("<yellow>Warning<clear>: resolved home directory relative path '{s}' contains normal characters\n", .{home_relative});
+            Zune.debug.print("<yellow>warning<clear>: resolved home directory relative path '{s}' contains normal characters\n", .{home_relative});
             Zune.debug.print("The bundled application may contain unwanted path names\n", .{});
         }
         try writer.writeInt(u16, @intCast(home_relative.len), .big);
@@ -286,7 +306,14 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
     for (SCRIPTS.keys()) |script| {
         const name = try std.fs.path.relative(allocator, cwd_path, script);
         defer allocator.free(name);
-        const script_contents = try std.fs.cwd().readFileAlloc(allocator, script, std.math.maxInt(usize));
+        const script_contents = std.fs.cwd().readFileAlloc(allocator, script, std.math.maxInt(usize)) catch |err| switch (err) {
+            error.FileNotFound => {
+                Zune.debug.print("<red>error<clear>: '{s}' was not found\n", .{name});
+                std.process.exit(1);
+            },
+            error.IsDir => continue, // skip directories
+            else => |e| return e,
+        };
         defer allocator.free(script_contents);
         const bytecode = try luau.Compiler.luacode.compile(allocator, script_contents, .{
             .optimizationLevel = Zune.STATE.LUAU_OPTIONS.OPTIMIZATION_LEVEL,
@@ -294,7 +321,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
         });
         defer allocator.free(bytecode);
         if (bytecode[0] == 0) {
-            Zune.debug.print("<red>CompileError<clear>: {s}{s}\n", .{ script, bytecode[1..] });
+            Zune.debug.print("<red>compile error<clear>: {s}{s}\n", .{ name, bytecode[1..] });
             std.process.exit(1);
         }
         switch (BUILD_MODE) {
@@ -305,7 +332,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     for (FILES.keys()) |file| {
         if (SCRIPTS.get(file)) |_| {
-            Zune.debug.print("<yellow>Warning<clear>: attempted to bundle an existing script '{s}' as file, skipping...\n", .{file});
+            Zune.debug.print("<yellow>warning<clear>: attempted to bundle an existing script '{s}' as file, skipping...\n", .{file});
             continue;
         }
         const name = try std.fs.path.relative(allocator, cwd_path, file);
@@ -346,14 +373,20 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
             else
                 path;
             defer if (comptime builtin.os.tag == .windows) if (OUTPUT == .default) allocator.free(file_name);
-            const handle = try std.fs.cwd().createFile(file_name, .{
+            const handle = std.fs.cwd().createFile(file_name, .{
                 .truncate = true,
                 .exclusive = OUTPUT == .default,
                 .mode = switch (comptime builtin.os.tag) {
                     .wasi, .windows => 0,
                     else => 0o755,
                 },
-            });
+            }) catch |err| switch (err) {
+                error.PathAlreadyExists => {
+                    Zune.debug.print("<red>error<clear>: '{s}' already exists, use '--out=<<file>>' to specify a path you allow to be written to\n", .{file_name});
+                    std.process.exit(1);
+                },
+                else => |e| return e,
+            };
             defer handle.close();
             try handle.writeAll(bundled_bytes.items);
             try handle.sync();
