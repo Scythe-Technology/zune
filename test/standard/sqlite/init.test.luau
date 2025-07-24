@@ -42,20 +42,20 @@ describe("SQLite", function()
                 [":id"] = "a",
                 [":age"] = 25,
             })).toBe(expect.similar({
-                lastInsertRowId = 1,
+                last_insert_row_id = 1,
                 changes = 1,
             }));
             expect(query:run({
                 [":id"] = "b",
                 [":age"] = 27,
             })).toBe(expect.similar({
-                lastInsertRowId = 2,
+                last_insert_row_id = 2,
                 changes = 1,
             }));
             expect(query:run({
                 [":id"] = "c",
             })).toBe(expect.similar({
-                lastInsertRowId = 3,
+                last_insert_row_id = 3,
                 changes = 1,
             }));
         end
@@ -223,26 +223,26 @@ describe("SQLite", function()
                 [":id"] = "a",
                 [":age"] = 21,
             })).toBe(expect.similar({
-                lastInsertRowId = 1,
+                last_insert_row_id = 1,
                 changes = 1,
             }));
             expect(query:run({
                 [":id"] = "b",
                 [":age"] = 20,
             })).toBe(expect.similar({
-                lastInsertRowId = 2,
+                last_insert_row_id = 2,
                 changes = 1,
             }));
             expect(query:run({
                 [":id"] = "c",
             })).toBe(expect.similar({
-                lastInsertRowId = 3,
+                last_insert_row_id = 3,
                 changes = 1,
             }));
             expect(query:run({
                 [":id"] = "d",
             })).toBe(expect.similar({
-                lastInsertRowId = 4,
+                last_insert_row_id = 4,
                 changes = 1,
             }));
         end
