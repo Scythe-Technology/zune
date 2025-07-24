@@ -289,7 +289,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
     if (args.len > 0) {
         var out: [6]u8 = undefined;
         if (args[0].len > out.len) {
-            std.debug.print("Unknown editor configuration (input too large)\n", .{});
+            std.debug.print("unknown editor configuration (input too large)\n", .{});
             return;
         }
         if (SetupMap.get(std.ascii.lowerString(&out, args[0]))) |editor| {

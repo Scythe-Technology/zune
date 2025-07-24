@@ -92,7 +92,7 @@ fn cmdRun(allocator: std.mem.Allocator, args: []const []const u8) !void {
                     };
                     Zune.STATE.LUAU_OPTIONS.OPTIMIZATION_LEVEL = level;
                 } else {
-                    std.debug.print("Flag: -O, Invalid Optimization level, usage: -O<N>\n", .{});
+                    std.debug.print("invalid optimization level, usage: -O<N>\n", .{});
                     std.process.exit(1);
                 },
                 'g' => {
@@ -105,7 +105,7 @@ fn cmdRun(allocator: std.mem.Allocator, args: []const []const u8) !void {
                         };
                         Zune.STATE.LUAU_OPTIONS.DEBUG_LEVEL = level;
                     } else {
-                        std.debug.print("Flag: -g, Invalid Debug level, usage: -g<N>\n", .{});
+                        std.debug.print("invalid debug level, usage: -g<N>\n", .{});
                         std.process.exit(1);
                     }
                 },
@@ -125,7 +125,7 @@ fn cmdRun(allocator: std.mem.Allocator, args: []const []const u8) !void {
                     LOAD_FLAGS.limbo = true;
                 },
                 else => {
-                    std.debug.print("Unknown flag: {s}\n", .{flag});
+                    std.debug.print("unknown flag: {s}\n", .{flag});
                     std.process.exit(1);
                 },
             },
@@ -213,7 +213,7 @@ fn cmdTest(allocator: std.mem.Allocator, args: []const []const u8) !void {
                     };
                     Zune.STATE.LUAU_OPTIONS.OPTIMIZATION_LEVEL = level;
                 } else {
-                    std.debug.print("Flag: -O, Invalid Optimization level, usage: -O<N>\n", .{});
+                    std.debug.print("invalid optimization level, usage: -O<N>\n", .{});
                     std.process.exit(1);
                 },
                 'g' => {
@@ -226,7 +226,7 @@ fn cmdTest(allocator: std.mem.Allocator, args: []const []const u8) !void {
                         };
                         Zune.STATE.LUAU_OPTIONS.DEBUG_LEVEL = level;
                     } else {
-                        std.debug.print("Flag: -g, Invalid Debug level, usage: -g<N>\n", .{});
+                        std.debug.print("invalid debug level, usage: -g<N>\n", .{});
                         std.process.exit(1);
                     }
                 },
@@ -240,7 +240,7 @@ fn cmdTest(allocator: std.mem.Allocator, args: []const []const u8) !void {
                     LOAD_FLAGS.limbo = true;
                 },
                 else => {
-                    std.debug.print("Unknown flag: {s}\n", .{flag});
+                    std.debug.print("unknown flag: {s}\n", .{flag});
                     std.process.exit(1);
                 },
             },
@@ -399,7 +399,7 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
                     };
                     Zune.STATE.LUAU_OPTIONS.OPTIMIZATION_LEVEL = level;
                 } else {
-                    std.debug.print("Flag: -O, Invalid Optimization level, usage: -O<N>\n", .{});
+                    std.debug.print("invalid optimization level, usage: -O<N>\n", .{});
                     std.process.exit(1);
                 },
                 '-' => if (std.mem.eql(u8, flag, "--once")) {
@@ -408,7 +408,7 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
                     LOAD_FLAGS.limbo = true;
                 },
                 else => {
-                    std.debug.print("Unknown flag: {s}\n", .{flag});
+                    std.debug.print("unknown flag: {s}\n", .{flag});
                     std.process.exit(1);
                 },
             },

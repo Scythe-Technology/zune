@@ -30,6 +30,12 @@ const INIT_CONFIG_FILE =
     \\#  You can use `zune luau list-fflags` to list all available FFlags.
     \\#[runtime.luau.fflags]
     \\#DebugCodegenOptSize = false
+    \\
+    \\# Features settings
+    \\#  This affects the features that are enabled in Zune.
+    \\#  mainly builtin libraries and features.
+    \\#[features.builtins]
+    \\#ffi = false
 ;
 
 fn Execute(_: std.mem.Allocator, args: []const []const u8) !void {

@@ -178,7 +178,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
                     };
                     Zune.STATE.LUAU_OPTIONS.OPTIMIZATION_LEVEL = level;
                 } else {
-                    std.debug.print("Flag: -O, Invalid Optimization level, usage: -O<N>\n", .{});
+                    std.debug.print("invalid optimization level, usage: -O<N>\n", .{});
                     std.process.exit(1);
                 },
                 'g' => {
@@ -191,7 +191,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
                         };
                         Zune.STATE.LUAU_OPTIONS.DEBUG_LEVEL = level;
                     } else {
-                        std.debug.print("Flag: -g, Invalid Debug level, usage: -g<N>\n", .{});
+                        std.debug.print("invalid debug level, usage: -g<N>\n", .{});
                         std.process.exit(1);
                     }
                 },
