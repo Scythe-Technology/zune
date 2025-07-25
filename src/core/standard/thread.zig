@@ -698,7 +698,7 @@ test "thread" {
     const TestRunner = @import("../utils/testrunner.zig");
 
     const testResult = try TestRunner.runTest(
-        TestRunner.newTestFile("standard/thread/init.test.luau"),
+        TestRunner.newTestFile("standard/thread/init.luau"),
         &.{},
         .{},
     );

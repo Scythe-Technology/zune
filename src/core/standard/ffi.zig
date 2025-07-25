@@ -2412,7 +2412,7 @@ test "ffi" {
     const TestRunner = @import("../utils/testrunner.zig");
 
     const testResult = try TestRunner.runTest(
-        TestRunner.newTestFile("standard/ffi/init.test.luau"),
+        TestRunner.newTestFile("standard/ffi/init.luau"),
         &.{},
         .{ .ref_leak_check = false },
     );
