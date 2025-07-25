@@ -324,9 +324,7 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
                 },
             };
         } else {
-            ML.load(module_src_path, file_content, 0) catch |err| switch (err) {
-                else => unreachable, // should not happen
-            };
+            ML.load(module_src_path, file_content, 0) catch unreachable; // should not error
             Engine.loadNative(ML);
         }
     }

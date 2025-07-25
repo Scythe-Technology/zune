@@ -339,9 +339,7 @@ pub fn main() !void {
                 else => return err,
             },
             .release => {
-                ML.load(b.entry.name, b.entry.data, 0) catch |err| switch (err) {
-                    else => unreachable, // should not happen
-                };
+                ML.load(b.entry.name, b.entry.data, 0) catch unreachable; // should not error
                 Runtime.Engine.loadNative(ML);
             },
         }

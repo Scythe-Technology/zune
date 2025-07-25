@@ -539,9 +539,7 @@ fn lua_fromModule(L: *VM.lua.State) !i32 {
             error.Syntax => return L.Zerror(ML.tostring(-1) orelse "UnknownError"),
         };
     } else {
-        ML.load(module_src_path, file_content, 0) catch |err| switch (err) {
-            else => unreachable, // should not happen
-        };
+        ML.load(module_src_path, file_content, 0) catch unreachable; // should not error
         Zune.Runtime.Engine.loadNative(ML);
     }
     return 1;
