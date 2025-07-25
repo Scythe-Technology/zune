@@ -60,7 +60,9 @@ fn splitArgs(args: []const []const u8) struct { []const []const u8, ?[]const []c
 
 const ScanOptions = struct {
     glob: []const u8,
-    kind: enum { script, file } = .script,
+    kind: Kind = .script,
+
+    pub const Kind = enum { script, file };
 };
 
 fn scanDir(
@@ -135,24 +137,36 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
         const abs_entry_file = try std.fs.path.resolve(allocator, &.{ cwd_path, file_path });
         errdefer allocator.free(abs_entry_file);
         try SCRIPTS.put(allocator, abs_entry_file, undefined);
-    }
 
-    for (bundle_args[1..]) |arg| {
-        const glob = try std.fs.path.resolve(allocator, &.{ cwd_path, arg });
-        if (std.mem.indexOfScalar(u8, glob, '*')) |i| {
-            defer allocator.free(glob);
-            if (comptime builtin.os.tag == .windows)
-                std.mem.replaceScalar(u8, glob, '\\', '/');
-            var d = if (i > 0) try dir.openDir(glob[0..i], .{ .iterate = true }) else dir;
-            defer if (i > 0) d.close();
-            try scanDir(allocator, &SCRIPTS, d, .{
-                .glob = glob,
-                .kind = .script,
-            }, glob[0..i], std.mem.indexOf(u8, glob[i..], "**") != null);
-        } else {
-            errdefer allocator.free(glob);
-            if (try SCRIPTS.fetchPut(allocator, glob, undefined)) |_|
-                allocator.free(glob);
+        var basket: *std.StringArrayHashMapUnmanaged(void) = &SCRIPTS;
+        var backet_kind: ScanOptions.Kind = .script;
+        for (bundle_args[1..]) |arg| {
+            if (std.mem.startsWith(u8, arg, "-")) {
+                if (std.mem.eql(u8, arg, "--files") or std.mem.eql(u8, arg, "-f")) {
+                    basket = &FILES;
+                    backet_kind = .file;
+                } else if (std.mem.eql(u8, arg, "--scripts") or std.mem.eql(u8, arg, "-s")) {
+                    basket = &SCRIPTS;
+                    backet_kind = .script;
+                }
+                continue;
+            }
+            const glob = try std.fs.path.resolve(allocator, &.{ cwd_path, arg });
+            if (std.mem.indexOfScalar(u8, glob, '*')) |i| {
+                defer allocator.free(glob);
+                if (comptime builtin.os.tag == .windows)
+                    std.mem.replaceScalar(u8, glob, '\\', '/');
+                var d = if (i > 0) try dir.openDir(glob[0..i], .{ .iterate = true }) else dir;
+                defer if (i > 0) d.close();
+                try scanDir(allocator, basket, d, .{
+                    .glob = glob,
+                    .kind = backet_kind,
+                }, glob[0..i], std.mem.indexOf(u8, glob[i..], "**") != null);
+            } else {
+                errdefer allocator.free(glob);
+                if (try basket.fetchPut(allocator, glob, undefined)) |_|
+                    allocator.free(glob);
+            }
         }
     }
 
@@ -215,23 +229,6 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
                     OUTPUT = .{ .path = flag[6..] };
                 } else if (std.mem.startsWith(u8, flag, "--home=") and flag.len > 7) {
                     home_dir = flag[7..];
-                } else if (std.mem.startsWith(u8, flag, "--files=") and flag.len > 8) {
-                    const glob = try std.fs.path.resolve(allocator, &.{ cwd_path, flag[8..] });
-                    if (std.mem.indexOfScalar(u8, glob, '*')) |i| {
-                        if (comptime builtin.os.tag == .windows)
-                            std.mem.replaceScalar(u8, glob, '\\', '/');
-                        defer allocator.free(glob);
-                        var d = if (i > 0) try dir.openDir(glob[0..i], .{ .iterate = true }) else dir;
-                        defer if (i > 0) d.close();
-                        try scanDir(allocator, &FILES, d, .{
-                            .glob = glob,
-                            .kind = .file,
-                        }, glob[0..i], std.mem.indexOf(u8, glob[i..], "**") != null);
-                    } else {
-                        errdefer allocator.free(glob);
-                        if (try FILES.fetchPut(allocator, glob, undefined)) |_|
-                            allocator.free(glob);
-                    }
                 },
                 else => {
                     std.debug.print("Unknown flag: {s}\n", .{flag});
@@ -420,7 +417,7 @@ test "cmdBundle" {
         defer allocator.free(exe_path);
         const sub_path = try std.mem.concat(allocator, u8, &.{ "--out=", exe_path });
         defer allocator.free(sub_path);
-        const args: []const []const u8 = &.{ sub_path, "--files=test/runner.zig", "test/cli/bundle.luau" };
+        const args: []const []const u8 = &.{ sub_path, "test/cli/bundle.luau", "--files", "test/runner.zig" };
 
         try Execute(allocator, args);
 
@@ -440,7 +437,7 @@ test "cmdBundle" {
         defer allocator.free(exe_path);
         const sub_path = try std.mem.concat(allocator, u8, &.{ "--out=", exe_path });
         defer allocator.free(sub_path);
-        const args: []const []const u8 = &.{ sub_path, "--files=test/*.zig", "test/cli/bundle.luau" };
+        const args: []const []const u8 = &.{ sub_path, "test/cli/bundle.luau", "-f", "test/*.zig" };
 
         try Execute(allocator, args);
 
