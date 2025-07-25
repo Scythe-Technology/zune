@@ -274,9 +274,14 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
             }
             L.pop(1); // drop: nil
         }
-        if (Zune.STATE.BUNDLE) |*bundle|
-            break :blk try File.searchLuauFileBundle(&src_path_buf, bundle, script_path);
-        break :blk try File.searchLuauFile(&src_path_buf, cwd, script_path);
+
+        break :blk (if (Zune.STATE.BUNDLE) |*bundle|
+            File.searchLuauFileBundle(&src_path_buf, bundle, script_path)
+        else
+            File.searchLuauFile(&src_path_buf, cwd, script_path)) catch |err| switch (err) {
+            error.RedundantFileExtension => return L.Zerrorf("redundant file extension, remove '{s}'", .{std.fs.path.extension(script_path)}),
+            else => return err,
+        };
     };
     defer search_result.deinit();
 
