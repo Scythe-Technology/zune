@@ -1,4 +1,6 @@
-<img align="center" height="296px" src="https://raw.githubusercontent.com/Scythe-Technology/zune-docs/master/public/logo-dark.svg" alt="Zoooooom!" />
+<p align="center">
+    <a href="https://zune.com"><img height="296px" src="https://raw.githubusercontent.com/Scythe-Technology/zune-docs/master/public/logo-dark.svg" alt="Zoooooom"/></a>
+</p>
 <div align="center">
     <a href="https://github.com/Scythe-Technology/Zune/releases" target="_blank"><img src="https://img.shields.io/badge/x64,_arm64-Linux?style=flat-square&logo=linux&logoColor=white&label=Linux&color=orange"/>
     <img src="https://img.shields.io/badge/x64,_arm64-macOs?style=flat-square&logo=apple&label=macOs&color=white"/>
