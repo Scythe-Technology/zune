@@ -35,7 +35,21 @@ const INIT_CONFIG_FILE =
     \\#  This affects the features that are enabled in Zune.
     \\#  mainly builtin libraries and features.
     \\#[features.builtins]
-    \\#ffi = false
+    \\#fs = true
+    \\#io = true
+    \\#net = true
+    \\#process = true
+    \\#task = true
+    \\#luau = true
+    \\#serde = true
+    \\#crypto = true
+    \\#datetime = true
+    \\#regex = true
+    \\#sqlite = true
+    \\#require = true
+    \\#random = true
+    \\#thread = true
+    \\#ffi = true
 ;
 
 fn Execute(_: std.mem.Allocator, args: []const []const u8) !void {
