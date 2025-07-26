@@ -326,7 +326,7 @@ fn cmdEval(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     Zune.loadConfiguration(std.fs.cwd());
 
-    const fileContent = args[0];
+    const file_content = args[0];
 
     var L = try luau.init(&allocator);
     defer L.deinit();
@@ -345,13 +345,13 @@ fn cmdEval(allocator: std.mem.Allocator, args: []const []const u8) !void {
     try ML.Lsandboxthread();
 
     try Engine.setLuaFileContext(ML, .{
-        .source = fileContent,
+        .source = file_content,
         .main = true,
     });
 
     ML.setsafeenv(VM.lua.GLOBALSINDEX, true);
 
-    Engine.loadModule(ML, "@EVAL", fileContent, null) catch |err| switch (err) {
+    Engine.loadModule(ML, "@EVAL", file_content, null) catch |err| switch (err) {
         error.Syntax => {
             std.debug.print("SyntaxError: {s}\n", .{ML.tostring(-1) orelse "UnknownError"});
             std.process.exit(1);

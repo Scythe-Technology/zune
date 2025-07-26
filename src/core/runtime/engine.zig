@@ -34,7 +34,6 @@ pub fn loadModule(L: *VM.lua.State, name: [:0]const u8, content: []const u8, cOp
 const FileContext = struct {
     source: ?[]const u8,
     main: bool = false,
-    thread: bool = false,
 };
 
 const StackInfo = struct {
@@ -49,7 +48,6 @@ pub fn setLuaFileContext(L: *VM.lua.State, ctx: FileContext) !void {
     try L.Zpushvalue(.{
         .source = if (Zune.STATE.USE_DETAILED_ERROR or Zune.STATE.RUN_MODE == .Test) ctx.source else null,
         .main = ctx.main,
-        .thread = ctx.thread,
     });
 
     try L.rawsetfield(VM.lua.GLOBALSINDEX, "_FILE");

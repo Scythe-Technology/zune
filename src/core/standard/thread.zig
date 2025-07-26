@@ -560,7 +560,6 @@ fn lua_fromBytecode(L: *VM.lua.State) !i32 {
 
     try Zune.Runtime.Engine.setLuaFileContext(ML, .{
         .source = null,
-        .thread = true,
         .main = true,
     });
 
