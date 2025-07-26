@@ -9,7 +9,7 @@
 
 <br/>
 
-<p align="left">
+<p align="center">
 A <a href="https://luau.org/">Luau</a> runtime, similar to <a href="https://lune-org.github.io/docs">Lune</a>, <a href="https://nodejs.org">Node</a>, or <a href="https://bun.sh">Bun</a>.
 </p>
 
