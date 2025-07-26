@@ -27,13 +27,13 @@ describe("require", function()
         local relative = zune.fs.path.relative(zune.fs.path.dirname(this_path) or "./", path);
         expect(relative).toBe(`module{_7}bar`);
         expect(zune.require.getCached(relative)).toBeNil();
-        local bar = require(`./{relative}`);
+        local bar = require(`./require/{relative}`);
         expect(bar).toBe(expect.similar({"bar"}));
         expect(zune.require.getCached(path)).toBe(bar);
     end)
     test("custom config", function()
         local path = zune.require.navigate("@test/foo", this_path, RelativeAlias);
-        expect(path).toBe(`test{_7}standard{_7}require{_7}foo`);
+        expect(path).toBe(`test{_7}standard{_7}foo`);
     end)
     test("custom config and context", function()
         do

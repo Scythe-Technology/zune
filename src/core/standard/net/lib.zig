@@ -110,7 +110,7 @@ test "net" {
     const TestRunner = @import("../../utils/testrunner.zig");
 
     const testResult = try TestRunner.runTest(
-        TestRunner.newTestFile("standard/net/init.test.luau"),
+        TestRunner.newTestFile("standard/net/init.luau"),
         &.{},
         .{},
     );

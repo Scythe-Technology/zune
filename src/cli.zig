@@ -15,9 +15,8 @@ pub fn start(args: [][:0]u8) !void {
     if (CommandMap.get(args[1])) |command|
         return command.execute(Zune.DEFAULT_ALLOCATOR, args[2..]);
 
-    std.debug.print("Unknown command, try 'help' or '-h'\n", .{});
-
-    return;
+    std.debug.print("unknown command, try 'help' or '-h'\n", .{});
+    std.process.exit(1);
 }
 
 test {

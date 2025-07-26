@@ -33,7 +33,13 @@ describe("Require", function()
         test("Bad Syntax #2", function()
             local ok, res = pcall(require, "./samples/simpleLib2.luau");
             expect(ok).toBeFalsy();
-            expect(res).toBe(`RedundantFileExtension`);
+            expect(res).toBe(`redundant file extension, remove '.luau'`);
+        end)
+
+        test("Bad Syntax #3", function()
+            local ok, res = pcall(require, "./samples/simpleLib2.lua");
+            expect(ok).toBeFalsy();
+            expect(res).toBe(`redundant file extension, remove '.lua'`);
         end)
 
         local SEP = if zune.process.os == "windows" then "\\" else "/"

@@ -11,8 +11,23 @@ local aead = crypto.aead;
 local chacha_poly = aead.chacha_poly;
 
 type Input = buffer | string;
+local function getsize(input: Input): number
+    return if (type(input) == "buffer") then buffer.len(input) else #input;
+end
 local function examine(algo: any, key: Input, nonce: Input, tests: {{data: Input, ad: Input?, cipher: string, tag: string}})
     for _, test in tests do
+        expect(function()
+            algo.encrypt(test.data, "", nonce, test.ad);
+        end).toThrow(`invalid key length (expected size {getsize(key)})`);
+        expect(function()
+            algo.encrypt(test.data, buffer.create(0), nonce, test.ad);
+        end).toThrow(`invalid key length (expected size {getsize(key)})`);
+        expect(function()
+            algo.encrypt(test.data, key, "", test.ad);
+        end).toThrow(`invalid nonce length (expected size {getsize(nonce)})`);
+        expect(function()
+            algo.encrypt(test.data, key, buffer.create(0), test.ad);
+        end).toThrow(`invalid nonce length (expected size {getsize(nonce)})`);
         local encrypted = algo.encrypt(test.data, key, nonce, test.ad);
         expect(encrypted).toBe(expect.similar({
             cipher = expect.type("buffer"),
@@ -32,9 +47,27 @@ local function examine(algo: any, key: Input, nonce: Input, tests: {{data: Input
             end).toThrow("AuthenticationFailed");
         else
             expect(function()
-                 algo.decrypt(encrypted.cipher, encrypted.tag, key, nonce, "\0\0\0\0");
+                algo.decrypt(encrypted.cipher, encrypted.tag, key, nonce, "\0\0\0\0");
             end).toThrow("AuthenticationFailed");
         end
+        expect(function()
+            algo.decrypt(encrypted.cipher, "", key, nonce, "\0\0\0\0");
+        end).toThrow(`invalid tag length (expected size {getsize(encrypted.tag)})`);
+        expect(function()
+            algo.decrypt(encrypted.cipher, buffer.create(0), key, nonce, "\0\0\0\0");
+        end).toThrow(`invalid tag length (expected size {getsize(encrypted.tag)})`);
+        expect(function()
+            algo.decrypt(encrypted.cipher, encrypted.tag, "", nonce, "\0\0\0\0");
+        end).toThrow(`invalid key length (expected size {getsize(key)})`);
+        expect(function()
+            algo.decrypt(encrypted.cipher, encrypted.tag, buffer.create(0), nonce, "\0\0\0\0");
+        end).toThrow(`invalid key length (expected size {getsize(key)})`);
+        expect(function()
+            algo.decrypt(encrypted.cipher, encrypted.tag, key, "", "\0\0\0\0");
+        end).toThrow(`invalid nonce length (expected size {getsize(nonce)})`);
+        expect(function()
+            algo.decrypt(encrypted.cipher, encrypted.tag, key, buffer.create(0), "\0\0\0\0");
+        end).toThrow(`invalid nonce length (expected size {getsize(nonce)})`);
     end
 end
 

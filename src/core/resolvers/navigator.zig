@@ -281,7 +281,7 @@ pub fn navigate(allocator: std.mem.Allocator, context: anytype, from: []const u8
                 std.mem.replaceScalar(u8, ext_path, '\\', '/');
                 return try context.resolvePathAlloc(
                     allocator,
-                    dirname(from) orelse ".",
+                    adjusted,
                     ext_path,
                 );
             }
@@ -433,6 +433,13 @@ test "home context" {
     try navigateTest(allocator, &context, "packages/json", "main.luau", "@packages/json");
     try navigateTest(allocator, &context, "packages", "main.luau", "@packages");
     try navigateTest(allocator, &context, "packages", "main.luau", "@packages/");
+
+    try navigateTest(allocator, &context, "script/test", "script/init.luau", "@self/test");
+    try navigateTest(allocator, &context, "main/test", "main.luau", "@self/test");
+    try navigateTest(allocator, &context, "src/child", "src/init.luau", "@self/child");
+    try navigateTest(allocator, &context, "main", "main.luau", "@self");
+    try navigateTest(allocator, &context, "main/sub/child", "main.luau", "@self/sub/child");
+    try navigateTest(allocator, &context, "test", "main.luau", "@self/../test");
 
     try navigateTest(allocator, &context, "/packages/json", "/script/init.luau", "@packages/json");
     try navigateTest(allocator, &context, "/packages/json", "/main.luau", "@packages/json");

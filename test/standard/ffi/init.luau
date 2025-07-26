@@ -459,14 +459,14 @@ describe("FFI", function()
                     { y = ffi.types.i32 },
                     { [3] = ffi.types.i32 } :: any,
                 });
-            end).toThrow("InvalidFieldName");
+            end).toThrow("struct field name must be a string (got number)");
             expect(function()
                 ffi.struct({
                     { x = ffi.types.i32 },
                     { y = ffi.types.i32 },
                     { z = ffi.types.i32, b = ffi.types.i32 },
                 });
-            end).toThrow("ExtraFieldsFound");
+            end).toThrow("struct field contains more than one field type");
         end)
     end)
 

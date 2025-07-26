@@ -12,12 +12,12 @@ pub fn lua_genEncryptFn(comptime algorithm: anytype) VM.zapi.LuaZigFn(anyerror!i
             const key = try L.Zcheckvalue([]const u8, 2, null);
 
             if (key.len != algorithm.key_length)
-                return L.Zerrorf("InvalidKeyLength (key length != {d})", .{algorithm.key_length});
+                return L.Zerrorf("invalid key length (expected size {d})", .{algorithm.key_length});
 
             const nonce = try L.Zcheckvalue([]const u8, 3, null);
 
             if (nonce.len != algorithm.nonce_length)
-                return L.Zerrorf("InvalidNonceLength (nonce length != {d})", .{algorithm.nonce_length});
+                return L.Zerrorf("invalid nonce length (expected size {d})", .{algorithm.nonce_length});
 
             const ad = try L.Zcheckvalue(?[]const u8, 4, null) orelse "";
 
@@ -54,17 +54,17 @@ pub fn lua_genDecryptFn(comptime algorithm: anytype) VM.zapi.LuaZigFn(anyerror!i
             const tag = try L.Zcheckvalue([]const u8, 2, null);
 
             if (tag.len != algorithm.tag_length)
-                return L.Zerrorf("InvalidTagLength (tag length != {})", .{algorithm.tag_length});
+                return L.Zerrorf("invalid tag length (expected size {})", .{algorithm.tag_length});
 
             const key = try L.Zcheckvalue([]const u8, 3, null);
 
             if (key.len != algorithm.key_length)
-                return L.Zerrorf("InvalidKeyLength (key length != {})", .{algorithm.key_length});
+                return L.Zerrorf("invalid key length (expected size {})", .{algorithm.key_length});
 
             const nonce = try L.Zcheckvalue([]const u8, 4, null);
 
             if (nonce.len != algorithm.nonce_length)
-                return L.Zerrorf("InvalidNonceLength (nonce length != {})", .{algorithm.nonce_length});
+                return L.Zerrorf("invalid nonce length (expected size {})", .{algorithm.nonce_length});
 
             const ad = try L.Zcheckvalue(?[]const u8, 5, null) orelse "";
 

@@ -454,7 +454,7 @@ test "sqlite" {
     const TestRunner = @import("../utils/testrunner.zig");
 
     const testResult = try TestRunner.runTest(
-        TestRunner.newTestFile("standard/sqlite/init.test.luau"),
+        TestRunner.newTestFile("standard/sqlite/init.luau"),
         &.{},
         .{},
     );

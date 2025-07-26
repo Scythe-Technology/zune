@@ -5,7 +5,7 @@ const Zune = @import("zune");
 
 const command = @import("lib.zig");
 
-const USAGE = "Usage: luau <list-fflags | version>\n";
+const USAGE = "usage: luau <list-fflags | version>\n";
 fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
     if (args.len != 1) {
         return std.debug.print(USAGE, .{});

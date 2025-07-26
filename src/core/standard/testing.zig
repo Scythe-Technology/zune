@@ -205,10 +205,7 @@ pub fn finish_testing(L: *VM.lua.State, rawstart: f64) !TestResult {
 pub fn runTestAsync(L: *VM.lua.State, sched: *Scheduler) !TestResult {
     const start = VM.lperf.clock();
 
-    try Engine.runAsync(L, sched, .{
-        .cleanUp = true,
-        .mode = .Test,
-    });
+    Engine.runAsync(L, sched, .{ .cleanUp = true, .mode = .Test }) catch {};
 
     return try finish_testing(L, start);
 }
