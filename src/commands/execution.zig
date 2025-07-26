@@ -68,7 +68,7 @@ fn cmdRun(allocator: std.mem.Allocator, args: []const []const u8) !void {
     const run_args, const flags = splitArgs(args);
 
     if (run_args.len < 1) {
-        std.debug.print("Usage: run [OPTIONS] <luau file>\n", .{});
+        Zune.debug.print("<red>usage<clear>: run [OPTIONS] <<luau file>>\n", .{});
         std.process.exit(1);
     }
 
@@ -92,7 +92,7 @@ fn cmdRun(allocator: std.mem.Allocator, args: []const []const u8) !void {
                     };
                     Zune.STATE.LUAU_OPTIONS.OPTIMIZATION_LEVEL = level;
                 } else {
-                    std.debug.print("invalid optimization level, usage: -O<N>\n", .{});
+                    Zune.debug.print("<red>error<clear>: invalid optimization level, usage: -O<<N>>\n", .{});
                     std.process.exit(1);
                 },
                 'g' => {
@@ -105,7 +105,7 @@ fn cmdRun(allocator: std.mem.Allocator, args: []const []const u8) !void {
                         };
                         Zune.STATE.LUAU_OPTIONS.DEBUG_LEVEL = level;
                     } else {
-                        std.debug.print("invalid debug level, usage: -g<N>\n", .{});
+                        Zune.debug.print("<red>error<clear>: invalid debug level, usage: -g<<N>>\n", .{});
                         std.process.exit(1);
                     }
                 },
@@ -125,7 +125,7 @@ fn cmdRun(allocator: std.mem.Allocator, args: []const []const u8) !void {
                     LOAD_FLAGS.limbo = true;
                 },
                 else => {
-                    std.debug.print("unknown flag: {s}\n", .{flag});
+                    Zune.debug.print("<red>error<clear>: unknown flag '{s}'\n", .{flag});
                     std.process.exit(1);
                 },
             },
@@ -138,7 +138,7 @@ fn cmdRun(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     const file_src_path, const file_content = getFile(allocator, dir, module) catch |err| switch (err) {
         error.FileNotFound => {
-            std.debug.print("file not found: {s}\n", .{module});
+            Zune.debug.print("<red>error<clear>: file not found '{s}'\n", .{module});
             std.process.exit(1);
         },
         else => return err,
@@ -190,7 +190,7 @@ fn cmdTest(allocator: std.mem.Allocator, args: []const []const u8) !void {
     const run_args, const flags = splitArgs(args);
 
     if (run_args.len < 1) {
-        std.debug.print("Usage: test <luau file>\n", .{});
+        Zune.debug.print("<red>usage<clear>: test <<luau file>>\n", .{});
         std.process.exit(1);
     }
 
@@ -213,7 +213,7 @@ fn cmdTest(allocator: std.mem.Allocator, args: []const []const u8) !void {
                     };
                     Zune.STATE.LUAU_OPTIONS.OPTIMIZATION_LEVEL = level;
                 } else {
-                    std.debug.print("invalid optimization level, usage: -O<N>\n", .{});
+                    Zune.debug.print("<red>error<clear>: invalid optimization level, usage: -O<<N>>\n", .{});
                     std.process.exit(1);
                 },
                 'g' => {
@@ -226,7 +226,7 @@ fn cmdTest(allocator: std.mem.Allocator, args: []const []const u8) !void {
                         };
                         Zune.STATE.LUAU_OPTIONS.DEBUG_LEVEL = level;
                     } else {
-                        std.debug.print("invalid debug level, usage: -g<N>\n", .{});
+                        Zune.debug.print("<red>error<clear>: invalid debug level, usage: -g<<N>>\n", .{});
                         std.process.exit(1);
                     }
                 },
@@ -240,7 +240,7 @@ fn cmdTest(allocator: std.mem.Allocator, args: []const []const u8) !void {
                     LOAD_FLAGS.limbo = true;
                 },
                 else => {
-                    std.debug.print("unknown flag: {s}\n", .{flag});
+                    Zune.debug.print("<red>error<clear>: unknown flag '{s}'\n", .{flag});
                     std.process.exit(1);
                 },
             },
@@ -253,7 +253,7 @@ fn cmdTest(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     const file_src_path, const file_content = getFile(allocator, dir, module) catch |err| switch (err) {
         error.FileNotFound => {
-            std.debug.print("file not found: {s}\n", .{module});
+            Zune.debug.print("<red>error<clear>: file not found '{s}'\n", .{module});
             std.process.exit(1);
         },
         else => return err,
@@ -320,7 +320,7 @@ fn cmdTest(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
 fn cmdEval(allocator: std.mem.Allocator, args: []const []const u8) !void {
     if (args.len < 1) {
-        std.debug.print("Usage: eval <luau>\n", .{});
+        Zune.debug.print("<red>usage<clear>: eval <<luau>>\n", .{});
         std.process.exit(1);
     }
 
@@ -374,7 +374,7 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
     const run_args, const flags = splitArgs(args);
 
     if (run_args.len < 1) {
-        std.debug.print("Usage: debug [OPTIONS] <luau file>\n", .{});
+        Zune.debug.print("<red>usage<clear>: debug [OPTIONS] <<luau file>>\n", .{});
         std.process.exit(1);
     }
 
@@ -399,7 +399,7 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
                     };
                     Zune.STATE.LUAU_OPTIONS.OPTIMIZATION_LEVEL = level;
                 } else {
-                    std.debug.print("invalid optimization level, usage: -O<N>\n", .{});
+                    Zune.debug.print("<red>error<clear>: invalid optimization level, usage: -O<<N>>\n", .{});
                     std.process.exit(1);
                 },
                 '-' => if (std.mem.eql(u8, flag, "--once")) {
@@ -408,7 +408,7 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
                     LOAD_FLAGS.limbo = true;
                 },
                 else => {
-                    std.debug.print("unknown flag: {s}\n", .{flag});
+                    Zune.debug.print("<red>error<clear>: unknown flag '{s}'\n", .{flag});
                     std.process.exit(1);
                 },
             },
@@ -425,18 +425,13 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     const file_src_path, const file_content = getFile(allocator, dir, module) catch |err| switch (err) {
         error.FileNotFound => {
-            std.debug.print("file not found: {s}\n", .{module});
+            Zune.debug.print("<red>error<clear>: file not found '{s}'\n", .{module});
             std.process.exit(1);
         },
         else => return err,
     };
     defer allocator.free(file_src_path);
     defer allocator.free(file_content);
-
-    if (file_content.len == 0) {
-        std.debug.print("File is empty: {s}\n", .{run_args[0]});
-        std.process.exit(1);
-    }
 
     while (true) {
         defer Debugger.DEBUG.dead = false;

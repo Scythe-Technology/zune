@@ -340,7 +340,7 @@ fn toBase64(allocator: std.mem.Allocator, input: []const u8) !struct { []u8, []c
 
 fn promptOpBreak(allocator: std.mem.Allocator, break_args: []const u8) !void {
     if (break_args.len <= 0) {
-        printResult("<red>Usage<clear>: break <<command>>\n", .{});
+        printResult("<red>usage<clear>: break <<command>>\n", .{});
         printResult("  <dim>try 'break help'<clear>\n", .{});
         return;
     }
@@ -358,13 +358,13 @@ fn promptOpBreak(allocator: std.mem.Allocator, break_args: []const u8) !void {
         },
         .add, .remove => |k| {
             if (rest.len <= 0)
-                return printResult("<red>Usage<clear>: break {s} <<file>>:<<line>>\n", .{command_input});
+                return printResult("<red>usage<clear>: break {s} <<file>>:<<line>>\n", .{command_input});
             const dir = std.fs.cwd();
             var args = std.mem.splitBackwardsScalar(u8, rest, ':');
             const line_str = std.mem.trim(u8, args.first(), " ");
             const file_str = std.mem.trim(u8, args.rest(), " ");
             if (line_str.len == 0 or file_str.len == 0)
-                return printResult("<red>Usage<clear>: break {s} <<file>>:<<line>>\n", .{command_input});
+                return printResult("<red>usage<clear>: break {s} <<file>>:<<line>>\n", .{command_input});
             const line = std.fmt.parseInt(i32, line_str, 10) catch |err| {
                 return printResult("Line Parse Error: {}\n", .{err});
             };
@@ -512,7 +512,7 @@ fn variableJsonDisassemble(allocator: std.mem.Allocator, L: *VM.lua.State, iter:
 
 fn promptOpLocals(L: *VM.lua.State, allocator: std.mem.Allocator, locals_args: []const u8) !void {
     if (locals_args.len <= 0) {
-        printResult("<red>Usage<clear>: locals <<command>>\n", .{});
+        printResult("<red>usage<clear>: locals <<command>>\n", .{});
         printResult("  <dim>try 'locals help'<clear>\n", .{});
         return;
     }
@@ -615,7 +615,7 @@ fn promptOpLocals(L: *VM.lua.State, allocator: std.mem.Allocator, locals_args: [
 
 fn promptOpParams(L: *VM.lua.State, allocator: std.mem.Allocator, params_args: []const u8) !void {
     if (params_args.len <= 0) {
-        printResult("<red>Usage<clear>: params <<command>>\n", .{});
+        printResult("<red>usage<clear>: params <<command>>\n", .{});
         printResult("  <dim>try 'params help'<clear>\n", .{});
         return;
     }
@@ -733,7 +733,7 @@ fn promptOpParams(L: *VM.lua.State, allocator: std.mem.Allocator, params_args: [
 
 fn promptOpUpvalues(L: *VM.lua.State, allocator: std.mem.Allocator, params_args: []const u8) !void {
     if (params_args.len <= 0) {
-        printResult("<red>Usage<clear>: upvalues <<command>>\n", .{});
+        printResult("<red>usage<clear>: upvalues <<command>>\n", .{});
         printResult("  <dim>try 'upvalues help'<clear>\n", .{});
         return;
     }
@@ -845,7 +845,7 @@ fn promptOpUpvalues(L: *VM.lua.State, allocator: std.mem.Allocator, params_args:
 
 fn promptOpGlobals(L: *VM.lua.State, allocator: std.mem.Allocator, globals_args: []const u8) !void {
     if (globals_args.len <= 0) {
-        printResult("<red>Usage<clear>: globals <<command>>\n", .{});
+        printResult("<red>usage<clear>: globals <<command>>\n", .{});
         printResult("  <dim>try 'globals help'<clear>\n", .{});
         return;
     }

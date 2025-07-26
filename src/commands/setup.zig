@@ -237,7 +237,7 @@ fn setup(editor: EditorKind, allocator: std.mem.Allocator, setupInfo: SetupInfo)
     std.debug.print("Saved configuration to '{s}'\n", .{settings_file_path});
 }
 
-const USAGE = "Usage: setup <nvim | zed | vscode | emacs>\n";
+const USAGE = "usage: setup <nvim | zed | vscode | emacs>\n";
 fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
     var envMap = try std.process.getEnvMap(allocator);
     defer envMap.deinit();

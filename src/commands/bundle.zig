@@ -111,7 +111,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
     const bundle_args, const flags = splitArgs(args);
 
     if (bundle_args.len < 1) {
-        std.debug.print("Usage: bundle [flags] <luau file> [...luau files]\n", .{});
+        Zune.debug.print("<red>usage<clear>: bundle [flags] <<luau file>> [...luau files]\n", .{});
         return;
     }
 
@@ -127,7 +127,13 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
     const cwd_path = try dir.realpathAlloc(allocator, ".");
     defer allocator.free(cwd_path);
 
-    const entry_file, const contents = try getFile(allocator, dir, module);
+    const entry_file, const contents = getFile(allocator, dir, module) catch |err| switch (err) {
+        error.FileNotFound => {
+            Zune.debug.print("<red>error<clear>: file not found '{s}'\n", .{module});
+            std.process.exit(1);
+        },
+        else => return err,
+    };
     defer allocator.free(entry_file);
     defer allocator.free(contents);
 
@@ -244,7 +250,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
                     };
                 },
                 else => {
-                    Zune.debug.print("<red>error<clear>: unknown flag: {s}\n", .{flag});
+                    Zune.debug.print("<red>error<clear>: unknown flag '{s}'\n", .{flag});
                     std.process.exit(1);
                 },
             },

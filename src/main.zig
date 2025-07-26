@@ -126,12 +126,12 @@ pub fn loadConfiguration(dir: std.fs.Dir) void {
     const allocator = DEFAULT_ALLOCATOR;
     const config_content = dir.readFileAlloc(allocator, "zune.toml", std.math.maxInt(usize)) catch |err| switch (err) {
         error.FileNotFound => return,
-        else => return std.debug.print("Failed to read zune.toml: {}\n", .{err}),
+        else => return std.debug.print("failed to read 'zune.toml': {}\n", .{err}),
     };
     defer allocator.free(config_content);
 
     var zconfig = toml.parse(allocator, config_content) catch |err| {
-        return std.debug.print("Failed to parse zune.toml: {}\n", .{err});
+        return std.debug.print("failed to parse 'zune.toml': {}\n", .{err});
     };
     defer zconfig.deinit(allocator);
 
