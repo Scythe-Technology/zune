@@ -100,6 +100,13 @@ fn scanDir(
     }
 }
 
+const COMPRESSION_MAP = std.StaticStringMap(Bundle.Section.Compression).initComptime(.{
+    .{ "none", .none },
+    .{ "zlib", .zlib },
+    .{ "lz4", .lz4 },
+    .{ "zstd", .zstd },
+});
+
 fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
     const bundle_args, const flags = splitArgs(args);
 
@@ -171,6 +178,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
     }
 
     var EXEC: ?[]const u8 = null;
+    var COMPRESSION: Bundle.Section.Compression = .none;
     var BUILD_MODE: enum(u1) { debug, release } = .debug;
     var OUTPUT: union(enum) {
         stdout: void,
@@ -192,7 +200,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
                     };
                     Zune.STATE.LUAU_OPTIONS.OPTIMIZATION_LEVEL = level;
                 } else {
-                    std.debug.print("invalid optimization level, usage: -O<N>\n", .{});
+                    Zune.debug.print("<red>error<clear>: invalid optimization level, usage: -O<<N>>\n", .{});
                     std.process.exit(1);
                 },
                 'g' => {
@@ -205,7 +213,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
                         };
                         Zune.STATE.LUAU_OPTIONS.DEBUG_LEVEL = level;
                     } else {
-                        std.debug.print("invalid debug level, usage: -g<N>\n", .{});
+                        Zune.debug.print("<red>error<clear>: invalid debug level, usage: -g<<N>>\n", .{});
                         std.process.exit(1);
                     }
                 },
@@ -229,9 +237,14 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
                     OUTPUT = .{ .path = flag[6..] };
                 } else if (std.mem.startsWith(u8, flag, "--home=") and flag.len > 7) {
                     home_dir = flag[7..];
+                } else if (std.mem.startsWith(u8, flag, "--compression=") and flag.len > 14) {
+                    COMPRESSION = COMPRESSION_MAP.get(flag[14..]) orelse {
+                        Zune.debug.print("<red>error<clear>: unknown compression type '{s}'\n", .{flag[14..]});
+                        std.process.exit(1);
+                    };
                 },
                 else => {
-                    std.debug.print("Unknown flag: {s}\n", .{flag});
+                    Zune.debug.print("<red>error<clear>: unknown flag: {s}\n", .{flag});
                     std.process.exit(1);
                 },
             },
@@ -321,10 +334,20 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
             Zune.debug.print("<red>compile error<clear>: {s}{s}\n", .{ name, bytecode[1..] });
             std.process.exit(1);
         }
-        switch (BUILD_MODE) {
-            .debug => try Bundle.Section.writeScript(writer, name, script_contents),
-            .release => try Bundle.Section.writeScript(writer, name, bytecode),
-        }
+        (switch (BUILD_MODE) {
+            .debug => Bundle.Section.writeScript(writer, name, script_contents),
+            .release => Bundle.Section.writeScript(writer, name, bytecode),
+        }) catch |err| switch (err) {
+            error.NameTooLong => {
+                Zune.debug.print("<red>error<clear>: script name '{s}' is too long to bundle\n", .{name});
+                std.process.exit(1);
+            },
+            error.DataTooLarge => {
+                Zune.debug.print("<red>error<clear>: script '{s}' is too large to bundle\n", .{name});
+                std.process.exit(1);
+            },
+            else => return err,
+        };
     }
 
     for (FILES.keys()) |file| {
@@ -336,18 +359,34 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
         defer allocator.free(name);
         const file_contents = try std.fs.cwd().readFileAlloc(allocator, file, std.math.maxInt(usize));
         defer allocator.free(file_contents);
-        try Bundle.Section.writeFile(allocator, writer, name, file_contents, .none);
+        Bundle.Section.writeFile(allocator, writer, name, file_contents, COMPRESSION) catch |err| switch (err) {
+            error.NameTooLong => {
+                Zune.debug.print("<red>error<clear>: file name '{s}' is too long to bundle\n", .{name});
+                std.process.exit(1);
+            },
+            error.DataTooLarge => {
+                Zune.debug.print("<red>error<clear>: file '{s}' is too large to bundle\n", .{name});
+                std.process.exit(1);
+            },
+            else => return err,
+        };
     }
 
     const sections = SCRIPTS.keys().len + FILES.keys().len;
     std.debug.assert(sections > 0);
 
-    if (sections > Bundle.ExeHeader.maxValue(.sections))
-        return error.TooManyEmbeddedContent;
-
+    if (sections > Bundle.ExeHeader.maxValue(.sections)) {
+        Zune.debug.print("<red>error<clear>: too many sections ({d}), maximum is {d}\n", .{ sections, Bundle.ExeHeader.maxValue(.sections) });
+        Zune.debug.print("sections are files and scripts combined, try reducing the amount of files or scripts.\n", .{});
+        std.process.exit(1);
+    }
     const bundled = bundled_bytes.items[zune_build_len..];
-    if (bundled.len > Bundle.ExeHeader.maxValue(.size))
-        return error.BundleTooLarge;
+    if (bundled.len > Bundle.ExeHeader.maxValue(.size)) {
+        Zune.debug.print("<red>error<clear>: large bundled size ({d} MB), exceeds maximum ({d} MB)\n", .{ @divTrunc(bundled.len, 1_000_000), @divTrunc(Bundle.ExeHeader.maxValue(.size), 1_000_000) });
+        Zune.debug.print("try bundling more compact data, either by bundling with bytecode instead of script source code with --release flag,\n", .{});
+        Zune.debug.print("or compressing files with --compress=<<zstd|lz4|zlib>>.\n", .{});
+        std.process.exit(1);
+    }
     const hash = std.hash.XxHash3.hash(Bundle.SEED, bundled);
     try Bundle.ExeHeader.write(writer, .{
         .sections = @intCast(sections),
@@ -364,7 +403,13 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
         inline .path, .default => |path| {
             const dir_path = std.fs.path.dirname(path);
             if (dir_path != null and dir_path.?.len > 0)
-                try std.fs.cwd().makePath(dir_path.?);
+                std.fs.cwd().makePath(dir_path.?) catch |err| switch (err) {
+                    error.NotDir => {
+                        Zune.debug.print("<red>error<clear>: failed to create path tree '{s}' (expected directory, got file)\n", .{dir_path.?});
+                        std.process.exit(1);
+                    },
+                    else => return err,
+                };
             const file_name = if (comptime builtin.os.tag == .windows)
                 if (OUTPUT == .default) try std.mem.concat(allocator, u8, &.{ path, ".exe" }) else path
             else
