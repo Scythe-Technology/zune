@@ -1,7 +1,7 @@
 --  https://github.com/JohnnyMorganz/luau-lsp/issues/271
 
 declare _FILE: {
-    source: string,
+    source: string?,
     main: boolean,
 }
 
