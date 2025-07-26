@@ -66,6 +66,9 @@ fn Execute(_: std.mem.Allocator, args: []const []const u8) !void {
 
     try config_file.writeAll(INIT_CONFIG_FILE);
 
+    if (args.len > 0 and std.mem.eql(u8, args[0], "bare"))
+        return;
+
     try std.fs.cwd().makePath("src");
 
     if (args.len > 0 and std.mem.eql(u8, args[0], "module")) {
