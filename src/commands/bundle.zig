@@ -310,7 +310,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     {
         const home_relative = if (home_dir.len > 0) try std.fs.path.relative(allocator, cwd_path, home_dir) else "";
-        defer allocator.free(home_relative);
+        defer if (home_dir.len > 0) allocator.free(home_relative);
         if (std.mem.indexOfAny(u8, home_relative, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789") != null) {
             Zune.debug.print("<yellow>warning<clear>: resolved home directory relative path '{s}' contains normal characters\n", .{home_relative});
             Zune.debug.print("The bundled application may contain unwanted path names\n", .{});
