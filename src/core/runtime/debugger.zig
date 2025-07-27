@@ -1445,8 +1445,7 @@ pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c
                 if (position == 0)
                     continue;
                 const append = position < buffer.items.len;
-                std.debug.print("{c}", .{127});
-                try terminal.moveCursor(.Left, 1);
+                std.debug.print("{c}", .{8});
                 position -= 1;
                 _ = buffer.orderedRemove(position);
                 try terminal.clearEndToCursor();
@@ -1463,8 +1462,7 @@ pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c
                     break :blk slice.len - (std.mem.lastIndexOfAny(u8, slice[0..back], Terminal.NON_LETTER) orelse break :blk position) - 1;
                 };
                 for (0..index) |_| {
-                    std.debug.print("{c}", .{127});
-                    try terminal.moveCursor(.Left, 1);
+                    std.debug.print("{c}", .{8});
                     position -= 1;
                     _ = buffer.orderedRemove(position);
                     try terminal.clearEndToCursor();

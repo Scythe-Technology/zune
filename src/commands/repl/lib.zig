@@ -227,8 +227,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
                 if (position == 0)
                     continue;
                 const append = position < buffer.items.len;
-                try out.writeByte(127);
-                try terminal.moveCursor(.Left, 1);
+                try out.writeByte(8);
                 position -= 1;
                 _ = buffer.orderedRemove(position);
                 try terminal.clearEndToCursor();
@@ -245,8 +244,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
                     break :blk slice.len - (std.mem.lastIndexOfAny(u8, slice[0..back], Terminal.NON_LETTER) orelse break :blk position) - 1;
                 };
                 for (0..index) |_| {
-                    std.debug.print("{c}", .{127});
-                    try terminal.moveCursor(.Left, 1);
+                    try out.writeByte(8);
                     position -= 1;
                     _ = buffer.orderedRemove(position);
                     try terminal.clearEndToCursor();
