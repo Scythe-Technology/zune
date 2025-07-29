@@ -381,7 +381,7 @@ const LuaPointer = struct {
         if (ptr.destroyed or ptr.ptr == null)
             return 0;
         if (ptr.type == .Static)
-            return L.Zerror("Cannot drop a static pointer");
+            return L.Zerror("cannot drop a static pointer");
         ptr.destroyed = true;
         if (ptr.local_ref) |ref|
             L.unref(ref);
@@ -390,19 +390,28 @@ const LuaPointer = struct {
     }
 
     pub fn lua_offset(ptr: *LuaPointer, L: *VM.lua.State) !i32 {
-        const pos: usize = @intCast(try L.Zcheckvalue(i32, 2, null));
+        const pos: i32 = try L.Zcheckvalue(i32, 2, null);
         if (ptr.ptr == null) {
-            _ = try LuaPointer.newStaticPtr(L, @ptrFromInt(pos), false);
+            if (pos < 0)
+                return L.Zerror("negative offset on null pointer is not allowed");
+            _ = try LuaPointer.newStaticPtr(L, @ptrFromInt(@as(usize, @intCast(pos))), false);
             return 1;
         }
         if (ptr.size) |size|
             if (size < pos)
-                return L.Zerror("Offset OutOfBounds");
+                return L.Zerror("offset out of bounds");
 
-        const static = try LuaPointer.newStaticPtr(L, @as([*]u8, @ptrCast(ptr.ptr))[pos..], false);
+        const static = try LuaPointer.newStaticPtr(
+            L,
+            if (pos > 0)
+                @as([*]u8, @ptrCast(ptr.ptr)) + @as(u32, @intCast(pos))
+            else
+                @as([*]u8, @ptrCast(ptr.ptr)) - @abs(pos),
+            false,
+        );
 
         if (ptr.size) |size|
-            static.size = size - pos;
+            static.size = if (pos < 0) size + @abs(pos) else size - @as(usize, @intCast(pos));
 
         return 1;
     }
@@ -599,18 +608,18 @@ const LuaPointer = struct {
 
     pub fn lua_setAlignment(ptr: *LuaPointer, L: *VM.lua.State) !i32 {
         if (ptr.destroyed or ptr.ptr == null)
-            return L.Zerror("NoAddressAvailable");
+            return error.NoAddressAvailable;
         const alignment = L.Lchecknumber(2);
         if (alignment < 0)
-            return L.Zerror("Alignment cannot be negative");
+            return L.Zerror("alignment cannot be negative");
 
         const length: usize = @intFromFloat(alignment);
 
         switch (ptr.type) {
-            .Allocated => return L.Zerror("Alignment is already known"),
+            .Allocated => return L.Zerror("alignment is already known"),
             .Static => {
                 if (ptr.alignment) |_|
-                    return L.Zerror("Alignment is already set");
+                    return L.Zerror("alignment is already set");
             },
         }
 
@@ -1332,6 +1341,9 @@ fn lua_struct(L: *VM.lua.State) !i32 {
 
             if (!isFFIType(L, -1))
                 return L.Zerror("struct field type must be a valid ffi type");
+
+            if (struct_map.contains(name))
+                return L.Zerrorf("struct field '{s}' already exists", .{name});
 
             {
                 const name_copy = try allocator.dupe(u8, name); // Zig owned string to prevent GC from Lua owned strings
