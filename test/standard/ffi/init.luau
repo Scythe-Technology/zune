@@ -33,7 +33,6 @@ expect(ffi).toBe(
         tagName = expect.type("function"),
         prefix = expect.type("string"),
         suffix = expect.type("string"),
-        supported = expect.type("boolean"),
         types = expect.similar({
             void = expect.type("userdata"),
             i8 = expect.type("userdata"),
@@ -76,10 +75,6 @@ local function testBufferOfValue(size: number, writer: (b: buffer, o: number, v:
 end
 
 describe("FFI", function()
-    if (not ffi.supported) then
-        warn("Skipping 'FFI' tests (Not Supported)");
-        return; -- Skip
-    end
     describe("dlopen", function()
         test("Sample Library (No Decls)", function()
             local lib = ffi.dlopen(`./zig-out/lib/{ffi.prefix}sample.{static_suffix}`, {});

@@ -2353,13 +2353,12 @@ pub fn loadLib(L: *VM.lua.State) !void {
         L.pop(1);
     }
 
-    try L.createtable(0, 18);
+    try L.createtable(0, 17);
 
     try L.Zsetfieldfn(-1, "dlopen", lua_dlopen);
     try L.Zsetfieldfn(-1, "struct", lua_struct);
     try L.Zsetfieldfn(-1, "closure", lua_closure);
     try L.Zsetfieldfn(-1, "fn", lua_fn);
-    try L.Zsetfield(-1, "supported", true);
 
     try L.Zsetfieldfn(-1, "alloc", lua_alloc);
     try L.Zsetfieldfn(-1, "free", lua_free);
