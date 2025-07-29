@@ -306,8 +306,8 @@ pub fn lua_setprops(L: *VM.lua.State) !void {
 
     try L.Zpushvalue(.{
         .none = 0,
-        .twoSpaces = 1,
-        .fourSpaces = 2,
+        .two_spaces = 1,
+        .four_spaces = 2,
         .tabs = 3,
     });
     L.setreadonly(-1, true);

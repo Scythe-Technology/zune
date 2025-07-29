@@ -9,8 +9,8 @@ expect(serde.json).toBe(expect.similar({
     decode = expect.type("function"),
     indents = expect.similar({
         none = expect.type("number"),
-        twoSpaces = expect.type("number"),
-        fourSpaces = expect.type("number"),
+        two_spaces = expect.type("number"),
+        four_spaces = expect.type("number"),
         tabs = expect.type("number"),
     }),
     values = expect.similar({
@@ -22,8 +22,8 @@ expect(serde.json5).toBe(expect.similar({
     decode = expect.type("function"),
     indents = expect.similar({
         none = expect.type("number"),
-        twoSpaces = expect.type("number"),
-        fourSpaces = expect.type("number"),
+        two_spaces = expect.type("number"),
+        four_spaces = expect.type("number"),
         tabs = expect.type("number"),
     }),
     values = expect.similar({
