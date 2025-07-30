@@ -126,6 +126,8 @@ const RequestAsyncContext = struct {
 };
 
 pub fn lua_request(L: *VM.lua.State) !i32 {
+    if (!L.isyieldable())
+        return L.Zyielderror();
     const allocator = luau.getallocator(L);
     const scheduler = Scheduler.getScheduler(L);
 

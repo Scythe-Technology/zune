@@ -307,6 +307,8 @@ const LuaThread = struct {
     }
 
     pub fn lua_receive(self: *LuaThread, L: *VM.lua.State) !i32 {
+        if (!L.isyieldable())
+            return L.Zyielderror();
         const runtime = self.runtime;
 
         const port = &runtime.transporter.incoming;
@@ -331,6 +333,8 @@ const LuaThread = struct {
     }
 
     pub fn lua_join(self: *LuaThread, L: *VM.lua.State) !i32 {
+        if (!L.isyieldable())
+            return L.Zyielderror();
         const runtime = self.runtime;
         runtime.access_mutex.lock();
         defer runtime.access_mutex.unlock();
@@ -580,6 +584,8 @@ fn lua_selfReceive(L: *VM.lua.State) !i32 {
         .LightUserdata => {},
         else => return L.Zerror("current context is not a thread"),
     }
+    if (!L.isyieldable())
+        return L.Zyielderror();
     const runtime = L.tolightuserdata(Runtime, -1).?;
     L.pop(1);
 

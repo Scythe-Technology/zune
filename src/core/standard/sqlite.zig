@@ -275,6 +275,8 @@ const LuaDatabase = struct {
         };
 
         if (status == .Yield) {
+            if (!L.isyieldable())
+                return L.Zyielderror();
             const allocator = luau.getallocator(L);
             const data = try allocator.create(Transaction);
             data.* = .{

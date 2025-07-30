@@ -1110,6 +1110,8 @@ pub fn generateKey(encoded: []u8) void {
 }
 
 pub fn lua_websocket(L: *VM.lua.State) !i32 {
+    if (!L.isyieldable())
+        return L.Zyielderror();
     const allocator = luau.getallocator(L);
     const scheduler = Scheduler.getScheduler(L);
 

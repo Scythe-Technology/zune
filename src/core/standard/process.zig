@@ -268,6 +268,8 @@ const ProcessAsyncRunContext = struct {
 fn lua_run(L: *VM.lua.State) !i32 {
     if (comptime !std.process.can_spawn)
         return error.UnsupportedPlatform;
+    if (!L.isyieldable())
+        return L.Zyielderror();
     const scheduler = Scheduler.getScheduler(L);
     const allocator = luau.getallocator(L);
 

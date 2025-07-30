@@ -257,6 +257,8 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
                     if (ptr == @as(*const anyopaque, @ptrCast(&ErrorState))) {
                         return L.Zerror("requested module failed to load");
                     } else if (ptr == @as(*const anyopaque, @ptrCast(&WaitingState))) {
+                        if (!L.isyieldable())
+                            return L.Zyielderror();
                         const res = REQUIRE_QUEUE_MAP.getEntry(module_relative_path) orelse std.debug.panic("zune_require: queue not found", .{});
                         try res.value_ptr.append(.{
                             .state = Scheduler.ThreadRef.init(L),
@@ -373,12 +375,15 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
             }
 
             var list = std.ArrayList(QueueItem).init(allocator);
-            try list.append(.{
-                .state = Scheduler.ThreadRef.init(L),
-            });
+            if (L.isyieldable())
+                try list.append(.{
+                    .state = Scheduler.ThreadRef.init(L),
+                });
 
             try REQUIRE_QUEUE_MAP.put(try allocator.dupe(u8, module_relative_path), list);
 
+            if (!L.isyieldable())
+                return L.Zyielderror();
             return L.yield(0);
         },
         else => unreachable,

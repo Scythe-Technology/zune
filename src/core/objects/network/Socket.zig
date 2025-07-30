@@ -932,6 +932,8 @@ const AsyncConnectContext = struct {
 };
 
 fn lua_send(self: *Socket, L: *VM.lua.State) !i32 {
+    if (!L.isyieldable())
+        return L.Zyielderror();
     const allocator = luau.getallocator(L);
     const scheduler = Scheduler.getScheduler(L);
     const buf = try L.Zcheckvalue([]const u8, 2, null);
@@ -975,6 +977,8 @@ fn lua_send(self: *Socket, L: *VM.lua.State) !i32 {
 fn lua_sendMsg(self: *Socket, L: *VM.lua.State) !i32 {
     if (self.tls_context != .none)
         return L.Zerror("Not supported with TLS");
+    if (!L.isyieldable())
+        return L.Zyielderror();
     const allocator = luau.getallocator(L);
     const scheduler = Scheduler.getScheduler(L);
     const port = L.Lcheckunsigned(2);
@@ -1021,6 +1025,8 @@ fn lua_sendMsg(self: *Socket, L: *VM.lua.State) !i32 {
 }
 
 fn lua_recv(self: *Socket, L: *VM.lua.State) !i32 {
+    if (!L.isyieldable())
+        return L.Zyielderror();
     const allocator = luau.getallocator(L);
     const scheduler = Scheduler.getScheduler(L);
     const size = L.Loptinteger(2, 8192);
@@ -1061,6 +1067,8 @@ fn lua_recv(self: *Socket, L: *VM.lua.State) !i32 {
 fn lua_recvMsg(self: *Socket, L: *VM.lua.State) !i32 {
     if (self.tls_context != .none)
         return L.Zerror("Not supported with TLS");
+    if (!L.isyieldable())
+        return L.Zyielderror();
     const allocator = luau.getallocator(L);
     const scheduler = Scheduler.getScheduler(L);
     const size = L.Loptinteger(2, 8192);
@@ -1096,6 +1104,8 @@ fn lua_recvMsg(self: *Socket, L: *VM.lua.State) !i32 {
 }
 
 fn lua_accept(self: *Socket, L: *VM.lua.State) !i32 {
+    if (!L.isyieldable())
+        return L.Zyielderror();
     const scheduler = Scheduler.getScheduler(L);
 
     const ptr = try scheduler.createAsyncCtx(AsyncAcceptContext);
@@ -1121,6 +1131,8 @@ fn lua_accept(self: *Socket, L: *VM.lua.State) !i32 {
 }
 
 fn lua_connect(self: *Socket, L: *VM.lua.State) !i32 {
+    if (!L.isyieldable())
+        return L.Zyielderror();
     const scheduler = Scheduler.getScheduler(L);
 
     switch (self.tls_context) {
@@ -1249,6 +1261,8 @@ pub const AsyncCloseContext = struct {
 fn lua_close(self: *Socket, L: *VM.lua.State) !i32 {
     if (self.open != .closed) {
         self.open = .closed;
+        if (!L.isyieldable())
+            return L.Zyielderror();
         const scheduler = Scheduler.getScheduler(L);
         const socket = xev.TCP.initFd(self.socket);
 
