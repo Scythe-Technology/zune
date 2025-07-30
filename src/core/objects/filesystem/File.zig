@@ -717,6 +717,8 @@ fn lua_close(self: *File, L: *VM.lua.State) !i32 {
     if (self.mode.isOpen()) {
         if (!self.mode.close)
             return error.NotCloseable;
+        if (!L.isyieldable())
+            return L.Zyielderror();
         self.mode = .closed;
         const scheduler = Scheduler.getScheduler(L);
         const file = xev.File.init(self.file) catch unreachable;

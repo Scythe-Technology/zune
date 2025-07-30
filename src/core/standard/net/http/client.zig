@@ -126,6 +126,8 @@ const RequestAsyncContext = struct {
 };
 
 pub fn lua_request(L: *VM.lua.State) !i32 {
+    if (!L.isyieldable())
+        return L.Zyielderror();
     const allocator = luau.getallocator(L);
     const scheduler = Scheduler.getScheduler(L);
 
@@ -150,26 +152,26 @@ pub fn lua_request(L: *VM.lua.State) !i32 {
         if (headers_type == .Table) {
             var headers_list = std.ArrayListUnmanaged(std.http.Header){};
             defer headers_list.deinit(allocator);
-            errdefer {
-                for (headers_list.items) |header| {
-                    allocator.free(header.name);
-                    allocator.free(header.value);
-                }
-            }
-            var i: i32 = L.rawiter(-1, 0);
-            while (i >= 0) : (i = L.rawiter(-1, i)) {
-                if (L.typeOf(-2) != .String) return L.Zerror("invalid header key (expected string)");
-                if (L.typeOf(-1) != .String) return L.Zerror("invalid header value (expected string)");
-                const key = try allocator.dupe(u8, L.tostring(-2).?);
-                errdefer allocator.free(key);
-                const value = try allocator.dupe(u8, L.tostring(-1).?);
-                errdefer allocator.free(value);
-                try headers_list.append(allocator, .{
-                    .name = key,
-                    .value = value,
-                });
-                L.pop(2);
-            }
+            errdefer for (headers_list.items) |header| {
+                allocator.free(header.name);
+                allocator.free(header.value);
+            };
+            var iter: LuaHelper.TableIterator = .{ .L = L, .idx = -1 };
+            while (iter.next()) |t| switch (t) {
+                .String => {
+                    if (L.typeOf(-1) != .String)
+                        return L.Zerrorf("invalid header value (expected string, got {s})", .{VM.lapi.typename(L.typeOf(-1))});
+                    const key = try allocator.dupe(u8, L.tostring(-2).?);
+                    errdefer allocator.free(key);
+                    const value = try allocator.dupe(u8, L.tostring(-1).?);
+                    errdefer allocator.free(value);
+                    try headers_list.append(allocator, .{
+                        .name = key,
+                        .value = value,
+                    });
+                },
+                else => return L.Zerrorf("invalid header key (expected string, got {s})", .{VM.lapi.typename(t)}),
+            };
             headers = try headers_list.toOwnedSlice(allocator);
         } else if (!headers_type.isnoneornil()) return L.Zerror("invalid headers (expected table)");
         L.pop(1);

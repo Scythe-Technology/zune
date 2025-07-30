@@ -34,7 +34,6 @@ pub fn loadModule(L: *VM.lua.State, name: [:0]const u8, content: []const u8, cOp
 const FileContext = struct {
     source: ?[]const u8,
     main: bool = false,
-    thread: bool = false,
 };
 
 const StackInfo = struct {
@@ -49,7 +48,6 @@ pub fn setLuaFileContext(L: *VM.lua.State, ctx: FileContext) !void {
     try L.Zpushvalue(.{
         .source = if (Zune.STATE.USE_DETAILED_ERROR or Zune.STATE.RUN_MODE == .Test) ctx.source else null,
         .main = ctx.main,
-        .thread = ctx.thread,
     });
 
     try L.rawsetfield(VM.lua.GLOBALSINDEX, "_FILE");
@@ -158,8 +156,11 @@ pub fn logDetailedDef(L: *VM.lua.State, idx: i32) !void {
             if (b.mode.compiled == .release)
                 return;
 
-        const padded_string = try allocator.alloc(u8, padding + 1);
-        defer allocator.free(padded_string);
+        var padding_buf: [12]u8 = undefined;
+        if (padding + 1 > padding_buf.len)
+            return;
+        const padded_string = padding_buf[0 .. padding + 1];
+
         @memset(padded_string, ' ');
 
         if (info.source) |src| {
@@ -202,7 +203,10 @@ pub fn logDetailedDef(L: *VM.lua.State, idx: i32) !void {
 
             Zune.debug.print("{s}|\n", .{padded_string});
             _ = std.fmt.bufPrint(padded_string, "{d}", .{source_line}) catch |e| std.debug.panic("{}", .{e});
-            Zune.debug.print("{s}| {s}\n", .{ padded_string, line_content });
+            if (line_content.len > 128)
+                Zune.debug.print("{s}| {s}...\n", .{ padded_string, line_content[0..128] })
+            else
+                Zune.debug.print("{s}| {s}\n", .{ padded_string, line_content });
             @memset(padded_string, ' ');
             Zune.debug.print("{s}|\n", .{padded_string});
         }
@@ -333,10 +337,14 @@ pub fn logDetailedError(L: *VM.lua.State) !void {
                 largest_line = @max(largest_line, @as(usize, @intCast(line)));
         }
     }
-    const padding = std.math.log10(largest_line) + 1;
 
-    const padded_string = try allocator.alloc(u8, padding + 1);
-    defer allocator.free(padded_string);
+    var padding_buf: [12]u8 = undefined;
+
+    const padding = std.math.log10(largest_line) + 1;
+    if (padding + 1 > padding_buf.len)
+        return;
+
+    const padded_string = padding_buf[0 .. padding + 1];
     @memset(padded_string, ' ');
 
     for (list.items, 0..) |info, lvl| {
@@ -399,22 +407,25 @@ pub fn logDetailedError(L: *VM.lua.State) !void {
 
             Zune.debug.print("{s}|\n", .{padded_string});
             _ = std.fmt.bufPrint(padded_string, "{d}", .{current_line}) catch |e| std.debug.panic("{}", .{e});
-            Zune.debug.print("{s}| {s}\n", .{ padded_string, line_content });
+            if (line_content.len > 128)
+                Zune.debug.print("{s}| {s}...\n", .{ padded_string, line_content[0..128] })
+            else
+                Zune.debug.print("{s}| {s}\n", .{ padded_string, line_content });
             @memset(padded_string, ' ');
 
             if (reference_level != null and reference_level.? == lvl) {
-                const front_pos = std.mem.indexOfNonePos(u8, line_content, 0, " \t") orelse 0;
-                const end_pos = std.mem.lastIndexOfNone(u8, line_content, " \t\r") orelse front_pos;
+                const front_pos = std.mem.indexOfNonePos(u8, line_content[0..@min(line_content.len, 128)], 0, " \t") orelse 0;
+                const end_pos = std.mem.lastIndexOfNone(u8, line_content[0..@min(line_content.len, 128)], " \t\r") orelse front_pos;
                 const len = (end_pos - front_pos) + 1;
 
+                var buf: [128]u8 = undefined;
+                if (len > buf.len)
+                    return Zune.debug.print("{s}|\n", .{padded_string});
                 const space_slice = line_content[0..front_pos];
 
-                const buf = allocator.alloc(u8, len) catch |e| std.debug.panic("{}", .{e});
-                defer allocator.free(buf);
+                @memset(buf[0..len], '^');
 
-                @memset(buf, '^');
-
-                Zune.debug.print("{s}| {s}<red>{s}<clear>\n", .{ padded_string, space_slice, buf });
+                Zune.debug.print("{s}| {s}<red>{s}<clear>\n", .{ padded_string, space_slice, buf[0..len] });
             } else {
                 Zune.debug.print("{s}|\n", .{padded_string});
             }

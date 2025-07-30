@@ -381,7 +381,7 @@ const LuaPointer = struct {
         if (ptr.destroyed or ptr.ptr == null)
             return 0;
         if (ptr.type == .Static)
-            return L.Zerror("Cannot drop a static pointer");
+            return L.Zerror("cannot drop a static pointer");
         ptr.destroyed = true;
         if (ptr.local_ref) |ref|
             L.unref(ref);
@@ -390,19 +390,28 @@ const LuaPointer = struct {
     }
 
     pub fn lua_offset(ptr: *LuaPointer, L: *VM.lua.State) !i32 {
-        const pos: usize = @intCast(try L.Zcheckvalue(i32, 2, null));
+        const pos: i32 = try L.Zcheckvalue(i32, 2, null);
         if (ptr.ptr == null) {
-            _ = try LuaPointer.newStaticPtr(L, @ptrFromInt(pos), false);
+            if (pos < 0)
+                return L.Zerror("negative offset on null pointer is not allowed");
+            _ = try LuaPointer.newStaticPtr(L, @ptrFromInt(@as(usize, @intCast(pos))), false);
             return 1;
         }
         if (ptr.size) |size|
             if (size < pos)
-                return L.Zerror("Offset OutOfBounds");
+                return L.Zerror("offset out of bounds");
 
-        const static = try LuaPointer.newStaticPtr(L, @as([*]u8, @ptrCast(ptr.ptr))[pos..], false);
+        const static = try LuaPointer.newStaticPtr(
+            L,
+            if (pos > 0)
+                @as([*]u8, @ptrCast(ptr.ptr)) + @as(u32, @intCast(pos))
+            else
+                @as([*]u8, @ptrCast(ptr.ptr)) - @abs(pos),
+            false,
+        );
 
         if (ptr.size) |size|
-            static.size = size - pos;
+            static.size = if (pos < 0) size + @abs(pos) else size - @as(usize, @intCast(pos));
 
         return 1;
     }
@@ -599,18 +608,18 @@ const LuaPointer = struct {
 
     pub fn lua_setAlignment(ptr: *LuaPointer, L: *VM.lua.State) !i32 {
         if (ptr.destroyed or ptr.ptr == null)
-            return L.Zerror("NoAddressAvailable");
+            return error.NoAddressAvailable;
         const alignment = L.Lchecknumber(2);
         if (alignment < 0)
-            return L.Zerror("Alignment cannot be negative");
+            return L.Zerror("alignment cannot be negative");
 
         const length: usize = @intFromFloat(alignment);
 
         switch (ptr.type) {
-            .Allocated => return L.Zerror("Alignment is already known"),
+            .Allocated => return L.Zerror("alignment is already known"),
             .Static => {
                 if (ptr.alignment) |_|
-                    return L.Zerror("Alignment is already set");
+                    return L.Zerror("alignment is already set");
             },
         }
 
@@ -1269,6 +1278,43 @@ const ffi_c_interface = struct {
     }
 };
 
+fn getfunctionSymbol(allocator: std.mem.Allocator, L: *VM.lua.State, idx: i32) !FunctionSymbol {
+    var symbol: FunctionSymbol = undefined;
+    _ = L.rawgetfield(idx, "returns");
+    if (!isFFIType(L, -1))
+        return L.Zerror("function return type must be a valid ffi type");
+    symbol.returns = try toFFIType(L, -1);
+    L.pop(1); // drop: returns
+
+    if (L.rawgetfield(idx, "args") != .Table)
+        return L.Zerrorf("function args must be a table (got {s})", .{VM.lapi.typename(L.typeOf(-1))});
+
+    const args_len = L.objlen(-1);
+
+    const args = try allocator.alloc(DataType, @intCast(args_len));
+    errdefer allocator.free(args);
+    symbol.args = args;
+
+    var order: usize = 0;
+    var arr_iter: LuaHelper.ArrayIterator = .{ .L = L, .idx = -1 };
+    while (try arr_iter.next()) |t| switch (t) {
+        .Userdata => {
+            if (!isFFIType(L, -1))
+                return L.Zerrorf("function arg type must be a valid ffi type (got {s})", .{VM.lapi.typename(L.typeOf(-1))});
+
+            const ffi_type = try toFFIType(L, -1);
+            if (ffi_type.size == 0)
+                return L.Zerror("function arg type cannot be void");
+
+            args[order] = ffi_type;
+            order += 1;
+        },
+        else => return L.Zerrorf("function arg must be a userdata (got {s})", .{VM.lapi.typename(t)}),
+    };
+    L.pop(1); // drop: args
+    return symbol;
+}
+
 fn lua_struct(L: *VM.lua.State) !i32 {
     try L.Zchecktype(1, .Table);
 
@@ -1283,42 +1329,37 @@ fn lua_struct(L: *VM.lua.State) !i32 {
     }
 
     var order: i32 = 1;
-    var i: i32 = L.rawiter(1, 0);
-    while (i >= 0) : (i = L.rawiter(1, i)) {
-        if (L.typeOf(-2) != .Number)
-            return error.InvalidIndex;
-        const index = L.tointeger(-2) orelse unreachable;
-        if (index != order)
-            return error.InvalidIndexOrder;
+    var iter: LuaHelper.ArrayIterator = .{ .L = L, .idx = 1 };
+    while (try iter.next()) |t| switch (t) {
+        .Table => {
+            if (L.rawiter(-1, 0) < 0)
+                return L.Zerror("struct field contains no field type");
 
-        if (L.typeOf(-1) != .Table)
-            return error.InvalidValue;
+            if (L.typeOf(-2) != .String)
+                return L.Zerrorf("struct field name must be a string (got {s})", .{VM.lapi.typename(L.typeOf(-2))});
+            const name = L.tostring(-2) orelse unreachable;
 
-        if (L.rawiter(-1, 0) < 0)
-            return error.InvalidValue;
+            if (!isFFIType(L, -1))
+                return L.Zerror("struct field type must be a valid ffi type");
 
-        if (L.typeOf(-2) != .String)
-            return error.InvalidFieldName;
-        const name = L.tostring(-2) orelse unreachable;
+            if (struct_map.contains(name))
+                return L.Zerrorf("struct field '{s}' already exists", .{name});
 
-        if (!isFFIType(L, -1))
-            return error.InvalidFieldType;
+            {
+                const name_copy = try allocator.dupe(u8, name); // Zig owned string to prevent GC from Lua owned strings
+                errdefer allocator.free(name_copy);
+                try struct_map.put(name_copy, try toFFIType(L, -1));
+            }
 
-        {
-            const name_copy = try allocator.dupe(u8, name); // Zig owned string to prevent GC from Lua owned strings
-            errdefer allocator.free(name_copy);
-            try struct_map.put(name_copy, try toFFIType(L, -1));
-        }
+            L.pop(2);
 
-        L.pop(2);
+            if (L.rawiter(-1, 1) >= 0)
+                return L.Zerror("struct field contains more than one field type");
 
-        if (L.rawiter(-1, 1) >= 0)
-            return error.ExtraFieldsFound;
-
-        L.pop(2);
-
-        order += 1;
-    }
+            order += 1;
+        },
+        else => return L.Zerrorf("struct field must be a table (got {s})", .{VM.lapi.typename(t)}),
+    };
 
     const data = try L.newuserdatataggedwithmetatable(LuaDataType, TAG_FFI_DATATYPE);
 
@@ -1524,58 +1565,22 @@ fn lua_dlopen(L: *VM.lua.State) !i32 {
         }
     }
 
-    var i: i32 = L.rawiter(2, 0);
-    while (i >= 0) : (i = L.rawiter(2, i)) {
-        defer L.pop(2);
-        if (L.typeOf(-2) != .String)
-            return error.InvalidName;
-        if (L.typeOf(-1) != .Table)
-            return error.InvalidValue;
+    var iter: LuaHelper.TableIterator = .{ .L = L, .idx = 2 };
+    while (iter.next()) |key| switch (key) {
+        .String => {
+            if (L.typeOf(-1) != .Table)
+                return L.Zerrorf("function type must be a table (got {s})", .{VM.lapi.typename(L.typeOf(-1))});
 
-        const name = L.tostring(-2) orelse unreachable;
+            const name = L.tostring(-2).?;
 
-        _ = L.rawgetfield(-1, "returns");
-        if (!isFFIType(L, -1))
-            return error.InvalidReturnType;
-        const returns_ffi_type = try toFFIType(L, -1);
-        L.pop(1); // drop: returns
+            const symbol = try getfunctionSymbol(allocator, L, -1);
 
-        if (L.rawgetfield(-1, "args") != .Table)
-            return error.InvalidArgs;
-
-        const args_len = L.objlen(-1);
-
-        const args = try allocator.alloc(DataType, @intCast(args_len));
-        errdefer allocator.free(args);
-
-        var order: usize = 0;
-        var j: i32 = L.rawiter(-1, 0);
-        while (j >= 0) : (j = L.rawiter(-1, j)) {
-            defer L.pop(2);
-            if (L.typeOf(-2) != .Number)
-                return error.InvalidArgOrder;
-            if (!isFFIType(L, -1))
-                return error.InvalidArgType;
-
-            const index = L.tointeger(-2) orelse unreachable;
-            if (index != order + 1)
-                return error.InvalidArgOrder;
-
-            args[order] = try toFFIType(L, -1);
-            if (args[order].size == 0)
-                return error.VoidArg;
-
-            order += 1;
-        }
-        L.pop(1); // drop: args
-
-        const name_copy = try allocator.dupe(u8, name); // Zig owned string to prevent GC from Lua owned strings
-        errdefer allocator.free(name_copy);
-        try func_map.put(name_copy, .{
-            .returns = returns_ffi_type,
-            .args = args,
-        });
-    }
+            const name_copy = try allocator.dupe(u8, name); // Zig owned string to prevent GC from Lua owned strings
+            errdefer allocator.free(name_copy);
+            try func_map.put(name_copy, symbol);
+        },
+        else => return L.Zerrorf("external function name must be a string (got {s})", .{VM.lapi.typename(key)}),
+    };
 
     const ptr = try L.newuserdatadtor(LuaHandle, LuaHandle.__dtor);
 
@@ -1600,8 +1605,7 @@ fn lua_dlopen(L: *VM.lua.State) !i32 {
         const namez = try allocator.dupeZ(u8, key);
         defer allocator.free(namez);
         const func = lib.lookup(*anyopaque, namez) orelse {
-            std.debug.print("Symbol not found: {s}\n", .{key});
-            return error.SymbolNotFound;
+            return L.Zerrorf("symbol '{s}' not found", .{key});
         };
 
         const code = try fetchCallableFunction(value.returns, value.args);
@@ -1787,46 +1791,9 @@ fn lua_closure(L: *VM.lua.State) !i32 {
 
     const allocator = luau.getallocator(L);
 
-    var symbol_returns: DataType = DataTypes.Types.type_void;
-    var args = std.ArrayList(DataType).init(allocator);
-    defer args.deinit();
-
-    _ = L.rawgetfield(1, "returns");
-    if (!isFFIType(L, -1))
-        return error.InvalidReturnType;
-    symbol_returns = try toFFIType(L, -1);
-    L.pop(1);
-
-    if (L.rawgetfield(1, "args") != .Table)
-        return error.InvalidArgs;
-
-    {
-        var order: usize = 0;
-        var i: i32 = L.rawiter(-1, 0);
-        while (i >= 0) : (i = L.rawiter(-1, i)) {
-            defer L.pop(2);
-            if (L.typeOf(-2) != .Number)
-                return error.InvalidArgOrder;
-            if (!isFFIType(L, -1))
-                return error.InvalidArgType;
-
-            const index = L.tointeger(-2) orelse unreachable;
-            if (index != order + 1)
-                return error.InvalidArgOrder;
-
-            const t = try toFFIType(L, -1);
-
-            if (t.size == 0)
-                return error.VoidArg;
-
-            try args.append(t);
-
-            order += 1;
-        }
-    }
-
-    const symbol_args = try args.toOwnedSlice();
-    errdefer allocator.free(symbol_args);
+    const symbol = try getfunctionSymbol(allocator, L, 1);
+    var handled = false;
+    errdefer if (!handled) allocator.free(symbol.args);
 
     const state = try tinycc.new();
     errdefer state.deinit();
@@ -1843,30 +1810,30 @@ fn lua_closure(L: *VM.lua.State) !i32 {
 
     try writer.print("\n", .{});
 
-    try generateTypesFromSymbol(&source, symbol_returns, symbol_args);
+    try generateTypesFromSymbol(&source, symbol.returns, symbol.args);
 
-    try generateTypeFromSymbol(&source, symbol_returns, 0, false);
+    try generateTypeFromSymbol(&source, symbol.returns, 0, false);
     try source.appendSlice(" call_closure_ffi(");
-    for (symbol_args, 0..) |arg, i| {
+    for (symbol.args, 0..) |arg, i| {
         if (i != 0)
             try source.appendSlice(", ");
         try generateTypeFromSymbol(&source, arg, i + 1, false);
         try writer.print(" arg_{d}", .{i});
     }
     try source.appendSlice(") {\n  ");
-    if (symbol_args.len > 0) {
-        try writer.print("void* args[{d}];\n  ", .{symbol_args.len});
+    if (symbol.args.len > 0) {
+        try writer.print("void* args[{d}];\n  ", .{symbol.args.len});
     }
-    if (symbol_returns.size > 0) {
-        try generateTypeFromSymbol(&source, symbol_returns, 0, false);
+    if (symbol.returns.size > 0) {
+        try generateTypeFromSymbol(&source, symbol.returns, 0, false);
         try source.appendSlice(" ret;\n  ");
     }
 
-    for (symbol_args, 0..) |_, i| {
+    for (symbol.args, 0..) |_, i| {
         try writer.print("args[{d}] = (void*)&arg_{d};\n  ", .{ i, i });
     }
 
-    if (symbol_returns.size > 0) {
+    if (symbol.returns.size > 0) {
         try writer.print("external_call(&external_ptr, args, (void*)&ret);\n  ", .{});
         try writer.print("return ret;\n}}\n", .{});
     } else {
@@ -1877,12 +1844,12 @@ fn lua_closure(L: *VM.lua.State) !i32 {
     errdefer allocator.destroy(call_ptr);
 
     call_ptr.* = .{
-        .args = @intCast(symbol_args.len),
+        .args = @intCast(symbol.args.len),
         .thread = L.mainthread(),
         .ref = null,
         .type = .{
-            .returns = symbol_returns,
-            .args = symbol_args,
+            .returns = symbol.returns,
+            .args = symbol.args,
         },
     };
 
@@ -1898,7 +1865,7 @@ fn lua_closure(L: *VM.lua.State) !i32 {
     call_ptr.ref = try L.ref(2);
 
     const data = try L.newuserdatadtor(LuaClosure, LuaClosure.__dtor);
-
+    handled = true;
     data.* = .{
         .allocator = allocator,
         .callable = callable,
@@ -1906,8 +1873,8 @@ fn lua_closure(L: *VM.lua.State) !i32 {
         .sym = .{
             .state = state,
             .type = .{
-                .returns = symbol_returns,
-                .args = symbol_args,
+                .returns = symbol.returns,
+                .args = symbol.args,
             },
         },
     };
@@ -2048,43 +2015,10 @@ fn lua_fn(L: *VM.lua.State) !i32 {
 
     const allocator = luau.getallocator(L);
 
-    var symbol_returns: DataType = DataTypes.Types.type_void;
-    var args = std.ArrayList(DataType).init(allocator);
-    defer args.deinit();
+    const symbol = try getfunctionSymbol(allocator, L, 1);
+    defer allocator.free(symbol.args);
 
-    _ = L.rawgetfield(1, "returns");
-    if (!isFFIType(L, -1))
-        return error.InvalidReturnType;
-    symbol_returns = try toFFIType(L, -1);
-    L.pop(1);
-
-    if (L.rawgetfield(1, "args") != .Table)
-        return error.InvalidArgs;
-
-    var order: usize = 0;
-    var i: i32 = L.rawiter(-1, 0);
-    while (i >= 0) : (i = L.rawiter(-1, i)) {
-        defer L.pop(2);
-        if (L.typeOf(-2) != .Number)
-            return error.InvalidArgOrder;
-        if (!isFFIType(L, -1))
-            return error.InvalidArgType;
-
-        const index = L.tointeger(-2) orelse unreachable;
-        if (index != order + 1)
-            return error.InvalidArgOrder;
-
-        const t = try toFFIType(L, -1);
-
-        if (t.size == 0)
-            return error.VoidArg;
-
-        try args.append(t);
-
-        order += 1;
-    }
-
-    const code = try fetchCallableFunction(symbol_returns, args.items);
+    const code = try fetchCallableFunction(symbol.returns, symbol.args);
     errdefer code.unref();
 
     const data = try L.newuserdatadtor(FFIFunction, FFIFunction.__dtor);
@@ -2318,77 +2252,61 @@ fn lua_compile(L: *VM.lua.State) !i32 {
         if (opts.options) |o|
             state.set_options(o);
 
-        const type_files = L.rawgetfield(2, "files");
-        if (!type_files.isnoneornil()) {
-            if (type_files != .Table)
-                return L.Zerror("files must be a table");
-            var i: i32 = L.rawiter(-1, 0);
-            while (i >= 0) : (i = L.rawiter(-1, i)) {
-                defer L.pop(2);
-                if ((L.tointeger(-2) orelse return L.Zerror("index must be an array")) != i)
-                    return L.Zerror("list must be an array");
-                const path = L.tostring(-1) orelse return L.Zerror("library must be a string");
-                try state.add_file(path);
-            }
+        if (LuaHelper.maybeKnownType(L.rawgetfield(2, "files"))) |@"type"| {
+            if (@"type" != .Table)
+                return L.Zerrorf("files must be a table (got {s})", .{VM.lapi.typename(@"type")});
+            var iter: LuaHelper.ArrayIterator = .{ .L = L, .idx = -1 };
+            while (try iter.next()) |t| switch (t) {
+                .String => try state.add_file(L.tostring(-1).?),
+                else => return L.Zerrorf("file must be a string (got {s})", .{VM.lapi.typename(t)}),
+            };
         }
         L.pop(1);
 
-        const type_libs = L.rawgetfield(2, "libraries");
-        if (!type_libs.isnoneornil()) {
-            if (type_libs != .Table)
-                return L.Zerror("libraries must be a table");
-            var i: i32 = L.rawiter(-1, 0);
-            while (i >= 0) : (i = L.rawiter(-1, i)) {
-                if ((L.tointeger(-2) orelse return L.Zerror("index must be an array")) != i)
-                    return L.Zerror("list must be an array");
-                const path = L.tostring(-1) orelse return L.Zerror("library must be a string");
-                try state.add_library(path);
-                L.pop(2);
-            }
+        if (LuaHelper.maybeKnownType(L.rawgetfield(2, "libraries"))) |@"type"| {
+            if (@"type" != .Table)
+                return L.Zerrorf("libraries must be a table (got {s})", .{VM.lapi.typename(@"type")});
+            var iter: LuaHelper.ArrayIterator = .{ .L = L, .idx = -1 };
+            while (try iter.next()) |t| switch (t) {
+                .String => try state.add_library(L.tostring(-1).?),
+                else => return L.Zerrorf("library must be a string (got {s})", .{VM.lapi.typename(t)}),
+            };
         }
         L.pop(1);
 
-        const type_includes = L.rawgetfield(2, "includes");
-        if (!type_includes.isnoneornil()) {
-            if (type_includes != .Table)
-                return L.Zerror("includes must be a table");
-            var i: i32 = L.rawiter(-1, 0);
-            while (i >= 0) : (i = L.rawiter(-1, i)) {
-                defer L.pop(2);
-                if ((L.tointeger(-2) orelse return L.Zerror("index must be an array")) != i)
-                    return L.Zerror("list must be an array");
-                const path = L.tostring(-1) orelse return L.Zerror("include path must be a string");
-                _ = state.add_include_path(path);
-            }
+        if (LuaHelper.maybeKnownType(L.rawgetfield(2, "includes"))) |@"type"| {
+            if (@"type" != .Table)
+                return L.Zerrorf("includes must be a table (got {s})", .{VM.lapi.typename(@"type")});
+            var iter: LuaHelper.ArrayIterator = .{ .L = L, .idx = -1 };
+            while (try iter.next()) |t| switch (t) {
+                .String => _ = state.add_include_path(L.tostring(-1).?),
+                else => return L.Zerrorf("include path must be a string (got {s})", .{VM.lapi.typename(t)}),
+            };
         }
         L.pop(1);
 
-        const type_sysincludes = L.rawgetfield(2, "sysincludes");
-        if (!type_sysincludes.isnoneornil()) {
-            if (type_sysincludes != .Table)
-                return L.Zerror("sysincludes must be a table");
-            var i: i32 = L.rawiter(-1, 0);
-            while (i >= 0) : (i = L.rawiter(-1, i)) {
-                defer L.pop(2);
-                if ((L.tointeger(-2) orelse return L.Zerror("index must be an array")) != i)
-                    return L.Zerror("list must be an array");
-                const path = L.tostring(-1) orelse return L.Zerror("sysinclude path must be a string");
-                _ = state.add_sysinclude_path(path);
-            }
+        if (LuaHelper.maybeKnownType(L.rawgetfield(2, "sysincludes"))) |@"type"| {
+            if (@"type" != .Table)
+                return L.Zerrorf("sysincludes must be a table (got {s})", .{VM.lapi.typename(@"type")});
+            var iter: LuaHelper.ArrayIterator = .{ .L = L, .idx = -1 };
+            while (try iter.next()) |t| switch (t) {
+                .String => _ = state.add_sysinclude_path(L.tostring(-1).?),
+                else => return L.Zerrorf("sysinclude path must be a string (got {s})", .{VM.lapi.typename(t)}),
+            };
         }
         L.pop(1);
 
-        const type_symbols = L.rawgetfield(2, "symbols");
-        if (!type_symbols.isnoneornil()) {
-            if (type_symbols != .Table)
-                return L.Zerror("symbols must be a table");
-            var i: i32 = L.rawiter(-1, 0);
-            while (i >= 0) : (i = L.rawiter(-1, i)) {
-                defer L.pop(2);
-                const name = L.tostring(-2) orelse return L.Zerror("symbol name must be a string");
-                const ptr = LuaPointer.value(L, -1) orelse return L.Zerror("include path must be a pointer");
-                _ = state.add_symbol(name, @ptrCast(@alignCast(ptr.ptr)));
-            }
+        if (LuaHelper.maybeKnownType(L.rawgetfield(2, "symbols"))) |@"type"| {
+            if (@"type" != .Table)
+                return L.Zerrorf("symbols must be a table (got {s})", .{VM.lapi.typename(@"type")});
+            var iter: LuaHelper.TableIterator = .{ .L = L, .idx = -1 };
+            while (iter.next()) |t| switch (t) {
+                .String => {
+                    const ptr = LuaPointer.value(L, -1) orelse return L.Zerror("include path must be a pointer");
+                    _ = state.add_symbol(L.tostring(-2).?, @ptrCast(@alignCast(ptr.ptr)));
+                },
+                else => return L.Zerrorf("symbol name must be a string (got {s})", .{VM.lapi.typename(t)}),
+            };
         }
         L.pop(1);
     }
@@ -2447,13 +2365,12 @@ pub fn loadLib(L: *VM.lua.State) !void {
         L.pop(1);
     }
 
-    try L.createtable(0, 18);
+    try L.createtable(0, 17);
 
     try L.Zsetfieldfn(-1, "dlopen", lua_dlopen);
     try L.Zsetfieldfn(-1, "struct", lua_struct);
     try L.Zsetfieldfn(-1, "closure", lua_closure);
     try L.Zsetfieldfn(-1, "fn", lua_fn);
-    try L.Zsetfield(-1, "supported", true);
 
     try L.Zsetfieldfn(-1, "alloc", lua_alloc);
     try L.Zsetfieldfn(-1, "free", lua_free);
@@ -2506,7 +2423,7 @@ test "ffi" {
     const TestRunner = @import("../utils/testrunner.zig");
 
     const testResult = try TestRunner.runTest(
-        TestRunner.newTestFile("standard/ffi/init.test.luau"),
+        TestRunner.newTestFile("standard/ffi/init.luau"),
         &.{},
         .{ .ref_leak_check = false },
     );

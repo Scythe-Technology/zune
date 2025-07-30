@@ -16,9 +16,9 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Setup Zig
-      uses: mlugg/setup-zig@v1
+      uses: mlugg/setup-zig@v2
       with:
-        version: 0.14.0
+        version: 0.14.1
         use-cache: false
 
     - name: Run fmt
@@ -34,9 +34,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Zig
-        uses: mlugg/setup-zig@v1
+        uses: mlugg/setup-zig@v2
         with:
-          version: 0.14.0
+          version: 0.14.1
           use-cache: false
 
       - name: Get Zune Version
@@ -85,9 +85,9 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Setup Zig
-      uses: mlugg/setup-zig@v1
+      uses: mlugg/setup-zig@v2
       with:
-        version: 0.14.0
+        version: 0.14.1
         use-cache: false
 
     - name: Setup QEMU

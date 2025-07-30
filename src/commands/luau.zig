@@ -5,7 +5,7 @@ const Zune = @import("zune");
 
 const command = @import("lib.zig");
 
-const USAGE = "Usage: luau <list-fflags | version>\n";
+const USAGE = "usage: luau <list-fflags | version>\n";
 fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
     if (args.len != 1) {
         return std.debug.print(USAGE, .{});
@@ -68,7 +68,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
             }
         }
     } else if (std.mem.eql(u8, args[0], "version")) {
-        std.debug.print("{}.{}", .{ luau.LUAU_VERSION.major, luau.LUAU_VERSION.minor });
+        std.debug.print("{}.{}\n", .{ luau.LUAU_VERSION.major, luau.LUAU_VERSION.minor });
     } else {
         return std.debug.print(USAGE, .{});
     }

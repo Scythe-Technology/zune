@@ -221,31 +221,27 @@ local function runTest(fn: () -> (), info: TestInfo)
             local s, d, w, t = task.count("sdwt");
             local show = {};
             if (s > 0) then
-                print(` {DIM}|    "Sleeping" - (Zune Luau),{RESET}`);
+                print(` {DIM}|    "Sleeping" - (zune luau),{RESET}`);
                 print(` {DIM}|      Active luau task, usually means there is a running task created by luau or zune.{RESET}`);
                 print(` {DIM}|      Caused when a sleeping task is still in queue.{RESET}`);
-                print(` {DIM}|      From calling 'task.delay'/'task.sleep' or zune backend has requested a delayed resume on a thread{RESET}`);
                 table.insert(show, `Sleeping Tasks: {YELLOW}{s}{RESET}`);
             end
             if (d > 0) then
-                print(` {DIM}|    "Deferred" - (Zune Luau),{RESET}`);
+                print(` {DIM}|    "Deferred" - (zune luau),{RESET}`);
                 print(` {DIM}|      Active luau task, usually means there is a running task created by luau or zune.{RESET}`);
                 print(` {DIM}|      Caused when a deferred task is still in queue.{RESET}`);
-                print(` {DIM}|      From calling 'task.defer' or zune backend has requested a deferred resume on a thread{RESET}`);
                 table.insert(show, `Deferred Tasks: {YELLOW}{d}{RESET}`);
             end
             if (w > 0) then
-                print(` {DIM}|    "Awaiting" - (Zune Backend > Zig),{RESET}`);
+                print(` {DIM}|    "Awaiting" - (zune backend),{RESET}`);
                 print(` {DIM}|      Active zune awaiting task, usually means there is a running task created by the zune backend.{RESET}`);
                 print(` {DIM}|      Caused by a the zune backend waiting for a response from luau{RESET}`);
-                print(` {DIM}|      For example, an active task waiting for a response from a zune server "@zcore/net" called in 'request'{RESET}`);
                 table.insert(show, `Awaiting Tasks: {YELLOW}{w}{RESET}`);
             end
             if (t > 0) then
-                print(` {DIM}|    "Internal" - (Zune Backend > Zig){RESET}`);
+                print(` {DIM}|    "Internal" - (zune backend){RESET}`);
                 print(` {DIM}|      Active zune core task, usually means there is a running task created by the zune backend.{RESET}`);
                 print(` {DIM}|      Caused by undisposed backend tasks.{RESET}`);
-                print(` {DIM}|      For example, an open zune server from zune.net{RESET}`);
                 table.insert(show, `Internal Tasks: {YELLOW}{t}{RESET}`);
             end
             print(` {DIM}|`);

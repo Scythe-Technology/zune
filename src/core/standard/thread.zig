@@ -317,6 +317,8 @@ const LuaThread = struct {
         if (try runtime.transporter.pushAndConsumeMessage(L, port)) |amt| {
             return amt;
         } else {
+            if (!L.isyieldable())
+                return L.Zyielderror();
             const scheduler = Scheduler.getScheduler(L);
             const sync = try scheduler.createSync(Sync, Sync.receiveComplete);
             sync.* = .{
@@ -331,6 +333,8 @@ const LuaThread = struct {
     }
 
     pub fn lua_join(self: *LuaThread, L: *VM.lua.State) !i32 {
+        if (!L.isyieldable())
+            return L.Zyielderror();
         const runtime = self.runtime;
         runtime.access_mutex.lock();
         defer runtime.access_mutex.unlock();
@@ -539,9 +543,7 @@ fn lua_fromModule(L: *VM.lua.State) !i32 {
             error.Syntax => return L.Zerror(ML.tostring(-1) orelse "UnknownError"),
         };
     } else {
-        ML.load(module_src_path, file_content, 0) catch |err| switch (err) {
-            else => unreachable, // should not happen
-        };
+        ML.load(module_src_path, file_content, 0) catch unreachable; // should not error
         Zune.Runtime.Engine.loadNative(ML);
     }
     return 1;
@@ -562,7 +564,6 @@ fn lua_fromBytecode(L: *VM.lua.State) !i32 {
 
     try Zune.Runtime.Engine.setLuaFileContext(ML, .{
         .source = null,
-        .thread = true,
         .main = true,
     });
 
@@ -594,6 +595,8 @@ fn lua_selfReceive(L: *VM.lua.State) !i32 {
     if (try runtime.transporter.pushAndConsumeMessage(L, port)) |amt| {
         return amt;
     } else {
+        if (!L.isyieldable())
+            return L.Zyielderror();
         const scheduler = Scheduler.getScheduler(L);
         const sync = try scheduler.createSync(Sync, Sync.receiveComplete);
         sync.* = .{
@@ -700,7 +703,7 @@ test "thread" {
     const TestRunner = @import("../utils/testrunner.zig");
 
     const testResult = try TestRunner.runTest(
-        TestRunner.newTestFile("standard/thread/init.test.luau"),
+        TestRunner.newTestFile("standard/thread/init.luau"),
         &.{},
         .{},
     );

@@ -1110,6 +1110,8 @@ pub fn generateKey(encoded: []u8) void {
 }
 
 pub fn lua_websocket(L: *VM.lua.State) !i32 {
+    if (!L.isyieldable())
+        return L.Zyielderror();
     const allocator = luau.getallocator(L);
     const scheduler = Scheduler.getScheduler(L);
 
@@ -1176,66 +1178,56 @@ pub fn lua_websocket(L: *VM.lua.State) !i32 {
     var host_handled = false;
     var user_agent_handled = false;
 
-    const headersType = L.rawgetfield(2, "headers");
-    if (!headersType.isnoneornil()) {
-        if (headersType != .Table)
+    if (LuaHelper.maybeKnownType(L.rawgetfield(2, "headers"))) |@"type"| {
+        if (@"type" != .Table)
             return L.Zerror("headers must be a table");
-        var i: i32 = L.rawiter(-1, 0);
-        while (i >= 0) : (i = L.rawiter(-1, i)) {
-            defer L.pop(2);
-            const keyType = L.typeOf(-2);
-            const valueType = L.typeOf(-1);
-            if (keyType != .String)
-                return L.Zerror("Table is not an dictionary");
-            if (valueType != .String)
-                return L.Zerror("Value must be a string");
-            try headers.appendSlice(allocator, "\r\n");
-            const key = L.tostring(-2).?;
-            if (std.ascii.eqlIgnoreCase(key, "host")) {
-                host_handled = true;
-            } else if (std.ascii.eqlIgnoreCase(key, "user-agent")) {
-                user_agent_handled = true;
-            } else if (std.ascii.eqlIgnoreCase(key, "sec-websocket-protocol")) {
-                return L.Zerror("sec-websocket-protocol must be set in protocols, not headers");
-            } else if (std.ascii.eqlIgnoreCase(key, "sec-websocket-version")) {
-                return L.Zerror("sec-websocket-version cannot be set");
-            } else if (std.ascii.eqlIgnoreCase(key, "sec-websocket-key")) {
-                return L.Zerror("sec-websocket-key cannot be set");
-            } else if (std.ascii.eqlIgnoreCase(key, "upgrade")) {
-                return L.Zerror("upgrade cannot be set");
-            } else if (std.ascii.eqlIgnoreCase(key, "connection")) {
-                return L.Zerror("connection cannot be set");
-            } else if (std.ascii.eqlIgnoreCase(key, "content-length")) {
-                return L.Zerror("content-length cannot be set");
-            }
-            const value = L.tostring(-1).?;
-            if (value.len == 0)
-                continue;
-            try headers.appendSlice(allocator, key);
-            try headers.appendSlice(allocator, ": ");
-            try headers.appendSlice(allocator, L.tostring(-1).?);
-        }
+        var iter: LuaHelper.TableIterator = .{ .L = L, .idx = -1 };
+        while (iter.next()) |t| switch (t) {
+            .String => {
+                if (L.typeOf(-1) != .String)
+                    return L.Zerrorf("header value must be a string (got {s})", .{VM.lapi.typename(L.typeOf(-1))});
+                try headers.appendSlice(allocator, "\r\n");
+                const key = L.tostring(-2).?;
+                if (std.ascii.eqlIgnoreCase(key, "host")) {
+                    host_handled = true;
+                } else if (std.ascii.eqlIgnoreCase(key, "user-agent")) {
+                    user_agent_handled = true;
+                } else if (std.ascii.eqlIgnoreCase(key, "sec-websocket-protocol")) {
+                    return L.Zerror("sec-websocket-protocol must be set in protocols, not headers");
+                } else if (std.ascii.eqlIgnoreCase(key, "sec-websocket-version")) {
+                    return L.Zerror("sec-websocket-version cannot be set");
+                } else if (std.ascii.eqlIgnoreCase(key, "sec-websocket-key")) {
+                    return L.Zerror("sec-websocket-key cannot be set");
+                } else if (std.ascii.eqlIgnoreCase(key, "upgrade")) {
+                    return L.Zerror("upgrade cannot be set");
+                } else if (std.ascii.eqlIgnoreCase(key, "connection")) {
+                    return L.Zerror("connection cannot be set");
+                } else if (std.ascii.eqlIgnoreCase(key, "content-length")) {
+                    return L.Zerror("content-length cannot be set");
+                }
+                const value = L.tostring(-1).?;
+                if (value.len == 0)
+                    continue;
+                try headers.appendSlice(allocator, key);
+                try headers.appendSlice(allocator, ": ");
+                try headers.appendSlice(allocator, L.tostring(-1).?);
+            },
+            else => return L.Zerrorf("header index is not a string (got {s})", .{VM.lapi.typename(t)}),
+        };
     }
 
-    const protocolsType = L.rawgetfield(2, "protocols");
-    if (!protocolsType.isnoneornil()) {
-        if (protocolsType != .Table)
+    if (LuaHelper.maybeKnownType(L.rawgetfield(2, "protocols"))) |@"type"| {
+        if (@"type" != .Table)
             return L.Zerror("protocols must be a table");
-        var i: i32 = L.rawiter(-1, 0);
-        while (i >= 0) : (i = L.rawiter(-1, i)) {
-            defer L.pop(2);
-            const keyType = L.typeOf(-2);
-            const valueType = L.typeOf(-1);
-            if (keyType != .Number)
-                return L.Zerror("Table is not an array");
-            if (L.tointeger(-2).? != i)
-                return L.Zerror("Table is not an array");
-            if (valueType != .String)
-                return L.Zerror("Value must be a string");
-            if (i > 1)
-                try protocols.appendSlice(allocator, ", ");
-            try protocols.appendSlice(allocator, L.tostring(-1).?);
-        }
+        var iter: LuaHelper.ArrayIterator = .{ .L = L, .idx = -1 };
+        while (try iter.next()) |t| switch (t) {
+            .String => {
+                if (protocols.items.len > 0)
+                    try protocols.appendSlice(allocator, ", ");
+                try protocols.appendSlice(allocator, L.tostring(-1).?);
+            },
+            else => return L.Zerrorf("protocol value is not a string (got {s})", .{VM.lapi.typename(t)}),
+        };
     }
     L.pop(1);
 

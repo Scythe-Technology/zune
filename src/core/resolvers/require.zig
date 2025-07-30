@@ -257,6 +257,8 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
                     if (ptr == @as(*const anyopaque, @ptrCast(&ErrorState))) {
                         return L.Zerror("requested module failed to load");
                     } else if (ptr == @as(*const anyopaque, @ptrCast(&WaitingState))) {
+                        if (!L.isyieldable())
+                            return L.Zyielderror();
                         const res = REQUIRE_QUEUE_MAP.getEntry(module_relative_path) orelse std.debug.panic("zune_require: queue not found", .{});
                         try res.value_ptr.append(.{
                             .state = Scheduler.ThreadRef.init(L),
@@ -274,9 +276,14 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
             }
             L.pop(1); // drop: nil
         }
-        if (Zune.STATE.BUNDLE) |*bundle|
-            break :blk try File.searchLuauFileBundle(&src_path_buf, bundle, script_path);
-        break :blk try File.searchLuauFile(&src_path_buf, cwd, script_path);
+
+        break :blk (if (Zune.STATE.BUNDLE) |*bundle|
+            File.searchLuauFileBundle(&src_path_buf, bundle, script_path)
+        else
+            File.searchLuauFile(&src_path_buf, cwd, script_path)) catch |err| switch (err) {
+            error.RedundantFileExtension => return L.Zerrorf("redundant file extension, remove '{s}'", .{std.fs.path.extension(script_path)}),
+            else => return err,
+        };
     };
     defer search_result.deinit();
 
@@ -319,9 +326,7 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
                 },
             };
         } else {
-            ML.load(module_src_path, file_content, 0) catch |err| switch (err) {
-                else => unreachable, // should not happen
-            };
+            ML.load(module_src_path, file_content, 0) catch unreachable; // should not error
             Engine.loadNative(ML);
         }
     }
@@ -370,12 +375,15 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
             }
 
             var list = std.ArrayList(QueueItem).init(allocator);
-            try list.append(.{
-                .state = Scheduler.ThreadRef.init(L),
-            });
+            if (L.isyieldable())
+                try list.append(.{
+                    .state = Scheduler.ThreadRef.init(L),
+                });
 
             try REQUIRE_QUEUE_MAP.put(try allocator.dupe(u8, module_relative_path), list);
 
+            if (!L.isyieldable())
+                return L.Zyielderror();
             return L.yield(0);
         },
         else => unreachable,

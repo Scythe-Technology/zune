@@ -29,7 +29,7 @@ This project includes third-party components with the following licenses:
 | [`zig-luau`](https://github.com/Scythe-Technology/zig-luau) | [MIT](https://github.com/Scythe-Technology/zig-luau/blob/master/license), [MIT](https://github.com/luau-lang/luau/blob/master/LICENSE.txt), [MIT](https://github.com/luau-lang/luau/blob/master/lua_LICENSE.txt) |
 | [`zig-json`](https://github.com/Scythe-Technology/zig-json) | [MIT](https://github.com/Scythe-Technology/zig-json/blob/master/LICENSE) |
 | [`zig-yaml`](https://github.com/kubkon/zig-yaml) | [MIT](https://github.com/kubkon/zig-yaml/blob/main/LICENSE) |
-| [`zig-lz4`](https://github.com/SnorlaxAssist/zig-lz4) | [MIT](https://github.com/SnorlaxAssist/zig-lz4/blob/master/LICENSE), [BSD 2-Clause](https://github.com/lz4/lz4/blob/dev/LICENSE) |
+| [`zig-lz4`](https://github.com/Scythe-Technology/zig-lz4) | [MIT](https://github.com/Scythe-Technology/zig-lz4/blob/master/LICENSE), [BSD 2-Clause](https://github.com/lz4/lz4/blob/dev/LICENSE) |
 | [`zpcre2`](https://github.com/Scythe-Technology/zpcre2) | [MIT](https://github.com/Scythe-Technology/zpcre2/blob/master/LICENSE), [BSD 3-Clause](https://github.com/Scythe-Technology/zpcre2/blob/master/PCRE2-LICENCE.md) |
 | [`zig-tinycc`](https://github.com/Scythe-Technology/zig-tinycc) | [MIT](https://github.com/Scythe-Technology/zffi/blob/master/LICENSE), [LGPL](https://github.com/TinyCC/tinycc/blob/mob/COPYING) |
 | [`zdt`](https://github.com/FObersteiner/zdt) | [MPL-2.0](https://github.com/FObersteiner/zdt/blob/master/LICENSE)|
@@ -37,3 +37,4 @@ This project includes third-party components with the following licenses:
 | [`z-sqlite`](https://github.com/Scythe-Technology/z-sqlite) | [MIT](https://github.com/Scythe-Technology/z-sqlite/blob/master/LICENSE), [SQLite](https://sqlite.org/copyright.html) |
 | [`zig-zstd`](https://github.com/Scythe-Technology/zig-zstd) | [MIT](https://github.com/Scythe-Technology/zig-zstd/blob/master/LICENSE), [BSD 3-Clause](https://github.com/facebook/zstd/blob/dev/LICENSE) |
 | [`libxev`](https://github.com/Scythe-Technology/libxev) | [MIT](https://github.com/Scythe-Technology/libxev/blob/main/LICENSE) |
+| [`tls`](https://github.com/ianic/tls.zig) | [MIT](https://github.com/ianic/tls.zig/blob/602f05bd84d819d487a6e22dd1463e907f7992ab/LICENSE) |

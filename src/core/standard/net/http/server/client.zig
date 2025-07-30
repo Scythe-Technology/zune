@@ -59,6 +59,11 @@ pub fn StaticResponse(comptime res: HttpStaticResponse) []const u8 {
     return part;
 }
 
+pub const HTTP_400 = StaticResponse(.{
+    .status = "400 Bad Request",
+    .headers = &[_][]const u8{ "Connection: close", "Content-Type: text/plain" },
+    .body = "The request could not be understood by the server due to malformed syntax.",
+});
 pub const HTTP_405 = StaticResponse(.{
     .status = "405 Method Not Allowed",
     .headers = &[_][]const u8{"Connection: close"},
@@ -720,13 +725,19 @@ pub fn onRecv(
     if (self.parser.parse(self.buffers.in[0..read]) catch |err| {
         self.state.stage = .closing;
         switch (err) {
+            error.BodyTooBig => self.writeAll(HTTP_413),
             error.InvalidContentLength => self.writeAll(HTTP_413),
             error.UnknownMethod => self.writeAll(HTTP_405),
             error.UnknownProtocol => self.writeAll(HTTP_431),
             error.InvalidRequestTarget => self.writeAll(HTTP_414),
+            error.HeaderTooBig => self.writeAll(HTTP_431),
             error.TooManyHeaders => self.writeAll(HTTP_431),
             error.UnsupportedProtocol => self.writeAll(HTTP_505),
-            else => {},
+            error.InvalidHeaderLine => self.writeAll(HTTP_400),
+            error.OutOfMemory => {
+                self.server.emitError(.raw_receive, err);
+                self.writeAll(HTTP_500);
+            },
         }
         return .disarm;
     }) {

@@ -275,6 +275,8 @@ const LuaDatabase = struct {
         };
 
         if (status == .Yield) {
+            if (!L.isyieldable())
+                return L.Zyielderror();
             const allocator = luau.getallocator(L);
             const data = try allocator.create(Transaction);
             data.* = .{
@@ -454,7 +456,7 @@ test "sqlite" {
     const TestRunner = @import("../utils/testrunner.zig");
 
     const testResult = try TestRunner.runTest(
-        TestRunner.newTestFile("standard/sqlite/init.test.luau"),
+        TestRunner.newTestFile("standard/sqlite/init.luau"),
         &.{},
         .{},
     );

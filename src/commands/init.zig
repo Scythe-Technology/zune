@@ -30,6 +30,26 @@ const INIT_CONFIG_FILE =
     \\#  You can use `zune luau list-fflags` to list all available FFlags.
     \\#[runtime.luau.fflags]
     \\#DebugCodegenOptSize = false
+    \\
+    \\# Features settings
+    \\#  This affects the features that are enabled in Zune.
+    \\#  mainly builtin libraries and features.
+    \\#[features.builtins]
+    \\#fs = true
+    \\#io = true
+    \\#net = true
+    \\#process = true
+    \\#task = true
+    \\#luau = true
+    \\#serde = true
+    \\#crypto = true
+    \\#datetime = true
+    \\#regex = true
+    \\#sqlite = true
+    \\#require = true
+    \\#random = true
+    \\#thread = true
+    \\#ffi = true
 ;
 
 fn Execute(_: std.mem.Allocator, args: []const []const u8) !void {
@@ -45,6 +65,9 @@ fn Execute(_: std.mem.Allocator, args: []const []const u8) !void {
     defer config_file.close();
 
     try config_file.writeAll(INIT_CONFIG_FILE);
+
+    if (args.len > 0 and std.mem.eql(u8, args[0], "bare"))
+        return;
 
     try std.fs.cwd().makePath("src");
 

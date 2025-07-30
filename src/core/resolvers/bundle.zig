@@ -27,16 +27,17 @@ pub const Section = union(enum) {
     file: File,
 
     pub const Script = []const u8;
+    pub const Compression = enum(u3) { none, zlib, lz4, zstd };
 
     pub const File = struct {
         data: []const u8,
         size: u64, // decompressed size
-        compression: enum { none, zlib, lz4, zstd },
+        compression: Compression,
     };
 
     pub const Header = packed struct(u56) {
         kind: enum(u1) { script, file }, // type of section
-        compression: enum(u3) { none, zlib, lz4, zstd },
+        compression: Compression,
         name_size: u15,
         size: u37,
     };
@@ -62,7 +63,7 @@ pub const Section = union(enum) {
         writer: anytype,
         name: []const u8,
         data: []const u8,
-        compression: enum { none, zlib, lz4, zstd },
+        compression: Compression,
     ) !void {
         if (name.len > std.math.maxInt(u15))
             return error.NameTooLong;
@@ -79,6 +80,8 @@ pub const Section = union(enum) {
             try writer.writeByte(0);
             try writer.writeAll(data);
         } else {
+            if (data.len > std.math.maxInt(u40)) // ~1.1TB
+                return error.DataTooLarge;
             var array: std.ArrayListUnmanaged(u8) = .empty;
             defer array.deinit(allocator);
             switch (compression) {
@@ -104,17 +107,18 @@ pub const Section = union(enum) {
                 },
                 else => unreachable,
             }
-            if (array.items.len > std.math.maxInt(u37))
+            const block_size: usize = array.items.len + 5; // 5 bytes for u40
+            if (block_size > std.math.maxInt(u37))
                 return error.DataTooLarge;
             try writer.writeInt(u56, @bitCast(Header{
                 .kind = .file,
-                .compression = @enumFromInt(@intFromEnum(compression)),
+                .compression = compression,
                 .name_size = @intCast(name.len),
-                .size = @intCast(array.items.len),
+                .size = @intCast(block_size),
             }), .big);
             try writer.writeAll(name);
             try writer.writeByte(0);
-            try writer.writeInt(u64, @intCast(data.len), .big);
+            try writer.writeInt(u40, @intCast(data.len), .big);
             try writer.writeAll(array.items);
         }
     }
@@ -199,32 +203,32 @@ pub const Map = struct {
     }
 
     fn unpackFile(self: *Map, file: *Section.File) ![]const u8 {
-        if (file.compression != .none) {
-            defer file.compression = .none;
-            switch (file.compression) {
-                .zlib => {
-                    const decompressed_bytes = try self.allocator.alloc(u8, file.size);
+        if (file.compression == .none)
+            return file.data;
+        defer file.compression = .none;
+        switch (file.compression) {
+            .zlib => {
+                const decompressed_bytes = try self.allocator.alloc(u8, file.size);
 
-                    var writer = std.io.fixedBufferStream(decompressed_bytes);
-                    var reader = std.io.fixedBufferStream(file.data);
+                var writer = std.io.fixedBufferStream(decompressed_bytes);
+                var reader = std.io.fixedBufferStream(file.data);
 
-                    try std.compress.zlib.decompress(reader.reader(), writer.writer());
-                    file.data = decompressed_bytes;
-                    return decompressed_bytes;
-                },
-                .lz4 => {
-                    const decompressed_bytes = try lz4.Standard.decompress(self.allocator, file.data, file.size);
-                    file.data = decompressed_bytes;
-                    return decompressed_bytes;
-                },
-                .zstd => {
-                    const decompressed_bytes = try zstd.decompressAlloc(self.allocator, file.data);
-                    file.data = decompressed_bytes;
-                    return decompressed_bytes;
-                },
-                else => unreachable,
-            }
-        } else return file.data;
+                try std.compress.zlib.decompress(reader.reader(), writer.writer());
+                file.data = decompressed_bytes;
+                return decompressed_bytes;
+            },
+            .lz4 => {
+                const decompressed_bytes = try lz4.Standard.decompress(self.allocator, file.data, file.size);
+                file.data = decompressed_bytes;
+                return decompressed_bytes;
+            },
+            .zstd => {
+                const decompressed_bytes = try zstd.decompressAlloc(self.allocator, file.data);
+                file.data = decompressed_bytes;
+                return decompressed_bytes;
+            },
+            else => unreachable,
+        }
     }
 
     pub fn loadFile(self: *Map, path: []const u8) ![]const u8 {
@@ -299,9 +303,9 @@ pub fn loadBundle(allocator: std.mem.Allocator, exe_header: ExeHeader, bundle: [
                         .compression = .none,
                     },
                     else => .{
-                        .data = data[8..],
-                        .size = std.mem.readVarInt(u64, data[0..8], .big),
-                        .compression = @enumFromInt(@intFromEnum(header.compression)),
+                        .data = data[5..],
+                        .size = std.mem.readVarInt(u40, data[0..5], .big),
+                        .compression = header.compression,
                     },
                 },
             },

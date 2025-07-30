@@ -150,7 +150,7 @@ test "serde" {
     const TestRunner = @import("../../utils/testrunner.zig");
 
     const testResult = try TestRunner.runTest(
-        TestRunner.newTestFile("standard/serde/init.test.luau"),
+        TestRunner.newTestFile("standard/serde/init.luau"),
         &.{},
         .{},
     );

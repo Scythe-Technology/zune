@@ -1,7 +1,7 @@
 --  https://github.com/JohnnyMorganz/luau-lsp/issues/271
 
 declare _FILE: {
-    source: string,
+    source: string?,
     main: boolean,
 }
 
@@ -31,291 +31,61 @@ export type Metadata = {
 }
 
 declare class FileHandle
-    --[[
-        Reads the contents of a file.
-
-        *Optional: The amount of bytes to read, if nil, reads the whole till EOF or Luau limit.*
-
-        @param amount The amount of bytes to read.
-    ]]
     read:
         & ((self: FileHandle, amount: number?, useBuffer: false?) -> string)
         & ((self: FileHandle, amount: number?, useBuffer: true) -> buffer)
-
-    --[[
-        Reads the contents of a file.
-
-        *Optional: The amount of bytes to read, if nil, reads the whole till EOF or Luau limit.*
-
-        @param amount The amount of bytes to read.
-    ]]
     readSync:
         & ((self: FileHandle, amount: number?, useBuffer: false?) -> string)
         & ((self: FileHandle, amount: number?, useBuffer: true) -> buffer)
-
-    --[[
-        Writes to a file.
-
-        @param contents The contents to write to the file.
-    ]]
     function write(self, contents: string | buffer): ()
-
-    --[[
-        Writes to a file.
-
-        @param contents The contents to write to the file.
-    ]]
     function writeSync(self, contents: string | buffer): ()
-
-    --[[
-        Appends to a file.
-
-        @param contents The contents to append to the file.
-    ]]
     function append(self, contents: string | buffer): ()
-
-    --[[
-        Appends to a file.
-
-        @param contents The contents to append to the file.
-    ]]
     function appendSync(self, contents: string | buffer): ()
-
-    --[[
-        Returns the size of the file. Based on current state of the file object.
-    ]]
     function getSize(self): number
-
-    --[[
-        Returns the current position of the file.
-    ]]
     function getSeekPosition(self): number
-
-    --[[
-        Seeks to a position in the file relative to the end.
-
-        *Optional: The amount of bytes to seek, if nil, seeks to the end*
-
-        @param amount The amount of bytes to seek.
-    ]]
     function seekFromEnd(self, amount: number?): ()
-
-    --[[
-        Seeks to a position in the file absolute to the start.
-
-        *Optional: The amount of bytes to seek, if nil, seeks to the start, 0*
-
-        @param amount The amount of bytes to seek.
-    ]]
     function seekTo(self, amount: number?): ()
-
-    --[[
-        Seeks to a position in the file relative to the current position.
-
-        *Optional: The amount of bytes to seek, if nil, seeks to the next position, 1*
-
-        *If `0` is provided, seek will not move.*
-
-        @param amount The amount of bytes to seek.
-    ]]
     function seekBy(self, amount: number?): ()
-
-    --[[
-        Locks the file.
-
-        *Optional: The mode to lock the file, if nil, locks the file in exclusive mode.*
-
-        @param lockMode The mode to lock the file.
-    ]]
     function lock(self, lockMode: ("shared" | "exclusive" | "none")?): boolean
-
-    --[[
-        Unlocks the file.
-    ]]
     function unlock(self): ()
-
-    --[[
-        Flushes the file. Writes the contents to the disk.
-
-        Does not yield, **blocks** process.
-    ]]
     function sync(self): ()
-
-    --[[
-        Returns whether the file is readonly.
-
-        *Optional: Whether to set the file to readonly, if nil, returns the current state.*
-
-        @param enabled Whether to set the file to readonly.
-    ]]
     readonly:
         & ((self: FileHandle) -> boolean)
         & ((self: FileHandle, enabled: boolean) -> ())
-
-    --[[
-        Closes the file. (Will flush the file)
-    ]]
     function close(self): ()
 end
 
 export type FileWatcher = {
-    --[[
-        Stops the watcher.
-    ]]
     stop: (self: FileWatcher) -> (),
 }
 
 type CreateFileOptions = {
-    --[[
-        Whether to create the file in exclusive mode.
-
-        *Default: false*
-    ]]
     exclusive: boolean?,
 }
 
 type OpenFileOptions = {
-    --[[
-        The mode to open the file in.
-
-        Available modes: `r`, `w`
-
-        *Default: `rw`*
-    ]]
     mode: string?,
 }
 
 type FileSystemLib = {
-    --[[
-        Creates a file.
-
-        If exclusive is true, the operation will fail if the file already exists.
-
-        @param path The path to the file.
-        @param opts The options to create the file.
-        @return `FileHandle` The file handle.
-    ]]
     createFile: (path: string, opts: CreateFileOptions?) -> FileHandle,
-
-    --[[
-        Opens a file.
-
-        *The file must exist*
-        @param path The path to the file.
-        @param opts The options to open the file.
-        @return `FileHandle` The file handle.
-        @error `ReadError`
-    ]]
     openFile: (path: string, opts: OpenFileOptions?) -> FileHandle,
-
-    --[[
-        Reads the contents of a file.
-
-        *The content could be limited*
-
-        @param path The path to the file.
-        @param useBuffer Whether to read the file as a buffer.
-        @return `string | buffer` The contents of the file.
-        @error
-    ]]
     readFile:
         & ((path: string) -> string)
         & ((path: string, useBuffer: true) -> buffer),
-
-    --[[
-        Reads the contents of a directory.
-
-        @param path The path to the directory.
-        @return `{string} | string` The contents of the directory, or an error.
-    ]]
     readDir: (path: string) -> { string },
-
-    --[[
-        Writes to a file.
-
-        *The content could be limited*
-
-        @param path The path to the file.
-        @param contents The contents to write to the file.
-        @return `FileWriteError` An error if the operation failed.
-    ]]
     writeFile: (path: string, contents: string | buffer) -> (),
-
-    --[[
-        Creates a directory.
-
-        @param path The path to the directory.
-        @param recursive Whether to write recursively.
-        @return `DirWriteError` An error if the operation failed.
-    ]]
     writeDir:  (path: string, recursive: boolean?) -> (),
-
-    --[[
-        Deletes a file.
-
-        @param path The path to the file.
-        @return `FileRemoveError` An error if the operation failed.
-    ]]
     removeFile: (path: string) -> (),
-
-    --[[
-        Deletes a directory.
-
-        @param path The path to the directory.
-        @param recursive Whether to delete recursively.
-        @return `DirRemoveError` An error if the operation failed.
-    ]]
     removeDir: (path: string, recursive: boolean?) -> (),
-
-    --[[
-        Returns the metadata of a file or directory.
-
-        @param path The path to the file or directory.
-        @return `Metadata` The metadata of the file or directory
-    ]]
     metadata: (path: string) -> Metadata,
-
-    --[[
-        Checks if a directory exists.
-
-        @param path The path to the directory.
-        @return `boolean` Whether the directory exists.
-    ]]
     isDir: (path: string) -> boolean,
-
-    --[[
-        Moves a file or directory to a new location.
-
-        @param from The path to the file or directory.
-        @param to The path to rename the file or directory to.
-        @param overwrite Whether to overwrite the file or directory if it exists.
-    ]]
     move: (from: string, to: string, overwrite: boolean?) -> (),
-
-    --[[
-        Copies a file or directory to a new location.
-
-        @param from The path to the file or directory.
-        @param to The path to copy the file or directory to.
-        @param overwrite Whether to overwrite the file or directory if it exists.
-    ]]
     copy: (from: string, to: string, overwrite: boolean?) -> (),
-
-    --[[
-        Creates a symbolic link.
-
-        *Currently **not** supported on `Windows`*
-
-        @param from The path to the file or directory.
-        @param to The path to create the symbolic link to.
-    ]]
     symlink: (from: string, to: string) -> (),
-
     getExePath: () -> string,
     realPath: (path: string) -> string,
-
     watch: (path: string, callback: (path: string, events: {"created" | "modified" | "moved" | "renamed" | "deleted" | "metadata"}) -> ()) -> FileWatcher,
-
     embedFile: (path: string) -> buffer,
     embeddedFiles: () -> { string },
     embeddedScripts: () -> { string },
@@ -469,103 +239,20 @@ declare class ProcessChild
     stdin: FileHandle?
     stdout: FileHandle?
     stderr: FileHandle?
-
-    --[[
-        Waits for the process to exit. Calls system function.
-
-        @return `ProcessResult`
-    ]]
     function wait(self): ProcessResult
-    --[[
-        Kills process. Calls system function.
-
-        @return `ProcessResult`
-    ]]
     function kill(self): ProcessResult
 end
 
 type ProcessLib = {
-    --[[
-        The os the process is running on.
-    ]]
     os: OS,
-
-    --[[
-        The architecture of the processor running.
-    ]]
     arch: CPUArchitecture,
-
-    --[[
-        The arguments passed to the process.
-    ]]
     args: { string },
-
-    --[[
-        The environment variables of the process.
-        - Includes `.env` file in the current working directory.
-        - Includes `.env.production` file in the current working directory. When LUAU_ENV is set to `PRODUCTION`.
-        - Includes `.env.development` file in the current working directory. When LUAU_ENV is set to `DEVELOPMENT`.
-        - Includes `.env.test` file in the current working directory. When LUAU_ENV is set to `TEST`.
-        - Includes `.env.local` file in the current working directory.
-    ]]
     env: { [string]: string },
-
-    --[[
-        Loads the environment variables of the process.
-        - Includes `.env` file in the current working directory.
-        - Includes `.env.production` file in the current working directory. When LUAU_ENV is set to `PRODUCTION`.
-        - Includes `.env.development` file in the current working directory. When LUAU_ENV is set to `DEVELOPMENT`.
-        - Includes `.env.test` file in the current working directory. When LUAU_ENV is set to `TEST`.
-        - Includes `.env.local` file in the current working directory.
-
-        @return `EnvironmentMap`
-    ]]
     loadEnv: () -> { [string]: string },
-
-    --[[
-        Get current working directory of the process.
-    ]]
     getCwd: () ->string,
-
-    --[[
-        Creates a new process.
-
-        @param exec The executable to run.
-        @param args The arguments to pass to the executable.
-        @param procOpts The options for the process.
-        @return `ProcessChild`
-        @error `ProcessCreateError`
-    ]]
     create: (exec: string, args: {string}?, procOpts: ProcessOptions?) -> ProcessChild,
-
-    --[[
-        Runs a new process.
-
-        Blocks the current process until the process has exited.
-
-        We recommend using `process.create` for non-blocking process creation.
-
-        @param exec The executable to run.
-        @param args The arguments to pass to the executable.
-        @param procOpts The options for the process.
-        @return `ProcessRunResult`
-        @error `ProcessRunError`
-    ]]
     run: (exec: string, args: {string}?, procOpts: ProcessOptions?) -> ProcessRunResult,
-
-    --[[
-        Exits the current process with the given exit code.
-
-        @param code
-    ]]
     exit: (code: number) -> never,
-
-    --[[
-        Registers a signal handler.
-
-        @param signal The signal to handle.
-        @param callback The callback to run when the signal is received.
-    ]]
     onSignal: (signal: "INT", callback: () -> ()) -> (),
 }
 --[======[ Process ]======]--
@@ -794,103 +481,23 @@ type TestingLib = {
 
 --[======[ Task ]======]--
 type TaskLib = {
-    --[[
-        Cancels a task.
-
-        @param thread The task to cancel.
-    ]]
     cancel: (thread: thread) -> (),
-
-    --[[
-        Defers a task.
-
-        Runs on next frame.
-
-        @param f The function to defer.
-        @return `thread`
-    ]]
     defer: <A..., R...>(f: ((A...) -> R...) | thread, A...) -> thread,
-
-    --[[
-        Delays a task.
-
-        Runs after a certain amount of time.
-
-        @param sec The time to delay.
-        @param f The function to delay.
-        @return `thread`
-    ]]
     delay: <A..., R...>(sec: number, f: ((A...) -> (R...)) | thread, A...) -> thread,
-
-    --[[
-        Spawns a task.
-
-        Runs immediately.
-
-        @param f The function to spawn.
-        @return `thread`
-    ]]
     spawn: <A..., R...>(f: ((A...) -> (R...)) | thread, A...) -> thread,
-
-    --[[
-        Sleeps task.
-
-        Yields caller.
-        Resumes after a certain amount of time.
-
-        @param sec The time to wait.
-        @return `number`
-    ]]
     wait: (sec: number?) -> number,
-
-    --[[
-        Counts the number of tasks.
-
-        Optional kinds parameter to count a specific kind of task.
-
-        Kinds:
-        - `s` to count sleeping tasks.
-        - `d` to count deferred tasks.
-        - `w` to count awaiting tasks. (Zune backend)
-        - `t` to count internal tasks. (Zune backend)
-
-        #### Example
-
-        ```luau
-        task.defer(function() end)
-        task.spawn(function() task.wait(1) end)
-        print(task.count("sd")) -- 2
-        print(task.count("d")) -- 1
-        print(task.count()) -- 2
-        ```
-
-        @param kinds The kinds of tasks to count.
-        @return `number` | `...number`
-    ]]
     count: (() -> number) & ((kinds: string?) -> ...number),
 }
 --[======[ Task ]======]--
 
 --[======[ Network ]======]--
 declare class NetHttpWebSocket
-    --[[
-        Whether the websocket is connected.
-    ]]
     function isConnected(self): boolean
-
-    --[[
-        Sends a message to the websocket.
-    ]]
     function send(self, message: string | buffer): ()
-
-    --[[
-        Closes the websocket.
-    ]]
     function close(self, code: number?): ()
 end
 
 declare class NetworkSocket
-    function isOpen(self): boolean
     function send(self, data: string | buffer, offset: number?): number
     function sendMsg(self, port: number, address: string, data: string | buffer, offset: number?): number
     function recv(self, max_size: number?): buffer
@@ -902,22 +509,12 @@ declare class NetworkSocket
     function getName(self): NetworkAddress
     function setOption(self, level: number, optname: number, value: boolean | string | buffer): ()
     function close(self): ()
+    function isOpen(self): boolean
 end
 
 declare class NetHttpServer
-     --[[
-        Stops the server.
-    ]]
     function stop(self): ()
-
-    --[[
-        The port the server is bound to.
-    ]]
     function getPort(self): number
-
-    --[[
-        Checks if the server is running.
-    ]]
     function isRunning(self): boolean
 end
 
@@ -942,87 +539,21 @@ export type ServerResponse = {
 }
 
 export type ServerWebSocketHandlers = {
-    --[[
-        Function to check if the request should be upgraded to a websocket.
-        Should return true if the request should be upgraded.
-        @return `boolean`
-    ]]
     upgrade: ((request: ServerRequest) -> boolean)?,
-
-    --[[
-        A function event for when a websocket is opened.
-
-        *`WebSocket` class will keep the same reference per connection*.
-    ]]
     open: ((websocket: NetHttpWebSocket) -> ())?,
-    --[[
-        A function event for when a websocket receives a message.
-
-        *`WebSocket` class will keep the same reference per connection*.
-    ]]
     message: ((websocket: NetHttpWebSocket, message: string) -> ())?,
-    --[[
-        A function event for when a websocket is closed.
-
-        *`WebSocket` class will keep the same reference per connection*.
-    ]]
     close: ((websocket: NetHttpWebSocket, code: number) -> ())?,
 }
 
 export type ServeOptions = {
-    --[[
-        The port to bind to.
-    ]]
     port: number,
-
-    --[[
-        The address to bind to.
-        - Default: `127.0.0.1`
-    ]]
     address: string?,
-
-    --[[
-        Whether to reuse the address.
-        - Useful for multi-threaded servers.
-
-        Default: `false`
-    ]]
     reuse_address: boolean?,
-
-    --[[
-        The amount of connections to backlog
-        - Default: `128`
-    ]]
     backlog: number?,
-
-    --[[
-        The maximum body size to accept.
-        - Default: `4096`
-    ]]
     max_body_size: number?,
-
-    --[[
-        The amount of seconds to wait before timing a client out.
-        - `0` for no timeout.
-        - Default: `60`
-    ]]
     client_timeout: number?,
-
-    --[[
-        The maximum number of connections to accept at a time.
-        - `0` for no limit.
-        - Default: `1024`
-    ]]
     max_connections: number?,
-
-    --[[
-        The function to handle requests.
-    ]]
     request: (request: ServerRequest) -> string | buffer | ServerResponse,
-
-    --[[
-        Functions to handle websockets.
-    ]]
     websocket: ServerWebSocketHandlers?,
 }
 
@@ -1042,33 +573,11 @@ export type RequestOptions = {
 }
 
 export type WebSocketOptions = {
-    --[[
-        The protocols to use.
-    ]]
     protocols: {string}?,
-    --[[
-        Timeout for the connection.
-
-        *Default: 30*
-
-        *Negative number for indefinite*
-    ]]
     timeout: number?,
-    --[[
-        WebSocket accept event
-    ]]
     accept: ((socket: NetHttpWebSocket, request: ServerResponse) -> boolean)?,
-    --[[
-        WebSocket open event.
-    ]]
     open: ((socket: NetHttpWebSocket) -> ())?,
-    --[[
-        WebSocket close event.
-    ]]
     close: ((socket: NetHttpWebSocket, close: number?) -> ())?,
-    --[[
-        WebSocket message event.
-    ]]
     message: ((socket: NetHttpWebSocket, message: string) -> ())?,
 }
 
@@ -1285,42 +794,11 @@ type NetworkLib = {
     getAddressList: (name: string, port: number) -> {NetworkAddress},
 
     http: {
-        --[[
-            Starts a server on the specified port.
-
-            @param options The options for the server.
-            @return `NetHttpServer` The server handle.
-            @error `ServerStartError`
-        ]]
         serve: (opts: ServeOptions) -> NetHttpServer,
-
-        --[[
-            Makes a request to the specified host.
-
-            Optional options, defaults to GET request.
-
-            *TLS is supported.*
-
-            @param host The host to make the request to.
-            @param options The options for the request.
-            @return `Response`
-            @error `RequestError`
-        ]]
         request:
             & ((host: string, opts: (RequestOptions & { response_body_type: "string"? })?) -> Response<string>)
             & ((host: string, opts: (RequestOptions & { response_body_type: "buffer" })) -> Response<buffer>)
             & ((host: string, opts: (RequestOptions | { response_body_type: "string" | "buffer" | nil })?) -> Response<string | buffer>),
-
-        --[[
-            Creates a websocket client.
-
-            *TLS is supported.*
-
-            @param host The host to connect to.
-            @param opts The options for the websocket.
-            @return `NetHttpWebSocket`
-            @error `WebSocketError`
-        ]]
         websocket: (host: string, opts: WebSocketOptions) -> NetHttpWebSocket,
     }
 }
@@ -1377,147 +855,54 @@ export type ParseResult = {
 };
 
 type LuauLib = {
-    --[[
-        Compiles Luau source code.
-
-        @param source The source code to compile.
-        @param options The options for the compilation.
-        @return `string` The compiled code, or an error.
-        @error `CompileError`
-    ]]
     compile: (source: string, opts: CompileOptions?) -> string,
-
-    --[[
-        Loads Luau source code.
-
-        *Notes:*
-        - `nativeCodeGen` will be disabled if `env` field is not a regular table (non-metatable).
-        - If `env` is not provided, it will default to the global environment.
-            - If the global environment is an unsafe environment, `nativeCodeGen` will not work.
-        - If `chunkName` is not provided, it will default to `(load)`.
-
-        @param bytecode The bytecode to load.
-        @param options The options for the load.
-        @return `(...any) -> ...any` The loaded function.
-    ]]
     load: (bytecode: string, opts: LoadOptions?) -> ((...any) -> ...any),
-
     coverage: (fn: (...any) -> ...any) -> {CoverageData},
-
     parse: (src: string) -> ParseResult,
     parseExpr: (src: string) -> any,
-
     garbagecollect: () -> (),
 }
 --[======[ Luau ]======]--
 
 --[======[ Serde ]======]--
 type JsonEncodeConfig = {
-    --[[
-        Pretty print indent level
-    ]]
     pretty_indent: number,
 }
 
-
 type JsonDecodeConfig = {
-    --[[
-        Preserve null values
-    ]]
     preserve_null: boolean,
 }
 
 type JsonEncoder = {
-    --[[
-        Encodes value to JSON/JSON5
-
-        @param value The value to encode
-        @param indent The indent level
-        @return `string` The encoded JSON/JSON5
-    ]]
     encode: (value: any, config: JsonEncodeConfig?) -> string,
-    --[[
-        Decodes JSON/JSON5
-
-        @param json The JSON/JSON5 to decode
-        @param config The configuration
-        @return `any` The decoded value
-    ]]
     decode: (json: string, config: JsonDecodeConfig?) -> any,
-
-    --[[
-        IndentKind for Pretty Printing
-    ]]
     indents: {
         none: number,
-        twoSpaces: number,
-        fourSpaces: number,
+        two_spaces: number,
+        four_spaces: number,
         tabs: number,
     },
-
-    --[[
-        Special values
-    ]]
     values: {
         null: any,
     }
 }
 
 type TomlEncoder = {
-    --[[
-        Encodes table to TOML
-
-        @param object The table to encode
-        @return `string` The encoded TOML
-    ]]
     encode: (object: {[string]: any}) -> string,
-    --[[
-        Decodes TOML
-
-        @param toml The TOML to decode
-        @return `table` The decoded table
-    ]]
     decode: (toml: string) -> {[string]: any},
 }
 
 type YamlEncoder = {
-    --[[
-        Encodes table to YAML
-
-        @param object The table to encode
-        @return `string` The encoded YAML
-    ]]
     encode: (object: {[string]: any}) -> string,
-    --[[
-        Decodes YAML
-
-        @param yaml The YAML to decode
-        @return `table` The decoded table
-    ]]
     decode: (yaml: string) -> {[string]: any},
 }
 
 type Base64Encoder = {
-    --[[
-        Encodes table to Base64
-
-        @param value The value to encode
-        @return `string` The encoded Base64
-    ]]
     encode: (value: string) -> string,
-    --[[
-        Decodes Base64
-
-        @param base64 The Base64 to decode
-        @return `string` The decoded value
-    ]]
     decode: (base64: string) -> string,
 }
 
 type GenericCompressionOptions = {
-    --[[
-        The compression level.
-    ]]
     level: number?,
 }
 
@@ -1534,79 +919,26 @@ type DecompressionFn =
 & ((compressed: buffer) -> buffer)
 
 type GenericCompressor = {
-    --[[
-        Compresses a string.
-    ]]
     compress : AdvancedCompressionFn,
-    --[[
-        Decompresses a string.
-    ]]
     decompress : DecompressionFn,
 }
 
 type SerdeLib = {
-    --[[
-        JSON encoder and decoder.
-    ]]
     json: JsonEncoder,
-
-    --[[
-        JSON5 encoder and decoder.
-    ]]
     json5: JsonEncoder,
-
-    --[[
-        TOML encoder and decoder.
-    ]]
     toml: TomlEncoder,
-
-    --[[
-        YAML encoder and decoder.
-    ]]
     yaml: YamlEncoder,
-
-    --[[
-        BASE64 encoder and decoder.
-    ]]
     base64: Base64Encoder,
-
-    --[[
-        GZIP compressor and decompressor.
-    ]]
     gzip: GenericCompressor,
-
-    --[[
-        ZLIB compressor and decompressor.
-    ]]
     zlib: GenericCompressor,
-
-    --[[
-        LZ4 compressor and decompressor.
-    ]]
     lz4: {
-        --[[
-            Compresses a string.
-        ]]
         compress : CompressionFn,
-        --[[
-            Compresses a string as a lz4 frame.
-        ]]
         compressFrame : AdvancedCompressionFn,
-        --[[
-            Decompresses a string.
-        ]]
         decompress :
             & ((compressed: string, size: number) -> string)
             & ((compressed: buffer, size: number) -> buffer),
-        --[[
-            Decompresses a string as a lz4 frame.
-        ]]
         decompressFrame : DecompressionFn,
     },
-
-    --[[
-        ZSTD compressor and decompressor.
-    ]]
     zstd: GenericCompressor,
 }
 --[======[ Serde ]======]--
@@ -1655,10 +987,7 @@ declare class BufferStream
 end
 
 declare class BufferSink
-    --[[
-        Written length
-    ]]
-    len: boolean
+    len: number
     closed: boolean
 
     flush:
@@ -1672,99 +1001,25 @@ declare class BufferSink
 end
 
 export type Terminal = {
-    --[[
-        Whether the terminal is a TTY.
-    ]]
     isTTY: boolean,
-
-    --[[
-        Get current saved mode.
-    ]]
     getCurrentMode: () -> "normal" | "raw",
-
-    --[[
-        Enable raw mode.
-
-        On unix: Will attempt to change terminal mode.
-        On windows: Will attempt to change console mode.
-
-        @return `boolean` Whether the mode was successfully changed.
-    ]]
     enableRawMode: () -> boolean,
-
-    --[[
-        Restore terminal mode.
-
-        On unix: Will attempt to restore the original terminal mode.
-        On windows: Will attempt to restore the original console mode.
-
-        @return `boolean` Whether the mode was successfully restored.
-    ]]
     restoreMode: () -> boolean,
-
-
-    --[[
-        Get the terminal size.
-
-        *Will return `nil` if the terminal is not TTY.*
-        *Will **error** if there was an issue getting the terminal size.*
-
-        @return `number` The width of the terminal.
-        @return `number` The height of the terminal.
-    ]]
-    getSize: () -> (number, number),
+    getSize: () -> (number?, number?),
 }
 
 type BufferSinkOptions = {
-    --[[
-        The maximum size of the buffer.
-        - Default: `1073741824`
-    ]]
     limit: number?,
 }
 
 type IoLib = {
     MAX_READ: number,
-
-    --[[
-        Formats input to a readable string.
-
-        @param ... The arguments to format.
-        @return `string`
-    ]]
     format: (...any) -> string,
-
-    --[[
-        Creates a buffer sink.
-
-        @param opts The options for the buffer sink.
-        @return `BufferSink`
-    ]]
     createBufferSink: (opts: BufferSinkOptions?) -> BufferSink,
-
-    --[[
-        Creates a buffer stream with provided lua buffer.
-
-        @param buffer The lua buffer to use.
-        @return `BufferStream`
-    ]]
     createFixedBufferStream: (buffer: buffer) -> BufferStream,
-
-    --[[
-        Terminal.
-    ]]
     terminal: Terminal,
-    --[[
-        stdout handle.
-    ]]
     stdout: FileHandle,
-    --[[
-        stderr handle.
-    ]]
     stderr: FileHandle,
-    --[[
-        stdin handle.
-    ]]
     stdin: FileHandle,
 }
 --[======[ Io ]======]--
@@ -1808,24 +1063,14 @@ type HashAlgorithms =
     | "blake2s256"
 
 type BcryptPasswordOptions = {
-    --- Default: "argon2d"
     algorithm: "bcrypt"?,
-    --[[
-        Default: 4
-
-        Only between 4 and 31
-    ]]
     cost: number?,
 }
 
 type Argon2PasswordOptions = {
-    --- Default: "argon2d"
     algorithm: ("argon2d" | "argon2i" | "argon2id")?,
-    --- Default: 2
     time_cost: number?,
-    --- Default: 65536
     memory_cost: number?,
-    --- Default: 1
     threads: number?,
 }
 
@@ -1843,45 +1088,20 @@ type Aead = {
 
 type CryptoLib = {
     createHash: (algorithm: HashAlgorithms, secret: string?) -> CryptoHash,
-
-    --[[
-        Password hashing function
-    ]]
     password: {
         hash: (password: string, opts: PasswordOptions?) -> string,
         verify: (password: string, hash: string) -> boolean,
     },
-
-    --[[
-        Cryptographically secure random number generation.
-    ]]
     random: {
-        --[[
-            Generates a random number (f64), if no arguments are provided, it will generate a number between 0 and 1.
-        ]]
         nextNumber:
             & (() -> number)
             & ((min: number, max: number) -> number),
-        --[[
-            Generates a random integer (i32), if no arguments are provided,
-
-            it will generate a number between the limits of a signed 32-bit integer.
-        ]]
         nextInteger:
             & (() -> number)
             & ((min: number, max: number) -> number),
-
-        --[[
-            Generates a random boolean.
-        ]]
         nextBoolean: () -> boolean,
-
-        --[[
-            Writes random bytes to the buffer.
-        ]]
         fill: (buffer: buffer, offset: number, length: number) -> (),
     },
-
     aead: {
         aes_gcm: {
             Aes128Gcm: Aead,
@@ -1925,88 +1145,30 @@ type CryptoLib = {
         bundleFromSystem: () -> TlsCertBundle,
         bundleFromFile: (file: string) -> TlsCertBundle,
         keyPairFromFile: (certFile: string, keyFile: string) -> TlsCertKeyPair,
-        setupClient: (socket: NetworkSocket, { host: string, ca: TlsCertBundle }) -> (),
-        setupServer: (socket: NetworkSocket, { auth: TlsCertKeyPair }) -> (),
+        setupClient: (socket: NetworkSocket, config: { host: string, ca: TlsCertBundle }) -> (),
+        setupServer: (socket: NetworkSocket, config: { auth: TlsCertKeyPair }) -> (),
     },
 }
 --[======[ Crypto ]======]--
 
 --[======[ Regex ]======]--
 export type RegexMatch = {
-    --[[
-        The captured group.
-    ]]
     string: string,
-    --[[
-        The index of the group.
-    ]]
     index: number,
 }
 
 export type Regex = {
-    --[[
-        Match a string.
-
-        @param str String to match
-    ]]
-    match: (self: Regex, str: string) -> {RegexMatch}?,
-    --[[
-        Search a string.
-
-        @param str String to search
-    ]]
-    search: (self: Regex, str: string) -> {RegexMatch}?,
-    --[[
-        Capture a string.
-
-        *If global is nil, it will default to false.*
-
-        @param str String to capture
-        @param global Whether to capture globally
-        @return `{{RegexMatch}}`
-    ]]
-    captures: (self: Regex, str: string, global: boolean?) -> {{RegexMatch}},
-    --[[
-        Check if a string matches the pattern.
-
-        @param str String to check
-    ]]
-    isMatch: (self: Regex, str: string) -> boolean,
-    --[[
-        Format a string.
-
-        @param str String to format
-        @param format Format to use
-    ]]
+    match: (self: Regex, input: string | buffer) -> {RegexMatch}?,
+    search: (self: Regex, input: string | buffer) -> {RegexMatch}?,
+    captures: (self: Regex, input: string | buffer, global: boolean?) -> {{RegexMatch}},
+    isMatch: (self: Regex, input: string | buffer) -> boolean,
     format: (self: Regex, str: string, format: string) -> string,
-    --[[
-        Replace the first occurrence of a string.
-
-        @param str String to replace
-        @param replacement String to replace with
-    ]]
     replace: (self: Regex, str: string, replacement: string) -> string,
-    --[[
-        Replace all occurrences of a string.
-
-        @param str String to replace
-        @param replacement String to replace with
-    ]]
     replaceAll: (self: Regex, str: string, replacement: string) -> string,
 }
 
 type RegexLib = {
-    --[[
-        Create a new regex object.
-
-        Flags:
-          - `i`: Case insensitive
-          - `m`: Multiline
-
-        @param pattern Pattern to use
-        @param flags Flags to use
-    ]]
-    create: (pattern: string, flags: string?) -> Regex,
+    create: (pattern: string | buffer, flags: string?) -> Regex,
 }
 --[======[ Regex ]======]--
 
@@ -2021,50 +1183,42 @@ export type TimeDictionary = {
     millisecond: number,
 }
 
-export type DateTime = {
-    unixTimestamp: number,
-    unixTimestampMillis: number,
-
-    UnixTimestamp: number,
-    UnixTimestampMillis: number,
-
-    toLocalTime: (self: DateTime) -> TimeDictionary,
-    ToLocalTime: (self: DateTime) -> TimeDictionary,
-
-    toUniversalTime: (self: DateTime) -> TimeDictionary,
-    ToUniversalTime: (self: DateTime) -> TimeDictionary,
-
-    toIsoDate: (self: DateTime) -> string,
-    ToIsoDate: (self: DateTime) -> string,
-
-    formatLocalTime: (self: DateTime, format: string) -> string,
-    FormatLocalTime: (self: DateTime, format: string) -> string,
-
-    formatUniversalTime: (self: DateTime, format: string) -> string,
-    FormatUniversalTime: (self: DateTime, format: string) -> string,
-}
+declare class DateTime
+    unixTimestamp: number
+    unixTimestampMillis: number
+    UnixTimestamp: number
+    UnixTimestampMillis: number
+    function toLocalTime(self): TimeDictionary
+    function ToLocalTime(self): TimeDictionary
+    function toUniversalTime(self): TimeDictionary
+    function ToUniversalTime(self): TimeDictionary
+    function toIsoDate(self): string
+    function ToIsoDate(self): string
+    function formatLocalTime(self, format: string): string
+    function FormatLocalTime(self, format: string): string
+    function formatUniversalTime(self, format: string): string
+    function FormatUniversalTime(self, format: string): string
+end
 
 type DatetimeLib = {
     now: () -> DateTime,
-
     fromIsoDate: (date: string) -> DateTime,
     fromUnixTimestamp: (timestamp: number) -> DateTime,
     fromUnixTimestampMillis: (timestamp: number) -> DateTime,
     fromLocalTime: (year: number, month: number, day: number, hour: number, minute: number, second: number, millisecond: number) -> DateTime,
     fromUniversalTime: (year: number, month: number, day: number, hour: number, minute: number, second: number, millisecond: number) -> DateTime,
-
     parse: (date: string) -> DateTime,
 }
 --[======[ Datetime ]======]--
 
 --[======[ FFI ]======]--
 export type FFILibrary = {
-    getSymbol: (self: FFILibrary, symbol: string) -> FFIPointer,
+    getSymbol: (self: FFILibrary, symbol: string) -> FFIPointer?,
     [string]: (...any) -> any,
 }
 
 declare class FFICompiled
-    function getSymbol(self, symbol: string): FFIPointer
+    function getSymbol(self, symbol: string): FFIPointer?
 end
 
 declare class FFIDataType
@@ -2099,32 +1253,32 @@ export type FFIPointer = {
     read: (self: FFIPointer, srcOffset: number, dest: buffer | FFIPointer, destOffset: number, count: number) -> buffer,
     write: (self: FFIPointer, destOffset: number, src: buffer | FFIPointer, srcOffset: number, count: number) -> (),
     readi8: (self: FFIPointer, offset: number?) -> number,
-    readu8: (self: FFIPointer, offset: number?) -> number,
     readi16: (self: FFIPointer, offset: number?) -> number,
-    readu16: (self: FFIPointer, offset: number?) -> number,
     readi32: (self: FFIPointer, offset: number?) -> number,
-    readu32: (self: FFIPointer, offset: number?) -> number,
     readi64: (self: FFIPointer, offset: number?) -> buffer,
+    readu8: (self: FFIPointer, offset: number?) -> number,
+    readu16: (self: FFIPointer, offset: number?) -> number,
+    readu32: (self: FFIPointer, offset: number?) -> number,
     readu64: (self: FFIPointer, offset: number?) -> buffer,
     readf32: (self: FFIPointer, offset: number?) -> number,
     readf64: (self: FFIPointer, offset: number?) -> number,
     readPtr: (self: FFIPointer, offset: number?) -> FFIPointer,
     writei8: (self: FFIPointer, offset: number, value: number | buffer | boolean) -> (),
-    writeu8: (self: FFIPointer, offset: number, value: number | buffer | boolean) -> (),
     writei16: (self: FFIPointer, offset: number, value: number | buffer | boolean) -> (),
-    writeu16: (self: FFIPointer, offset: number, value: number | buffer | boolean) -> (),
     writei32: (self: FFIPointer, offset: number, value: number | buffer | boolean) -> (),
-    writeu32: (self: FFIPointer, offset: number, value: number | buffer | boolean) -> (),
     writei64: (self: FFIPointer, offset: number, value: number | buffer | boolean) -> (),
+    writeu8: (self: FFIPointer, offset: number, value: number | buffer | boolean) -> (),
+    writeu16: (self: FFIPointer, offset: number, value: number | buffer | boolean) -> (),
+    writeu32: (self: FFIPointer, offset: number, value: number | buffer | boolean) -> (),
     writeu64: (self: FFIPointer, offset: number, value: number | buffer | boolean) -> (),
     writef32: (self: FFIPointer, offset: number, value: number | buffer | boolean) -> (),
     writef64: (self: FFIPointer, offset: number, value: number | buffer | boolean) -> (),
     writePtr: (self: FFIPointer, offset: number, value: FFIPointer) -> (),
     isNull: (self: FFIPointer) -> boolean,
     setSize: (self: FFIPointer, size: number) -> (),
-    getSize: (self: FFIPointer) -> number,
+    getSize: (self: FFIPointer) -> number?,
     setAlignment: (self: FFIPointer, alignment: number) -> (),
-    getAlignment: (self: FFIPointer) -> number,
+    getAlignment: (self: FFIPointer) -> number?,
     span: (self: FFIPointer, offset: number?) -> buffer,
 }
 
@@ -2134,15 +1288,12 @@ type FFICompileOptions = {
     libraries: {string}?,
     includes: {string}?,
     sysincludes: {string}?,
-    symbols: {[string]: string}?,
+    symbols: {[string]: FFIPointer}?,
 }
 
 type FFILib = {
-    supported: boolean,
-
     prefix: string,
     suffix: string,
-
     types: {
         void: FFIDataType,
         i8: FFIDataType,
@@ -2157,24 +1308,18 @@ type FFILib = {
         double: FFIDataType,
         pointer: FFIPointerType,
     },
-
     c: {
         compile: (src: string, opts: FFICompileOptions?) -> FFICompiled,
     },
-
     ptr: (src: FFIPointer) -> FFIPointer,
     ptrFromAddress: (src: buffer) -> FFIPointer,
-
     getLuaState: (mainthread: boolean?) -> FFIPointer,
-
     alloc: (size: number, alignment: number?) -> FFIPointer,
     free: (src: FFIPointer) -> (),
     dupe: (src: buffer | FFIPointer) -> FFIPointer,
     len: (src: buffer | FFIPointer) -> number?,
     copy: (dest: buffer | FFIPointer, destOffset: number, src: buffer | FFIPointer, srcOffset: number, count: number) -> (),
-
-    tagName: (tag: number) -> string,
-
+    tagName: (tag: number) -> string?,
     struct: (fields: {{ [string]: AnyDataType }}) -> FFIStructureType,
     fn: (definition: FFIFunctionDef, srcPtr: FFIPointer) -> ((...any) -> any),
     closure: (definition: FFIFunctionDef, handler: (...any) -> any) -> FFIPointer,
@@ -2183,7 +1328,6 @@ type FFILib = {
 --[======[ FFI ]======]--
 
 --[======[ SQLite ]======]--
-
 export type SQLite3Values = {[string]: number | string | buffer};
 export type SQLite3Result = {
     last_insert_row_id: number,
@@ -2205,15 +1349,6 @@ declare class SQLite3Database
 end
 
 export type SQLiteLib = {
-    --[[
-        Opens a database.
-
-        *Default: `:memory:`*
-
-        @param path The path to the database.
-        @return `SQLite3Database`
-        @error `SQLite3Error`
-    ]]
     open: (path: string?) -> SQLite3Database,
 }
 --[======[ SQLite ]======]--
@@ -2245,7 +1380,6 @@ type RandomConstructor = {
 
 export type RandomLib = RandomConstructor & {
     LuauPcg32: RandomConstructor,
-    Pcg32: RandomConstructor,
     Isaac64: RandomConstructor,
     Pcg32: RandomConstructor,
     Xoroshiro128: RandomConstructor,
@@ -2272,8 +1406,8 @@ type ThreadLoadOptions = {
 export type ThreadLib = {
     fromModule: (module: string) -> Thread,
     fromBytecode: (bytecode: string | buffer, opts: ThreadLoadOptions?) -> Thread,
-    receive: (self: Thread) -> ...any,
-    send: (self: Thread, ...any) -> (),
+    receive: () -> ...any,
+    send: (...any) -> (),
     getCpuCount: () -> number,
     isThread: boolean,
 }

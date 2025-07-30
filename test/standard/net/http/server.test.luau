@@ -419,4 +419,109 @@ describe("Server Error", function()
     end)
 end)
 
+test("Macro Random", function()
+    if (not table.find(zune.process.args, "hard")) then
+        print(`Skip Random test`);
+        return;
+    end
+    print(`Test can take up to 125+ seconds...`);
+    local server = net.http.serve({
+        port = 8080,
+        reuse_address = true,
+        client_timeout = 1,
+        request = function(req)
+            return {
+                status_code = 200,
+                body = "Hello",
+            }
+        end,
+    });
+    testing.defer(function()
+        server:stop();
+    end)
+    expect(server).toBe(expect.type("userdata"));
+
+    local request = "GET / HTTP/1.1\r\n" ..
+        "Host: localhost:8080\r\n" ..
+        "User-Agent: zune/test\r\n" ..
+        "Accept: */*\r\n" ..
+        "Connection: close\r\n" ..
+        "\r\n";
+
+    local function createRequest(data: string)
+        local socket = net.createSocket(
+            net.ADDRF.INET,
+            bit32.bor(
+                net.SOCKF.STREAM,
+                if (zune.process.os == "windows") then 0 else net.SOCKF.CLOEXEC
+            ),
+            net.IPPROTO.TCP
+        );
+
+        socket:connect("127.0.0.1", 8080);
+
+        local sent = 0;
+        while sent < #data do
+            sent += socket:send(data, sent);
+        end
+
+        return pcall(socket.recv, socket, 1024);
+    end
+
+    local work = 0;
+    local errors = 0;
+    for len = 0, #request do
+        local part = string.sub(request, 1, len);
+        work += 1;
+        task.spawn(function()
+            local ok, res: any = createRequest(part);
+            work -= 1;
+            if (len ~= #request and ok) then
+                errors += 1;
+                error(`expected EOF, got {buffer.tostring(res)}`);
+            end
+            if (not ok) then
+                if (res == "EOF" or res == "ConnectionResetByPeer") then
+                    if (len ~= #request) then
+                        return; -- expected
+                    else
+                        errors += 1;
+                        error("eof sent full request");
+                    end
+                else
+                    errors += 1;
+                    error(`unknown socket error: {res}`);
+                end
+            end
+        end)
+        work += 256;
+        for char = 0, 255 do
+            task.spawn(function()
+                local ok, res: any = createRequest(part .. string.char(char));
+                work -= 1;
+                if (not ok) then
+                    if (res == "EOF" or res == "ConnectionResetByPeer") then
+                        return;
+                    else
+                        errors += 1;
+                        error(`unknown socket error: {res}`);
+                    end
+                else
+                    local response = buffer.tostring(res);
+                    if (not response:find("HTTP/1.1 200") or len + 1 >= #request) then
+                        return;
+                    end
+                    errors += 1;
+                    error(`expected EOF, got {buffer.tostring(res)}`);
+                end
+            end)
+        end
+        repeat
+            task.wait();
+        until work == 0;
+
+        expect(errors).toBe(0);
+    end
+end)
+
 return nil;

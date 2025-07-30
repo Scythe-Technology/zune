@@ -7,7 +7,7 @@ const command = @import("lib.zig");
 fn Execute(_: std.mem.Allocator, _: []const []const u8) !void {
     Zune.debug.print("<bold><dim>Z<clear><bold>UNE<clear> - A luau runtime\n" ++
         "\n" ++
-        "<bold>Usage:<clear> zune <dim><<command>> [...args]<clear>\n" ++
+        "<bold>usage:<clear> zune <dim><<command>> [...args]<clear>\n" ++
         "\n" ++
         "<bold>Commands:<clear>\n" ++
         "  <bold><green>run      <clear><dim>./script.luau    <clear>Execute lua/luau file.\n" ++

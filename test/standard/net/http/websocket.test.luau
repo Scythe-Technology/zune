@@ -256,7 +256,7 @@ test("Time out", function()
 end)
 
 test("TLS", function()
-    if (zune.process.args[1] ~= "allow") then
+    if (not table.find(zune.process.args, "allow")) then
         print(`Skip TLS test`);
         return;
     end
