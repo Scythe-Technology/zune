@@ -307,8 +307,6 @@ const LuaThread = struct {
     }
 
     pub fn lua_receive(self: *LuaThread, L: *VM.lua.State) !i32 {
-        if (!L.isyieldable())
-            return L.Zyielderror();
         const runtime = self.runtime;
 
         const port = &runtime.transporter.incoming;
@@ -319,6 +317,8 @@ const LuaThread = struct {
         if (try runtime.transporter.pushAndConsumeMessage(L, port)) |amt| {
             return amt;
         } else {
+            if (!L.isyieldable())
+                return L.Zyielderror();
             const scheduler = Scheduler.getScheduler(L);
             const sync = try scheduler.createSync(Sync, Sync.receiveComplete);
             sync.* = .{
@@ -584,8 +584,6 @@ fn lua_selfReceive(L: *VM.lua.State) !i32 {
         .LightUserdata => {},
         else => return L.Zerror("current context is not a thread"),
     }
-    if (!L.isyieldable())
-        return L.Zyielderror();
     const runtime = L.tolightuserdata(Runtime, -1).?;
     L.pop(1);
 
@@ -597,6 +595,8 @@ fn lua_selfReceive(L: *VM.lua.State) !i32 {
     if (try runtime.transporter.pushAndConsumeMessage(L, port)) |amt| {
         return amt;
     } else {
+        if (!L.isyieldable())
+            return L.Zyielderror();
         const scheduler = Scheduler.getScheduler(L);
         const sync = try scheduler.createSync(Sync, Sync.receiveComplete);
         sync.* = .{
