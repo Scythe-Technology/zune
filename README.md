@@ -19,29 +19,12 @@ A <a href="https://luau.org/">Luau</a> runtime, similar to <a href="https://lune
 - **Cross-Platform Compatibility**: Fully compatible with **Linux**, **macOS**, and **Windows**, ensuring broad usability across different operating systems.
 - **High Performance**: Built with Zig, designed for high performance and low memory usage.
 
-## Building
+## Links
+- [Installation guide](https://zune.sh/guides/install)
+- [Compile & build locally](https://zune.sh/guides/install#install-zig)
 
-Requirements:
-- [zig](https://ziglang.org/).
-
-Steps:
-1. Clone the repository:
-```sh
-git clone https://github.com/Scythe-Technology/zune.git
-cd zune
-```
-2. Compile
-```sh
-zig build -Doptimize=ReleaseFast
-```
-3. Execute
-```sh
-./zig-out/bin/zune --version
-```
-
-# Roadmap
+## Roadmap
 For more information on the future of zune, check out the milestones
 
-
-# Contributing
+## Contributing
 Read [CONTRIBUTING.md](https://github.com/Scythe-Technology/zune/blob/master/CONTRIBUTING.md).
