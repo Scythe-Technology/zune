@@ -261,15 +261,23 @@ fn cmdTest(allocator: std.mem.Allocator, args: []const []const u8) !void {
     };
 
     const dir = std.fs.cwd();
-    const module = args[0];
 
-    const file_src_path, const file_content = getFile(allocator, .Test, dir, module) catch |err| switch (err) {
-        error.FileNotFound => {
-            Zune.debug.print("<red>error<clear>: file not found '{s}'\n", .{module});
-            std.process.exit(1);
-        },
-        else => return err,
-    };
+    const file_src_path, const file_content = if (Zune.STATE.WORKSPACE.scripts.get(run_args[0])) |defined|
+        getFile(allocator, .Other, dir, defined) catch |err| switch (err) {
+            error.FileNotFound => {
+                Zune.debug.print("<red>error<clear>: file not found '{s}'\n", .{defined});
+                std.process.exit(1);
+            },
+            else => return err,
+        }
+    else
+        getFile(allocator, .Test, dir, run_args[0]) catch |err| switch (err) {
+            error.FileNotFound => {
+                Zune.debug.print("<red>error<clear>: file not found '{s}'\n", .{run_args[0]});
+                std.process.exit(1);
+            },
+            else => return err,
+        };
     defer allocator.free(file_src_path);
     defer allocator.free(file_content);
 
