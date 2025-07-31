@@ -17,7 +17,7 @@ const Terminal = @import("repl/Terminal.zig");
 
 const VM = luau.VM;
 
-fn getFile(allocator: std.mem.Allocator, dir: std.fs.Dir, input: []const u8) !struct { [:0]u8, []const u8 } {
+fn getFile(allocator: std.mem.Allocator, comptime from: enum { Run, Test, Other }, dir: std.fs.Dir, input: []const u8) !struct { [:0]u8, []const u8 } {
     var maybe_src: ?[:0]u8 = null;
     errdefer if (maybe_src) |s| allocator.free(s);
     var maybe_content: ?[]const u8 = null;
@@ -27,7 +27,11 @@ fn getFile(allocator: std.mem.Allocator, dir: std.fs.Dir, input: []const u8) !st
         maybe_content = try std.io.getStdIn().readToEndAlloc(allocator, std.math.maxInt(usize));
         maybe_src = try allocator.dupeZ(u8, "@STDIN");
     } else {
-        const path = try File.resolve(allocator, Zune.STATE.ENV_MAP, &.{input});
+        const path = try File.resolve(allocator, Zune.STATE.ENV_MAP, switch (comptime from) {
+            .Run => if (Zune.STATE.WORKSPACE.run_path) |path| &.{ path, input } else &.{input},
+            .Test => if (Zune.STATE.WORKSPACE.test_path) |path| &.{ path, input } else &.{input},
+            else => &.{input},
+        });
         defer allocator.free(path);
         if (dir.readFileAlloc(allocator, path, std.math.maxInt(usize)) catch null) |content| {
             maybe_content = content;
@@ -134,15 +138,23 @@ fn cmdRun(allocator: std.mem.Allocator, args: []const []const u8) !void {
     };
 
     const dir = std.fs.cwd();
-    const module = run_args[0];
 
-    const file_src_path, const file_content = getFile(allocator, dir, module) catch |err| switch (err) {
-        error.FileNotFound => {
-            Zune.debug.print("<red>error<clear>: file not found '{s}'\n", .{module});
-            std.process.exit(1);
-        },
-        else => return err,
-    };
+    const file_src_path, const file_content = if (Zune.STATE.WORKSPACE.scripts.get(run_args[0])) |defined|
+        getFile(allocator, .Other, dir, defined) catch |err| switch (err) {
+            error.FileNotFound => {
+                Zune.debug.print("<red>error<clear>: file not found '{s}'\n", .{defined});
+                std.process.exit(1);
+            },
+            else => return err,
+        }
+    else
+        getFile(allocator, .Run, dir, run_args[0]) catch |err| switch (err) {
+            error.FileNotFound => {
+                Zune.debug.print("<red>error<clear>: file not found '{s}'\n", .{run_args[0]});
+                std.process.exit(1);
+            },
+            else => return err,
+        };
     defer allocator.free(file_src_path);
     defer allocator.free(file_content);
 
@@ -251,7 +263,7 @@ fn cmdTest(allocator: std.mem.Allocator, args: []const []const u8) !void {
     const dir = std.fs.cwd();
     const module = args[0];
 
-    const file_src_path, const file_content = getFile(allocator, dir, module) catch |err| switch (err) {
+    const file_src_path, const file_content = getFile(allocator, .Test, dir, module) catch |err| switch (err) {
         error.FileNotFound => {
             Zune.debug.print("<red>error<clear>: file not found '{s}'\n", .{module});
             std.process.exit(1);
@@ -423,7 +435,7 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
     const dir = std.fs.cwd();
     const module = run_args[0];
 
-    const file_src_path, const file_content = getFile(allocator, dir, module) catch |err| switch (err) {
+    const file_src_path, const file_content = getFile(allocator, .Other, dir, module) catch |err| switch (err) {
         error.FileNotFound => {
             Zune.debug.print("<red>error<clear>: file not found '{s}'\n", .{module});
             std.process.exit(1);

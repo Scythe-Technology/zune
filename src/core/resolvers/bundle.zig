@@ -167,10 +167,10 @@ pub const PackedState = packed struct(u40) {
 
     const Format = packed struct(u26) {
         use_color: bool = true,
-        show_table_address: bool = true,
-        show_recursive_table: bool = false,
+        table_address: bool = true,
+        recursive_table: bool = false,
         max_depth: u8 = 4,
-        display_buffer_contents_max: u15 = 48,
+        buffer_max_display: u15 = 48,
     };
 
     const Luau = packed struct(u6) {
@@ -328,10 +328,10 @@ pub fn loadBundle(allocator: std.mem.Allocator, exe_header: ExeHeader, bundle: [
     Zune.STATE.LUAU_OPTIONS.OPTIMIZATION_LEVEL = state.luau.optimization_level;
 
     Zune.STATE.FORMAT.USE_COLOR = state.format.use_color;
-    Zune.STATE.FORMAT.SHOW_TABLE_ADDRESS = state.format.show_table_address;
-    Zune.STATE.FORMAT.SHOW_RECURSIVE_TABLE = state.format.show_recursive_table;
+    Zune.STATE.FORMAT.TABLE_ADDRESS = state.format.table_address;
+    Zune.STATE.FORMAT.RECURSIVE_TABLE = state.format.recursive_table;
     Zune.STATE.FORMAT.MAX_DEPTH = state.format.max_depth;
-    Zune.STATE.FORMAT.DISPLAY_BUFFER_CONTENTS_MAX = state.format.display_buffer_contents_max;
+    Zune.STATE.FORMAT.BUFFER_MAX_DISPLAY = state.format.buffer_max_display;
 
     inline for (@typeInfo(@TypeOf(Zune.FEATURES)).@"struct".fields) |field| {
         @field(Zune.FEATURES, field.name) = @field(features, field.name);

@@ -86,12 +86,13 @@ pub var FEATURES: struct {
 pub const ZuneState = struct {
     ENV_MAP: std.process.EnvMap = undefined,
     RUN_MODE: RunMode = .Run,
-    CONFIG_CACHE: std.StringArrayHashMap(Resolvers.Config) = .init(DEFAULT_ALLOCATOR),
+    CONFIG_CACHE: std.StringArrayHashMapUnmanaged(Resolvers.Config) = .empty,
     MAIN_THREAD_ID: ?std.Thread.Id = null,
     LUAU_OPTIONS: LuauOptions = .{},
     FORMAT: FormatOptions = .{},
     USE_DETAILED_ERROR: bool = true,
     BUNDLE: ?Resolvers.Bundle.Map = null,
+    WORKSPACE: Workspace = .{},
 
     pub const LuauOptions = struct {
         DEBUG_LEVEL: u2 = 2,
@@ -103,9 +104,15 @@ pub const ZuneState = struct {
     pub const FormatOptions = struct {
         MAX_DEPTH: u8 = 4,
         USE_COLOR: bool = true,
-        SHOW_TABLE_ADDRESS: bool = true,
-        SHOW_RECURSIVE_TABLE: bool = false,
-        DISPLAY_BUFFER_CONTENTS_MAX: u15 = 48,
+        TABLE_ADDRESS: bool = true,
+        RECURSIVE_TABLE: bool = false,
+        BUFFER_MAX_DISPLAY: u15 = 48,
+    };
+
+    pub const Workspace = struct {
+        run_path: ?[]const u8 = null,
+        test_path: ?[]const u8 = null,
+        scripts: std.StringHashMapUnmanaged([]const u8) = .empty,
     };
 };
 
@@ -130,28 +137,18 @@ pub fn loadConfiguration(dir: std.fs.Dir) void {
     };
     defer allocator.free(config_content);
 
-    var zconfig = toml.parse(allocator, config_content) catch |err| {
+    var zune_config = toml.parse(allocator, config_content) catch |err| {
         return std.debug.print("failed to parse 'zune.toml': {}\n", .{err});
     };
-    defer zconfig.deinit(allocator);
+    defer zune_config.deinit(allocator);
 
-    if (toml.checkOptionTable(zconfig, "runtime")) |runtime_config| {
-        if (toml.checkOptionString(runtime_config, "cwd")) |path| {
-            if (comptime builtin.target.os.tag != .wasi) {
-                const cwd = dir.openDir(path, .{}) catch |err| {
-                    std.debug.panic("[zune.toml] Failed to open cwd (\"{s}\"): {}\n", .{ path, err });
-                };
-                cwd.setAsCwd() catch |err| {
-                    std.debug.panic("[zune.toml] Failed to set cwd to (\"{s}\"): {}\n", .{ path, err });
-                };
-            }
-        }
-        if (toml.checkOptionTable(runtime_config, "debug")) |debug_config| {
-            if (toml.checkOptionBool(debug_config, "detailedError")) |enabled|
+    if (toml.checkTable(zune_config, "runtime")) |config| {
+        if (toml.checkTable(config, "debug")) |debug_config| {
+            if (toml.checkBool(debug_config, "detailed_error")) |enabled|
                 STATE.USE_DETAILED_ERROR = enabled;
         }
-        if (toml.checkOptionTable(runtime_config, "luau")) |luau_config| {
-            if (toml.checkOptionTable(luau_config, "fflags")) |fflags_config| {
+        if (toml.checkTable(config, "luau")) |luau_config| {
+            if (toml.checkTable(luau_config, "fflags")) |fflags_config| {
                 var iter = fflags_config.table.iterator();
                 while (iter.next()) |entry| {
                     switch (entry.value_ptr.*) {
@@ -165,36 +162,86 @@ pub fn loadConfiguration(dir: std.fs.Dir) void {
                     }
                 }
             }
-            if (toml.checkOptionTable(luau_config, "options")) |compiling| {
-                if (toml.checkOptionInteger(compiling, "debugLevel")) |debug_level|
+            if (toml.checkTable(luau_config, "options")) |compiling| {
+                if (toml.checkInteger(compiling, "debug_level")) |debug_level|
                     STATE.LUAU_OPTIONS.DEBUG_LEVEL = @max(0, @min(2, @as(u2, @truncate(@as(u64, @bitCast(debug_level))))));
-                if (toml.checkOptionInteger(compiling, "optimizationLevel")) |opt_level|
+                if (toml.checkInteger(compiling, "optimization_level")) |opt_level|
                     STATE.LUAU_OPTIONS.OPTIMIZATION_LEVEL = @max(0, @min(2, @as(u2, @truncate(@as(u64, @bitCast(opt_level))))));
-                if (toml.checkOptionBool(compiling, "nativeCodeGen")) |enabled|
+                if (toml.checkBool(compiling, "native_code_gen")) |enabled|
                     STATE.LUAU_OPTIONS.CODEGEN = enabled;
             }
         }
     }
 
-    if (toml.checkOptionTable(zconfig, "resolvers")) |resolvers_config| {
-        if (toml.checkOptionTable(resolvers_config, "formatter")) |fmt_config| {
-            if (toml.checkOptionInteger(fmt_config, "maxDepth")) |depth|
-                STATE.FORMAT.MAX_DEPTH = @truncate(@as(u64, @bitCast(depth)));
-            if (toml.checkOptionBool(fmt_config, "useColor")) |enabled|
-                STATE.FORMAT.USE_COLOR = enabled;
-            if (toml.checkOptionBool(fmt_config, "showTableAddress")) |enabled|
-                STATE.FORMAT.SHOW_TABLE_ADDRESS = enabled;
-            if (toml.checkOptionBool(fmt_config, "showRecursiveTable")) |enabled|
-                STATE.FORMAT.SHOW_RECURSIVE_TABLE = enabled;
-            if (toml.checkOptionInteger(fmt_config, "displayBufferContentsMax")) |max|
-                STATE.FORMAT.DISPLAY_BUFFER_CONTENTS_MAX = @truncate(@as(u64, @bitCast(max)));
+    if (toml.checkTable(zune_config, "workspace")) |config| {
+        if (toml.checkString(config, "cwd")) |path| {
+            if (comptime builtin.target.os.tag != .wasi) {
+                const cwd = dir.openDir(path, .{}) catch |err| {
+                    std.debug.panic("[zune.toml] Failed to open cwd (\"{s}\"): {}\n", .{ path, err });
+                };
+                cwd.setAsCwd() catch |err| {
+                    std.debug.panic("[zune.toml] Failed to set cwd to (\"{s}\"): {}\n", .{ path, err });
+                };
+            }
+        }
+        if (toml.checkString(config, "run_path")) |path| {
+            STATE.WORKSPACE.run_path = DEFAULT_ALLOCATOR.dupe(u8, path) catch |err| {
+                std.debug.panic("[zune.toml] {}\n", .{err});
+            };
+        }
+        if (toml.checkString(config, "test_path")) |path| {
+            STATE.WORKSPACE.test_path = DEFAULT_ALLOCATOR.dupe(u8, path) catch |err| {
+                std.debug.panic("[zune.toml] {}\n", .{err});
+            };
+        }
+        if (toml.checkTable(config, "scripts")) |scripts| {
+            var iter = scripts.table.iterator();
+            while (iter.next()) |entry| {
+                const key = entry.key_ptr.*;
+                const value = entry.value_ptr.*;
+                if (value != .string)
+                    std.debug.panic("[zune.toml] 'scripts.{s}' must be a string\n", .{key});
+                const script_path = value.string;
+                if (script_path.len == 0)
+                    std.debug.panic("[zune.toml] 'scripts.{s}' cannot be empty\n", .{key});
+                if (std.mem.indexOfNone(u8, key, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-+#&$!@")) |_| {
+                    std.debug.panic("[zune.toml] 'scripts.{s}' contains invalid characters\n", .{key});
+                }
+                if (STATE.WORKSPACE.scripts.contains(key)) {
+                    std.debug.panic("[zune.toml] Duplicate script key '{s}' found\n", .{key});
+                }
+                const key_copy = DEFAULT_ALLOCATOR.dupe(u8, key) catch |err| {
+                    std.debug.panic("[zune.toml] Failed to copy script key '{s}': {}\n", .{ key, err });
+                };
+                const value_copy = DEFAULT_ALLOCATOR.dupe(u8, script_path) catch |err| {
+                    std.debug.panic("[zune.toml] Failed to copy script path '{s}': {}\n", .{ script_path, err });
+                };
+                STATE.WORKSPACE.scripts.put(allocator, key_copy, value_copy) catch |err| {
+                    std.debug.panic("[zune.toml] Failed to add script '{s}': {}\n", .{ key, err });
+                };
+            }
         }
     }
 
-    if (toml.checkOptionTable(zconfig, "features")) |features_config| {
-        if (toml.checkOptionTable(features_config, "builtins")) |builtins| {
+    if (toml.checkTable(zune_config, "resolvers")) |resolvers_config| {
+        if (toml.checkTable(resolvers_config, "formatter")) |fmt_config| {
+            if (toml.checkInteger(fmt_config, "max_depth")) |depth|
+                STATE.FORMAT.MAX_DEPTH = @truncate(@as(u64, @bitCast(depth)));
+            if (toml.checkBool(fmt_config, "use_color")) |enabled|
+                STATE.FORMAT.USE_COLOR = enabled;
+            if (toml.checkBool(fmt_config, "table_address")) |enabled|
+                STATE.FORMAT.TABLE_ADDRESS = enabled;
+            if (toml.checkBool(fmt_config, "recursive_table")) |enabled|
+                STATE.FORMAT.RECURSIVE_TABLE = enabled;
+            if (toml.checkInteger(fmt_config, "buffer_max_display")) |max|
+                STATE.FORMAT.BUFFER_MAX_DISPLAY = @truncate(@as(u64, @bitCast(max)));
+        }
+    }
+
+    if (toml.checkTable(zune_config, "features")) |config| {
+        if (toml.checkTable(config, "builtin")) |builtin_config| {
             inline for (@typeInfo(@TypeOf(FEATURES)).@"struct".fields) |field| {
-                if (toml.checkOptionBool(builtins, field.name)) |enabled|
+                if (toml.checkBool(builtin_config, field.name)) |enabled|
                     @field(FEATURES, field.name) = enabled;
             }
         }

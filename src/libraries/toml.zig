@@ -3,42 +3,42 @@ const toml = @import("toml");
 
 pub const parse = toml.parse;
 
-pub fn checkOptionTable(table: toml.Table, comptime key: []const u8) ?toml.Table {
+pub fn checkTable(table: toml.Table, comptime key: []const u8) ?toml.Table {
     if (!table.contains(key)) return null;
     const item = table.table.get(key) orelse unreachable;
-    if (item != .table) {
-        std.debug.print("[zune.toml] '{s}' must be a table\n", .{key});
-        return null;
-    }
+    if (item != .table)
+        std.debug.panic("[zune.toml] '{s}' must be a table\n", .{key});
     return item.table;
 }
 
-pub fn checkOptionInteger(table: toml.Table, comptime key: []const u8) ?i64 {
+pub fn checkArray(table: toml.Table, comptime key: []const u8) ?toml.Array {
     if (!table.contains(key)) return null;
     const item = table.table.get(key) orelse unreachable;
-    if (item != .integer) {
-        std.debug.print("[zune.toml] '{s}' must be a integer\n", .{key});
-        return null;
-    }
+    if (item != .array)
+        std.debug.panic("[zune.toml] '{s}' must be a table\n", .{key});
+    return item.array;
+}
+
+pub fn checkInteger(table: toml.Table, comptime key: []const u8) ?i64 {
+    if (!table.contains(key)) return null;
+    const item = table.table.get(key) orelse unreachable;
+    if (item != .integer)
+        std.debug.panic("[zune.toml] '{s}' must be a integer\n", .{key});
     return item.integer;
 }
 
-pub fn checkOptionBool(table: toml.Table, comptime key: []const u8) ?bool {
+pub fn checkBool(table: toml.Table, comptime key: []const u8) ?bool {
     if (!table.contains(key)) return null;
     const item = table.table.get(key) orelse unreachable;
-    if (item != .boolean) {
-        std.debug.print("[zune.toml] '{s}' must be a boolean\n", .{key});
-        return null;
-    }
+    if (item != .boolean)
+        std.debug.panic("[zune.toml] '{s}' must be a boolean\n", .{key});
     return item.boolean;
 }
 
-pub fn checkOptionString(table: toml.Table, comptime key: []const u8) ?[]const u8 {
+pub fn checkString(table: toml.Table, comptime key: []const u8) ?[]const u8 {
     if (!table.contains(key)) return null;
     const item = table.table.get(key) orelse unreachable;
-    if (item != .string) {
-        std.debug.print("[zune.toml] '{s}' must be a string\n", .{key});
-        return null;
-    }
+    if (item != .string)
+        std.debug.panic("[zune.toml] '{s}' must be a string\n", .{key});
     return item.string;
 }

@@ -290,9 +290,9 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
         .format = .{
             .use_color = Zune.STATE.FORMAT.USE_COLOR,
             .max_depth = Zune.STATE.FORMAT.MAX_DEPTH,
-            .show_table_address = Zune.STATE.FORMAT.SHOW_TABLE_ADDRESS,
-            .show_recursive_table = Zune.STATE.FORMAT.SHOW_RECURSIVE_TABLE,
-            .display_buffer_contents_max = Zune.STATE.FORMAT.DISPLAY_BUFFER_CONTENTS_MAX,
+            .table_address = Zune.STATE.FORMAT.TABLE_ADDRESS,
+            .recursive_table = Zune.STATE.FORMAT.RECURSIVE_TABLE,
+            .buffer_max_display = Zune.STATE.FORMAT.BUFFER_MAX_DISPLAY,
         },
         .luau = .{
             .codegen = Zune.STATE.LUAU_OPTIONS.CODEGEN,
