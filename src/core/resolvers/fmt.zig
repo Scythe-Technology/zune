@@ -99,7 +99,7 @@ pub fn printValue(
                 const ptr = @intFromPtr(L.topointer(idx) orelse std.debug.panic("Failed Table to Ptr Conversion", .{}));
                 if (map) |tracked| {
                     if (tracked.get(ptr)) |_| {
-                        if (Zune.STATE.FORMAT.SHOW_TABLE_ADDRESS)
+                        if (Zune.STATE.FORMAT.TABLE_ADDRESS)
                             try Zune.debug.writerPrint(writer, "<dim><<recursive, table: 0x{x}>><clear>", .{ptr})
                         else
                             try Zune.debug.writerPrint(writer, "<dim><<recursive, table>><clear>", .{});
@@ -108,7 +108,7 @@ pub fn printValue(
                     try tracked.put(ptr, true);
                 }
                 defer _ = if (map) |tracked| tracked.orderedRemove(ptr);
-                if (Zune.STATE.FORMAT.SHOW_TABLE_ADDRESS) {
+                if (Zune.STATE.FORMAT.TABLE_ADDRESS) {
                     if (tostring(allocator, L, idx) catch try allocator.dupe(u8, "!ERR!")) |str| {
                         defer allocator.free(str);
                         try Zune.debug.writerPrint(writer, "<dim><<{s}>> {{<clear>\n", .{str});
@@ -143,12 +143,14 @@ pub fn printValue(
                     break :blk @intFromPtr(L.topointer(idx) orelse break :blk 0);
                 };
                 try Zune.debug.writerPrint(writer, "<bmagenta><<buffer ", .{});
-                if (b.len > Zune.STATE.FORMAT.DISPLAY_BUFFER_CONTENTS_MAX) {
-                    try writer.print("0x{x} {X}", .{ ptr, b[0..Zune.STATE.FORMAT.DISPLAY_BUFFER_CONTENTS_MAX] });
-                    try writer.print(" ...{d} truncated", .{(b.len - Zune.STATE.FORMAT.DISPLAY_BUFFER_CONTENTS_MAX)});
-                } else {
-                    try writer.print("0x{x} {X}", .{ ptr, b });
-                }
+                if (Zune.STATE.FORMAT.BUFFER_MAX_DISPLAY > 0) {
+                    if (b.len > Zune.STATE.FORMAT.BUFFER_MAX_DISPLAY) {
+                        try writer.print("0x{x} {X}", .{ ptr, b[0..Zune.STATE.FORMAT.BUFFER_MAX_DISPLAY] });
+                        try writer.print(" ...{d} truncated", .{(b.len - Zune.STATE.FORMAT.BUFFER_MAX_DISPLAY)});
+                    } else {
+                        try writer.print("0x{x} {X}", .{ ptr, b });
+                    }
+                } else try writer.print("0x{x}", .{ptr});
                 try Zune.debug.writerPrint(writer, ">><clear>", .{});
             },
             .Vector => {
@@ -180,7 +182,7 @@ pub fn writeIdx(allocator: std.mem.Allocator, L: *VM.lua.State, writer: anytype,
             } else try Zune.debug.writerPrint(writer, "<bmagenta><<{s}>><clear>", .{VM.lapi.typename(t)});
         },
         else => {
-            if (!Zune.STATE.FORMAT.SHOW_RECURSIVE_TABLE) {
+            if (!Zune.STATE.FORMAT.RECURSIVE_TABLE) {
                 var map = std.AutoArrayHashMap(usize, bool).init(allocator);
                 defer map.deinit();
                 try printValue(L, writer, idx, 0, false, &map, max_depth);

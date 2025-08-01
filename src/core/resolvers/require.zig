@@ -131,7 +131,7 @@ const RequireNavigatorContext = struct {
         const copy = try Zune.DEFAULT_ALLOCATOR.dupe(u8, path);
         errdefer Zune.DEFAULT_ALLOCATOR.free(copy);
 
-        try Zune.STATE.CONFIG_CACHE.put(copy, config);
+        try Zune.STATE.CONFIG_CACHE.put(Zune.DEFAULT_ALLOCATOR, copy, config);
 
         return config;
     }

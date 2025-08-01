@@ -8,23 +8,23 @@ const INIT_CONFIG_FILE =
     \\# Debug settings
     \\#  This affects the way Zune handles errors and debug information.
     \\[runtime.debug]
-    \\detailedError = true
+    \\detailed_error = true
     \\
     \\# Compiling settings
     \\#  This affects all required files and the main file.
     \\[runtime.luau.options]
-    \\debugLevel = 2
-    \\optimizationLevel = 1
-    \\nativeCodeGen = true
+    \\debug_level = 2
+    \\optimization_level = 1
+    \\native_code_gen = true
     \\
     \\# Formatter settings
     \\#  This affects the output of the formatter while printing.
     \\[resolvers.formatter]
-    \\maxDepth = 4
-    \\useColor = true
-    \\showTableAddress = true
-    \\showRecursiveTable = false
-    \\displayBufferContentsMax = 48
+    \\max_depth = 4
+    \\use_color = true
+    \\table_address = true
+    \\recursive_Table = false
+    \\buffer_max_display = 48
     \\
     \\# FFlag settings for Luau
     \\#  You can use `zune luau list-fflags` to list all available FFlags.
@@ -34,7 +34,7 @@ const INIT_CONFIG_FILE =
     \\# Features settings
     \\#  This affects the features that are enabled in Zune.
     \\#  mainly builtin libraries and features.
-    \\#[features.builtins]
+    \\#[features.builtin]
     \\#fs = true
     \\#io = true
     \\#net = true
