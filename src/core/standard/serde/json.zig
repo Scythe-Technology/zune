@@ -55,7 +55,7 @@ fn encode(
     L: *VM.lua.State,
     allocator: std.mem.Allocator,
     buf: *std.ArrayList(u8),
-    tracked: *std.ArrayList(*const anyopaque),
+    tracked: *std.AutoHashMapUnmanaged(*const anyopaque, void),
     kind: json.JsonIndent,
     depth: u32,
     comptime json_kind: JsonKind,
@@ -70,10 +70,10 @@ fn encode(
                 return;
             };
 
-            for (tracked.items) |t|
-                if (t == tablePtr)
-                    return L.Zerror("table circular reference");
-            try tracked.append(tablePtr);
+            if (tracked.contains(tablePtr))
+                return L.Zerror("table circular reference");
+            try tracked.put(allocator, tablePtr, undefined);
+            defer std.debug.assert(tracked.remove(tablePtr));
 
             const tableSize = L.objlen(-1);
             var i: i32 = L.rawiter(-1, 0);
@@ -195,8 +195,8 @@ pub fn LuaEncoder(comptime json_kind: JsonKind) fn (L: *VM.lua.State) anyerror!i
             var buf = std.ArrayList(u8).init(allocator);
             defer buf.deinit();
 
-            var tracked = std.ArrayList(*const anyopaque).init(allocator);
-            defer tracked.deinit();
+            var tracked: std.AutoHashMapUnmanaged(*const anyopaque, void) = .empty;
+            defer tracked.deinit(allocator);
 
             L.pushvalue(1);
             try encode(L, allocator, &buf, &tracked, kind, 0, json_kind);
