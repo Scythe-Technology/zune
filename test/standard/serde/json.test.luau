@@ -140,6 +140,29 @@ describe("Json", function()
             expect(function() serde.json.values.null.a = 2 end).toThrow(`attempt to modify a readonly table`);
         end)
     end)
+
+    describe("Full", function()
+        local full_table = {};
+        full_table["a"] = "a";
+        full_table["b"] = 100.20;
+        full_table["c"] = true;
+        full_table["d"] = serde.json.values.null;
+        full_table["e"] = {1, 2, 3};
+        full_table["f"] = {a = "a", b = 100.20, c = true, d = serde.json.values.null};
+        full_table["some encoded\0name"] = "someencoded\0value\1\n\n";
+        full_table["g"] = table.clone(full_table);
+        full_table["g"]["__sub"] = table.clone(full_table);
+        full_table["h"] = table.clone(full_table);
+
+        -- fixes
+        full_table["g"]["__sub"]["g"] = nil :: any; -- circular reference
+        full_table["h"]["__sub"] = nil :: any; -- circular reference
+        full_table["h"]["g"] = nil :: any; -- circular reference
+
+        test("Encode/Decode", function()
+            expect(serde.json.decode(serde.json.encode(full_table), {preserve_null = true})).toBe(expect.similar(full_table));
+        end)
+    end)
 end)
 
 return nil;
