@@ -81,8 +81,10 @@ fn encode(
                 try buf.append('[');
                 if (i >= 0) {
                     var n: i32 = 0;
+                    var appended = false;
                     while (i >= 0) : (i = L.rawiter(-1, i)) {
-                        if (i > 1) {
+                        defer appended = true;
+                        if (appended) {
                             try buf.append(',');
                             if (kind != .NO_LINE)
                                 try buf.append(' ');
@@ -103,8 +105,10 @@ fn encode(
                 try buf.append(']');
             } else {
                 try buf.appendSlice("{");
+                var appended = false;
                 while (i >= 0) : (i = L.rawiter(-1, i)) {
-                    if (i > 1)
+                    defer appended = true;
+                    if (appended)
                         try buf.append(',');
                     switch (L.typeOf(-2)) {
                         .String => {},

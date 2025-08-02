@@ -38,6 +38,7 @@ describe("Json", function()
         test("Object/Array", function()
             expect(serde.json.encode({})).toBe("[]");
             expect(serde.json.encode({a = 1, b = 2, c = 3})).toBe(`\{"a":1,"c":3,"b":2\}`);
+            expect(serde.json.encode({a = {b = 2, c = 3, d = 4}})).toBe(`\{"a":\{"d":4,"c":3,"b":2\}\}`);
             expect(serde.json.encode({a = 1, b = serde.json.values.null, c = 3})).toBe(`\{"a":1,"c":3,"b":null\}`);
             expect(serde.json.encode({1,2,3})).toBe(`[1,2,3]`);
 
