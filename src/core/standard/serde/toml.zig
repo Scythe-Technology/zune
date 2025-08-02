@@ -72,7 +72,7 @@ const EncodeInfo = struct {
     root: bool = true,
     isName: bool = false,
     keyName: []const u8,
-    tracked: *std.ArrayList(*const anyopaque),
+    tracked: *std.AutoHashMapUnmanaged(*const anyopaque, void),
     tagged: *std.StringArrayHashMap([]const u8),
 };
 
@@ -145,10 +145,10 @@ fn encodeArrayPartial(L: *VM.lua.State, allocator: std.mem.Allocator, arraySize:
                 size += 1;
                 const tablePtr = L.topointer(-1) orelse return error.Failed;
 
-                for (info.tracked.items) |t|
-                    if (t == tablePtr)
-                        return L.Zerror("table circular reference");
-                try info.tracked.append(tablePtr);
+                if (info.tracked.contains(tablePtr))
+                    return L.Zerror("table circular reference");
+                try info.tracked.put(allocator, tablePtr, undefined);
+                defer std.debug.assert(info.tracked.remove(tablePtr));
 
                 const tableSize = L.objlen(-1);
                 const j: i32 = L.rawiter(-1, 0);
@@ -255,11 +255,10 @@ fn encodeTable(L: *VM.lua.State, allocator: std.mem.Allocator, buf: *std.ArrayLi
 
                 const tablePtr = L.topointer(-1).?;
 
-                for (info.tracked.items) |t|
-                    if (t == tablePtr)
-                        return L.Zerror("table circular reference");
-
-                try info.tracked.append(tablePtr);
+                if (info.tracked.contains(tablePtr))
+                    return L.Zerror("table circular reference");
+                try info.tracked.put(allocator, tablePtr, undefined);
+                defer std.debug.assert(info.tracked.remove(tablePtr));
 
                 const tableSize = L.objlen(-1);
                 const j: i32 = L.rawiter(-1, 0);
@@ -776,8 +775,8 @@ pub fn lua_encode(L: *VM.lua.State) !i32 {
     var tagged = std.StringArrayHashMap([]const u8).init(allocator);
     defer tagged.deinit();
 
-    var tracked = std.ArrayList(*const anyopaque).init(allocator);
-    defer tracked.deinit();
+    var tracked: std.AutoHashMapUnmanaged(*const anyopaque, void) = .empty;
+    defer tracked.deinit(allocator);
 
     const info = EncodeInfo{
         .keyName = "",
