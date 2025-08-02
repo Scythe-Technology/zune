@@ -892,9 +892,12 @@ type TomlEncoder = {
     decode: (toml: string) -> {[string]: any},
 }
 
+type YamlInput = string | number | boolean | {[string]: YamlInput}
+type YamlOuput = string | {[string]: YamlOuput}
+
 type YamlEncoder = {
-    encode: (object: {[string]: any}) -> string,
-    decode: (yaml: string) -> {[string]: any},
+    encode: (object: YamlInput) -> string,
+    decode: (yaml: string) -> YamlOuput,
 }
 
 type Base64Encoder = {

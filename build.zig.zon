@@ -8,8 +8,8 @@
             .hash = "json-0.1.3-yTw8kwGEAQC8CcGSBwBruB9HiwGFu5lWNs0l64cVhWFQ",
         },
         .yaml = .{
-            .url = "https://codeload.github.com/kubkon/zig-yaml/tar.gz/a37be441b042d8aa119213f82f715c0dd1019655",
-            .hash = "zig_yaml-0.1.0-C1161hmEAgBeNkAzDaTpcf-2HBydmS1KpJ6FVfGIZfr_",
+            .url = "https://codeload.github.com/kubkon/zig-yaml/tar.gz/9b19ff52d2ee41ecbb55cb844771b3c52fb19dbb",
+            .hash = "zig_yaml-0.1.0-C1161m2cAgCRKV1mYzwK1YmjVn75x5bIgwHojVW111fV",
         },
         .lz4 = .{
             .url = "https://codeload.github.com/Scythe-Technology/zig-lz4/tar.gz/374e4c899efc3a517b1f1d3ceaa64b258773abed",
