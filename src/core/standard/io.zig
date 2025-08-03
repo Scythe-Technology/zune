@@ -158,7 +158,7 @@ const Stream = struct {
         std.debug.assert(self.vtable.read != null);
         const amount = L.Loptunsigned(2, MAX_LUAU_SIZE);
         const use_buffer = L.Loptboolean(3, true);
-        const data = try self.vtable.read.?(self.ref.value, amount, false) orelse return error.EOF;
+        const data = try self.vtable.read.?(self.ref.value, amount, false) orelse "";
         if (use_buffer)
             try L.Zpushbuffer(data)
         else
@@ -399,7 +399,7 @@ const BufferStream = struct {
     pub fn lua_read(self: *BufferStream, L: *VM.lua.State) !i32 {
         const amount = L.Loptunsigned(2, MAX_LUAU_SIZE);
         const use_buffer = L.Loptboolean(3, true);
-        const data = try self.stream_read(amount, false) orelse return error.EOF;
+        const data = try self.stream_read(amount, false) orelse "";
         if (use_buffer)
             try L.Zpushbuffer(data)
         else
