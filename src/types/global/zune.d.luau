@@ -223,6 +223,7 @@ export type ProcessOptions = {
 	cwd: string?,
 	env: { [string]: string }?,
 	shell: (boolean | string)?,
+    stdio: ("inherit" | "pipe" | "ignore")?,
 }
 
 export type ProcessResult = {
