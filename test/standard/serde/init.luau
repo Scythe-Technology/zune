@@ -40,6 +40,10 @@ expect(serde.yaml).toBe(expect.similar({
     encode = expect.type("function"),
     decode = expect.type("function"),
 }));
+expect(serde.base64).toBe(expect.similar({
+    encode = expect.type("function"),
+    decode = expect.type("function"),
+}));
 expect(serde.gzip).toBe(expect.similar({
     compress = expect.type("function"),
     decompress = expect.type("function"),
@@ -63,6 +67,7 @@ require("@self/json.test");
 require("@self/json5.test");
 require("@self/toml.test");
 require("@self/yaml.test");
+require("@self/base64.test");
 require("@self/gzip.test");
 require("@self/zlib.test");
 require("@self/lz4.test");
