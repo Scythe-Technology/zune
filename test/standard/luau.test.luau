@@ -270,6 +270,7 @@ describe("Parse", function()
         expect(result).toBe(expect.similar({
             tag = "block",
             lines = 2,
+            line_offsets = {0, 33},
             root = {
                 statements = {
                     tag = "local",
@@ -282,6 +283,23 @@ describe("Parse", function()
                                         position = {
                                             line = 0,
                                             column = 18,
+                                        },
+                                        trailingTrivia = {},
+                                        leadingTrivia = {
+                                            [1] = {
+                                                location = {
+                                                    begin = {
+                                                        line = 0,
+                                                        column = 17,
+                                                    },
+                                                    ["end"] = {
+                                                        line = 0,
+                                                        column = 18,
+                                                    },
+                                                },
+                                                text = " ",
+                                                tag = "whitespace",
+                                            },
                                         },
                                     },
                                 },
@@ -307,6 +325,52 @@ describe("Parse", function()
                                             column = 23,
                                         },
                                     },
+                                    trailingTrivia = {
+                                        [1] = {
+                                            location = {
+                                                begin = {
+                                                    line = 0,
+                                                    column = 23,
+                                                },
+                                                ["end"] = {
+                                                    line = 0,
+                                                    column = 24,
+                                                },
+                                            },
+                                            text = " ",
+                                            tag = "whitespace",
+                                        },
+                                        [2] = {
+                                            location = {
+                                                begin = {
+                                                    line = 0,
+                                                    column = 24,
+                                                },
+                                                ["end"] = {
+                                                    line = 0,
+                                                    column = 32,
+                                                },
+                                            },
+                                            text = "-- hello",
+                                            tag = "comment",
+                                        },
+                                    },
+                                    leadingTrivia = {
+                                        [1] = {
+                                            location = {
+                                                begin = {
+                                                    line = 0,
+                                                    column = 21,
+                                                },
+                                                ["end"] = {
+                                                    line = 0,
+                                                    column = 22,
+                                                },
+                                            },
+                                            text = " ",
+                                            tag = "whitespace",
+                                        },
+                                    },
                                 },
                             },
                         },
@@ -315,6 +379,23 @@ describe("Parse", function()
                             position = {
                                 line = 0,
                                 column = 20,
+                            },
+                            trailingTrivia = {},
+                            leadingTrivia = {
+                                [1] = {
+                                    location = {
+                                        begin = {
+                                            line = 0,
+                                            column = 19,
+                                        },
+                                        ["end"] = {
+                                            line = 0,
+                                            column = 20,
+                                        },
+                                    },
+                                    text = " ",
+                                    tag = "whitespace",
+                                },
                             },
                         }
                     },
@@ -334,6 +415,23 @@ describe("Parse", function()
                             line = 0,
                             column = 12,
                         },
+                        trailingTrivia = {},
+                        leadingTrivia = {
+                            [1] = {
+                                location = {
+                                    begin = {
+                                        line = 0,
+                                        column = 0,
+                                    },
+                                    ["end"] = {
+                                        line = 0,
+                                        column = 12,
+                                    },
+                                },
+                                text = "            ",
+                                tag = "whitespace",
+                            },
+                        },
                     },
                 },
             },
@@ -343,6 +441,37 @@ describe("Parse", function()
                 position = {
                     line = 1,
                     column = 8,
+                },
+                trailingTrivia = {},
+                leadingTrivia = {
+                    [1] = {
+                        location = {
+                            begin = {
+                                line = 0,
+                                column = 32,
+                            },
+                            ["end"] = {
+                                line = 1,
+                                column = 0,
+                            },
+                        },
+                        text = "\n",
+                        tag = "whitespace",
+                    },
+                    [2] = {
+                        location = {
+                            begin = {
+                                line = 1,
+                                column = 0,
+                            },
+                            ["end"] = {
+                                line = 1,
+                                column = 8,
+                            },
+                        },
+                        text = "        ",
+                        tag = "whitespace",
+                    },
                 },
             },
             location = {
@@ -389,8 +518,138 @@ describe("Parse", function()
                     line = 4,
                     column = 8,
                 },
+                trailingTrivia = {},
+                leadingTrivia = {
+                    [1] = {
+                        location = {
+                            begin = {
+                                line = 0,
+                                column = 0,
+                            },
+                            ["end"] = {
+                                line = 0,
+                                column = 9,
+                            },
+                        },
+                        text = "--!native",
+                        tag = "comment",
+                    },
+                    [2] = {
+                        location = {
+                            begin = {
+                                line = 0,
+                                column = 9,
+                            },
+                            ["end"] = {
+                                line = 1,
+                                column = 0,
+                            },
+                        },
+                        text = "\n",
+                        tag = "whitespace",
+                    },
+                    [3] = {
+                        location = {
+                            begin = {
+                                line = 1,
+                                column = 0,
+                            },
+                            ["end"] = {
+                                line = 1,
+                                column = 9,
+                            },
+                        },
+                        text = "--!unsafe",
+                        tag = "comment",
+                    },
+                    [4] = {
+                        location = {
+                            begin = {
+                                line = 1,
+                                column = 9,
+                            },
+                            ["end"] = {
+                                line = 2,
+                                column = 0,
+                            },
+                        },
+                        text = "\n",
+                        tag = "whitespace",
+                    },
+                    [5] = {
+                        location = {
+                            begin = {
+                                line = 2,
+                                column = 0,
+                            },
+                            ["end"] = {
+                                line = 2,
+                                column = 8,
+                            },
+                        },
+                        text = "-- space",
+                        tag = "comment",
+                    },
+                    [6] = {
+                        location = {
+                            begin = {
+                                line = 2,
+                                column = 8,
+                            },
+                            ["end"] = {
+                                line = 3,
+                                column = 0,
+                            },
+                        },
+                        text = "\n",
+                        tag = "whitespace",
+                    },
+                    [7] = {
+                        location = {
+                            begin = {
+                                line = 3,
+                                column = 0,
+                            },
+                            ["end"] = {
+                                line = 3,
+                                column = 10,
+                            },
+                        },
+                        text = "--!unknown",
+                        tag = "comment",
+                    },
+                    [8] = {
+                        location = {
+                            begin = {
+                                line = 3,
+                                column = 10,
+                            },
+                            ["end"] = {
+                                line = 4,
+                                column = 0,
+                            },
+                        },
+                        text = "\n",
+                        tag = "whitespace",
+                    },
+                    [9] = {
+                        location = {
+                            begin = {
+                                line = 4,
+                                column = 0,
+                            },
+                            ["end"] = {
+                                line = 4,
+                                column = 8,
+                            },
+                        },
+                        text = "        ",
+                        tag = "whitespace",
+                    },
+                },
             },
             lines = 5,
+            line_offsets = {0, 10, 20, 29, 40},
             hot_comments = {
                 {
                     header = true,
@@ -486,6 +745,8 @@ describe("ParseExpr", function()
                     column = 8,
                 },
             },
+            trailingTrivia = {},
+            leadingTrivia = {},
         }));
     end)
 
@@ -512,6 +773,8 @@ describe("ParseExpr", function()
                         column = 1,
                     },
                 },
+                trailingTrivia = {},
+                leadingTrivia = {},
             },
             rhsoperand = {
                 tag = "number",
@@ -531,12 +794,46 @@ describe("ParseExpr", function()
                         column = 5,
                     },
                 },
+                trailingTrivia = {},
+                leadingTrivia = {
+                    [1] = {
+                        location = {
+                            begin = {
+                                line = 0,
+                                column = 3,
+                            },
+                            ["end"] = {
+                                line = 0,
+                                column = 4,
+                            },
+                        },
+                        text = " ",
+                        tag = "whitespace",
+                    },
+                },
             },
             operator = {
                 text = "*",
                 position = {
                     line = 0,
                     column = 2,
+                },
+                trailingTrivia = {},
+                leadingTrivia = {
+                    [1] = {
+                        location = {
+                            begin = {
+                                line = 0,
+                                column = 1,
+                            },
+                            ["end"] = {
+                                line = 0,
+                                column = 2,
+                            },
+                        },
+                        text = " ",
+                        tag = "whitespace",
+                    },
                 },
             },
             location = {

@@ -134,6 +134,31 @@ fn lua_coverage(L: *VM.lua.State) !i32 {
     return 1;
 }
 
+pub fn computeLineOffsets(allocator: std.mem.Allocator, source: []const u8) ![]const u32 {
+    var offests: std.ArrayListUnmanaged(u32) = .empty;
+    defer offests.deinit(allocator);
+
+    try offests.append(allocator, 0);
+
+    if (source.len > std.math.maxInt(u32))
+        return error.LargeSource;
+
+    var i: usize = 0;
+    while (i < source.len) : (i += 1) {
+        const c = source[i];
+        switch (c) {
+            '\r' => if (i + 1 < source.len and source[i + 1] == '\n') {
+                i += 1;
+            },
+            '\n' => {},
+            else => continue,
+        }
+        try offests.append(allocator, @intCast(i + 1));
+    }
+
+    return offests.toOwnedSlice(allocator);
+}
+
 const AstSerializer = struct {
     // Based on https://github.com/luau-lang/lute/blob/76fa819ee3cf202d979b59c477241c3968fe8b1a/lute/luau/src/luau.cpp#L135
     const Ast = luau.Ast.Ast;
@@ -141,13 +166,16 @@ const AstSerializer = struct {
     const Parser = luau.Ast.Parser;
     const Location = luau.Ast.Location.Location;
 
+    allocator: std.mem.Allocator,
+
     L: *VM.lua.State,
-    cstNodeMap: *Parser.CstNodeMap,
+    cst_node_map: *Parser.CstNodeMap,
     source: []const u8,
-    currentPosition: Location.Position = .zeros,
-    commentLocations: []const Parser.Comment,
-    localTableIndex: i32,
-    // lastTokenRef: ?i32 = null,
+    current_position: Location.Position = .zeros,
+    comment_locations: []const Parser.Comment,
+    local_table_index: i32,
+    last_token_ref: ?i32 = null,
+    line_offsets: []const u32,
 
     fn advancePosition(self: *@This(), contents: []const u8) void {
         if (contents.len == 0)
@@ -161,11 +189,11 @@ const AstSerializer = struct {
             index += newlinePos + 1;
         }
 
-        self.currentPosition.line += @intCast(numLines);
+        self.current_position.line += @intCast(numLines);
         if (numLines > 0)
-            self.currentPosition.column = @intCast(contents.len - index)
+            self.current_position.column = @intCast(contents.len - index)
         else
-            self.currentPosition.column += @intCast(contents.len);
+            self.current_position.column += @intCast(contents.len);
     }
 
     fn serializeLocal(self: *@This(), local: *Ast.Local, createToken: bool, colonPosition: ?Location.Position) !void {
@@ -174,13 +202,13 @@ const AstSerializer = struct {
 
         self.L.pushlightuserdata(@ptrCast(@alignCast(local)));
 
-        if (self.L.rawget(self.localTableIndex).isnoneornil()) {
+        if (self.L.rawget(self.local_table_index).isnoneornil()) {
             self.L.pop(1);
             try self.L.createtable(0, 4);
 
             self.L.pushlightuserdata(@ptrCast(@alignCast(local)));
             self.L.pushvalue(-2);
-            try self.L.rawset(self.localTableIndex);
+            try self.L.rawset(self.local_table_index);
 
             if (createToken) {
                 try self.serializeToken(local.location.begin, std.mem.span(local.name.value), null);
@@ -259,23 +287,153 @@ const AstSerializer = struct {
         }
     }
 
+    pub const Trivia = struct {
+        kind: enum {
+            Whitespace,
+            SingleLineComment,
+            MultiLineComment,
+        },
+        location: Location,
+        text: []const u8,
+    };
+
+    fn extractWhitespace(self: *@This(), results: *std.ArrayListUnmanaged(Trivia), newPos: Location.Position) !void {
+        const start_offset = self.line_offsets[self.current_position.line] + self.current_position.column;
+        const end_offset = self.line_offsets[newPos.line] + newPos.column;
+
+        var begin_position = self.current_position;
+
+        var trivia = self.source[start_offset..end_offset];
+        while (trivia.len > 0) {
+            const index = std.mem.indexOfScalar(u8, trivia, '\n');
+            var part: []const u8 = trivia;
+            if (index) |idx| {
+                part = trivia[0 .. idx + 1];
+                trivia = trivia[idx + 1 ..];
+            }
+            self.advancePosition(part);
+            try results.append(self.allocator, Trivia{
+                .kind = .Whitespace,
+                .location = .{ .begin = begin_position, .end = self.current_position },
+                .text = part,
+            });
+            begin_position = self.current_position;
+            if (index == null)
+                break;
+        }
+    }
+
+    fn extractTrivia(self: *@This(), newPos: Location.Position) ![]Trivia {
+        std.debug.assert(self.current_position.lessThanOrEq(newPos));
+        if (self.current_position.eq(newPos))
+            return &.{};
+
+        var results: std.ArrayListUnmanaged(Trivia) = .empty;
+        errdefer results.deinit(self.allocator);
+        const span: Location = .{ .begin = self.current_position, .end = newPos };
+        for (self.comment_locations) |comment| {
+            if (!span.encloses(comment.location))
+                continue;
+
+            if (self.current_position.lessThan(comment.location.begin))
+                try self.extractWhitespace(&results, comment.location.begin);
+
+            const start_offset = self.line_offsets[comment.location.begin.line] + comment.location.begin.column;
+            const end_offset = self.line_offsets[comment.location.end.line] + comment.location.end.column;
+
+            const comment_text = self.source[start_offset..end_offset];
+
+            self.advancePosition(comment_text);
+
+            try results.append(self.allocator, .{
+                .kind = if (comment.type == .Comment) .SingleLineComment else .MultiLineComment,
+                .location = comment.location,
+                .text = comment_text,
+            });
+        }
+
+        if (self.current_position.lessThan(newPos))
+            try self.extractWhitespace(&results, newPos);
+
+        return try results.toOwnedSlice(self.allocator);
+    }
+
+    fn splitTrivia(self: *@This(), trivia: []Trivia) !struct { []Trivia, []Trivia } {
+        var split: usize = 0;
+        for (trivia, 0..) |t, i| {
+            split = i;
+            if (t.kind == .Whitespace and std.mem.indexOfScalar(u8, t.text, '\n') != null)
+                break;
+        }
+
+        if (split == trivia.len)
+            return .{ trivia, &.{} };
+
+        const trailing = try self.allocator.alloc(Trivia, trivia.len - split);
+        errdefer self.allocator.free(trailing);
+        const leading = try self.allocator.alloc(Trivia, split);
+        errdefer self.allocator.free(leading);
+
+        defer self.allocator.free(trivia);
+
+        @memcpy(leading, trivia[0..split]);
+        @memcpy(trailing, trivia[split..]);
+
+        return .{ leading, trailing };
+    }
+
+    pub fn serializeTrivia(self: *@This(), trivia: []Trivia) !void {
+        try self.L.rawcheckstack(3);
+        try self.L.createtable(@truncate(trivia.len), 0);
+
+        for (trivia, 0..) |t, i| {
+            try self.L.Zpushvalue(.{
+                .tag = switch (t.kind) {
+                    .Whitespace => "whitespace",
+                    .SingleLineComment => "comment",
+                    .MultiLineComment => "blockcomment",
+                },
+                .location = t.location,
+                .text = t.text,
+            });
+            try self.L.rawseti(-2, @intCast(i + 1));
+        }
+    }
+
     pub fn serializeToken(self: *@This(), position: Location.Position, text: []const u8, nrec: ?u32) !void {
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, (nrec orelse 0) + 4);
 
-        // TODO: add leadingTrivia
-        // try self.L.createtable(0, 0);
-        // try self.L.rawsetfield(-2, "leadingTrivia");
+        const trivia = try self.extractTrivia(position);
+        if (self.last_token_ref) |ref| {
+            const trailing_trivia, const leading_trivia = try self.splitTrivia(trivia);
+            defer self.allocator.free(trailing_trivia);
+            defer self.allocator.free(leading_trivia);
+
+            std.debug.assert(self.L.getref(ref) == .Table);
+            {
+                defer self.L.unref(ref);
+                try self.serializeTrivia(trailing_trivia);
+                try self.L.rawsetfield(-2, "trailingTrivia");
+                self.L.pop(1);
+            }
+            self.last_token_ref = null;
+
+            try self.serializeTrivia(leading_trivia);
+        } else {
+            defer self.allocator.free(trivia);
+            try self.serializeTrivia(trivia);
+        }
+        try self.L.rawsetfield(-2, "leadingTrivia");
 
         try self.L.Zsetfield(-1, "position", position);
         try self.L.Zsetfield(-1, "text", text);
         self.advancePosition(text);
 
-        // TODO: add trailingTrivia
-        // try self.L.createtable(0, 0);
-        // try self.L.rawsetfield(-2, "trailingTrivia");
+        try self.L.createtable(0, 0);
+        try self.L.rawsetfield(-2, "trailingTrivia");
 
-        // self.lastTokenRef = try self.L.ref(-1);
+        self.last_token_ref = try self.L.ref(-1);
     }
 
     fn serializeExprs(self: *@This(), exprs: Ast.Array(*Ast.Expr), nrec: u32) !void {
@@ -416,7 +574,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitExprConstantNumber(self: *@This(), node: *Ast.ExprConstantNumber) !bool {
-        const cstNode = self.cstNodeMap.find(@ptrCast(node)).?.second.*.as(.expr_constant_number).?;
+        const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.expr_constant_number).?;
 
         try self.serializeToken(node.location.begin, cstNode.value.slice(), 3);
         try self.L.Zsetfield(-1, "tag", "number");
@@ -427,7 +585,7 @@ const AstSerializer = struct {
     }
     pub fn visitExprConstantString(self: *@This(), node: *Ast.ExprConstantString) !bool {
         // TODO: fix class index issues
-        const cstNode: *Cst.ExprConstantString = @ptrCast(self.cstNodeMap.find(@ptrCast(node)).?.second.*.as(.expr_constant_number).?);
+        const cstNode: *Cst.ExprConstantString = @ptrCast(self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.expr_constant_number).?);
 
         try self.serializeToken(node.location.begin, cstNode.sourceString.slice(), 4);
         try self.L.Zsetfield(-1, "tag", "string");
@@ -441,7 +599,7 @@ const AstSerializer = struct {
         });
         try self.L.Zsetfield(-1, "blockDepth", cstNode.blockDepth);
 
-        self.currentPosition = node.location.end;
+        self.current_position = node.location.end;
         return false;
     }
     pub fn visitExprLocal(self: *@This(), node: *Ast.ExprLocal) !bool {
@@ -478,7 +636,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitExprCall(self: *@This(), node: *Ast.ExprCall) !bool {
-        const cstNode = self.cstNodeMap.find(@ptrCast(node)).?.second.*.as(.expr_call).?;
+        const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.expr_call).?;
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 8);
 
@@ -524,7 +682,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitExprIndexExpr(self: *@This(), node: *Ast.ExprIndexExpr) !bool {
-        const cstNode = self.cstNodeMap.find(@ptrCast(node)).?.second.*.as(.expr_index_expr).?;
+        const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.expr_index_expr).?;
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 6);
 
@@ -545,7 +703,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn serializeFunctionBody(self: *@This(), node: *Ast.ExprFunction) !void {
-        const cstNode = self.cstNodeMap.find(@ptrCast(node)).?.second.*.as(.expr_function).?;
+        const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.expr_function).?;
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 15);
 
@@ -625,7 +783,7 @@ const AstSerializer = struct {
         try self.serializeAttributes(node.attributes, 0);
         try self.L.rawsetfield(-2, "attributes");
 
-        const cstNode = self.cstNodeMap.find(@ptrCast(node)).?.second.*.as(.expr_function).?;
+        const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.expr_function).?;
 
         try self.serializeToken(cstNode.functionKeywordPosition, "function", null);
         try self.L.rawsetfield(-2, "functionKeyword");
@@ -635,7 +793,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitExprTable(self: *@This(), node: *Ast.ExprTable) !bool {
-        const cstNode = self.cstNodeMap.find(@ptrCast(node)).?.second.*.as(.expr_table).?;
+        const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.expr_table).?;
         try self.L.rawcheckstack(3);
         try self.L.createtable(0, 5);
 
@@ -666,7 +824,7 @@ const AstSerializer = struct {
         try self.L.Zsetfield(-1, "tag", "unary");
         try self.L.Zsetfield(-1, "location", node.location);
 
-        const cstNode = self.cstNodeMap.find(@ptrCast(node)).?.second.*.as(.expr_op).?;
+        const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.expr_op).?;
         try self.serializeToken(cstNode.opPosition, node.op.toString(), null);
         try self.L.rawsetfield(-2, "operator");
 
@@ -684,7 +842,7 @@ const AstSerializer = struct {
         try node.left.visit(self);
         try self.L.rawsetfield(-2, "lhsoperand");
 
-        const cstNode = self.cstNodeMap.find(@ptrCast(node)).?.second.*.as(.expr_op).?;
+        const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.expr_op).?;
         try self.serializeToken(cstNode.opPosition, node.op.toString(), null);
         try self.L.rawsetfield(-2, "operator");
 
@@ -702,7 +860,7 @@ const AstSerializer = struct {
         try node.expr.visit(self);
         try self.L.rawsetfield(-2, "operand");
 
-        const cstNode = self.cstNodeMap.find(@ptrCast(node)).?.second.*.as(.expr_type_assertion).?;
+        const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.expr_type_assertion).?;
         try self.serializeToken(cstNode.opPosition, "::", null);
         try self.L.rawsetfield(-2, "operator");
 
@@ -711,7 +869,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitExprIfElse(self: *@This(), node: *Ast.ExprIfElse) !bool {
-        const cstNode = self.cstNodeMap.find(@ptrCast(node)).?.second.*.as(.expr_if_else).?;
+        const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.expr_if_else).?;
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 9);
 
@@ -741,7 +899,7 @@ const AstSerializer = struct {
             try self.L.createtable(0, 4);
 
             currentNode = node.falseExpr.as(.expr_if_else).?;
-            currentCstNode = self.cstNodeMap.find(@ptrCast(currentNode)).?.second.*.as(.expr_if_else).?;
+            currentCstNode = self.cst_node_map.find(@ptrCast(currentNode)).?.second.*.as(.expr_if_else).?;
 
             try self.serializeToken(node.location.begin, "elseif", null);
             try self.L.rawsetfield(-2, "elseifKeyword");
@@ -769,7 +927,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitExprInterpString(self: *@This(), node: *Ast.ExprInterpString) !bool {
-        const cstNode = self.cstNodeMap.find(@ptrCast(node)).?.second.*.as(.expr_interp_string).?;
+        const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.expr_interp_string).?;
         try self.L.rawcheckstack(3);
         try self.L.createtable(0, 4);
 
@@ -784,7 +942,7 @@ const AstSerializer = struct {
             try self.serializeToken(position, cstNode.sourceStrings.data.?[i].slice(), null);
             try self.L.rawseti(-3, @intCast(i + 1));
 
-            self.currentPosition.column += if (position.line == self.currentPosition.line) 2 else 1;
+            self.current_position.column += if (position.line == self.current_position.line) 2 else 1;
 
             if (i < node.expressions.size) {
                 try node.expressions.data.?[i].visit(self);
@@ -930,7 +1088,7 @@ const AstSerializer = struct {
         try node.body.visit(self);
         try self.L.rawsetfield(-2, "body");
 
-        const cstNode = self.cstNodeMap.find(@ptrCast(node)).?.second.*.as(.stat_repeat).?;
+        const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.stat_repeat).?;
         try self.serializeToken(cstNode.untilPosition, "until", null);
         try self.L.rawsetfield(-2, "untilKeyword");
 
@@ -963,7 +1121,7 @@ const AstSerializer = struct {
         try self.serializeToken(node.location.begin, "return", null);
         try self.L.rawsetfield(-2, "returnKeyword");
 
-        const cstNode = self.cstNodeMap.find(@ptrCast(node)).?.second.*.as(.stat_return).?;
+        const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.stat_return).?;
         try self.serializePunctuated(node.list, cstNode.commaPositions.slice(), ",");
         try self.L.rawsetfield(-2, "expressions");
         return false;
@@ -989,7 +1147,7 @@ const AstSerializer = struct {
         try self.serializeToken(node.location.begin, "local", null);
         try self.L.rawsetfield(-2, "localKeyword");
 
-        const cstNode = self.cstNodeMap.find(@ptrCast(node)).?.second.*.as(.stat_local).?;
+        const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.stat_local).?;
         try self.serializePunctuatedLocal(node.vars, cstNode.varsCommaPositions.slice(), ",", cstNode.varsAnnotationColonPositions);
         try self.L.rawsetfield(-2, "variables");
 
@@ -1006,7 +1164,7 @@ const AstSerializer = struct {
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 13);
 
-        const cstNode = self.cstNodeMap.find(@ptrCast(node)).?.second.*.as(.stat_for).?;
+        const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.stat_for).?;
 
         try self.L.Zsetfield(-1, "tag", "for");
         try self.L.Zsetfield(-1, "location", node.location);
@@ -1055,7 +1213,7 @@ const AstSerializer = struct {
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 9);
 
-        const cstNode = self.cstNodeMap.find(@ptrCast(node)).?.second.*.as(.stat_for_in).?;
+        const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.stat_for_in).?;
 
         try self.L.Zsetfield(-1, "tag", "forin");
         try self.L.Zsetfield(-1, "location", node.location);
@@ -1090,7 +1248,7 @@ const AstSerializer = struct {
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 5);
 
-        const cstNode = self.cstNodeMap.find(@ptrCast(node)).?.second.*.as(.stat_assign).?;
+        const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.stat_assign).?;
 
         try self.L.Zsetfield(-1, "tag", "assign");
         try self.L.Zsetfield(-1, "location", node.location);
@@ -1115,7 +1273,7 @@ const AstSerializer = struct {
         try node.variable.visit(self);
         try self.L.rawsetfield(-2, "variable");
 
-        const cstNode = self.cstNodeMap.find(@ptrCast(node)).?.second.*.as(.stat_compound_assign).?;
+        const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.stat_compound_assign).?;
         try self.serializeToken(cstNode.opPosition, &[_]u8{ node.op.toString()[1], '=' }, null);
         try self.L.rawsetfield(-2, "operand");
 
@@ -1130,7 +1288,7 @@ const AstSerializer = struct {
         try self.L.Zsetfield(-1, "tag", "function");
         try self.L.Zsetfield(-1, "location", node.location);
 
-        const cstNode = self.cstNodeMap.find(@ptrCast(node)).?.second.*.as(.stat_function).?;
+        const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.stat_function).?;
 
         try self.serializeAttributes(node.func.attributes, 0);
         try self.L.rawsetfield(-2, "attributes");
@@ -1155,7 +1313,7 @@ const AstSerializer = struct {
         try self.serializeAttributes(node.func.attributes, 0);
         try self.L.rawsetfield(-2, "attributes");
 
-        const cstNode = self.cstNodeMap.find(@ptrCast(node)).?.second.*.as(.stat_local_function).?;
+        const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.stat_local_function).?;
 
         try self.serializeToken(cstNode.localKeywordPosition, "local", null);
         try self.L.rawsetfield(-2, "localKeyword");
@@ -1177,7 +1335,7 @@ const AstSerializer = struct {
         try self.L.Zsetfield(-1, "tag", "typealias");
         try self.L.Zsetfield(-1, "location", node.location);
 
-        const cstNode = self.cstNodeMap.find(@ptrCast(node)).?.second.*.as(.stat_type_alias).?;
+        const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.stat_type_alias).?;
 
         if (node.exported) {
             try self.serializeToken(node.location.begin, "export", null);
@@ -1216,7 +1374,7 @@ const AstSerializer = struct {
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 7);
 
-        const cstNode = self.cstNodeMap.find(@ptrCast(node)).?.second.*.as(.stat_type_function).?;
+        const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.stat_type_function).?;
 
         try self.L.Zsetfield(-1, "tag", "typefunction");
         try self.L.Zsetfield(-1, "location", node.location);
@@ -1279,7 +1437,7 @@ const AstSerializer = struct {
         try self.L.Zsetfield(-1, "location", node.location);
 
         const cstNode = if (node.prefix.has or node.hasParameterList)
-            self.cstNodeMap.find(@ptrCast(node)).?.second.*.as(.type_reference).?
+            self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.type_reference).?
         else
             null;
 
@@ -1311,7 +1469,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitTypeTable(self: *@This(), node: *Ast.TypeTable) !bool {
-        const cstNode = self.cstNodeMap.find(@ptrCast(node)).?.second.*.as(.type_table).?;
+        const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.type_table).?;
         try self.L.rawcheckstack(2);
         if (cstNode.isArray) {
             try self.L.createtable(0, 6);
@@ -1403,10 +1561,10 @@ const AstSerializer = struct {
                             else => unreachable,
                         }
 
-                        if (item.stringPosition.line == self.currentPosition.line)
-                            self.currentPosition.column += 2
+                        if (item.stringPosition.line == self.current_position.line)
+                            self.current_position.column += 2
                         else
-                            self.currentPosition.column += 1;
+                            self.current_position.column += 1;
                     }
                     try self.L.rawsetfield(-2, "key");
 
@@ -1448,7 +1606,7 @@ const AstSerializer = struct {
         try self.L.Zsetfield(-1, "tag", "function");
         try self.L.Zsetfield(-1, "location", node.location);
 
-        const cstNode = self.cstNodeMap.find(@ptrCast(node)).?.second.*.as(.type_function).?;
+        const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.type_function).?;
 
         if (node.generics.size > 0 or node.genericPacks.size > 0) {
             try self.serializeToken(cstNode.openGenericsPosition, "<", null);
@@ -1524,7 +1682,7 @@ const AstSerializer = struct {
         try self.serializeToken(node.location.begin, "typeof", null);
         try self.L.rawsetfield(-2, "typeof");
 
-        const cstNode = self.cstNodeMap.find(@ptrCast(node)).?.second.*.as(.type_typeof).?;
+        const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.type_typeof).?;
         try self.serializeToken(cstNode.openPosition, "(", null);
         try self.L.rawsetfield(-2, "openParens");
 
@@ -1536,7 +1694,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitTypeUnion(self: *@This(), node: *Ast.TypeUnion) !bool {
-        const cstNode = self.cstNodeMap.find(@ptrCast(node)).?.second.*.as(.type_union).?;
+        const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.type_union).?;
 
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 4);
@@ -1578,7 +1736,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitTypeIntersection(self: *@This(), node: *Ast.TypeIntersection) !bool {
-        const cstNode = self.cstNodeMap.find(@ptrCast(node)).?.second.*.as(.type_intersection).?;
+        const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.type_intersection).?;
 
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 4);
@@ -1604,7 +1762,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitTypeSingletonString(self: *@This(), node: *Ast.TypeSingletonString) !bool {
-        const cstNode = self.cstNodeMap.find(@ptrCast(node)).?.second.*.as(.type_singleton_string).?;
+        const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.type_singleton_string).?;
         try self.serializeToken(node.location.begin, cstNode.sourceString.slice(), 3);
         try self.L.Zsetfield(-1, "tag", "string");
         try self.L.Zsetfield(-1, "location", node.location);
@@ -1615,8 +1773,8 @@ const AstSerializer = struct {
             else => unreachable,
         }
 
-        std.debug.assert(self.currentPosition.lessThanOrEq(node.location.end));
-        self.currentPosition = node.location.end;
+        std.debug.assert(self.current_position.lessThanOrEq(node.location.end));
+        self.current_position = node.location.end;
         return false;
     }
     pub fn visitTypeError(_: *@This(), _: *Ast.TypeError) !bool {
@@ -1632,7 +1790,7 @@ const AstSerializer = struct {
         try self.L.Zsetfield(-1, "tag", "explicit");
         try self.L.Zsetfield(-1, "location", node.location);
 
-        const cstNode = self.cstNodeMap.find(@ptrCast(node)).?.second.*.as(.type_pack_explicit).?;
+        const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.type_pack_explicit).?;
 
         if (cstNode.hasParentheses) {
             try self.serializeToken(cstNode.openParenthesesPosition, "(", null);
@@ -1683,7 +1841,7 @@ const AstSerializer = struct {
         try self.serializeToken(node.location.begin, std.mem.span(node.genericName.value), null);
         try self.L.rawsetfield(-2, "name");
 
-        const cstNode = self.cstNodeMap.find(@ptrCast(node)).?.second.*.as(.type_pack_generic).?;
+        const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.type_pack_generic).?;
         try self.serializeToken(cstNode.ellipsisPosition, "...", null);
         try self.L.rawsetfield(-2, "ellipsis");
         return false;
@@ -1715,7 +1873,7 @@ const AstSerializer = struct {
         try self.L.Zsetfield(-1, "tag", "generic");
         try self.L.Zsetfield(-1, "location", node.location);
 
-        const cstNode = self.cstNodeMap.find(@ptrCast(node)).?.second.*.as(.generic_type).?;
+        const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.generic_type).?;
 
         try self.serializeToken(node.location.begin, std.mem.span(node.name.value), null);
         try self.L.rawsetfield(-2, "name");
@@ -1736,7 +1894,7 @@ const AstSerializer = struct {
         try self.L.Zsetfield(-1, "tag", "generic");
         try self.L.Zsetfield(-1, "location", node.location);
 
-        const cstNode = self.cstNodeMap.find(@ptrCast(node)).?.second.*.as(.generic_type_pack).?;
+        const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.generic_type_pack).?;
         try self.serializeToken(node.location.begin, std.mem.span(node.name.value), null);
         try self.L.rawsetfield(-2, "name");
 
@@ -1755,6 +1913,7 @@ const AstSerializer = struct {
 };
 
 fn lua_parse(L: *VM.lua.State) !i32 {
+    const allocator = luau.getallocator(L);
     const source = try L.Zcheckvalue([]const u8, 1, null);
 
     const lallocator = luau.Ast.Allocator.init();
@@ -1788,23 +1947,37 @@ fn lua_parse(L: *VM.lua.State) !i32 {
         return 1;
     }
 
+    const line_offsets = try computeLineOffsets(allocator, source);
+    defer allocator.free(line_offsets);
+
     try L.createtable(0, 0);
     try L.createtable(0, 4);
     var serializer: AstSerializer = .{
         .L = L,
-        .cstNodeMap = &parseResult.cstNodeMap,
+        .allocator = allocator,
+        .cst_node_map = &parseResult.cstNodeMap,
         .source = source,
-        .localTableIndex = L.absindex(-2),
-        .commentLocations = parseResult.commentLocations.begin[0..parseResult.commentLocations.size()],
+        .local_table_index = L.absindex(-2),
+        .comment_locations = parseResult.commentLocations.begin[0..parseResult.commentLocations.size()],
+        .line_offsets = line_offsets,
     };
     try parseResult.root.visit(&serializer);
+
     try L.rawsetfield(-2, "root");
 
     try serializer.serializeToken(parseResult.root.location.end, "", null);
+    if (serializer.last_token_ref) |ref|
+        L.unref(ref);
     try L.Zsetfield(-1, "tag", "eof");
     try L.rawsetfield(-2, "eof");
 
     try L.Zsetfield(-1, "lines", @as(f64, @floatFromInt(parseResult.lines)));
+    try L.createtable(@intCast(line_offsets.len), 0);
+    for (line_offsets, 0..) |offset, i| {
+        L.pushunsigned(offset);
+        try L.rawseti(-2, @intCast(i + 1));
+    }
+    try L.rawsetfield(-2, "lineOffsets");
     {
         try L.createtable(@truncate(parseResult.hotcomments.size()), 0);
         var iter = parseResult.hotcomments.iterator();
@@ -1818,12 +1991,13 @@ fn lua_parse(L: *VM.lua.State) !i32 {
             try L.rawseti(-2, count);
         }
     }
-    try L.rawsetfield(-2, "hot_comments");
+    try L.rawsetfield(-2, "hotcomments");
 
     return 1;
 }
 
 fn lua_parseExpr(L: *VM.lua.State) !i32 {
+    const allocator = luau.getallocator(L);
     const source = try L.Zcheckvalue([]const u8, 1, null);
 
     const lallocator = luau.Ast.Allocator.init();
@@ -1857,16 +2031,22 @@ fn lua_parseExpr(L: *VM.lua.State) !i32 {
         return 1;
     }
 
+    const line_offsets = try computeLineOffsets(allocator, source);
+    defer allocator.free(line_offsets);
+
     try L.createtable(0, 0);
     var serializer: AstSerializer = .{
         .L = L,
-        .cstNodeMap = &parseResult.cstNodeMap,
+        .allocator = allocator,
+        .cst_node_map = &parseResult.cstNodeMap,
         .source = source,
-        .localTableIndex = L.absindex(-1),
-        .commentLocations = parseResult.commentLocations.begin[0..parseResult.commentLocations.size()],
+        .local_table_index = L.absindex(-1),
+        .comment_locations = parseResult.commentLocations.begin[0..parseResult.commentLocations.size()],
+        .line_offsets = line_offsets,
     };
     try parseResult.expr.visit(&serializer);
-
+    if (serializer.last_token_ref) |ref|
+        L.unref(ref);
     return 1;
 }
 

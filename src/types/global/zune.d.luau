@@ -390,7 +390,7 @@ type ExpectHandler = {
 
         @param expected The expected table.
     ]]
-    similar: (expected: {[any]: any}) -> any,
+    similar: (expected: {[any]: any} | {any}) -> any,
 }
 
 type TestingLib = {
@@ -846,7 +846,8 @@ export type ParseResult = {
     root: {any},
     eof: { text: "", position: Position, tag: "eof" },
     lines: number,
-    hot_comments: {
+    lineOffsets: {number},
+    hotcomments: {
         {
             header: boolean,
             content: string,
