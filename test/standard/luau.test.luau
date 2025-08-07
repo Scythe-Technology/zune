@@ -270,7 +270,7 @@ describe("Parse", function()
         expect(result).toBe(expect.similar({
             tag = "block",
             lines = 2,
-            line_offsets = {0, 33},
+            lineOffsets = {0, 33},
             root = {
                 statements = {
                     tag = "local",
@@ -484,7 +484,7 @@ describe("Parse", function()
                     column = 8,
                 },
             },
-            hot_comments = {},
+            hotcomments = {},
         }));
     end)
 
@@ -649,8 +649,8 @@ describe("Parse", function()
                 },
             },
             lines = 5,
-            line_offsets = {0, 10, 20, 29, 40},
-            hot_comments = {
+            lineOffsets = {0, 10, 20, 29, 40},
+            hotcomments = {
                 {
                     header = true,
                     content = "native",
