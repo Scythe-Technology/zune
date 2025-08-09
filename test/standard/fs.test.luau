@@ -198,12 +198,12 @@ describe("Dir", function()
     test("ReadDir", function()
         local result = fs.readDir(path(""));
         expect(result).toBe(expect.any("table"));
-        expect(result).toBe(expect.similar({"foo"}));
+        expect(result).toBe(expect.similar({{name = "foo", kind = "directory"}}));
         
         local result2 = fs.readDir(TEMP_DIR);
         expect(result2).toBe(expect.any("table"));
         expect(result2).toHaveLength(1);
-        expect(result2).toBe(expect.similar({"foo"}));
+        expect(result2).toBe(expect.similar({{name = "foo", kind = "directory"}}));
 
         local result3 = fs.readDir(path("foo/bar/luau"));
         expect(result3).toBe(expect.any("table"));
