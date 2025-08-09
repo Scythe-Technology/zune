@@ -82,7 +82,10 @@ fn lua_readDir(L: *VM.lua.State) !i32 {
     var i: i32 = 1;
     while (try iter.next()) |entry| {
         L.pushinteger(i);
-        try L.pushlstring(entry.name);
+        try L.Zpushvalue(.{
+            .name = entry.name,
+            .kind = @tagName(entry.kind),
+        });
         try L.rawset(-3);
         i += 1;
     }

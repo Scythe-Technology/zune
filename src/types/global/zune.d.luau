@@ -67,13 +67,18 @@ type OpenFileOptions = {
     mode: string?,
 }
 
+type DirectoryEntry = {
+    name: string,
+    kind: MetadataKind,
+}
+
 type FileSystemLib = {
     createFile: (path: string, opts: CreateFileOptions?) -> FileHandle,
     openFile: (path: string, opts: OpenFileOptions?) -> FileHandle,
     readFile:
         & ((path: string) -> string)
         & ((path: string, useBuffer: true) -> buffer),
-    readDir: (path: string) -> { string },
+    readDir: (path: string) -> { DirectoryEntry },
     writeFile: (path: string, contents: string | buffer) -> (),
     writeDir:  (path: string, recursive: boolean?) -> (),
     removeFile: (path: string) -> (),
