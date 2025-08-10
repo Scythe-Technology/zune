@@ -276,5 +276,6 @@ fn buildZune(
     module.addImport("datetime", mod_datetime);
     module.addImport("toml", mod_toml);
     module.addImport("sqlite", mod_sqlite);
-    module.addImport("tinycc", mod_tinycc);
+    if (target.result.os.tag != .windows and target.result.cpu.arch != .aarch64)
+        module.addImport("tinycc", mod_tinycc);
 }
