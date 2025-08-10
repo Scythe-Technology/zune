@@ -268,13 +268,13 @@ describe("Parse", function()
         ]];
         local result = luau.parse(input);
         expect(result).toBe(expect.similar({
-            tag = "block",
             lines = 2,
             lineOffsets = {0, 33},
             root = {
+                tag = "block",
                 statements = {
-                    tag = "local",
                     [1] = {
+                        tag = "local",
                         variables = {
                             [1] = {
                                 node = {
@@ -397,41 +397,51 @@ describe("Parse", function()
                                     tag = "whitespace",
                                 },
                             },
-                        }
-                    },
-                    location = {
-                        begin = {
-                            line = 0,
-                            column = 12,
                         },
-                        ["end"] = {
-                            line = 0,
-                            column = 23,
-                        },
-                    },
-                    localKeyword = {
-                        text = "local",
-                        position = {
-                            line = 0,
-                            column = 12,
-                        },
-                        trailingTrivia = {},
-                        leadingTrivia = {
-                            [1] = {
-                                location = {
-                                    begin = {
-                                        line = 0,
-                                        column = 0,
-                                    },
-                                    ["end"] = {
-                                        line = 0,
-                                        column = 12,
-                                    },
-                                },
-                                text = "            ",
-                                tag = "whitespace",
+                        location = {
+                            begin = {
+                                line = 0,
+                                column = 12,
+                            },
+                            ["end"] = {
+                                line = 0,
+                                column = 23,
                             },
                         },
+                        localKeyword = {
+                            text = "local",
+                            position = {
+                                line = 0,
+                                column = 12,
+                            },
+                            trailingTrivia = {},
+                            leadingTrivia = {
+                                [1] = {
+                                    location = {
+                                        begin = {
+                                            line = 0,
+                                            column = 0,
+                                        },
+                                        ["end"] = {
+                                            line = 0,
+                                            column = 12,
+                                        },
+                                    },
+                                    text = "            ",
+                                    tag = "whitespace",
+                                },
+                            },
+                        },
+                    },
+                },
+                location = {
+                    begin = {
+                        line = 0,
+                        column = 0,
+                    },
+                    ["end"] = {
+                        line = 1,
+                        column = 8,
                     },
                 },
             },
@@ -472,16 +482,6 @@ describe("Parse", function()
                         text = "        ",
                         tag = "whitespace",
                     },
-                },
-            },
-            location = {
-                begin = {
-                    line = 0,
-                    column = 0,
-                },
-                ["end"] = {
-                    line = 1,
-                    column = 8,
                 },
             },
             hotcomments = {},
@@ -719,6 +719,30 @@ describe("Parse", function()
                 }
             },
         }));
+    end)
+
+    test("Source Any", function()
+        local function tryDir(dir: string)
+            for _, entry in zune.fs.readDir(dir) do
+                if (entry.kind == "file") then
+                    if (string.find(entry.name, ".luau$")) then
+                        local input = zune.fs.readFile(zune.fs.path.join(dir, entry.name));
+                        local result = luau.parse(input);
+                        expect(result).toBe(expect.similar({
+                            root = expect.type("table"),
+                            eof = expect.type("table"),
+                            lines = expect.any("number"),
+                            lineOffsets = expect.any("table"),
+                            hotcomments = expect.any("table"),
+                        }));
+                    end
+                elseif (entry.kind == "directory") then
+                    tryDir(zune.fs.path.join(dir, entry.name));
+                    continue;
+                end
+            end
+        end
+        tryDir("test/standard");
     end)
 end)
 

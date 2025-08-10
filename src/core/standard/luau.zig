@@ -197,8 +197,7 @@ const AstSerializer = struct {
     }
 
     fn serializeLocal(self: *@This(), local: *Ast.Local, createToken: bool, colonPosition: ?Location.Position) !void {
-        try self.L.rawcheckstack(2);
-        try self.L.createtable(0, 3);
+        try self.L.rawcheckstack(3);
 
         self.L.pushlightuserdata(@ptrCast(@alignCast(local)));
 
@@ -298,6 +297,10 @@ const AstSerializer = struct {
     };
 
     fn extractWhitespace(self: *@This(), results: *std.ArrayListUnmanaged(Trivia), newPos: Location.Position) !void {
+        std.debug.assert(self.current_position.lessThan(newPos));
+        std.debug.assert(self.current_position.line < self.line_offsets.len);
+        std.debug.assert(newPos.line < self.line_offsets.len);
+
         const start_offset = self.line_offsets[self.current_position.line] + self.current_position.column;
         const end_offset = self.line_offsets[newPos.line] + newPos.column;
 
@@ -321,6 +324,7 @@ const AstSerializer = struct {
             if (index == null)
                 break;
         }
+        std.debug.assert(self.current_position.eq(newPos));
     }
 
     fn extractTrivia(self: *@This(), newPos: Location.Position) ![]Trivia {
@@ -383,7 +387,7 @@ const AstSerializer = struct {
     }
 
     pub fn serializeTrivia(self: *@This(), trivia: []Trivia) !void {
-        try self.L.rawcheckstack(3);
+        try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(@truncate(trivia.len), 0);
 
         for (trivia, 0..) |t, i| {
@@ -401,7 +405,7 @@ const AstSerializer = struct {
     }
 
     pub fn serializeToken(self: *@This(), position: Location.Position, text: []const u8, nrec: ?u32) !void {
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 2);
         try self.L.createtable(0, (nrec orelse 0) + 4);
 
         const trivia = try self.extractTrivia(position);
@@ -457,7 +461,7 @@ const AstSerializer = struct {
     }
 
     fn serializeAttributes(self: *@This(), attrs: Ast.Array(*Ast.Attr), nrec: u32) !void {
-        try self.L.rawcheckstack(3);
+        try self.L.rawcheckstack(3 + 4);
         try self.L.createtable(@truncate(attrs.size), nrec);
 
         for (attrs.slice(), 1..) |attr, i| {
@@ -539,7 +543,7 @@ const AstSerializer = struct {
             try self.L.rawsetfield(-2, "node");
 
             if (i < separators.len) {
-                try self.serializeToken(separators[i - 1], separatorText, null);
+                try self.serializeToken(separators[i], separatorText, null);
                 try self.L.rawsetfield(-2, "separator");
             }
 
@@ -552,7 +556,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitExprGroup(self: *@This(), node: *Ast.ExprGroup) !bool {
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 5);
 
         try self.L.Zsetfield(-1, "tag", "group");
@@ -560,13 +564,13 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitExprConstantNil(self: *@This(), node: *Ast.ExprConstantNil) !bool {
-        try self.serializeToken(node.location.begin, "nil", 2);
+        try self.serializeToken(node.location.begin, "nil", 2 + 4);
         try self.L.Zsetfield(-1, "tag", "nil");
         try self.L.Zsetfield(-1, "location", node.location);
         return false;
     }
     pub fn visitExprConstantBool(self: *@This(), node: *Ast.ExprConstantBool) !bool {
-        try self.serializeToken(node.location.begin, if (node.value) "true" else "false", 3);
+        try self.serializeToken(node.location.begin, if (node.value) "true" else "false", 3 + 4);
         try self.L.Zsetfield(-1, "tag", "boolean");
         try self.L.Zsetfield(-1, "location", node.location);
 
@@ -576,7 +580,7 @@ const AstSerializer = struct {
     pub fn visitExprConstantNumber(self: *@This(), node: *Ast.ExprConstantNumber) !bool {
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.expr_constant_number).?;
 
-        try self.serializeToken(node.location.begin, cstNode.value.slice(), 3);
+        try self.serializeToken(node.location.begin, cstNode.value.slice(), 3 + 4);
         try self.L.Zsetfield(-1, "tag", "number");
         try self.L.Zsetfield(-1, "location", node.location);
 
@@ -587,7 +591,7 @@ const AstSerializer = struct {
         // TODO: fix class index issues
         const cstNode: *Cst.ExprConstantString = @ptrCast(self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.expr_constant_number).?);
 
-        try self.serializeToken(node.location.begin, cstNode.sourceString.slice(), 4);
+        try self.serializeToken(node.location.begin, cstNode.sourceString.slice(), 4 + 4);
         try self.L.Zsetfield(-1, "tag", "string");
         try self.L.Zsetfield(-1, "location", node.location);
 
@@ -603,7 +607,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitExprLocal(self: *@This(), node: *Ast.ExprLocal) !bool {
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 5);
 
         try self.L.Zsetfield(-1, "tag", "local");
@@ -619,7 +623,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitExprGlobal(self: *@This(), node: *Ast.ExprGlobal) !bool {
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 3);
 
         try self.L.Zsetfield(-1, "tag", "global");
@@ -630,14 +634,14 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitExprVarargs(self: *@This(), node: *Ast.ExprVarargs) !bool {
-        try self.serializeToken(node.location.begin, "...", 2);
+        try self.serializeToken(node.location.begin, "...", 2 + 4);
         try self.L.Zsetfield(-1, "tag", "vararg");
         try self.L.Zsetfield(-1, "location", node.location);
         return false;
     }
     pub fn visitExprCall(self: *@This(), node: *Ast.ExprCall) !bool {
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.expr_call).?;
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 8);
 
         try self.L.Zsetfield(-1, "tag", "call");
@@ -664,7 +668,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitExprIndexName(self: *@This(), node: *Ast.ExprIndexName) !bool {
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 6);
 
         try self.L.Zsetfield(-1, "tag", "indexname");
@@ -683,7 +687,7 @@ const AstSerializer = struct {
     }
     pub fn visitExprIndexExpr(self: *@This(), node: *Ast.ExprIndexExpr) !bool {
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.expr_index_expr).?;
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 6);
 
         try self.L.Zsetfield(-1, "tag", "index");
@@ -774,7 +778,7 @@ const AstSerializer = struct {
         try self.L.rawsetfield(-2, "endKeyword");
     }
     pub fn visitExprFunction(self: *@This(), node: *Ast.ExprFunction) !bool {
-        try self.L.rawcheckstack(3);
+        try self.L.rawcheckstack(3 + 4);
         try self.L.createtable(0, 5);
 
         try self.L.Zsetfield(-1, "tag", "function");
@@ -794,7 +798,7 @@ const AstSerializer = struct {
     }
     pub fn visitExprTable(self: *@This(), node: *Ast.ExprTable) !bool {
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.expr_table).?;
-        try self.L.rawcheckstack(3);
+        try self.L.rawcheckstack(3 + 4);
         try self.L.createtable(0, 5);
 
         try self.L.Zsetfield(-1, "tag", "table");
@@ -818,7 +822,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitExprUnary(self: *@This(), node: *Ast.ExprUnary) !bool {
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 4);
 
         try self.L.Zsetfield(-1, "tag", "unary");
@@ -833,7 +837,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitExprBinary(self: *@This(), node: *Ast.ExprBinary) !bool {
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 5);
 
         try self.L.Zsetfield(-1, "tag", "binary");
@@ -851,7 +855,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitExprTypeAssertion(self: *@This(), node: *Ast.ExprTypeAssertion) !bool {
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 5);
 
         try self.L.Zsetfield(-1, "tag", "cast");
@@ -870,7 +874,7 @@ const AstSerializer = struct {
     }
     pub fn visitExprIfElse(self: *@This(), node: *Ast.ExprIfElse) !bool {
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.expr_if_else).?;
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 9);
 
         try self.L.Zsetfield(-1, "tag", "conditional");
@@ -928,7 +932,7 @@ const AstSerializer = struct {
     }
     pub fn visitExprInterpString(self: *@This(), node: *Ast.ExprInterpString) !bool {
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.expr_interp_string).?;
-        try self.L.rawcheckstack(3);
+        try self.L.rawcheckstack(3 + 4);
         try self.L.createtable(0, 4);
 
         try self.L.Zsetfield(-1, "tag", "interpolatedstring");
@@ -956,7 +960,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitExprError(self: *@This(), node: *Ast.ExprError) !bool {
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 4);
 
         try self.L.Zsetfield(-1, "tag", "error");
@@ -971,7 +975,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitStatBlock(self: *@This(), node: *Ast.StatBlock) !bool {
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 3);
 
         try self.L.Zsetfield(-1, "tag", "block");
@@ -990,7 +994,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitStatIf(self: *@This(), node: *Ast.StatIf) !bool {
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 10);
 
         try self.L.Zsetfield(-1, "tag", "conditional");
@@ -1051,7 +1055,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitStatWhile(self: *@This(), node: *Ast.StatWhile) !bool {
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 7);
 
         try self.L.Zsetfield(-1, "tag", "while");
@@ -1076,7 +1080,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitStatRepeat(self: *@This(), node: *Ast.StatRepeat) !bool {
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 6);
 
         try self.L.Zsetfield(-1, "tag", "repeat");
@@ -1097,7 +1101,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitStatBreak(self: *@This(), node: *Ast.StatBreak) !bool {
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.serializeToken(node.location.begin, "break", 2);
 
         try self.L.Zsetfield(-1, "tag", "break");
@@ -1105,14 +1109,14 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitStatContinue(self: *@This(), node: *Ast.StatContinue) !bool {
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.serializeToken(node.location.begin, "continue", 2);
         try self.L.Zsetfield(-1, "tag", "continue");
         try self.L.Zsetfield(-1, "location", node.location);
         return false;
     }
     pub fn visitStatReturn(self: *@This(), node: *Ast.StatReturn) !bool {
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 4);
 
         try self.L.Zsetfield(-1, "tag", "return");
@@ -1127,7 +1131,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitStatExpr(self: *@This(), node: *Ast.StatExpr) !bool {
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 3);
 
         try self.L.Zsetfield(-1, "tag", "expression");
@@ -1138,7 +1142,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitStatLocal(self: *@This(), node: *Ast.StatLocal) !bool {
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 6);
 
         try self.L.Zsetfield(-1, "tag", "local");
@@ -1161,7 +1165,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitStatFor(self: *@This(), node: *Ast.StatFor) !bool {
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 13);
 
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.stat_for).?;
@@ -1210,7 +1214,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitStatForIn(self: *@This(), node: *Ast.StatForIn) !bool {
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 9);
 
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.stat_for_in).?;
@@ -1245,7 +1249,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitStatAssign(self: *@This(), node: *Ast.StatAssign) !bool {
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 5);
 
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.stat_assign).?;
@@ -1264,7 +1268,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitStatCompoundAssign(self: *@This(), node: *Ast.StatCompoundAssign) !bool {
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 5);
 
         try self.L.Zsetfield(-1, "tag", "compoundassign");
@@ -1274,7 +1278,7 @@ const AstSerializer = struct {
         try self.L.rawsetfield(-2, "variable");
 
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.stat_compound_assign).?;
-        try self.serializeToken(cstNode.opPosition, &[_]u8{ node.op.toString()[1], '=' }, null);
+        try self.serializeToken(cstNode.opPosition, &[_]u8{ node.op.toString()[0], '=' }, null);
         try self.L.rawsetfield(-2, "operand");
 
         try node.value.visit(self);
@@ -1282,7 +1286,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitStatFunction(self: *@This(), node: *Ast.StatFunction) !bool {
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 6);
 
         try self.L.Zsetfield(-1, "tag", "function");
@@ -1304,7 +1308,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitStatLocalFunction(self: *@This(), node: *Ast.StatLocalFunction) !bool {
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 7);
 
         try self.L.Zsetfield(-1, "tag", "localfunction");
@@ -1329,7 +1333,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitStatTypeAlias(self: *@This(), node: *Ast.StatTypeAlias) !bool {
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 11);
 
         try self.L.Zsetfield(-1, "tag", "typealias");
@@ -1371,7 +1375,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitStatTypeFunction(self: *@This(), node: *Ast.StatTypeFunction) !bool {
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 7);
 
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.stat_type_function).?;
@@ -1413,7 +1417,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitStatError(self: *@This(), node: *Ast.StatError) !bool {
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 5);
 
         try self.L.Zsetfield(-1, "tag", "error");
@@ -1430,7 +1434,7 @@ const AstSerializer = struct {
         return true;
     }
     pub fn visitTypeReference(self: *@This(), node: *Ast.TypeReference) !bool {
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 8);
 
         try self.L.Zsetfield(-1, "tag", "reference");
@@ -1470,7 +1474,7 @@ const AstSerializer = struct {
     }
     pub fn visitTypeTable(self: *@This(), node: *Ast.TypeTable) !bool {
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.type_table).?;
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         if (cstNode.isArray) {
             try self.L.createtable(0, 6);
 
@@ -1505,7 +1509,7 @@ const AstSerializer = struct {
         try self.L.rawsetfield(-2, "openBrace");
 
         try self.L.createtable(@truncate(cstNode.items.size), 0);
-        var prop = node.props.data.?;
+        const prop = node.props.data;
         for (cstNode.items.slice(), 0..) |item, i| {
             try self.L.rawcheckstack(2);
             try self.L.createtable(0, 8);
@@ -1521,13 +1525,13 @@ const AstSerializer = struct {
                     try self.L.rawsetfield(-2, "access");
                 }
 
-                try self.serializeToken(item.indexerOpenPosition.to().?, "[", null);
+                try self.serializeToken(item.indexerOpenPosition, "[", null);
                 try self.L.rawsetfield(-2, "indexerOpen");
 
                 try node.indexer.?.indexType.visit(self);
                 try self.L.rawsetfield(-2, "key");
 
-                try self.serializeToken(item.indexerClosePosition.to().?, "]", null);
+                try self.serializeToken(item.indexerClosePosition, "]", null);
                 try self.L.rawsetfield(-2, "indexerClose");
 
                 try self.serializeToken(item.colonPosition, ":", null);
@@ -1543,14 +1547,14 @@ const AstSerializer = struct {
             } else {
                 try self.L.Zsetfield(-1, "kind", if (item.kind == .string_property) "stringproperty" else "property");
 
-                if (prop[0].accessLocation.to()) |accessLocation| {
-                    std.debug.assert(prop[0].access != .ReadWrite);
-                    try self.serializeToken(accessLocation.begin, if (prop[0].access == .Read) "read" else "write", null);
+                if (prop.?[i].accessLocation.to()) |accessLocation| {
+                    std.debug.assert(prop.?[i].access != .ReadWrite);
+                    try self.serializeToken(accessLocation.begin, if (prop.?[i].access == .Read) "read" else "write", null);
                     try self.L.rawsetfield(-2, "access");
                 }
 
                 if (item.kind == .string_property) {
-                    try self.serializeToken(item.indexerOpenPosition.to().?, "[", null);
+                    try self.serializeToken(item.indexerOpenPosition, "[", null);
                     try self.L.rawsetfield(-2, "indexerOpen");
                     {
                         try self.serializeToken(item.stringPosition, item.stringInfo.?.sourceString.slice(), null);
@@ -1568,25 +1572,23 @@ const AstSerializer = struct {
                     }
                     try self.L.rawsetfield(-2, "key");
 
-                    try self.serializeToken(item.indexerClosePosition.to().?, "]", null);
+                    try self.serializeToken(item.indexerClosePosition, "]", null);
                     try self.L.rawsetfield(-2, "indexerClose");
                 } else {
-                    try self.serializeToken(prop[0].location.begin, std.mem.span(prop[0].name.value), null);
+                    try self.serializeToken(prop.?[i].location.begin, std.mem.span(prop.?[i].name.value), null);
                     try self.L.rawsetfield(-2, "key");
                 }
 
                 try self.serializeToken(item.colonPosition, ":", null);
                 try self.L.rawsetfield(-2, "colon");
 
-                try prop[0].type.visit(self);
+                try prop.?[i].type.visit(self);
                 try self.L.rawsetfield(-2, "value");
 
                 if (item.separator.to()) |separator| {
                     try self.serializeToken(item.separatorPosition.to().?, if (separator == .comma) "," else ";", null);
                     try self.L.rawsetfield(-2, "separator");
                 }
-
-                prop += 1;
             }
             try self.L.rawseti(-2, @intCast(i + 1));
         }
@@ -1600,7 +1602,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitTypeFunction(self: *@This(), node: *Ast.TypeFunction) !bool {
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 12);
 
         try self.L.Zsetfield(-1, "tag", "function");
@@ -1673,7 +1675,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitTypeTypeof(self: *@This(), node: *Ast.TypeTypeof) !bool {
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 6);
 
         try self.L.Zsetfield(-1, "tag", "typeof");
@@ -1696,7 +1698,7 @@ const AstSerializer = struct {
     pub fn visitTypeUnion(self: *@This(), node: *Ast.TypeUnion) !bool {
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.type_union).?;
 
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 4);
 
         try self.L.Zsetfield(-1, "tag", "union");
@@ -1738,7 +1740,7 @@ const AstSerializer = struct {
     pub fn visitTypeIntersection(self: *@This(), node: *Ast.TypeIntersection) !bool {
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.type_intersection).?;
 
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 4);
 
         try self.L.Zsetfield(-1, "tag", "intersection");
@@ -1754,7 +1756,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitTypeSingletonBool(self: *@This(), node: *Ast.TypeSingletonBool) !bool {
-        try self.serializeToken(node.location.begin, if (node.value) "true" else "false", 3);
+        try self.serializeToken(node.location.begin, if (node.value) "true" else "false", 3 + 4);
         try self.L.Zsetfield(-1, "tag", "boolean");
         try self.L.Zsetfield(-1, "location", node.location);
 
@@ -1763,7 +1765,7 @@ const AstSerializer = struct {
     }
     pub fn visitTypeSingletonString(self: *@This(), node: *Ast.TypeSingletonString) !bool {
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.type_singleton_string).?;
-        try self.serializeToken(node.location.begin, cstNode.sourceString.slice(), 3);
+        try self.serializeToken(node.location.begin, cstNode.sourceString.slice(), 3 + 4);
         try self.L.Zsetfield(-1, "tag", "string");
         try self.L.Zsetfield(-1, "location", node.location);
 
@@ -1784,7 +1786,7 @@ const AstSerializer = struct {
         return true;
     }
     pub fn visitTypePackExplicit(self: *@This(), node: *Ast.TypePackExplicit) !bool {
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 6);
 
         try self.L.Zsetfield(-1, "tag", "explicit");
@@ -1813,7 +1815,7 @@ const AstSerializer = struct {
         return false;
     }
     fn serializeTypePackVariadic(self: *@This(), node: *Ast.TypePackVariadic, forVarArg: bool) !void {
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 4);
 
         try self.L.Zsetfield(-1, "tag", "variadic");
@@ -1832,7 +1834,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitTypePackGeneric(self: *@This(), node: *Ast.TypePackGeneric) !bool {
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 4);
 
         try self.L.Zsetfield(-1, "tag", "generic");
@@ -1847,7 +1849,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitTypeGroup(self: *@This(), node: *Ast.TypeGroup) !bool {
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 5);
 
         try self.L.Zsetfield(-1, "tag", "group");
@@ -1867,7 +1869,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitGenericType(self: *@This(), node: *Ast.GenericType) !bool {
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 5);
 
         try self.L.Zsetfield(-1, "tag", "generic");
@@ -1888,7 +1890,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitGenericTypePack(self: *@This(), node: *Ast.GenericTypePack) !bool {
-        try self.L.rawcheckstack(2);
+        try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 4);
 
         try self.L.Zsetfield(-1, "tag", "generic");
