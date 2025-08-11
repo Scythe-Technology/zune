@@ -119,10 +119,16 @@ const RequireNavigatorContext = struct {
         if (Zune.STATE.CONFIG_CACHE.get(path)) |cached|
             return cached;
 
-        const contents = if (Zune.STATE.BUNDLE) |*bundle| try bundle.loadFileAlloc(allocator, path) else self.dir.readFileAlloc(allocator, path, std.math.maxInt(usize)) catch |err| switch (err) {
-            error.AccessDenied, error.FileNotFound => return error.NotPresent,
-            else => return err,
-        };
+        const contents = if (Zune.STATE.BUNDLE) |*bundle|
+            bundle.loadFileAlloc(allocator, path) catch |err| switch (err) {
+                error.FileNotFound => return error.NotPresent,
+                else => return err,
+            }
+        else
+            self.dir.readFileAlloc(allocator, path, std.math.maxInt(usize)) catch |err| switch (err) {
+                error.AccessDenied, error.FileNotFound => return error.NotPresent,
+                else => return err,
+            };
         defer allocator.free(contents);
 
         var config = try Config.parse(Zune.DEFAULT_ALLOCATOR, contents, out_err);

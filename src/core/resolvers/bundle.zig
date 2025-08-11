@@ -240,8 +240,15 @@ pub const Map = struct {
         return try self.unpackFile(file);
     }
 
+    fn shortResolve(path: []const u8) []const u8 {
+        var resolved = path;
+        while (std.mem.startsWith(u8, resolved, "./") or std.mem.startsWith(u8, resolved, ".\\"))
+            resolved = std.mem.trimLeft(u8, resolved[1..], "\\/");
+        return resolved;
+    }
+
     pub fn loadFileAlloc(self: *Map, allocator: std.mem.Allocator, path: []const u8) ![]u8 {
-        return try allocator.dupe(u8, try self.load(path));
+        return try allocator.dupe(u8, try self.load(shortResolve(path)));
     }
 
     pub fn loadScript(self: *const Map, path: []const u8) !Section.Script {
