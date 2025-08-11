@@ -60,7 +60,7 @@ fn prebuild(b: *std.Build, step: *std.Build.Step) !void {
     };
 
     { // Pre-compile Luau
-        const dep_luau = b.dependency("luau", .{ .target = build_native_target, .optimize = .Debug });
+        const dep_luau = b.dependency("luau", .{ .target = build_native_target, .optimize = .Debug, .Analysis = false });
         const bytecode_builder = b.addExecutable(.{
             .name = "bytecode_builder",
             .root_source_file = b.path("prebuild/bytecode.zig"),
