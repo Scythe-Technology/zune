@@ -256,7 +256,7 @@ const LuaCryptoHasher = struct {
     pub fn __dtor(L: *VM.lua.State, self: *LuaCryptoHasher) void {
         const allocator = luau.getallocator(L);
 
-        allocator.free(self.state);
+        allocator.rawFree(self.state, .fromByteUnits(self.algorithm.alignment()), @returnAddress());
         if (self.extra) |e|
             allocator.free(e);
     }
