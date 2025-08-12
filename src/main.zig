@@ -97,6 +97,7 @@ pub const ZuneState = struct {
     pub const LuauOptions = struct {
         DEBUG_LEVEL: u2 = 2,
         OPTIMIZATION_LEVEL: u2 = 1,
+        COVERAGE_LEVEL: u2 = 0,
         CODEGEN: bool = true,
         JIT_ENABLED: bool = true,
     };

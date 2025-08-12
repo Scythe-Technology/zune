@@ -11,6 +11,8 @@ pub inline fn loadAndCompileModule(L: *VM.lua.State, moduleName: [:0]const u8, c
     const compileOptions = cOpts orelse luau.CompileOptions{
         .debugLevel = Zune.STATE.LUAU_OPTIONS.DEBUG_LEVEL,
         .optimizationLevel = Zune.STATE.LUAU_OPTIONS.OPTIMIZATION_LEVEL,
+        .coverageLevel = Zune.STATE.LUAU_OPTIONS.COVERAGE_LEVEL,
+        .typeInfoLevel = 1,
     };
 
     luau.Compiler.Compiler.compileLoad(L, moduleName, content, compileOptions, 0) catch return error.Syntax;

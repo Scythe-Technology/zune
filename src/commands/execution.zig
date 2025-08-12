@@ -113,6 +113,20 @@ fn cmdRun(allocator: std.mem.Allocator, args: []const []const u8) !void {
                         std.process.exit(1);
                     }
                 },
+                'c' => {
+                    if (flag.len == 3 and flag[2] >= '0' and flag[2] <= '2') {
+                        const level: u2 = switch (flag[2]) {
+                            '0' => 0,
+                            '1' => 1,
+                            '2' => 2,
+                            else => unreachable,
+                        };
+                        Zune.STATE.LUAU_OPTIONS.COVERAGE_LEVEL = level;
+                    } else {
+                        Zune.debug.print("<red>error<clear>: invalid coverage level, usage: -c<<N>>\n", .{});
+                        std.process.exit(1);
+                    }
+                },
                 '-' => if (std.mem.startsWith(u8, flag, "--profile")) {
                     PROFILER = 10000;
                     if (flag.len > 10 and flag[9] == '=') {
@@ -242,6 +256,20 @@ fn cmdTest(allocator: std.mem.Allocator, args: []const []const u8) !void {
                         Zune.STATE.LUAU_OPTIONS.DEBUG_LEVEL = level;
                     } else {
                         Zune.debug.print("<red>error<clear>: invalid debug level, usage: -g<<N>>\n", .{});
+                        std.process.exit(1);
+                    }
+                },
+                'c' => {
+                    if (flag.len == 3 and flag[2] >= '0' and flag[2] <= '2') {
+                        const level: u2 = switch (flag[2]) {
+                            '0' => 0,
+                            '1' => 1,
+                            '2' => 2,
+                            else => unreachable,
+                        };
+                        Zune.STATE.LUAU_OPTIONS.COVERAGE_LEVEL = level;
+                    } else {
+                        Zune.debug.print("<red>error<clear>: invalid coverage level, usage: -c<<N>>\n", .{});
                         std.process.exit(1);
                     }
                 },
@@ -430,6 +458,20 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
                 } else {
                     Zune.debug.print("<red>error<clear>: invalid optimization level, usage: -O<<N>>\n", .{});
                     std.process.exit(1);
+                },
+                'c' => {
+                    if (flag.len == 3 and flag[2] >= '0' and flag[2] <= '2') {
+                        const level: u2 = switch (flag[2]) {
+                            '0' => 0,
+                            '1' => 1,
+                            '2' => 2,
+                            else => unreachable,
+                        };
+                        Zune.STATE.LUAU_OPTIONS.COVERAGE_LEVEL = level;
+                    } else {
+                        Zune.debug.print("<red>error<clear>: invalid coverage level, usage: -c<<N>>\n", .{});
+                        std.process.exit(1);
+                    }
                 },
                 '-' => if (std.mem.eql(u8, flag, "--once")) {
                     ALWAYS_DEBUG = false;
