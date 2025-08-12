@@ -171,7 +171,7 @@ fn cmdRun(allocator: std.mem.Allocator, args: []const []const u8) !void {
     try Engine.prepAsync(L, &scheduler);
     try Zune.openZune(L, run_args, LOAD_FLAGS);
 
-    try L.Lsandbox();
+    L.setsafeenv(VM.lua.GLOBALSINDEX, true);
 
     const ML = try L.newthread();
 
@@ -312,7 +312,7 @@ fn cmdTest(allocator: std.mem.Allocator, args: []const []const u8) !void {
     try Engine.prepAsync(L, &scheduler);
     try Zune.openZune(L, args, LOAD_FLAGS);
 
-    try L.Lsandbox();
+    L.setsafeenv(VM.lua.GLOBALSINDEX, true);
 
     const ML = try L.newthread();
 
@@ -367,7 +367,7 @@ fn cmdEval(allocator: std.mem.Allocator, args: []const []const u8) !void {
     try Engine.prepAsync(L, &scheduler);
     try Zune.openZune(L, args, .{});
 
-    try L.Lsandbox();
+    L.setsafeenv(VM.lua.GLOBALSINDEX, true);
 
     const ML = try L.newthread();
 
@@ -487,7 +487,7 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
         try Engine.prepAsync(L, &scheduler);
         try Zune.openZune(L, run_args, LOAD_FLAGS);
 
-        try L.Lsandbox();
+        L.setsafeenv(VM.lua.GLOBALSINDEX, true);
 
         const terminal = &(Zune.corelib.io.TERMINAL orelse std.debug.panic("Terminal not initialized", .{}));
         errdefer terminal.restoreSettings() catch {};

@@ -74,7 +74,7 @@ pub fn runTest(comptime testFile: TestFile, args: []const []const u8, comptime o
     const current_top = L.gettop();
     try Zune.openZune(L, args, .{});
 
-    try L.Lsandbox();
+    L.setsafeenv(VM.lua.GLOBALSINDEX, true);
     std.debug.assert(L.gettop() == current_top); // zune should not leave anything on the stack
 
     const ML = try L.newthread();

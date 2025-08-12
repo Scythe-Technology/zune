@@ -60,7 +60,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
         .main = true,
     });
 
-    try L.Lsandbox();
+    L.setsafeenv(VM.lua.GLOBALSINDEX, true);
 
     var stdin = std.io.getStdIn();
     var in_reader = stdin.reader();

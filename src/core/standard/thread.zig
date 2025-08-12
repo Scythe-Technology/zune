@@ -491,7 +491,7 @@ fn createThread(allocator: std.mem.Allocator, L: *VM.lua.State) !*VM.lua.State {
     try Zune.Runtime.Engine.prepAsync(runtime.L, &runtime.scheduler);
     try Zune.openZune(runtime.L, &.{}, .{});
 
-    try runtime.L.Lsandbox();
+    runtime.L.setsafeenv(VM.lua.GLOBALSINDEX, true);
 
     const ML = try runtime.L.newthread();
 
