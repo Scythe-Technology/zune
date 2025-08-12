@@ -47,6 +47,9 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
     var scheduler = try Scheduler.init(allocator, L);
     defer scheduler.deinit();
 
+    try Zune.Resolvers.Require.init(L);
+    defer Zune.Resolvers.Require.deinit(L);
+
     try Scheduler.SCHEDULERS.append(&scheduler);
 
     try Engine.prepAsync(L, &scheduler);
@@ -57,7 +60,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
         .main = true,
     });
 
-    L.setsafeenv(VM.lua.GLOBALSINDEX, true);
+    try L.Lsandbox();
 
     var stdin = std.io.getStdIn();
     var in_reader = stdin.reader();

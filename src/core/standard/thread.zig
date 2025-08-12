@@ -211,7 +211,12 @@ pub const Runtime = struct {
     fn entry(self: *Runtime) void {
         const ML = self.L.tothread(1).?;
 
-        Zune.Runtime.Engine.runAsync(ML, &self.scheduler, .{ .cleanUp = false }) catch {};
+        jmp: {
+            Zune.Resolvers.Require.init(self.L) catch break :jmp;
+            defer Zune.Resolvers.Require.deinit(self.L);
+
+            Zune.Runtime.Engine.runAsync(ML, &self.scheduler, .{ .cleanUp = false }) catch {};
+        }
 
         self.access_mutex.lock();
         defer self.access_mutex.unlock();
@@ -486,7 +491,7 @@ fn createThread(allocator: std.mem.Allocator, L: *VM.lua.State) !*VM.lua.State {
     try Zune.Runtime.Engine.prepAsync(runtime.L, &runtime.scheduler);
     try Zune.openZune(runtime.L, &.{}, .{});
 
-    runtime.L.setsafeenv(VM.lua.GLOBALSINDEX, true);
+    try runtime.L.Lsandbox();
 
     const ML = try runtime.L.newthread();
 

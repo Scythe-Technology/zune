@@ -163,12 +163,15 @@ fn cmdRun(allocator: std.mem.Allocator, args: []const []const u8) !void {
     var scheduler = try Scheduler.init(allocator, L);
     defer scheduler.deinit();
 
+    try Zune.Resolvers.Require.init(L);
+    defer Zune.Resolvers.Require.deinit(L);
+
     try Scheduler.SCHEDULERS.append(&scheduler);
 
     try Engine.prepAsync(L, &scheduler);
     try Zune.openZune(L, run_args, LOAD_FLAGS);
 
-    L.setsafeenv(VM.lua.GLOBALSINDEX, true);
+    try L.Lsandbox();
 
     const ML = try L.newthread();
 
@@ -301,12 +304,15 @@ fn cmdTest(allocator: std.mem.Allocator, args: []const []const u8) !void {
     var scheduler = try Scheduler.init(gpa_allocator, L);
     defer scheduler.deinit();
 
+    try Zune.Resolvers.Require.init(L);
+    defer Zune.Resolvers.Require.deinit(L);
+
     try Scheduler.SCHEDULERS.append(&scheduler);
 
     try Engine.prepAsync(L, &scheduler);
     try Zune.openZune(L, args, LOAD_FLAGS);
 
-    L.setsafeenv(VM.lua.GLOBALSINDEX, true);
+    try L.Lsandbox();
 
     const ML = try L.newthread();
 
@@ -353,12 +359,15 @@ fn cmdEval(allocator: std.mem.Allocator, args: []const []const u8) !void {
     var scheduler = try Scheduler.init(allocator, L);
     defer scheduler.deinit();
 
+    try Zune.Resolvers.Require.init(L);
+    defer Zune.Resolvers.Require.deinit(L);
+
     try Scheduler.SCHEDULERS.append(&scheduler);
 
     try Engine.prepAsync(L, &scheduler);
     try Zune.openZune(L, args, .{});
 
-    L.setsafeenv(VM.lua.GLOBALSINDEX, true);
+    try L.Lsandbox();
 
     const ML = try L.newthread();
 
@@ -464,6 +473,9 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
         var scheduler = try Scheduler.init(allocator, L);
         defer scheduler.deinit();
 
+        try Zune.Resolvers.Require.init(L);
+        defer Zune.Resolvers.Require.deinit(L);
+
         try Scheduler.SCHEDULERS.append(&scheduler);
 
         const callbacks = L.callbacks();
@@ -475,7 +487,7 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
         try Engine.prepAsync(L, &scheduler);
         try Zune.openZune(L, run_args, LOAD_FLAGS);
 
-        L.setsafeenv(VM.lua.GLOBALSINDEX, true);
+        try L.Lsandbox();
 
         const terminal = &(Zune.corelib.io.TERMINAL orelse std.debug.panic("Terminal not initialized", .{}));
         errdefer terminal.restoreSettings() catch {};

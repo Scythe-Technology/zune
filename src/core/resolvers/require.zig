@@ -322,6 +322,8 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
             .main = false,
         });
 
+        ML.setsafeenv(VM.lua.GLOBALSINDEX, true);
+
         if (Zune.STATE.BUNDLE == null or Zune.STATE.BUNDLE.?.mode.compiled == .debug) {
             @branchHint(.likely);
             Engine.loadModule(ML, module_src_path, file_content, null) catch |err| switch (err) {
@@ -405,6 +407,22 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
     }
 
     return 1;
+}
+
+pub fn init(L: *VM.lua.State) !void {
+    const allocator = luau.getallocator(L);
+
+    Navigator.PATH_ALLOCATOR = .init(try allocator.alloc(u8, (std.fs.max_path_bytes * 4) + 32));
+}
+
+pub fn deinit(L: *VM.lua.State) void {
+    const allocator = luau.getallocator(L);
+
+    allocator.free(Navigator.PATH_ALLOCATOR.buffer);
+}
+
+pub fn load(L: *VM.lua.State) !void {
+    try L.Zsetglobalfn("require", zune_require);
 }
 
 test "require" {
