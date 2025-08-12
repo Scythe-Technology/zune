@@ -25,25 +25,30 @@ const States = enum {
     Loaded,
 };
 
-const ErrorState = States.Error;
-const WaitingState = States.Waiting;
-const PreloadedState = States.Preloaded;
-const LoadedState = States.Loaded;
-
 const QueueItem = struct {
     state: Scheduler.ThreadRef,
 };
 
-threadlocal var REQUIRE_QUEUE_MAP = std.StringArrayHashMap(std.ArrayList(QueueItem)).init(Zune.DEFAULT_ALLOCATOR);
+const RequireItem = union(enum) {
+    loading: void,
+    @"error": void,
+    loaded: void,
+    yielded: std.ArrayListUnmanaged(QueueItem),
+};
+
+threadlocal var REQUIRE_MAP: std.StringHashMapUnmanaged(RequireItem) = .empty;
 
 const RequireContext = struct {
     allocator: std.mem.Allocator,
-    path: [:0]const u8,
+    path: []const u8,
 };
 fn require_finished(self: *RequireContext, ML: *VM.lua.State, _: *Scheduler) void {
     var outErr: ?[]const u8 = null;
 
-    const queue = REQUIRE_QUEUE_MAP.getEntry(self.path) orelse std.debug.panic("require_finished: queue not found", .{});
+    const queue = REQUIRE_MAP.getEntry(self.path) orelse std.debug.panic("require_finished: queue not found", .{});
+    std.debug.assert(queue.value_ptr.* == .yielded);
+
+    var free_path = false;
 
     if (ML.status() == .Ok) jmp: {
         const t = ML.gettop();
@@ -58,22 +63,29 @@ fn require_finished(self: *RequireContext, ML: *VM.lua.State, _: *Scheduler) voi
 
     GL.rawcheckstack(2) catch |e| std.debug.panic("{}", .{e});
 
-    _ = GL.Lfindtable(VM.lua.REGISTRYINDEX, "_MODULES", 1) catch |e| std.debug.panic("{}", .{e});
+    var list = queue.value_ptr.*.yielded;
+
     if (outErr != null)
-        GL.pushlightuserdata(@constCast(@ptrCast(&ErrorState)))
-    else
+        queue.value_ptr.* = .@"error"
+    else {
+        _ = GL.Lfindtable(VM.lua.REGISTRYINDEX, "_MODULES", 1) catch |e| std.debug.panic("{}", .{e});
         ML.xpush(GL, -1);
-    if (GL.typeOf(-1) != .Nil) {
-        GL.rawsetfield(-2, self.path) catch |e| std.debug.panic("{}", .{e}); // SET: _MODULES[moduleName] = module
-    } else {
-        GL.pop(1); // drop: nil
-        GL.pushlightuserdata(@constCast(@ptrCast(&LoadedState)));
-        GL.rawsetfield(-2, self.path) catch |e| std.debug.panic("{}", .{e}); // SET: _MODULES[moduleName] = <tag>
+        if (GL.typeOf(-1) != .Nil) {
+            free_path = true;
+            GL.rawsetfield(-2, self.path) catch |e| std.debug.panic("{}", .{e}); // SET: _MODULES[moduleName] = module
+        } else {
+            GL.pop(1); // drop: nil
+            queue.value_ptr.* = .loaded;
+        }
+        GL.pop(1); // drop: _MODULES
     }
 
-    GL.pop(1); // drop: _MODULES
+    if (free_path) {
+        defer self.allocator.free(self.path);
+        _ = REQUIRE_MAP.remove(self.path);
+    }
 
-    for (queue.value_ptr.*.items, 0..) |item, i| {
+    for (list.items, 0..) |item, i| {
         const L = item.state.value;
         if (i == 0) {
             if (outErr) |msg| {
@@ -92,19 +104,15 @@ fn require_finished(self: *RequireContext, ML: *VM.lua.State, _: *Scheduler) voi
     }
 
     ML.pop(1);
+
+    for (list.items) |*item|
+        item.state.deref();
+    list.deinit(Zune.DEFAULT_ALLOCATOR);
 }
 
 fn require_dtor(self: *RequireContext, _: *VM.lua.State, _: *Scheduler) void {
     const allocator = self.allocator;
     defer allocator.destroy(self);
-    defer allocator.free(self.path);
-
-    const queue = REQUIRE_QUEUE_MAP.getEntry(self.path) orelse return;
-
-    for (queue.value_ptr.items) |*item|
-        item.state.deref();
-    queue.value_ptr.deinit();
-    allocator.free(queue.key_ptr.*);
 }
 
 const RequireNavigatorContext = struct {
@@ -156,11 +164,6 @@ pub fn getFilePath(source: ?[]const u8) []const u8 {
             return path;
         };
     return ".";
-}
-
-inline fn setErrorState(L: *VM.lua.State, moduleName: [:0]const u8) !void {
-    L.pushlightuserdata(@constCast(@ptrCast(&ErrorState)));
-    try L.rawsetfield(-2, moduleName);
 }
 
 pub fn resolveScriptPath(
@@ -238,69 +241,82 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
     const cwd = std.fs.cwd();
 
     const script_path = try resolveScriptPath(allocator, L, moduleName, cwd);
-    defer allocator.free(script_path);
-
-    std.debug.assert(script_path.len <= std.fs.max_path_bytes - File.LARGEST_EXTENSION);
-
-    _ = try L.Lfindtable(VM.lua.REGISTRYINDEX, "_MODULES", 1);
-
-    const search_result = blk: {
-        var src_path_buf: [std.fs.max_path_bytes:0]u8 = undefined;
-
-        @memcpy(src_path_buf[0..script_path.len], script_path);
-
-        const ext_buf = src_path_buf[script_path.len..];
-        for (File.POSSIBLE_EXTENSIONS) |ext| {
-            @memcpy(ext_buf[0..ext.len], ext);
-            const full_len = script_path.len + ext.len;
-            src_path_buf[full_len] = 0;
-
-            const module_relative_path = src_path_buf[0..full_len :0];
-            switch (L.rawgetfield(-1, module_relative_path)) {
+    jmp: {
+        errdefer allocator.free(script_path);
+        _ = try L.Lfindtable(VM.lua.REGISTRYINDEX, "_MODULES", 1);
+        const res = REQUIRE_MAP.getEntry(script_path) orelse {
+            switch (L.rawgetfield(-1, script_path)) {
                 .Nil => {},
-                .LightUserdata => {
-                    const ptr = L.topointer(-1) orelse unreachable;
-                    if (ptr == @as(*const anyopaque, @ptrCast(&ErrorState))) {
-                        return L.Zerror("requested module failed to load");
-                    } else if (ptr == @as(*const anyopaque, @ptrCast(&WaitingState))) {
-                        if (!L.isyieldable())
-                            return L.Zyielderror();
-                        const res = REQUIRE_QUEUE_MAP.getEntry(module_relative_path) orelse std.debug.panic("zune_require: queue not found", .{});
-                        try res.value_ptr.append(.{
-                            .state = Scheduler.ThreadRef.init(L),
-                        });
-                        return L.yield(0);
-                    } else if (ptr == @as(*const anyopaque, @ptrCast(&PreloadedState))) {
-                        return L.Zerror("Cyclic dependency detected");
-                    } else if (ptr == @as(*const anyopaque, @ptrCast(&LoadedState))) {
-                        L.pushnil(); // return nil
-                        return 1;
-                    }
+                else => {
+                    defer allocator.free(script_path);
                     return 1;
                 },
-                else => return 1,
             }
             L.pop(1); // drop: nil
-        }
+            break :jmp;
+        };
+        switch (res.value_ptr.*) {
+            .loading => return L.Zerror("Cyclic dependency detected"),
+            .@"error" => return L.Zerror("requested module failed to load"),
+            .loaded => {
+                defer allocator.free(script_path);
+                L.pushnil(); // return nil
+                return 1;
+            },
+            .yielded => |*arr| {
+                defer allocator.free(script_path);
+                if (!L.isyieldable())
+                    return L.Zyielderror();
 
-        break :blk (if (Zune.STATE.BUNDLE) |*bundle|
-            File.searchLuauFileBundle(&src_path_buf, bundle, script_path)
+                try arr.append(Zune.DEFAULT_ALLOCATOR, .{
+                    .state = Scheduler.ThreadRef.init(L),
+                });
+                return L.yield(0);
+            },
+        }
+    }
+
+    const module_src_buf: [:0]u8 = try allocator.allocSentinel(u8, 1 + script_path.len + File.LARGEST_EXTENSION.len, 0);
+    defer allocator.free(module_src_buf);
+
+    const search_result = blk: {
+        errdefer allocator.free(script_path);
+
+        std.debug.assert(script_path.len <= std.fs.max_path_bytes);
+
+        module_src_buf[0] = '@';
+        @memcpy(module_src_buf[1..][0..script_path.len], script_path);
+
+        const input_buf = module_src_buf[1..][0 .. script_path.len + File.LARGEST_EXTENSION.len];
+        const result = (if (Zune.STATE.BUNDLE) |*bundle|
+            File.searchLuauFileBundle(input_buf, bundle, script_path)
         else
-            File.searchLuauFile(&src_path_buf, cwd, script_path)) catch |err| switch (err) {
+            File.searchLuauFile(input_buf, cwd, script_path)) catch |err| switch (err) {
             error.RedundantFileExtension => return L.Zerrorf("redundant file extension, remove '{s}'", .{std.fs.path.extension(script_path)}),
             else => return err,
         };
+        errdefer result.deinit();
+
+        try checkSearchResult(allocator, L, script_path, result);
+
+        break :blk result;
     };
     defer search_result.deinit();
 
-    try checkSearchResult(allocator, L, script_path, search_result);
-
     const file = search_result.first();
 
-    const module_src_path = try std.mem.concatWithSentinel(allocator, u8, &.{ "@", script_path, file.ext }, 0);
-    defer allocator.free(module_src_path);
+    const extended = module_src_buf[1 + script_path.len ..];
+    @memcpy(extended[0..file.ext.len], file.ext);
+    extended[file.ext.len] = 0;
 
-    const module_relative_path = module_src_path[1..];
+    const module_src: [:0]u8 = module_src_buf[0 .. 1 + script_path.len + file.ext.len :0];
+
+    const entry = blk: {
+        errdefer allocator.free(script_path);
+        break :blk try REQUIRE_MAP.getOrPut(Zune.DEFAULT_ALLOCATOR, script_path);
+    };
+
+    entry.value_ptr.* = .loading;
 
     const GL = L.mainthread();
     const ML = try GL.newthread();
@@ -309,7 +325,7 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
         const file_content: []const u8 = switch (file.val) {
             .contents => |c| c,
             .handle => |h| h.readToEndAlloc(allocator, std.math.maxInt(usize)) catch |err| {
-                try setErrorState(L, module_relative_path);
+                entry.value_ptr.* = .@"error";
                 return L.Zerrorf("could not read file: {}", .{err});
             },
         };
@@ -326,21 +342,18 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
 
         if (Zune.STATE.BUNDLE == null or Zune.STATE.BUNDLE.?.mode.compiled == .debug) {
             @branchHint(.likely);
-            Engine.loadModule(ML, module_src_path, file_content, null) catch |err| switch (err) {
+            Engine.loadModule(ML, module_src, file_content, null) catch |err| switch (err) {
                 error.Syntax => {
                     L.pop(1); // drop: thread
-                    try setErrorState(L, module_relative_path);
+                    entry.value_ptr.* = .@"error";
                     return L.Zerror(ML.tostring(-1) orelse "UnknownError");
                 },
             };
         } else {
-            ML.load(module_src_path, file_content, 0) catch unreachable; // should not error
+            ML.load(module_src, file_content, 0) catch unreachable; // should not error
             Engine.loadNative(ML);
         }
     }
-
-    L.pushlightuserdata(@constCast(@ptrCast(&PreloadedState)));
-    try L.setfield(-3, module_relative_path);
 
     switch (ML.resumethread(L, 0).check() catch |err| {
         Engine.logError(ML, err, false);
@@ -352,43 +365,37 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
             }
         }
         L.pop(1); // drop: thread
-        try setErrorState(L, module_relative_path);
+        entry.value_ptr.* = .@"error";
         return L.Zerror("requested module failed to load");
     }) {
         .Ok => {
             const t = ML.gettop();
             if (t > 1) {
                 L.pop(1); // drop: thread
-                try setErrorState(L, module_relative_path);
+                entry.value_ptr.* = .@"error";
                 return L.Zerror("module must return one value");
             } else if (t == 0)
                 ML.pushnil();
         },
         .Yield => {
-            L.pushlightuserdata(@constCast(@ptrCast(&WaitingState)));
-            try L.rawsetfield(-3, module_relative_path);
-
             {
-                const path = try allocator.dupeZ(u8, module_relative_path);
-                errdefer allocator.free(path);
-
                 const ptr = try allocator.create(RequireContext);
 
                 ptr.* = .{
                     .allocator = allocator,
-                    .path = path,
+                    .path = script_path,
                 };
 
                 scheduler.awaitResult(RequireContext, ptr, ML, require_finished, require_dtor, .Internal);
             }
 
-            var list = std.ArrayList(QueueItem).init(allocator);
+            var list: std.ArrayListUnmanaged(QueueItem) = .empty;
             if (L.isyieldable())
-                try list.append(.{
+                try list.append(Zune.DEFAULT_ALLOCATOR, .{
                     .state = Scheduler.ThreadRef.init(L),
                 });
 
-            try REQUIRE_QUEUE_MAP.put(try allocator.dupe(u8, module_relative_path), list);
+            entry.value_ptr.* = .{ .yielded = list };
 
             if (!L.isyieldable())
                 return L.Zyielderror();
@@ -399,12 +406,11 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
 
     ML.xmove(L, 1);
     if (L.typeOf(-1) != .Nil) {
+        defer allocator.free(script_path);
+        _ = REQUIRE_MAP.remove(script_path);
         L.pushvalue(-1);
-        try L.rawsetfield(-4, module_relative_path); // SET: _MODULES[moduleName] = module
-    } else {
-        L.pushlightuserdata(@constCast(@ptrCast(&LoadedState)));
-        try L.rawsetfield(-4, module_relative_path); // SET: _MODULES[moduleName] = <tag>
-    }
+        try L.rawsetfield(-4, script_path); // SET: _MODULES[moduleName] = module
+    } else entry.value_ptr.* = .loaded;
 
     return 1;
 }
@@ -412,6 +418,7 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
 pub fn init(L: *VM.lua.State) !void {
     const allocator = luau.getallocator(L);
 
+    REQUIRE_MAP = .empty;
     Navigator.PATH_ALLOCATOR = .init(try allocator.alloc(u8, (std.fs.max_path_bytes * 4) + 32));
 }
 
@@ -419,6 +426,11 @@ pub fn deinit(L: *VM.lua.State) void {
     const allocator = luau.getallocator(L);
 
     allocator.free(Navigator.PATH_ALLOCATOR.buffer);
+
+    var iter = REQUIRE_MAP.iterator();
+    while (iter.next()) |entry|
+        allocator.free(entry.key_ptr.*);
+    REQUIRE_MAP.deinit(Zune.DEFAULT_ALLOCATOR);
 }
 
 pub fn load(L: *VM.lua.State) !void {

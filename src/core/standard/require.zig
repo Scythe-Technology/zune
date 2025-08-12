@@ -74,19 +74,10 @@ fn lua_navigate(L: *VM.lua.State) !i32 {
 }
 
 fn lua_getCached(L: *VM.lua.State) !i32 {
-    const allocator = luau.getallocator(L);
-    const resolved_path = try L.Zcheckvalue([]const u8, 1, null);
+    const resolved_path = try L.Zcheckvalue([:0]const u8, 1, null);
     _ = try L.Lfindtable(VM.lua.REGISTRYINDEX, "_MODULES", 1);
 
-    for (Zune.Resolvers.File.POSSIBLE_EXTENSIONS) |ext| {
-        const path = try std.mem.concatWithSentinel(allocator, u8, &.{ resolved_path, ext }, 0);
-        defer allocator.free(path);
-        if (!L.rawgetfield(-1, path).isnoneornil())
-            return 1;
-        L.pop(1);
-    }
-
-    L.pushnil();
+    _ = L.rawgetfield(-1, resolved_path);
     return 1;
 }
 
