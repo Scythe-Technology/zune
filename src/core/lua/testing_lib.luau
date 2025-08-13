@@ -40,7 +40,7 @@ local DEFER_QUEUE = {}::{()->()};
 local SCOPE_STACK = {}::{string};
 local TEST_STACK = {}::{string};
 
-local useColor = (zune.process.env["NO_COLOR"] == nil or zune.process.env["NO_COLOR"] == "0");
+local useColor = ((zune.process.env["NO_COLOR"] :: any) == nil or zune.process.env["NO_COLOR"] == "0");
 
 local RESET = if (useColor) then "\27[0m" else "";
 
@@ -64,7 +64,7 @@ function printPreviewLine(
     longest: number,
     dim: boolean
 )
-    if (source_lines[line] == nil) then
+    if (not source_lines[line]) then
         return
     end
     local style = if (dim) then DIM else BOLD;
@@ -136,7 +136,7 @@ local function runTest(fn: () -> (), info: TestInfo)
                 if (l < 0) then
                     continue;
                 end
-                local context = getfenv(f);
+                local context = getfenv(f) :: {[string]: any};
                 local file = context._FILE;
                 if (type(file) ~= "table") then
                     continue;
@@ -145,7 +145,7 @@ local function runTest(fn: () -> (), info: TestInfo)
                 copy.name = s;
                 table.insert(
                     stacktrace,
-                    writeStackTrace(copy, ln::string, l, tostring(f))
+                    writeStackTrace(copy :: any, ln::string, l, tostring(f :: any))
                 );
             end
             err = e;
@@ -173,7 +173,7 @@ local function runTest(fn: () -> (), info: TestInfo)
 
     for i = #DEFER_QUEUE, 1, -1 do
         local v = DEFER_QUEUE[i];
-        local success, result: any = pcall(v);
+        local success, result: any = pcall(v :: any);
         if (not success) then
             print(`{YELLOW}Deferred function failed:{RESET}\n    {RED}{result}{RESET}`);
         end
@@ -312,7 +312,7 @@ end
 
 function testing.test(
     name: string,
-    fn: (...any) -> ...any,
+    fn: () -> (),
     timeout: number?
 ): ()
     table.insert(TEST_STACK, name);
@@ -334,7 +334,7 @@ local function assertExpect(flipped : boolean, value : boolean, fmt : string, ..
         value = not value;
     end
     if (not value) then
-        error(string.format(fmt, ...), 4);
+        error(string.format(fmt :: any, ...), 4);
     end
 end
 
@@ -342,7 +342,7 @@ end
 local Conditional = {};
 Conditional.__index = Conditional;
 
-function Conditional.new(name : string, func : (value : any) -> (boolean, string?), any: any?)
+function Conditional.new(name : string, func : (value : any) -> (boolean, string?, string?), any: any?)
     return setmetatable({
         test = func,
         name = name,
@@ -354,10 +354,10 @@ function Conditional.is(a)
     return type(a) == "table" and getmetatable(a) == Conditional;
 end
 
-type Conditional = typeof(Conditional.new("", function(_) return true, "" end));
+type Conditional = typeof(Conditional.new("", function(_) return true, "", "" end));
 
 function Conditional.__call(self : Conditional, ...)
-    return self.test(...);
+    return self.test(... :: any);
 end
 
 function Conditional.__tostring(self : Conditional)
@@ -418,7 +418,7 @@ local conditionals = {
         if (Conditional.is(expected)) then
             local cond, a, s = expected(self.received);
             if (s) then
-                assertExpect(self.flipped, cond, s, flipTag(self.flipped));
+                assertExpect(self.flipped, cond, s :: string, flipTag(self.flipped));
             else
                 assertExpect(self.flipped, cond, "Expected %s to %sbe %s", a or readable(self.received), flipTag(self.flipped), readable(expected));
             end
@@ -491,9 +491,9 @@ local function deepScan(a : any, b : any, state : {[any] : any}, key: string?) :
     end
     if (Conditional.is(a)) then
         if (a.name ~= "@similar") then
-            local result, _, reason = a(b);
+            local result, _, reason: string = a(b);
             if (not result) then
-                return {`{key or ''}{if (reason) then string.format(reason, "") else "failed condition"}`};
+                return {`{key or ''}{if (reason) then string.format(reason :: any, "") else "failed condition"}`};
             end
             return {}
         else
@@ -520,7 +520,7 @@ local function deepScan(a : any, b : any, state : {[any] : any}, key: string?) :
             end
         end
         for key, value in b do
-            local result = deepScan(a[key], value, state, `{DIM}[{RESET}{GREEN}{readable(key)}{DIM}]: {RESET}`);
+            local result = deepScan((a :: any)[key], value, state, `{DIM}[{RESET}{GREEN}{readable(key)}{DIM}]: {RESET}`);
             if (keys_hit[key]) then
                 continue;
             end
@@ -540,7 +540,7 @@ end
 
 local expect = setmetatable({
     nothing = Conditional.new("nothing", function(value)
-        return value == nil;
+        return value == nil, nil, nil;
     end),
     any = function(typename : string)
         if (type(typename) ~= "string") then
