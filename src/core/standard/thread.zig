@@ -512,23 +512,38 @@ fn lua_fromModule(L: *VM.lua.State) !i32 {
     const script_path = try Zune.Resolvers.Require.resolveScriptPath(allocator, L, moduleName, cwd);
     defer allocator.free(script_path);
 
-    var src_path_buf: [std.fs.max_path_bytes:0]u8 = undefined;
-    const search_result = if (Zune.STATE.BUNDLE) |*b| try Zune.Resolvers.File.searchLuauFileBundle(&src_path_buf, b, script_path) else try Zune.Resolvers.File.searchLuauFile(&src_path_buf, cwd, script_path);
+    const module_src_buf: [:0]u8 = try allocator.allocSentinel(u8, 1 + script_path.len + Zune.Resolvers.File.LARGEST_EXTENSION.len, 0);
+    defer allocator.free(module_src_buf);
+
+    std.debug.assert(script_path.len <= std.fs.max_path_bytes);
+
+    module_src_buf[0] = '@';
+    @memcpy(module_src_buf[1..][0..script_path.len], script_path);
+
+    const input_buf = module_src_buf[1..][0 .. script_path.len + Zune.Resolvers.File.LARGEST_EXTENSION.len];
+    const search_result = (if (Zune.STATE.BUNDLE) |*b|
+        Zune.Resolvers.File.searchLuauFileBundle(input_buf, b, script_path)
+    else
+        Zune.Resolvers.File.searchLuauFile(input_buf, cwd, script_path)) catch |err| switch (err) {
+        error.RedundantFileExtension => return L.Zerrorf("redundant file extension, remove '{s}'", .{std.fs.path.extension(script_path)}),
+        else => return err,
+    };
     defer search_result.deinit();
 
     try Zune.Resolvers.Require.checkSearchResult(allocator, L, script_path, search_result);
 
     const file = search_result.first();
 
-    const module_src_path = try std.mem.concatWithSentinel(allocator, u8, &.{ "@", script_path, file.ext }, 0);
-    defer allocator.free(module_src_path);
+    const extended = module_src_buf[1 + script_path.len ..];
+    @memcpy(extended[0..file.ext.len], file.ext);
+    extended[file.ext.len] = 0;
 
-    const module_relative_path = module_src_path[1..];
+    const module_src: [:0]u8 = module_src_buf[0 .. 1 + script_path.len + file.ext.len :0];
 
     const file_content: []const u8 = switch (file.val) {
         .contents => |c| c,
         .handle => |h| h.readToEndAlloc(allocator, std.math.maxInt(usize)) catch |err| {
-            return L.Zerrorf("could not read module file '{s}': {}", .{ module_relative_path, err });
+            return L.Zerrorf("could not read module file '{s}': {}", .{ module_src, err });
         },
     };
     defer if (file.val == .handle) allocator.free(file_content);
@@ -544,11 +559,11 @@ fn lua_fromModule(L: *VM.lua.State) !i32 {
 
     if (Zune.STATE.BUNDLE == null or Zune.STATE.BUNDLE.?.mode.compiled == .debug) {
         @branchHint(.likely);
-        Zune.Runtime.Engine.loadModule(ML, module_src_path, file_content, null) catch |err| switch (err) {
+        Zune.Runtime.Engine.loadModule(ML, module_src, file_content, null) catch |err| switch (err) {
             error.Syntax => return L.Zerror(ML.tostring(-1) orelse "UnknownError"),
         };
     } else {
-        ML.load(module_src_path, file_content, 0) catch unreachable; // should not error
+        ML.load(module_src, file_content, 0) catch unreachable; // should not error
         Zune.Runtime.Engine.loadNative(ML);
     }
     return 1;
