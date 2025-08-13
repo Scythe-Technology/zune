@@ -544,7 +544,7 @@ export type NetworkAddress = {
 export type ServerRequest = {
     method: string,
     path: string,
-    query: {[string]: string},
+    query: {[string | number]: string},
     headers: {[string]: string},
     body: string?,
 }
@@ -552,7 +552,7 @@ export type ServerRequest = {
 export type ServerResponse = {
     status_code: number,
     headers: {[string]: string}?,
-    body: string | buffer,
+    body: (string | buffer)?,
 }
 
 export type ServerWebSocketHandlers = {
