@@ -25,10 +25,10 @@ pub const POSSIBLE_EXTENSIONS = [_][]const u8{
 };
 
 pub const LARGEST_EXTENSION = blk: {
-    var largest: usize = 0;
+    var largest: []const u8 = POSSIBLE_EXTENSIONS[0];
     for (POSSIBLE_EXTENSIONS) |ext| {
-        if (ext.len > largest)
-            largest = ext.len;
+        if (ext.len > largest.len)
+            largest = ext;
     }
     break :blk largest;
 };
@@ -47,12 +47,14 @@ pub fn findLuauFile(dir: std.fs.Dir, fileName: []const u8) !?LuauFile {
 
     var path_buf: [std.fs.max_path_bytes]u8 = undefined;
 
-    if (fileName.len > path_buf.len - LARGEST_EXTENSION)
+    if (fileName.len > path_buf.len - LARGEST_EXTENSION.len)
         return error.PathTooLong;
 
+    @memcpy(path_buf[0..fileName.len], fileName);
+    const ext_buf = path_buf[fileName.len..];
+
     for (POSSIBLE_EXTENSIONS) |ext| {
-        @memcpy(path_buf[0..fileName.len], fileName);
-        @memcpy(path_buf[fileName.len..][0..ext.len], ext);
+        @memcpy(ext_buf[0..ext.len], ext);
         const result = path_buf[0 .. fileName.len + ext.len];
 
         const file = dir.openFile(result, .{ .mode = .read_only }) catch |err| switch (err) {
@@ -102,16 +104,17 @@ pub fn searchLuauFile(buf: []u8, dir: std.fs.Dir, fileName: []const u8) !SearchR
     if (getLuaFileType(fileName)) |_|
         return error.RedundantFileExtension;
 
-    if (fileName.len > buf.len - LARGEST_EXTENSION)
+    if (fileName.len > buf.len - LARGEST_EXTENSION.len)
         return error.PathTooLong;
 
     var results: SearchResult = .{
         .results = undefined,
     };
 
+    const ext_buf = buf[fileName.len..];
+
     for (POSSIBLE_EXTENSIONS) |ext| {
-        @memcpy(buf[0..fileName.len], fileName);
-        @memcpy(buf[fileName.len..][0..ext.len], ext);
+        @memcpy(ext_buf[0..ext.len], ext);
         const result = buf[0 .. fileName.len + ext.len];
 
         const file = dir.openFile(result, .{ .mode = .read_only }) catch |err| switch (err) {
@@ -139,16 +142,17 @@ pub fn searchLuauFileBundle(buf: []u8, b: *const Bundle.Map, fileName: []const u
     if (getLuaFileType(fileName)) |_|
         return error.RedundantFileExtension;
 
-    if (fileName.len > buf.len - LARGEST_EXTENSION)
+    if (fileName.len > buf.len - LARGEST_EXTENSION.len)
         return error.PathTooLong;
 
     var results: SearchResult = .{
         .results = undefined,
     };
 
+    const ext_buf = buf[fileName.len..];
+
     for (POSSIBLE_EXTENSIONS) |ext| {
-        @memcpy(buf[0..fileName.len], fileName);
-        @memcpy(buf[fileName.len..][0..ext.len], ext);
+        @memcpy(ext_buf[0..ext.len], ext);
         const result = buf[0 .. fileName.len + ext.len];
 
         const contents = b.loadScript(result) catch |err| switch (err) {

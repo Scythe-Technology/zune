@@ -128,12 +128,14 @@ const ProcessChildOptions = struct {
                 .String => blk: {
                     const shellOption = L.tostring(-1) orelse unreachable;
 
-                    switch (std.StaticStringMap(enum { shell, bash, powershell, cmd }).initComptime(.{
+                    switch (std.StaticStringMap(enum { shell, bash, powershell, powershell_core, cmd }).initComptime(.{
                         .{ "sh", .shell },
                         .{ "/bin/sh", .shell },
                         .{ "bash", .bash },
                         .{ "powershell", .powershell },
                         .{ "ps", .powershell },
+                        .{ "pwsh", .powershell_core },
+                        .{ "powershell-core", .powershell_core },
                         .{ "cmd", .cmd },
                     }).get(shellOption) orelse {
                         shell = shellOption;
@@ -143,6 +145,7 @@ const ProcessChildOptions = struct {
                         .shell => shell = "/bin/sh",
                         .bash => shell = "bash",
                         .powershell => shell = "powershell",
+                        .powershell_core => shell = "pwsh",
                         .cmd => {
                             shell = "cmd";
                             shell_inline = "/c";

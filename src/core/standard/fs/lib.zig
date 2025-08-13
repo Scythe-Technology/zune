@@ -82,7 +82,10 @@ fn lua_readDir(L: *VM.lua.State) !i32 {
     var i: i32 = 1;
     while (try iter.next()) |entry| {
         L.pushinteger(i);
-        try L.pushlstring(entry.name);
+        try L.Zpushvalue(.{
+            .name = entry.name,
+            .kind = @tagName(entry.kind),
+        });
         try L.rawset(-3);
         i += 1;
     }
@@ -160,14 +163,45 @@ fn internal_isFile(srcDir: fs.Dir, path: []const u8) bool {
     return stat.kind == .file;
 }
 
-fn lua_isDir(L: *VM.lua.State) i32 {
-    const path = L.Lcheckstring(1);
-    L.pushboolean(internal_isDir(fs.cwd(), path));
-    return 1;
-}
-
 fn internal_lossyfloat_time(n: i128) f64 {
     return @as(f64, @floatFromInt(n)) / 1_000_000_000.0;
+}
+
+fn internal_stat(dir: fs.Dir, path: []const u8) !fs.Dir.Stat {
+    if (comptime builtin.os.tag == .windows) {
+        var d = dir.openDir(path, .{}) catch {
+            const file = try dir.openFile(path, .{});
+            defer file.close();
+            return try file.stat();
+        };
+        defer d.close();
+        return try d.stat();
+    }
+    return try dir.statFile(path);
+}
+
+fn lua_stat(L: *VM.lua.State) !i32 {
+    switch (comptime builtin.os.tag) {
+        .windows, .linux, .macos => {},
+        else => return error.UnsupportedPlatform,
+    }
+    const path = L.Lcheckstring(1);
+    const cwd = std.fs.cwd();
+    const stat = internal_stat(cwd, path) catch {
+        try L.Zpushvalue(.{
+            .kind = "none",
+        });
+        return 1;
+    };
+    try L.Zpushvalue(.{
+        .kind = @tagName(stat.kind),
+        .changed_at = internal_lossyfloat_time(stat.ctime),
+        .modified_at = internal_lossyfloat_time(stat.mtime),
+        .accessed_at = internal_lossyfloat_time(stat.atime),
+        .mode = stat.mode,
+        .size = @as(f64, @floatFromInt(stat.size)),
+    });
+    return 1;
 }
 
 fn internal_metadata_table(L: *VM.lua.State, metadata: fs.File.Metadata, isSymlink: bool) !void {
@@ -752,7 +786,7 @@ pub fn loadLib(L: *VM.lua.State) !void {
         .writeDir = lua_writeDir,
         .removeFile = lua_removeFile,
         .removeDir = lua_removeDir,
-        .isDir = lua_isDir,
+        .stat = lua_stat,
         .metadata = lua_metadata,
         .move = lua_move,
         .copy = lua_copy,

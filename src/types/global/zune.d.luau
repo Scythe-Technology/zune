@@ -30,6 +30,17 @@ export type Metadata = {
     },
 }
 
+export type FileStat = {
+    kind: MetadataKind,
+    changed_at: number,
+    modified_at: number,
+    accessed_at: number,
+    size: number,
+    mode: number,
+} | {
+    kind: "none",
+}
+
 declare class FileHandle
     read:
         & ((self: FileHandle, amount: number?, useBuffer: false?) -> string)
@@ -67,19 +78,24 @@ type OpenFileOptions = {
     mode: string?,
 }
 
+type DirectoryEntry = {
+    name: string,
+    kind: MetadataKind,
+}
+
 type FileSystemLib = {
     createFile: (path: string, opts: CreateFileOptions?) -> FileHandle,
     openFile: (path: string, opts: OpenFileOptions?) -> FileHandle,
     readFile:
         & ((path: string) -> string)
         & ((path: string, useBuffer: true) -> buffer),
-    readDir: (path: string) -> { string },
+    readDir: (path: string) -> { DirectoryEntry },
     writeFile: (path: string, contents: string | buffer) -> (),
     writeDir:  (path: string, recursive: boolean?) -> (),
     removeFile: (path: string) -> (),
     removeDir: (path: string, recursive: boolean?) -> (),
     metadata: (path: string) -> Metadata,
-    isDir: (path: string) -> boolean,
+    stat: (path: string) -> FileStat,
     move: (from: string, to: string, overwrite: boolean?) -> (),
     copy: (from: string, to: string, overwrite: boolean?) -> (),
     symlink: (from: string, to: string) -> (),
@@ -223,6 +239,7 @@ export type ProcessOptions = {
 	cwd: string?,
 	env: { [string]: string }?,
 	shell: (boolean | string)?,
+    stdio: ("inherit" | "pipe" | "ignore")?,
 }
 
 export type ProcessResult = {
@@ -389,7 +406,7 @@ type ExpectHandler = {
 
         @param expected The expected table.
     ]]
-    similar: (expected: {[any]: any}) -> any,
+    similar: (expected: {[any]: any} | {any}) -> any,
 }
 
 type TestingLib = {
@@ -845,7 +862,8 @@ export type ParseResult = {
     root: {any},
     eof: { text: "", position: Position, tag: "eof" },
     lines: number,
-    hot_comments: {
+    lineOffsets: {number},
+    hotcomments: {
         {
             header: boolean,
             content: string,

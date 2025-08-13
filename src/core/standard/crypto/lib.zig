@@ -83,6 +83,12 @@ const LuaCryptoHasher = struct {
             };
         }
 
+        pub fn alignment(self: Algorithm) u32 {
+            return switch (self) {
+                inline else => |algo| @alignOf(algo.hasher()),
+            };
+        }
+
         pub fn quickHash(self: Algorithm, value: []const u8, out: []u8) void {
             switch (self) {
                 inline else => |algo| {
@@ -224,8 +230,10 @@ const LuaCryptoHasher = struct {
 
         const hasher = try L.newuserdatataggedwithmetatable(LuaCryptoHasher, TAG_CRYPTO_HASHER);
 
-        const state = try allocator.dupe(u8, self.state);
-        errdefer allocator.free(state);
+        const state_alloc = allocator.rawAlloc(self.algorithm.size(), .fromByteUnits(self.algorithm.alignment()), @returnAddress()) orelse return error.OutOfMemory;
+        const state = state_alloc[0..self.algorithm.size()];
+        @memcpy(state, self.state);
+        errdefer allocator.rawFree(state, .fromByteUnits(self.algorithm.alignment()), @returnAddress());
 
         const extra = if (self.extra) |e| try allocator.dupe(u8, e) else null;
         errdefer if (extra) |e| allocator.free(e);
@@ -248,7 +256,7 @@ const LuaCryptoHasher = struct {
     pub fn __dtor(L: *VM.lua.State, self: *LuaCryptoHasher) void {
         const allocator = luau.getallocator(L);
 
-        allocator.free(self.state);
+        allocator.rawFree(self.state, .fromByteUnits(self.algorithm.alignment()), @returnAddress());
         if (self.extra) |e|
             allocator.free(e);
     }
@@ -266,8 +274,9 @@ fn lua_createHash(L: *VM.lua.State) !i32 {
 
     const ptr = try L.newuserdatataggedwithmetatable(LuaCryptoHasher, TAG_CRYPTO_HASHER);
 
-    const state = try allocator.alloc(u8, algo.size());
-    errdefer allocator.free(state);
+    const state_alloc = allocator.rawAlloc(algo.size(), .fromByteUnits(algo.alignment()), @returnAddress()) orelse return error.OutOfMemory;
+    const state = state_alloc[0..algo.size()];
+    errdefer allocator.rawFree(state, .fromByteUnits(algo.alignment()), @returnAddress());
 
     const extra = if (secret != null) try allocator.alloc(u8, block_length) else null;
 

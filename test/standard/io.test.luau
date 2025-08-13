@@ -160,8 +160,8 @@ describe("IO", function()
             stream:write(buf);
 
             local ok, err = pcall(stream.read, stream)
-            expect(ok).toBeFalsy();
-            expect(err).toBe("EOF");
+            expect(ok).toBeTruthy();
+            expect(buffer.tostring(err)).toBe("");
 
             stream:seekTo(0);
             expect(stream:pos()).toBe(0)
@@ -189,8 +189,8 @@ describe("IO", function()
             expect(stream:pos()).toBe(0)
 
             local string_ok, string_err = pcall(stream.read, stream, 0, false)
-            expect(string_ok).toBeFalsy()
-            expect(string_err).toBe("EOF")
+            expect(string_ok).toBeTruthy()
+            expect(string_err).toBe("")
 
             local partial = stream:read(4)
             expect(partial).never.toBeNil()
@@ -294,8 +294,8 @@ describe("IO", function()
             expect(ok).toBeFalsy();
             expect(err).toBe("EOF");
             local string_ok, string_err = pcall(reader.read, reader, 0, false)
-            expect(string_ok).toBeFalsy()
-            expect(string_err).toBe("EOF");
+            expect(string_ok).toBeTruthy()
+            expect(string_err).toBe("");
 
             reader = nil :: any; -- remove reference
 

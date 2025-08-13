@@ -10,7 +10,11 @@ local describe = testing.describe;
 local expect = testing.expect;
 local test = testing.test;
 
-assert(fs.isDir(TEMP_DIR), `TEMP_DIR is not a directory, {TEMP_DIR}`);
+local function isDir(path: string): boolean
+    return fs.stat(path).kind == "directory";
+end
+
+assert(isDir(TEMP_DIR), `TEMP_DIR is not a directory, {TEMP_DIR}`);
 
 local function path(dir: string)
     return `{TEMP_DIR}/{dir}`;
@@ -163,9 +167,9 @@ describe("Text", function()
 
     test("IsFile", function()
         expect(isFile(path("sample.txt"))).toBeTruthy();
-        expect(fs.isDir(path("sample.txt"))).toBeFalsy();
+        expect(isDir(path("sample.txt"))).toBeFalsy();
         expect(isFile(path("sample2.txt"))).toBeTruthy();
-        expect(fs.isDir(path("sample2.txt"))).toBeFalsy();
+        expect(isDir(path("sample2.txt"))).toBeFalsy();
         expect(isFile(path("unknown/sample.txt"))).toBeFalsy();
         expect(isFile(path("unknown/sample2.txt"))).toBeFalsy();
     end)
@@ -198,12 +202,12 @@ describe("Dir", function()
     test("ReadDir", function()
         local result = fs.readDir(path(""));
         expect(result).toBe(expect.any("table"));
-        expect(result).toBe(expect.similar({"foo"}));
+        expect(result).toBe(expect.similar({{name = "foo", kind = "directory"}}));
         
         local result2 = fs.readDir(TEMP_DIR);
         expect(result2).toBe(expect.any("table"));
         expect(result2).toHaveLength(1);
-        expect(result2).toBe(expect.similar({"foo"}));
+        expect(result2).toBe(expect.similar({{name = "foo", kind = "directory"}}));
 
         local result3 = fs.readDir(path("foo/bar/luau"));
         expect(result3).toBe(expect.any("table"));
@@ -215,14 +219,14 @@ describe("Dir", function()
     end)
 
     test("IsDir", function()
-        expect(fs.isDir(path("foo"))).toBeTruthy();
+        expect(isDir(path("foo"))).toBeTruthy();
         expect(isFile(path("foo"))).toBeFalsy();
-        expect(fs.isDir(path("unknown/foo"))).toBeFalsy();
+        expect(isDir(path("unknown/foo"))).toBeFalsy();
     end)
 
     test("RemoveDir", function()
         fs.removeDir(path("foo/bar/luau"));
-        expect(fs.isDir(path("foo/bar/luau"))).toBeFalsy();
+        expect(isDir(path("foo/bar/luau"))).toBeFalsy();
 
         expect(function()
             fs.removeDir(path("foo"));
@@ -230,7 +234,7 @@ describe("Dir", function()
 
         -- Recursive
         fs.removeDir(path("foo"), true);
-        expect(fs.isDir(path("foo"))).toBeFalsy();
+        expect(isDir(path("foo"))).toBeFalsy();
     end)
 end)
 
@@ -250,7 +254,49 @@ test("Metadata", function()
             read_only = false,
         },
     }));
-    expect(fs.removeDir(path("metadata")));
+    fs.removeDir(path("metadata"));
+end)
+
+test("Stat", function()
+    fs.writeDir(path("stat"));
+    fs.writeFile(path("stat/sample.txt"), "Some text sample\n");
+
+    do
+        local stat = fs.stat(path("stat"));
+        expect(stat).toBe(expect.any("table"));
+        expect(stat).toBe(expect.similar({
+            changed_at = expect.any("number"),
+            modified_at = expect.any("number"),
+            accessed_at = expect.any("number"),
+            size = expect.any("number"),
+            mode = expect.any("number"),
+            kind = "directory",
+        }));
+    end
+
+    do
+        local stat = fs.stat(path("stat/sample.txt"));
+        expect(stat).toBe(expect.any("table"));
+        expect(stat).toBe(expect.similar({
+            changed_at = expect.any("number"),
+            modified_at = expect.any("number"),
+            accessed_at = expect.any("number"),
+            size = expect.any("number"),
+            mode = expect.any("number"),
+            kind = "file",
+        }));
+    end
+
+    do
+        local stat = fs.stat(path("stat/unknown.txt"));
+        expect(stat).toBe(expect.any("table"));
+        expect(stat).toBe(expect.similar({
+            kind = "none",
+        }));
+    end
+
+    fs.removeFile(path("stat/sample.txt")); 
+    fs.removeDir(path("stat"));
 end)
 
 test("Move", function()
@@ -281,7 +327,7 @@ test("Move", function()
     fs.removeDir(path("metadata"));
 
     expect(isFile(path("sample.txt"))).toBeFalsy();
-    expect(fs.isDir(path("metadata"))).toBeFalsy();
+    expect(isDir(path("metadata"))).toBeFalsy();
 end)
 
 test("Copy", function()
@@ -299,19 +345,19 @@ test("Copy", function()
     expect(isFile(path("sample3"))).toBeFalsy();
 
     fs.copy(path("metadata"), path("metadata2"));
-    expect(fs.isDir(path("metadata2"))).toBeTruthy();
+    expect(isDir(path("metadata2"))).toBeTruthy();
     expect(isFile(path("metadata2/sample.txt"))).toBeTruthy();
     expect(isFile(path("metadata2/sample2.txt"))).toBeTruthy();
 
     expect(function()
         fs.copy(path("metadata"), path("metadata2"));
     end).toThrow("PathAlreadyExists");
-    expect(fs.isDir(path("metadata2"))).toBeTruthy();
+    expect(isDir(path("metadata2"))).toBeTruthy();
     expect(isFile(path("metadata2/sample.txt"))).toBeTruthy();
     expect(isFile(path("metadata2/sample2.txt"))).toBeTruthy();
 
     fs.copy(path("metadata"), path("metadata2"), true);
-    expect(fs.isDir(path("metadata2"))).toBeTruthy();
+    expect(isDir(path("metadata2"))).toBeTruthy();
     expect(isFile(path("metadata2/sample.txt"))).toBeTruthy();
     expect(isFile(path("metadata2/sample2.txt"))).toBeTruthy();
 
@@ -320,8 +366,8 @@ test("Copy", function()
     fs.removeDir(path("metadata2"), true);
 
     expect(isFile(path("sample.txt"))).toBeFalsy();
-    expect(fs.isDir(path("metadata"))).toBeFalsy();
-    expect(fs.isDir(path("metadata2"))).toBeFalsy();
+    expect(isDir(path("metadata"))).toBeFalsy();
+    expect(isDir(path("metadata2"))).toBeFalsy();
 end)
 
 test("Symlink", function()
@@ -353,7 +399,7 @@ test("Symlink", function()
         expect(isFile(path("sample3"))).toBeFalsy();
 
         fs.symlink(path("metadata"), path("metadata2"));
-        expect(fs.isDir(path("metadata2"))).toBeTruthy();
+        expect(isDir(path("metadata2"))).toBeTruthy();
         expect(isFile(path("metadata2/sample.txt"))).toBeTruthy();
         expect(isFile(path("metadata2/sample2.txt"))).toBeTruthy();
         local metadata2 = fs.metadata(path("metadata2"));
@@ -373,7 +419,7 @@ test("Symlink", function()
         expect(function()
             fs.symlink(path("metadata"), path("metadata2"));
         end).toThrow("PathAlreadyExists");
-        expect(fs.isDir(path("metadata2"))).toBeTruthy();
+        expect(isDir(path("metadata2"))).toBeTruthy();
         expect(isFile(path("metadata2/sample.txt"))).toBeTruthy();
         expect(isFile(path("metadata2/sample2.txt"))).toBeTruthy();
 
@@ -382,8 +428,8 @@ test("Symlink", function()
         fs.removeDir(path("metadata2"), true);
 
         expect(isFile(path("sample.txt"))).toBeFalsy();
-        expect(fs.isDir(path("metadata"))).toBeFalsy();
-        expect(fs.isDir(path("metadata2"))).toBeFalsy();
+        expect(isDir(path("metadata"))).toBeFalsy();
+        expect(isDir(path("metadata2"))).toBeFalsy();
     end
 end)
 

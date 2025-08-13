@@ -60,7 +60,7 @@ fn prebuild(b: *std.Build, step: *std.Build.Step) !void {
     };
 
     { // Pre-compile Luau
-        const dep_luau = b.dependency("luau", .{ .target = build_native_target, .optimize = .Debug });
+        const dep_luau = b.dependency("luau", .{ .target = build_native_target, .optimize = .Debug, .Analysis = false });
         const bytecode_builder = b.addExecutable(.{
             .name = "bytecode_builder",
             .root_source_file = b.path("prebuild/bytecode.zig"),
@@ -276,5 +276,6 @@ fn buildZune(
     module.addImport("datetime", mod_datetime);
     module.addImport("toml", mod_toml);
     module.addImport("sqlite", mod_sqlite);
-    module.addImport("tinycc", mod_tinycc);
+    if (target.result.os.tag != .windows or target.result.cpu.arch != .aarch64)
+        module.addImport("tinycc", mod_tinycc);
 }

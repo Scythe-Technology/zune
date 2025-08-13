@@ -97,6 +97,7 @@ pub const ZuneState = struct {
     pub const LuauOptions = struct {
         DEBUG_LEVEL: u2 = 2,
         OPTIMIZATION_LEVEL: u2 = 1,
+        COVERAGE_LEVEL: u2 = 0,
         CODEGEN: bool = true,
         JIT_ENABLED: bool = true,
     };
@@ -249,7 +250,7 @@ pub fn loadConfiguration(dir: std.fs.Dir) void {
 }
 
 pub fn openZune(L: *VM.lua.State, args: []const []const u8, flags: Flags) !void {
-    try L.Zsetglobalfn("require", @import("core/resolvers/require.zig").zune_require);
+    try Resolvers.Require.load(L);
 
     try objects.load(L);
 
@@ -361,6 +362,9 @@ pub fn main() !void {
         defer L.deinit();
         var scheduler = try Runtime.Scheduler.init(allocator, L);
         defer scheduler.deinit();
+
+        try Resolvers.Require.init(L);
+        defer Resolvers.Require.deinit(L);
 
         try Runtime.Scheduler.SCHEDULERS.append(&scheduler);
 
