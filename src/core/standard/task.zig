@@ -186,11 +186,6 @@ pub fn loadLib(L: *VM.lua.State) !void {
     try LuaHelper.registerModule(L, LIB_NAME);
 }
 
-const TestResult = struct {
-    failed: i32,
-    total: i32,
-};
-
 test "task" {
     const TestRunner = @import("../utils/testrunner.zig");
 
