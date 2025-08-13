@@ -30,6 +30,17 @@ export type Metadata = {
     },
 }
 
+export type FileStat = {
+    kind: MetadataKind,
+    changed_at: number,
+    modified_at: number,
+    accessed_at: number,
+    size: number,
+    mode: number,
+} | {
+    kind: "none",
+}
+
 declare class FileHandle
     read:
         & ((self: FileHandle, amount: number?, useBuffer: false?) -> string)
@@ -84,7 +95,7 @@ type FileSystemLib = {
     removeFile: (path: string) -> (),
     removeDir: (path: string, recursive: boolean?) -> (),
     metadata: (path: string) -> Metadata,
-    isDir: (path: string) -> boolean,
+    stat: (path: string) -> FileStat,
     move: (from: string, to: string, overwrite: boolean?) -> (),
     copy: (from: string, to: string, overwrite: boolean?) -> (),
     symlink: (from: string, to: string) -> (),
