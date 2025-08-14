@@ -15,6 +15,7 @@ local function randomTest(impl: any)
         for i = 1, 20 do
             rand:nextNumber(0, 10);
         end
+        expect(rand:nextBoolean()).toBe(expect.type("boolean"));
     end
     
     local rand: Random = impl.new(0);

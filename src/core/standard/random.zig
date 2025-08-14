@@ -89,21 +89,22 @@ const LuaRandom = struct {
         return 1;
     }
 
+    fn lua_nextBoolean(self: *LuaRandom, L: *VM.lua.State) !i32 {
+        L.pushboolean(self.algorithm.random().boolean());
+        return 1;
+    }
+
     fn lua_clone(self: *LuaRandom, L: *VM.lua.State) !i32 {
         const random = try L.newuserdatataggedwithmetatable(LuaRandom, TAG_RANDOM);
-        random.* = .{
-            .algorithm = self.algorithm,
-        };
+        random.* = .{ .algorithm = self.algorithm };
         return 1;
     }
 
     pub const __index = MethodMap.CreateStaticIndexMap(LuaRandom, TAG_RANDOM, .{
         .{ "nextInteger", lua_nextInteger },
-        .{ "NextInteger", lua_nextInteger },
         .{ "nextNumber", lua_nextNumber },
-        .{ "NextNumber", lua_nextInteger },
+        .{ "nextBoolean", lua_nextBoolean },
         .{ "clone", lua_clone },
-        .{ "Clone", lua_clone },
     });
 };
 
