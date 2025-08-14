@@ -1205,20 +1205,13 @@ export type TimeDictionary = {
 }
 
 declare class DateTime
-    unixTimestamp: number
-    unixTimestampMillis: number
-    UnixTimestamp: number
-    UnixTimestampMillis: number
+    timestamp: number
+    timestamp_millis: number
     function toLocalTime(self): TimeDictionary
-    function ToLocalTime(self): TimeDictionary
     function toUniversalTime(self): TimeDictionary
-    function ToUniversalTime(self): TimeDictionary
     function toIsoDate(self): string
-    function ToIsoDate(self): string
     function formatLocalTime(self, format: string): string
-    function FormatLocalTime(self, format: string): string
     function formatUniversalTime(self, format: string): string
-    function FormatUniversalTime(self, format: string): string
 end
 
 type DatetimeLib = {
@@ -1386,13 +1379,9 @@ declare class Random
     nextNumber:
         & ((self: Random) -> number)
         & ((self: Random, min: number, max: number) -> number)
-    NextNumber:
-        & ((self: Random) -> number)
-        & ((self: Random, min: number, max: number) -> number)
     function nextInteger(self, min: number, max: number): number
-    function NextInteger(self, min: number, max: number): number
+    function nextBoolean(self): boolean
     function clone(self): Random
-    function Clone(self): Random
 end
 
 type RandomConstructor = {
