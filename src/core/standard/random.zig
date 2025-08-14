@@ -107,8 +107,15 @@ const LuaRandom = struct {
     });
 };
 
+fn defaultSeed(L: *VM.lua.State) u64 {
+    var default_seed: u64 = @intFromPtr(L);
+    default_seed ^= @as(u64, @bitCast(std.time.timestamp()));
+    default_seed ^= @intFromFloat(VM.lperf.clock());
+    return default_seed;
+}
+
 fn lua_newLuauPcg32(L: *VM.lua.State) !i32 {
-    const seed = try L.Zcheckvalue(u32, 1, null);
+    const seed = try L.Zcheckvalue(?u32, 1, null) orelse defaultSeed(L);
 
     var pcg32: std.Random.Pcg = .{
         .s = 0,
@@ -128,7 +135,7 @@ fn lua_newLuauPcg32(L: *VM.lua.State) !i32 {
 fn NewGenerator(comptime name: []const u8) fn (L: *VM.lua.State) anyerror!i32 {
     return struct {
         fn inner(L: *VM.lua.State) !i32 {
-            const seed = try L.Zcheckvalue(u32, 1, null);
+            const seed: u64 = try L.Zcheckvalue(?u32, 1, null) orelse defaultSeed(L);
             const hasher = try L.newuserdatataggedwithmetatable(LuaRandom, TAG_RANDOM);
             hasher.* = .{ .algorithm = @unionInit(LuaRandom.Algorithm, name, .init(@intCast(seed))) };
             return 1;

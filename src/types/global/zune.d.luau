@@ -1396,7 +1396,7 @@ declare class Random
 end
 
 type RandomConstructor = {
-    new: (seed: number) -> Random,
+    new: (seed: number?) -> Random,
 }
 
 export type RandomLib = RandomConstructor & {
