@@ -11,11 +11,11 @@ describe("DateTime", function()
         local date = datetime.now();
 
         expect({
-            UnixTimestamp = date.UnixTimestamp,
-            UnixTimestampMillis = date.UnixTimestampMillis,
+            timestamp = date.timestamp,
+            timestamp_millis = date.timestamp_millis,
         }).toBe(expect.similar({
-            UnixTimestamp = expect.type("number"),
-            UnixTimestampMillis = expect.type("number"),
+            timestamp = expect.type("number"),
+            timestamp_millis = expect.type("number"),
         }));
     end)
 
@@ -24,55 +24,55 @@ describe("DateTime", function()
             local date = datetime.parse("04 Dec 1995 00:12:00 GMT");
     
             expect({
-                UnixTimestamp = date.UnixTimestamp,
-                UnixTimestampMillis = date.UnixTimestampMillis,
+                timestamp = date.timestamp,
+                timestamp_millis = date.timestamp_millis,
             }).toBe(expect.similar({
-                UnixTimestamp = 818035920,
-                UnixTimestampMillis = 818035920000,
+                timestamp = 818035920,
+                timestamp_millis = 818035920000,
             }));
         end)
         test("EST", function()
             local date = datetime.parse("04 Dec 1995 00:12:00 EST");
     
             expect({
-                UnixTimestamp = date.UnixTimestamp,
-                UnixTimestampMillis = date.UnixTimestampMillis,
+                timestamp = date.timestamp,
+                timestamp_millis = date.timestamp_millis,
             }).toBe(expect.similar({
-                UnixTimestamp = 818053920,
-                UnixTimestampMillis = 818053920000,
+                timestamp = 818053920,
+                timestamp_millis = 818053920000,
             }));
         end)
         test("GMT Long", function()
             local date = datetime.parse("Mon, 04 Dec 1995 00:12:00 GMT");
     
             expect({
-                UnixTimestamp = date.UnixTimestamp,
-                UnixTimestampMillis = date.UnixTimestampMillis,
+                timestamp = date.timestamp,
+                timestamp_millis = date.timestamp_millis,
             }).toBe(expect.similar({
-                UnixTimestamp = 818035920,
-                UnixTimestampMillis = 818035920000,
+                timestamp = 818035920,
+                timestamp_millis = 818035920000,
             }));
         end)
         test("EST Long", function()
             local date = datetime.parse("Mon, 04 Dec 1995 00:12:00 EST");
     
             expect({
-                UnixTimestamp = date.UnixTimestamp,
-                UnixTimestampMillis = date.UnixTimestampMillis,
+                timestamp = date.timestamp,
+                timestamp_millis = date.timestamp_millis,
             }).toBe(expect.similar({
-                UnixTimestamp = 818053920,
-                UnixTimestampMillis = 818053920000,
+                timestamp = 818053920,
+                timestamp_millis = 818053920000,
             }));
         end)
         test("ISO8601 UTC", function()
             local date = datetime.parse("1995-12-04T00:12:00Z");
     
             expect({
-                UnixTimestamp = date.UnixTimestamp,
-                UnixTimestampMillis = date.UnixTimestampMillis,
+                timestamp = date.timestamp,
+                timestamp_millis = date.timestamp_millis,
             }).toBe(expect.similar({
-                UnixTimestamp = 818035920,
-                UnixTimestampMillis = 818035920000,
+                timestamp = 818035920,
+                timestamp_millis = 818035920000,
             }));
         end)
     end)
@@ -81,11 +81,11 @@ describe("DateTime", function()
         local date = datetime.fromIsoDate("1995-12-04T00:12:00Z");
 
         expect({
-            UnixTimestamp = date.UnixTimestamp,
-            UnixTimestampMillis = date.UnixTimestampMillis,
+            timestamp = date.timestamp,
+            timestamp_millis = date.timestamp_millis,
         }).toBe(expect.similar({
-            UnixTimestamp = 818035920,
-            UnixTimestampMillis = 818035920000,
+            timestamp = 818035920,
+            timestamp_millis = 818035920000,
         }));
     end)
 
@@ -149,27 +149,27 @@ describe("DateTime", function()
         end)
     end)
 
-    describe("UnixTimestamp", function()
+    describe("Unix Timestamp", function()
         test("Seconds", function()
             local date = datetime.fromUnixTimestamp(818035920);
     
             expect({
-                UnixTimestamp = date.UnixTimestamp,
-                UnixTimestampMillis = date.UnixTimestampMillis,
+                timestamp = date.timestamp,
+                timestamp_millis = date.timestamp_millis,
             }).toBe(expect.similar({
-                UnixTimestamp = 818035920,
-                UnixTimestampMillis = 818035920000,
+                timestamp = 818035920,
+                timestamp_millis = 818035920000,
             }));
         end)
         test("Milliseconds", function()
             local date = datetime.fromUnixTimestampMillis(818035920000);
     
             expect({
-                UnixTimestamp = date.UnixTimestamp,
-                UnixTimestampMillis = date.UnixTimestampMillis,
+                timestamp = date.timestamp,
+                timestamp_millis = date.timestamp_millis,
             }).toBe(expect.similar({
-                UnixTimestamp = 818035920,
-                UnixTimestampMillis = 818035920000,
+                timestamp = 818035920,
+                timestamp_millis = 818035920000,
             }));
         end)
     end)

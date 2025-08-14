@@ -143,15 +143,10 @@ pub const LuaDatetime = struct {
 
     pub const __namecall = MethodMap.CreateNamecallMap(LuaDatetime, TAG_DATETIME, .{
         .{ "toIsoDate", lua_toIsoDate },
-        .{ "ToIsoDate", lua_toIsoDate },
         .{ "toLocalTime", lua_toLocalTime },
-        .{ "ToLocalTime", lua_toLocalTime },
         .{ "toUniversalTime", lua_toUniversalTime },
-        .{ "ToUniversalTime", lua_toUniversalTime },
         .{ "formatLocalTime", lua_formatLocalTime },
-        .{ "FormatLocalTime", lua_formatLocalTime },
         .{ "formatUniversalTime", lua_formatUniversalTime },
-        .{ "FormatUniversalTime", lua_formatUniversalTime },
     });
 
     pub fn __index(L: *VM.lua.State) !i32 {
@@ -160,10 +155,10 @@ pub const LuaDatetime = struct {
 
         const index = L.Lcheckstring(2);
 
-        if (std.mem.eql(u8, index, "unixTimestamp") or std.mem.eql(u8, index, "UnixTimestamp")) {
+        if (std.mem.eql(u8, index, "timestamp")) {
             L.pushnumber(@floatFromInt(ptr.datetime.toUnix(.second)));
             return 1;
-        } else if (std.mem.eql(u8, index, "unixTimestampMillis") or std.mem.eql(u8, index, "UnixTimestampMillis")) {
+        } else if (std.mem.eql(u8, index, "timestamp_millis")) {
             L.pushnumber(@floatFromInt(ptr.datetime.toUnix(.millisecond)));
             return 1;
         }
