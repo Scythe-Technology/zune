@@ -561,6 +561,16 @@ const AstSerializer = struct {
 
         try self.L.Zsetfield(-1, "tag", "group");
         try self.L.Zsetfield(-1, "location", node.location);
+
+        try self.serializeToken(node.location.begin, "(", null);
+        try self.L.rawsetfield(-2, "openParens");
+
+        try node.expr.visit(self);
+        try self.L.rawsetfield(-2, "expression");
+
+        try self.serializeToken(.{ .line = node.location.end.line, .column = node.location.end.column - 1 }, ")", null);
+        try self.L.rawsetfield(-2, "closeParens");
+
         return false;
     }
     pub fn visitExprConstantNil(self: *@This(), node: *Ast.ExprConstantNil) !bool {
