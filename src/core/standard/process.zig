@@ -536,7 +536,7 @@ fn lua_onsignal(L: *VM.lua.State) !i32 {
     return 0;
 }
 
-fn lua_getCwd(L: *VM.lua.State) !i32 {
+fn lua_cwd(L: *VM.lua.State) !i32 {
     const allocator = luau.getallocator(L);
     const path = try std.fs.cwd().realpathAlloc(allocator, ".");
     defer allocator.free(path);
@@ -559,7 +559,7 @@ pub fn loadLib(L: *VM.lua.State, args: []const []const u8) !void {
     try L.rawsetfield(-2, "env");
     try L.Zsetfieldfn(-1, "loadEnv", lua_loadEnv);
 
-    try L.Zsetfieldfn(-1, "getCwd", lua_getCwd);
+    try L.Zsetfieldfn(-1, "cwd", lua_cwd);
 
     try L.Zsetfieldfn(-1, "exit", lua_exit);
     try L.Zsetfieldfn(-1, "run", lua_run);

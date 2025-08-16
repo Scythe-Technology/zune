@@ -266,7 +266,7 @@ type ProcessLib = {
     args: { string },
     env: { [string]: string },
     loadEnv: () -> { [string]: string },
-    getCwd: () ->string,
+    cwd: () -> string,
     create: (exec: string, args: {string}?, procOpts: ProcessOptions?) -> ProcessChild,
     run: (exec: string, args: {string}?, procOpts: ProcessOptions?) -> ProcessRunResult,
     exit: (code: number) -> never,
