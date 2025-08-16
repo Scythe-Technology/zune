@@ -211,9 +211,19 @@ fn SleepOrder(_: void, a: SleepingThread, b: SleepingThread) std.math.Order {
 
 const SleepingQueue = std.PriorityQueue(SleepingThread, void, SleepOrder);
 pub const CompletionLinkedList = struct {
-    allocator: std.mem.Allocator,
     list: Lists.DoublyLinkedList = .{},
-    loose: bool = false,
+    allocator: if (builtin.mode == .Debug) std.mem.Allocator else void,
+
+    pub fn init(allocator: std.mem.Allocator) CompletionLinkedList {
+        return .{
+            .allocator = if (builtin.mode == .Debug) allocator else undefined,
+        };
+    }
+
+    pub fn deinit(self: *CompletionLinkedList, allocator: std.mem.Allocator) void {
+        std.debug.assert(self.list.len == 0);
+        allocator.destroy(self);
+    }
 
     pub const Node = struct {
         completion: xev.Dynamic.Completion,
@@ -225,19 +235,11 @@ pub const CompletionLinkedList = struct {
         }
     };
 
-    pub fn deinit(self: *CompletionLinkedList) void {
-        self.loose = true;
-        if (self.list.len == 0)
-            self.allocator.destroy(self);
-    }
-
     pub fn remove(self: *CompletionLinkedList, node: *Node) void {
         self.list.remove(&node.node);
         if (comptime builtin.mode == .Debug) {
             self.allocator.destroy(node.tracker.?);
         }
-        if (self.loose and self.list.len == 0)
-            self.allocator.destroy(self);
     }
 
     pub fn append(self: *CompletionLinkedList, node: *Node) void {

@@ -1333,11 +1333,12 @@ const __index = MethodMap.CreateStaticIndexMap(Socket, TAG_NET_SOCKET, .{
     .{ "isOpen", lua_isOpen },
 });
 
-pub fn __dtor(_: *VM.lua.State, self: *Socket) void {
+pub fn __dtor(L: *VM.lua.State, self: *Socket) void {
+    const allocator = luau.getallocator(L);
     if (self.open != .closed)
         closesocket(self.socket);
     self.tls_context.deinit();
-    self.list.deinit();
+    self.list.deinit(allocator);
 }
 
 pub inline fn load(L: *VM.lua.State) !void {
@@ -1355,7 +1356,7 @@ pub fn push(L: *VM.lua.State, value: std.posix.socket_t, open: OpenCase) !*Socke
     const allocator = luau.getallocator(L);
     const self = try L.newuserdatataggedwithmetatable(Socket, TAG_NET_SOCKET);
     const list = try allocator.create(Scheduler.CompletionLinkedList);
-    list.* = .{ .allocator = allocator };
+    list.* = .init(allocator);
     self.* = .{
         .open = open,
         .socket = value,

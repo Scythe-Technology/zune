@@ -780,10 +780,11 @@ const __index = MethodMap.CreateStaticIndexMap(File, TAG_FS_FILE, .{
     .{ "close", lua_close },
 });
 
-pub fn __dtor(_: *VM.lua.State, self: *File) void {
+pub fn __dtor(L: *VM.lua.State, self: *File) void {
+    const allocator = luau.getallocator(L);
     if (self.mode.isOpen() and self.mode.close)
         self.file.close();
-    self.list.deinit();
+    self.list.deinit(allocator);
 }
 
 pub inline fn load(L: *VM.lua.State) !void {
@@ -801,7 +802,7 @@ pub fn push(L: *VM.lua.State, file: std.fs.File, kind: FileKind, mode: OpenMode)
     const allocator = luau.getallocator(L);
     const self = try L.newuserdatataggedwithmetatable(File, TAG_FS_FILE);
     const list = try allocator.create(Scheduler.CompletionLinkedList);
-    list.* = .{ .allocator = allocator };
+    list.* = .init(allocator);
     self.* = .{
         .file = file,
         .kind = kind,
