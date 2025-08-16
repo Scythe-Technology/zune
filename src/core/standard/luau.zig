@@ -1720,7 +1720,7 @@ const AstSerializer = struct {
 
             if (typeNode.is(.type_optional)) {
                 try self.serializeToken(typeNode.location.begin, "?", 1);
-                try self.L.Zsetfield(-2, "tag", "optional");
+                try self.L.Zsetfield(-1, "tag", "optional");
                 try self.L.rawsetfield(-2, "node");
             } else {
                 try typeNode.visit(self);
