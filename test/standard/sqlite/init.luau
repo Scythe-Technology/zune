@@ -33,7 +33,10 @@ describe("SQLite", function()
     test("Insert", function()
         local db = sqlite.open();
 
-        db:exec("CREATE TABLE users(id TEXT PRIMARY KEY, age FLOAT)");
+        expect(db:exec("CREATE TABLE users(id TEXT PRIMARY KEY, age FLOAT)")).toBe(expect.similar({
+            last_insert_row_id = 0,
+            changes = 0,
+        }));
 
         do
             local query = db:query("INSERT INTO users VALUES (:id, :age)");
@@ -75,7 +78,10 @@ describe("SQLite", function()
     test("Transaction", function()
         local db = sqlite.open();
 
-        db:exec("CREATE TABLE users(id TEXT PRIMARY KEY, age FLOAT)");
+        expect(db:exec("CREATE TABLE users(id TEXT PRIMARY KEY, age FLOAT)")).toBe(expect.similar({
+            last_insert_row_id = 0,
+            changes = 0,
+        }));
         local insert_query = db:query("INSERT INTO users VALUES (:id, :age)");
         local select_query = db:query("SELECT id, age FROM users");
 
@@ -113,15 +119,19 @@ describe("SQLite", function()
             { id = "c", age = nil },
         }));
 
-        pcall(insert, {
-            {
-                [":id"] = "d",
-                [":age"] = 28,
-            },
-            {
-                [":id"] = "e",
-            }
-        })
+        do
+            local ok, err =pcall(insert, {
+                {
+                    [":id"] = "d",
+                    [":age"] = 28,
+                },
+                {
+                    [":id"] = "e",
+                }
+            })
+            expect(ok).toBe(false);
+            expect(err:find("Oops", 1, true) ~= nil).toBeTruthy();
+        end
 
         expect(select_query:all()).toBe(expect.similar({
             { id = "a", age = 25 },
@@ -172,7 +182,7 @@ describe("SQLite", function()
             }
         })
         expect(ok).toBe(false);
-        expect(err).toBe("Oops");
+        expect(err:find("Oops", 1, true)).toBeTruthy();
 
         expect(select_query:all()).toBe(expect.similar({
             { id = "a", age = 25 },
@@ -190,10 +200,22 @@ describe("SQLite", function()
     test("Count", function()
         local db = sqlite.open();
 
-        db:exec("CREATE TABLE users(id TEXT PRIMARY KEY, age FLOAT)");
-        db:exec(`INSERT INTO users VALUES("a", 25)`);
-        db:exec(`INSERT INTO users VALUES("b", 27)`);
-        db:exec(`INSERT INTO users VALUES("c", NULL)`);
+        expect(db:exec("CREATE TABLE users(id TEXT PRIMARY KEY, age FLOAT)")).toBe(expect.similar({
+            last_insert_row_id = 0,
+            changes = 0,
+        }));
+        expect(db:exec(`INSERT INTO users VALUES("a", 25)`)).toBe(expect.similar({
+            last_insert_row_id = 1,
+            changes = 1,
+        }));
+        expect(db:exec(`INSERT INTO users VALUES("b", 27)`)).toBe(expect.similar({
+            last_insert_row_id = 2,
+            changes = 1,
+        }));
+        expect(db:exec(`INSERT INTO users VALUES("c", NULL)`)).toBe(expect.similar({
+            last_insert_row_id = 3,
+            changes = 1,
+        }));
 
         do
             local query = db:query("SELECT age FROM users");

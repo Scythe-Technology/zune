@@ -1358,7 +1358,7 @@ end
 declare class SQLite3Database
     function transaction(self, callback: (...any) -> (), kind: ("deferred" | "immediate" | "exclusive")?): ((...any) -> ())
     function query(self, query: string): SQLite3Statement
-    function exec(self, query: string, args: SQLite3Values?): ()
+    function exec(self, query: string, args: SQLite3Values?): SQLite3Result
     function close(self): ()
 end
 
