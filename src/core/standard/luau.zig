@@ -1550,7 +1550,7 @@ const AstSerializer = struct {
                 try self.L.rawsetfield(-2, "colon");
 
                 try node.indexer.?.resultType.visit(self);
-                try self.L.rawsetfield(-2, "type");
+                try self.L.rawsetfield(-2, "value");
 
                 if (item.separator.to()) |separator| {
                     try self.serializeToken(item.separatorPosition.to().?, if (separator == .comma) "," else ";", null);
