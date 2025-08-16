@@ -716,10 +716,11 @@ const AstSerializer = struct {
             try self.L.rawsetfield(-2, "openGenerics");
 
             const commas = cstNode.genericsCommaPositions;
-            try self.serializePunctuated(node.generics, commas.slice(), ",");
+            const slice = commas.slice();
+            try self.serializePunctuated(node.generics, slice, ",");
             try self.L.rawsetfield(-2, "generics");
 
-            try self.serializePunctuated(node.genericPacks, commas.slice()[node.generics.size..], ",");
+            try self.serializePunctuated(node.genericPacks, if (slice.len < node.generics.size) slice else slice[node.generics.size..], ",");
             try self.L.rawsetfield(-2, "genericPacks");
 
             try self.serializeToken(cstNode.closeGenericsPosition, ">", null);
@@ -1357,10 +1358,11 @@ const AstSerializer = struct {
             try self.L.rawsetfield(-2, "openGenerics");
 
             const commas = cstNode.genericsCommaPositions;
-            try self.serializePunctuated(node.generics, commas.slice(), ",");
+            const slice = commas.slice();
+            try self.serializePunctuated(node.generics, slice, ",");
             try self.L.rawsetfield(-2, "generics");
 
-            try self.serializePunctuated(node.genericPacks, commas.slice()[node.generics.size..], ",");
+            try self.serializePunctuated(node.genericPacks, if (slice.len < node.generics.size) slice else slice[node.generics.size..], ",");
             try self.L.rawsetfield(-2, "genericPacks");
 
             try self.serializeToken(cstNode.genericsClosePosition, ">", null);
@@ -1615,10 +1617,11 @@ const AstSerializer = struct {
             try self.L.rawsetfield(-2, "openGenerics");
 
             const commas = cstNode.genericsCommaPositions;
-            try self.serializePunctuated(node.generics, commas.slice(), ",");
+            const slice = commas.slice();
+            try self.serializePunctuated(node.generics, slice, ",");
             try self.L.rawsetfield(-2, "generics");
 
-            try self.serializePunctuated(node.genericPacks, commas.slice()[node.generics.size..], ",");
+            try self.serializePunctuated(node.genericPacks, if (slice.len < node.generics.size) slice else slice[node.generics.size..], ",");
             try self.L.rawsetfield(-2, "genericPacks");
 
             try self.serializeToken(cstNode.closeGenericsPosition, ">", null);
@@ -1821,7 +1824,7 @@ const AstSerializer = struct {
         try self.L.Zsetfield(-1, "tag", "variadic");
         try self.L.Zsetfield(-1, "location", node.location);
 
-        if (forVarArg) {
+        if (!forVarArg) {
             try self.serializeToken(node.location.begin, "...", null);
             try self.L.rawsetfield(-2, "ellipsis");
         }
