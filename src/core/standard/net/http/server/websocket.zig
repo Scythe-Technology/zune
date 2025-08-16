@@ -226,7 +226,7 @@ pub const __index = MethodMap.CreateStaticIndexMap(Self, TAG_NET_HTTP_WEBSOCKET,
     .{ "isConnected", lua_isConnected },
 });
 
-pub fn __dtor(self: *Self) void {
+pub fn __dtor(_: *VM.lua.State, self: *Self) void {
     self.closed = true;
     var it: ?*Lists.DoublyLinkedList.Node = self.message_queue.first;
     while (it) |node| {
