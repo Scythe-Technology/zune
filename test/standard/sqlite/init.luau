@@ -97,9 +97,10 @@ describe("SQLite", function()
                     error("Oops")
                 end
             end
+            return args;
         end)
 
-        insert({
+        local input_args_0 = {
             {
                 [":id"] = "a",
                 [":age"] = 25,
@@ -111,7 +112,11 @@ describe("SQLite", function()
             {
                 [":id"] = "c",
             }
-        })
+        };
+        local res_0 = {insert(input_args_0)};
+        expect(#res_0).toBe(1);
+        expect(res_0[1]).toBe(expect.type("table"));
+        expect(res_0[1]).toBe(input_args_0);
 
         expect(select_query:all()).toBe(expect.similar({
             { id = "a", age = 25 },
@@ -120,7 +125,7 @@ describe("SQLite", function()
         }));
 
         do
-            local ok, err =pcall(insert, {
+            local ok, err = pcall(insert, {
                 {
                     [":id"] = "d",
                     [":age"] = 28,
@@ -139,7 +144,8 @@ describe("SQLite", function()
             { id = "c", age = nil },
         }));
 
-        insert({
+
+        local input_args_1 = {
             {
                 [":id"] = "d",
             },
@@ -152,7 +158,11 @@ describe("SQLite", function()
             {
                 [":id"] = "g",
             }
-        })
+        };
+        local res_1 = {insert(input_args_1)};
+        expect(#res_1).toBe(1);
+        expect(res_1[1]).toBe(expect.type("table"));
+        expect(res_1[1]).toBe(input_args_1);
 
         expect(select_query:all()).toBe(expect.similar({
             { id = "a", age = 25 },

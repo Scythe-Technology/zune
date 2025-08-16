@@ -1355,8 +1355,10 @@ declare class SQLite3Statement
     function finalize(self): ()
 end
 
+type TransactionFn = <A..., R...>(self: SQLite3Database, callback: ((A...) -> R...), kind: ("deferred" | "immediate" | "exclusive")?) -> ((A...) -> R...)
+
 declare class SQLite3Database
-    function transaction(self, callback: (...any) -> (), kind: ("deferred" | "immediate" | "exclusive")?): ((...any) -> ())
+    transaction: TransactionFn
     function query(self, query: string): SQLite3Statement
     function exec(self, query: string, args: SQLite3Values?): SQLite3Result
     function close(self): ()

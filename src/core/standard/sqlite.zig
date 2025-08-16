@@ -218,7 +218,9 @@ const LuaDatabase = struct {
             L.xpush(state, 1);
             _ = Scheduler.resumeStateError(state, null) catch {};
         } else {
-            _ = Scheduler.resumeState(state, null, 0) catch {};
+            const results = L.gettop();
+            L.xmove(state, @truncate(results));
+            _ = Scheduler.resumeState(state, null, @intCast(results)) catch {};
         }
     }
 
@@ -282,7 +284,9 @@ const LuaDatabase = struct {
                 else => return L.Zerrorf("SQLite Error ({}): {s}", .{ err, ptr.db.getErrorMessage() }),
             };
         }
-        return 0;
+        const results = ML.gettop();
+        ML.xmove(L, @truncate(results));
+        return @intCast(results);
     }
 
     pub fn lua_query(self: *LuaDatabase, L: *VM.lua.State) !i32 {
