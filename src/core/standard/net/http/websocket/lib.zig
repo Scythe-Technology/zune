@@ -15,7 +15,7 @@ const Lists = Zune.Utils.Lists;
 const Response = @import("../response.zig");
 const WebSocket = @import("../websocket.zig");
 
-const TAG_NET_HTTP_WEBSOCKET = Zune.tagged.Tags.get("NET_HTTP_WEBSOCKET").?;
+const TAG_NET_HTTP_WEBSOCKET = Zune.tagged.Tags.get("NET_HTTP_CLIENTWEBSOCKET").?;
 
 const VM = luau.VM;
 
@@ -1355,7 +1355,7 @@ pub fn lua_websocket(L: *VM.lua.State) !i32 {
 pub fn lua_load(L: *VM.lua.State) !void {
     _ = try L.Znewmetatable(@typeName(Self), .{
         .__metatable = "Metatable is locked",
-        .__type = "ClientWebSocket",
+        .__type = "HTTPClientWebSocket",
     });
     try __index(L, -1);
     L.setreadonly(-1, true);

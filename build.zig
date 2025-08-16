@@ -113,11 +113,6 @@ pub fn build(b: *std.Build) !void {
     const prebuild_step = b.step("prebuild", "Setup project for build");
 
     try prebuild(b, prebuild_step);
-    const lib = b.addInstallDirectory(.{
-        .source_dir = b.path("lib"),
-        .install_dir = .bin,
-        .install_subdir = "lib",
-    });
 
     var version = try getPackageVersion(b);
     if (std.mem.indexOf(u8, version, "-dev")) |_| {
@@ -140,7 +135,6 @@ pub fn build(b: *std.Build) !void {
         },
     });
 
-    exe.step.dependOn(&lib.step);
     exe.step.dependOn(prebuild_step);
 
     buildZune(

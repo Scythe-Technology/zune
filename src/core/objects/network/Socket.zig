@@ -137,7 +137,7 @@ pub fn AddressToString(buf: []u8, address: std.net.Address) []const u8 {
 
 const AsyncSendContext = struct {
     completion: Scheduler.CompletionLinkedList.Node = .{
-        .data = .{},
+        .completion = .{},
     },
     ref: Scheduler.ThreadRef,
     buffer: []u8,
@@ -286,7 +286,7 @@ const AsyncSendContext = struct {
 
 const AsyncSendMsgContext = struct {
     completion: Scheduler.CompletionLinkedList.Node = .{
-        .data = .{},
+        .completion = .{},
     },
     state: xev.UDP.State,
     ref: Scheduler.ThreadRef,
@@ -333,7 +333,7 @@ const AsyncSendMsgContext = struct {
 
 const AsyncRecvContext = struct {
     completion: Scheduler.CompletionLinkedList.Node = .{
-        .data = .{},
+        .completion = .{},
     },
     ref: Scheduler.ThreadRef,
     buffer: []u8,
@@ -498,7 +498,7 @@ const AsyncRecvContext = struct {
 
 const AsyncRecvMsgContext = struct {
     completion: Scheduler.CompletionLinkedList.Node = .{
-        .data = .{},
+        .completion = .{},
     },
     state: xev.UDP.State,
     ref: Scheduler.ThreadRef,
@@ -553,7 +553,7 @@ const AsyncRecvMsgContext = struct {
 
 const AsyncAcceptContext = struct {
     completion: Scheduler.CompletionLinkedList.Node = .{
-        .data = .{},
+        .completion = .{},
     },
     ref: Scheduler.ThreadRef,
     list: *Scheduler.CompletionLinkedList,
@@ -760,7 +760,7 @@ const AsyncAcceptContext = struct {
 
 const AsyncConnectContext = struct {
     completion: Scheduler.CompletionLinkedList.Node = .{
-        .data = .{},
+        .completion = .{},
     },
     ref: Scheduler.ThreadRef,
     list: *Scheduler.CompletionLinkedList,
@@ -965,7 +965,7 @@ fn lua_send(self: *Socket, L: *VM.lua.State) !i32 {
 
     ptr.write(
         &scheduler.loop,
-        &ptr.completion.data,
+        &ptr.completion.completion,
         socket,
         AsyncSendContext.complete,
     );
@@ -1011,7 +1011,7 @@ fn lua_sendMsg(self: *Socket, L: *VM.lua.State) !i32 {
 
     socket.write(
         &scheduler.loop,
-        &ptr.completion.data,
+        &ptr.completion.completion,
         &ptr.state,
         address,
         .{ .slice = buf },
@@ -1055,7 +1055,7 @@ fn lua_recv(self: *Socket, L: *VM.lua.State) !i32 {
 
     ptr.read(
         &scheduler.loop,
-        &ptr.completion.data,
+        &ptr.completion.completion,
         socket,
         AsyncRecvContext.complete,
     );
@@ -1091,7 +1091,7 @@ fn lua_recvMsg(self: *Socket, L: *VM.lua.State) !i32 {
 
     socket.read(
         &scheduler.loop,
-        &ptr.completion.data,
+        &ptr.completion.completion,
         &ptr.state,
         .{ .slice = buf },
         AsyncRecvMsgContext,
@@ -1120,7 +1120,7 @@ fn lua_accept(self: *Socket, L: *VM.lua.State) !i32 {
 
     socket.accept(
         &scheduler.loop,
-        &ptr.completion.data,
+        &ptr.completion.completion,
         AsyncAcceptContext,
         ptr,
         AsyncAcceptContext.complete,
@@ -1168,7 +1168,7 @@ fn lua_connect(self: *Socket, L: *VM.lua.State) !i32 {
 
     socket.connect(
         &scheduler.loop,
-        &ptr.completion.data,
+        &ptr.completion.completion,
         address,
         AsyncConnectContext,
         ptr,
@@ -1274,9 +1274,9 @@ fn lua_close(self: *Socket, L: *VM.lua.State) !i32 {
         switch (comptime builtin.os.tag) {
             .windows => _ = std.os.windows.kernel32.CancelIoEx(self.socket, null),
             else => {
-                var node = self.list.first;
+                var node = self.list.list.first;
                 while (node) |n| {
-                    scheduler.cancelAsyncTask(&n.data);
+                    scheduler.cancelAsyncTask(&Scheduler.CompletionLinkedList.Node.from(n).completion);
                     node = n.next;
                 }
             },
@@ -1338,7 +1338,7 @@ pub fn __dtor(L: *VM.lua.State, self: *Socket) void {
     if (self.open != .closed)
         closesocket(self.socket);
     self.tls_context.deinit();
-    allocator.destroy(self.list);
+    self.list.deinit(allocator);
 }
 
 pub inline fn load(L: *VM.lua.State) !void {
@@ -1356,7 +1356,7 @@ pub fn push(L: *VM.lua.State, value: std.posix.socket_t, open: OpenCase) !*Socke
     const allocator = luau.getallocator(L);
     const self = try L.newuserdatataggedwithmetatable(Socket, TAG_NET_SOCKET);
     const list = try allocator.create(Scheduler.CompletionLinkedList);
-    list.* = .{};
+    list.* = .init(allocator);
     self.* = .{
         .open = open,
         .socket = value,

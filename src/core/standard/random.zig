@@ -89,26 +89,34 @@ const LuaRandom = struct {
         return 1;
     }
 
+    fn lua_nextBoolean(self: *LuaRandom, L: *VM.lua.State) !i32 {
+        L.pushboolean(self.algorithm.random().boolean());
+        return 1;
+    }
+
     fn lua_clone(self: *LuaRandom, L: *VM.lua.State) !i32 {
         const random = try L.newuserdatataggedwithmetatable(LuaRandom, TAG_RANDOM);
-        random.* = .{
-            .algorithm = self.algorithm,
-        };
+        random.* = .{ .algorithm = self.algorithm };
         return 1;
     }
 
     pub const __index = MethodMap.CreateStaticIndexMap(LuaRandom, TAG_RANDOM, .{
         .{ "nextInteger", lua_nextInteger },
-        .{ "NextInteger", lua_nextInteger },
         .{ "nextNumber", lua_nextNumber },
-        .{ "NextNumber", lua_nextInteger },
+        .{ "nextBoolean", lua_nextBoolean },
         .{ "clone", lua_clone },
-        .{ "Clone", lua_clone },
     });
 };
 
+fn defaultSeed(L: *VM.lua.State) u64 {
+    var default_seed: u64 = @intFromPtr(L);
+    default_seed ^= @as(u64, @bitCast(std.time.timestamp()));
+    default_seed ^= @intFromFloat(VM.lperf.clock());
+    return default_seed;
+}
+
 fn lua_newLuauPcg32(L: *VM.lua.State) !i32 {
-    const seed = try L.Zcheckvalue(u32, 1, null);
+    const seed = try L.Zcheckvalue(?u32, 1, null) orelse defaultSeed(L);
 
     var pcg32: std.Random.Pcg = .{
         .s = 0,
@@ -128,7 +136,7 @@ fn lua_newLuauPcg32(L: *VM.lua.State) !i32 {
 fn NewGenerator(comptime name: []const u8) fn (L: *VM.lua.State) anyerror!i32 {
     return struct {
         fn inner(L: *VM.lua.State) !i32 {
-            const seed = try L.Zcheckvalue(u32, 1, null);
+            const seed: u64 = try L.Zcheckvalue(?u32, 1, null) orelse defaultSeed(L);
             const hasher = try L.newuserdatataggedwithmetatable(LuaRandom, TAG_RANDOM);
             hasher.* = .{ .algorithm = @unionInit(LuaRandom.Algorithm, name, .init(@intCast(seed))) };
             return 1;

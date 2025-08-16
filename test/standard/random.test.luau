@@ -7,6 +7,17 @@ local expect = testing.expect;
 local test = testing.test;
 
 local function randomTest(impl: any)
+    do
+        local rand: Random = impl.new();
+        for i = 1, 20 do
+            rand:nextInteger(0, 10);
+        end
+        for i = 1, 20 do
+            rand:nextNumber(0, 10);
+        end
+        expect(rand:nextBoolean()).toBe(expect.type("boolean"));
+    end
+    
     local rand: Random = impl.new(0);
     for i = 1, 20 do
         local result = rand:nextInteger(0, 10);

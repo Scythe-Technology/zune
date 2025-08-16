@@ -508,12 +508,6 @@ type TaskLib = {
 --[======[ Task ]======]--
 
 --[======[ Network ]======]--
-declare class NetHttpWebSocket
-    function isConnected(self): boolean
-    function send(self, message: string | buffer): ()
-    function close(self, code: number?): ()
-end
-
 declare class NetworkSocket
     function send(self, data: string | buffer, offset: number?): number
     function sendMsg(self, port: number, address: string, data: string | buffer, offset: number?): number
@@ -529,10 +523,16 @@ declare class NetworkSocket
     function isOpen(self): boolean
 end
 
-declare class NetHttpServer
+declare class HttpServer
     function stop(self): ()
     function getPort(self): number
     function isRunning(self): boolean
+end
+
+declare class HttpWebSocket
+    function isConnected(self): boolean
+    function send(self, message: string | buffer): ()
+    function close(self, code: number?): ()
 end
 
 export type NetworkAddress = {
@@ -541,25 +541,25 @@ export type NetworkAddress = {
     address: string,
 }
 
-export type ServerRequest = {
+export type HttpServerRequest = {
     method: string,
     path: string,
-    query: {[string]: string},
+    query: {[string | number]: string},
     headers: {[string]: string},
     body: string?,
 }
 
-export type ServerResponse = {
+export type HttpServerResponse = {
     status_code: number,
     headers: {[string]: string}?,
-    body: string | buffer,
+    body: (string | buffer)?,
 }
 
 export type ServerWebSocketHandlers = {
-    upgrade: ((request: ServerRequest) -> boolean)?,
-    open: ((websocket: NetHttpWebSocket) -> ())?,
-    message: ((websocket: NetHttpWebSocket, message: string) -> ())?,
-    close: ((websocket: NetHttpWebSocket, code: number) -> ())?,
+    upgrade: ((request: HttpServerRequest) -> boolean)?,
+    open: ((websocket: HttpWebSocket) -> ())?,
+    message: ((websocket: HttpWebSocket, message: string) -> ())?,
+    close: ((websocket: HttpWebSocket, code: number) -> ())?,
 }
 
 export type ServeOptions = {
@@ -570,11 +570,11 @@ export type ServeOptions = {
     max_body_size: number?,
     client_timeout: number?,
     max_connections: number?,
-    request: (request: ServerRequest) -> string | buffer | ServerResponse,
+    request: (request: HttpServerRequest) -> string | buffer | HttpServerResponse,
     websocket: ServerWebSocketHandlers?,
 }
 
-export type Response<T> = {
+export type HttpResponse<T> = {
     ok: boolean,
     status_code: number,
     status_reason: string,
@@ -592,10 +592,10 @@ export type RequestOptions = {
 export type WebSocketOptions = {
     protocols: {string}?,
     timeout: number?,
-    accept: ((socket: NetHttpWebSocket, request: ServerResponse) -> boolean)?,
-    open: ((socket: NetHttpWebSocket) -> ())?,
-    close: ((socket: NetHttpWebSocket, close: number?) -> ())?,
-    message: ((socket: NetHttpWebSocket, message: string) -> ())?,
+    accept: ((socket: HttpWebSocket, request: HttpServerResponse) -> boolean)?,
+    open: ((socket: HttpWebSocket) -> ())?,
+    close: ((socket: HttpWebSocket, close: number?) -> ())?,
+    message: ((socket: HttpWebSocket, message: string) -> ())?,
 }
 
 type NetworkAddressFamily = {
@@ -811,12 +811,12 @@ type NetworkLib = {
     getAddressList: (name: string, port: number) -> {NetworkAddress},
 
     http: {
-        serve: (opts: ServeOptions) -> NetHttpServer,
+        serve: (opts: ServeOptions) -> HttpServer,
         request:
-            & ((host: string, opts: (RequestOptions & { response_body_type: "string"? })?) -> Response<string>)
-            & ((host: string, opts: (RequestOptions & { response_body_type: "buffer" })) -> Response<buffer>)
-            & ((host: string, opts: (RequestOptions | { response_body_type: "string" | "buffer" | nil })?) -> Response<string | buffer>),
-        websocket: (host: string, opts: WebSocketOptions) -> NetHttpWebSocket,
+            & ((host: string, opts: (RequestOptions & { response_body_type: "string"? })?) -> HttpResponse<string>)
+            & ((host: string, opts: (RequestOptions & { response_body_type: "buffer" })) -> HttpResponse<buffer>)
+            & ((host: string, opts: (RequestOptions | { response_body_type: "string" | "buffer" | nil })?) -> HttpResponse<string | buffer>),
+        websocket: (host: string, opts: WebSocketOptions) -> HttpWebSocket,
     }
 }
 --[======[ Network ]======]--
@@ -1205,20 +1205,13 @@ export type TimeDictionary = {
 }
 
 declare class DateTime
-    unixTimestamp: number
-    unixTimestampMillis: number
-    UnixTimestamp: number
-    UnixTimestampMillis: number
+    timestamp: number
+    timestamp_millis: number
     function toLocalTime(self): TimeDictionary
-    function ToLocalTime(self): TimeDictionary
     function toUniversalTime(self): TimeDictionary
-    function ToUniversalTime(self): TimeDictionary
     function toIsoDate(self): string
-    function ToIsoDate(self): string
     function formatLocalTime(self, format: string): string
-    function FormatLocalTime(self, format: string): string
     function formatUniversalTime(self, format: string): string
-    function FormatUniversalTime(self, format: string): string
 end
 
 type DatetimeLib = {
@@ -1362,10 +1355,12 @@ declare class SQLite3Statement
     function finalize(self): ()
 end
 
+type TransactionFn = <A..., R...>(self: SQLite3Database, callback: ((A...) -> R...), kind: ("deferred" | "immediate" | "exclusive")?) -> ((A...) -> R...)
+
 declare class SQLite3Database
-    function transaction(self, callback: (...any) -> (), kind: ("deferred" | "immediate" | "exclusive")?): ((...any) -> ())
+    transaction: TransactionFn
     function query(self, query: string): SQLite3Statement
-    function exec(self, query: string, args: SQLite3Values?): ()
+    function exec(self, query: string, args: SQLite3Values?): SQLite3Result
     function close(self): ()
 end
 
@@ -1386,17 +1381,13 @@ declare class Random
     nextNumber:
         & ((self: Random) -> number)
         & ((self: Random, min: number, max: number) -> number)
-    NextNumber:
-        & ((self: Random) -> number)
-        & ((self: Random, min: number, max: number) -> number)
     function nextInteger(self, min: number, max: number): number
-    function NextInteger(self, min: number, max: number): number
+    function nextBoolean(self): boolean
     function clone(self): Random
-    function Clone(self): Random
 end
 
 type RandomConstructor = {
-    new: (seed: number) -> Random,
+    new: (seed: number?) -> Random,
 }
 
 export type RandomLib = RandomConstructor & {

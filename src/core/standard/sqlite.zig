@@ -196,8 +196,7 @@ const LuaDatabase = struct {
 
     const Transaction = struct {
         ptr: *LuaDatabase,
-        state: *VM.lua.State,
-        state_ref: ?i32,
+        state: Scheduler.ThreadRef,
     };
 
     pub fn transactionResumed(ctx: *Transaction, L: *VM.lua.State, _: *Scheduler) void {
@@ -206,9 +205,7 @@ const LuaDatabase = struct {
             .Ok => "COMMIT",
             else => "ROLLBACK",
         };
-        L.unref(ctx.state_ref orelse unreachable);
-        ctx.state_ref = null;
-        const state = ctx.state;
+        const state = ctx.state.value;
         ptr.db.exec(command, &.{}) catch |err| {
             switch (err) {
                 error.OutOfMemory => state.pushstring(@errorName(err)) catch |e| std.debug.panic("{}", .{e}),
@@ -221,18 +218,21 @@ const LuaDatabase = struct {
             L.xpush(state, 1);
             _ = Scheduler.resumeStateError(state, null) catch {};
         } else {
-            _ = Scheduler.resumeState(state, null, 0) catch {};
+            const results = L.gettop();
+            L.xmove(state, @truncate(results));
+            _ = Scheduler.resumeState(state, null, @intCast(results)) catch {};
         }
     }
 
     pub fn transactionResumedDtor(ctx: *Transaction, L: *VM.lua.State, _: *Scheduler) void {
         const allocator = luau.getallocator(L);
         defer allocator.destroy(ctx);
-        if (ctx.state_ref) |ref|
-            L.unref(ref);
+        defer ctx.state.deref();
     }
 
     pub fn lua_utransaction(L: *VM.lua.State) !i32 {
+        if (!L.isyieldable())
+            return L.Zyielderror();
         const scheduler = Scheduler.getScheduler(L);
 
         const ptr = L.touserdatatagged(LuaDatabase, VM.lua.upvalueindex(1), TAG_SQLITE_DATABASE) orelse unreachable;
@@ -255,12 +255,7 @@ const LuaDatabase = struct {
                 L.xpush(ML, @intCast(i));
             };
 
-        _ = L.pushthread();
-        const ref = try L.ref(-1) orelse unreachable;
-        L.pop(1); // drop: thread
-
         const status = Scheduler.resumeState(ML, L, @intCast(args)) catch |err| {
-            L.unref(ref);
             ptr.db.exec("ROLLBACK", &.{}) catch |sql_err| switch (sql_err) {
                 error.OutOfMemory => return error.OutOfMemory,
                 else => return L.Zerrorf("SQLite Error ({}): {s}", .{ sql_err, ptr.db.getErrorMessage() }),
@@ -275,25 +270,23 @@ const LuaDatabase = struct {
         };
 
         if (status == .Yield) {
-            if (!L.isyieldable())
-                return L.Zyielderror();
             const allocator = luau.getallocator(L);
             const data = try allocator.create(Transaction);
             data.* = .{
                 .ptr = ptr,
-                .state = ML,
-                .state_ref = ref,
+                .state = .init(L),
             };
             scheduler.awaitResult(Transaction, data, ML, transactionResumed, transactionResumedDtor, .User);
             return L.yield(0);
         } else {
-            L.unref(ref);
             ptr.db.exec("COMMIT", &.{}) catch |err| switch (err) {
                 error.OutOfMemory => return error.OutOfMemory,
                 else => return L.Zerrorf("SQLite Error ({}): {s}", .{ err, ptr.db.getErrorMessage() }),
             };
         }
-        return 0;
+        const results = ML.gettop();
+        ML.xmove(L, @truncate(results));
+        return @intCast(results);
     }
 
     pub fn lua_query(self: *LuaDatabase, L: *VM.lua.State) !i32 {
@@ -341,7 +334,13 @@ const LuaDatabase = struct {
             error.OutOfMemory => return err,
             else => return L.Zerrorf("SQLite Error ({}): {s}", .{ err, self.db.getErrorMessage() }),
         };
-        return 0;
+
+        try L.Zpushvalue(.{
+            .last_insert_row_id = @as(i32, @truncate(self.db.getLastInsertRowId())),
+            .changes = @as(i32, @truncate(self.db.countChanges())),
+        });
+
+        return 1;
     }
 
     pub fn lua_transaction(_: *LuaDatabase, L: *VM.lua.State) !i32 {
@@ -379,10 +378,8 @@ const LuaDatabase = struct {
     pub fn close(ptr: *LuaDatabase, L: *VM.lua.State) !void {
         if (ptr.closed)
             return;
-        defer {
-            ptr.closed = true;
-            ptr.statements.deinit();
-        }
+        ptr.closed = true;
+        defer ptr.statements.deinit();
         try L.rawcheckstack(2);
         if (ptr.statements.items.len > 0) {
             var i = ptr.statements.items.len;
@@ -427,6 +424,7 @@ pub fn loadLib(L: *VM.lua.State) !void {
     {
         _ = try L.Znewmetatable(@typeName(LuaDatabase), .{
             .__metatable = "Metatable is locked",
+            .__type = "SQLiteDatabase",
         });
         try LuaDatabase.__index(L, -1);
         L.setreadonly(-1, true);
@@ -438,6 +436,7 @@ pub fn loadLib(L: *VM.lua.State) !void {
             .__index = LuaStatement.__index,
             .__namecall = LuaStatement.__namecall,
             .__metatable = "Metatable is locked",
+            .__type = "SQLiteStatement",
         });
         L.setreadonly(-1, true);
         L.setuserdatadtor(LuaStatement, TAG_SQLITE_STATEMENT, LuaStatement.__dtor);

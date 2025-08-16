@@ -210,7 +210,47 @@ fn SleepOrder(_: void, a: SleepingThread, b: SleepingThread) std.math.Order {
 }
 
 const SleepingQueue = std.PriorityQueue(SleepingThread, void, SleepOrder);
-pub const CompletionLinkedList = std.DoublyLinkedList(xev.Dynamic.Completion);
+pub const CompletionLinkedList = struct {
+    list: Lists.DoublyLinkedList = .{},
+    allocator: if (builtin.mode == .Debug) std.mem.Allocator else void,
+
+    pub fn init(allocator: std.mem.Allocator) CompletionLinkedList {
+        return .{
+            .allocator = if (builtin.mode == .Debug) allocator else undefined,
+        };
+    }
+
+    pub fn deinit(self: *CompletionLinkedList, allocator: std.mem.Allocator) void {
+        std.debug.assert(self.list.len == 0);
+        allocator.destroy(self);
+    }
+
+    pub const Node = struct {
+        completion: xev.Dynamic.Completion,
+        node: Lists.DoublyLinkedList.Node = .{},
+        tracker: if (builtin.mode == .Debug) ?*u8 else void = if (builtin.mode == .Debug) null else undefined,
+
+        pub fn from(node: *Lists.DoublyLinkedList.Node) *Node {
+            return @fieldParentPtr("node", node);
+        }
+    };
+
+    pub fn remove(self: *CompletionLinkedList, node: *Node) void {
+        self.list.remove(&node.node);
+        if (comptime builtin.mode == .Debug) {
+            self.allocator.destroy(node.tracker.?);
+        }
+    }
+
+    pub fn append(self: *CompletionLinkedList, node: *Node) void {
+        if (comptime builtin.mode == .Debug) {
+            if (node.tracker != null)
+                std.debug.panic("double append detected", .{});
+            node.tracker = self.allocator.create(u8) catch |err| std.debug.panic("{}", .{err});
+        }
+        self.list.append(&node.node);
+    }
+};
 
 global: *VM.lua.State,
 allocator: std.mem.Allocator,

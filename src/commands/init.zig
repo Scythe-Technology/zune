@@ -72,35 +72,49 @@ fn Execute(_: std.mem.Allocator, args: []const []const u8) !void {
     try std.fs.cwd().makePath("src");
 
     if (args.len > 0 and std.mem.eql(u8, args[0], "module")) {
-        const file = std.fs.cwd().createFile("src/init.luau", .{
-            .exclusive = true,
-        }) catch |err| switch (err) {
-            error.PathAlreadyExists => return,
-            else => return err,
-        };
-        defer file.close();
+        try std.fs.cwd().makePath("tests");
+        blk: {
+            const file = std.fs.cwd().createFile("src/init.luau", .{
+                .exclusive = true,
+            }) catch |err| switch (err) {
+                error.PathAlreadyExists => break :blk,
+                else => return err,
+            };
+            defer file.close();
 
-        try file.writeAll(
-            \\local stdio = zune.stdio
-            \\
-            \\local module = {}
-            \\
-            \\function module.hello()
-            \\    stdio.stdout:write("Hello, World!")
-            \\end
-            \\
-            \\if zune.testing.running then
-            \\    local testing = zune.testing
-            \\
-            \\    local test = testing.test
-            \\
-            \\    test("module.hello", function()
-            \\        module.hello()
-            \\    end)
-            \\end
-            \\
-            \\return module
-        );
+            try file.writeAll(
+                \\local io = zune.io
+                \\
+                \\local module = {}
+                \\
+                \\function module.hello()
+                \\    io.stdout:write("Hello, World!\n")
+                \\end
+                \\
+                \\return module
+            );
+        }
+        blk: {
+            const file = std.fs.cwd().createFile("tests/init.luau", .{
+                .exclusive = true,
+            }) catch |err| switch (err) {
+                error.PathAlreadyExists => break :blk,
+                else => return err,
+            };
+            defer file.close();
+
+            try file.writeAll(
+                \\local testing = zune.testing
+                \\
+                \\local test = testing.test
+                \\
+                \\local module = require("./src")
+                \\
+                \\test("module.hello", function()
+                \\    module.hello()
+                \\end)
+            );
+        }
     } else {
         const file = std.fs.cwd().createFile("src/main.luau", .{
             .exclusive = true,
@@ -111,10 +125,10 @@ fn Execute(_: std.mem.Allocator, args: []const []const u8) !void {
         defer file.close();
 
         try file.writeAll(
-            \\local stdio = zune.stdio
+            \\local io = zune.io
             \\
             \\local function main()
-            \\    stdio.stdout:write("Hello, World!")
+            \\    io.stdout:write("Hello, World!")
             \\end
             \\
             \\main()

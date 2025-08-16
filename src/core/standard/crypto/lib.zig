@@ -322,6 +322,7 @@ pub fn loadLib(L: *VM.lua.State) !void {
     {
         _ = try L.Znewmetatable(@typeName(LuaCryptoHasher), .{
             .__metatable = "Metatable is locked",
+            .__type = "CryptoHasher",
         });
         try LuaCryptoHasher.__index(L, -1);
         L.setreadonly(-1, true);

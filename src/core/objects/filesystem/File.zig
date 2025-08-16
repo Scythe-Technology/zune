@@ -10,7 +10,7 @@ const Scheduler = Zune.Runtime.Scheduler;
 const LuaHelper = Zune.Utils.LuaHelper;
 const MethodMap = Zune.Utils.MethodMap;
 
-const tagged = @import("../../../tagged.zig");
+const tagged = Zune.tagged;
 const sysfd = @import("../../utils/sysfd.zig");
 
 const VM = luau.VM;
@@ -85,7 +85,7 @@ list: *Scheduler.CompletionLinkedList,
 
 pub const AsyncReadContext = struct {
     completion: Scheduler.CompletionLinkedList.Node = .{
-        .data = .{},
+        .completion = .{},
     },
     ref: Scheduler.ThreadRef,
     limit: usize = LuaHelper.MAX_LUAU_SIZE,
@@ -114,7 +114,8 @@ pub const AsyncReadContext = struct {
         defer scheduler.completeAsync(self);
         defer self.ref.deref();
         defer self.array.deinit();
-        defer if (self.list) |l|
+
+        if (self.list) |l|
             l.remove(&self.completion);
 
         if (self.err) |e| {
@@ -234,6 +235,7 @@ pub const AsyncReadContext = struct {
             .limit = max_size,
             .auto_close = auto_close,
             .file_kind = file_kind,
+            .list = list,
         };
 
         ctx.array.expandToCapacity();
@@ -241,7 +243,7 @@ pub const AsyncReadContext = struct {
         switch (file_kind) {
             .File => file.pread(
                 &scheduler.loop,
-                &ctx.completion.data,
+                &ctx.completion.completion,
                 .{ .slice = ctx.array.items },
                 0,
                 This,
@@ -250,7 +252,7 @@ pub const AsyncReadContext = struct {
             ),
             .Tty => file.read(
                 &scheduler.loop,
-                &ctx.completion.data,
+                &ctx.completion.completion,
                 .{ .slice = ctx.array.items },
                 This,
                 ctx,
@@ -266,7 +268,7 @@ pub const AsyncReadContext = struct {
 
 pub const AsyncWriteContext = struct {
     completion: Scheduler.CompletionLinkedList.Node = .{
-        .data = .{},
+        .completion = .{},
     },
     ref: Scheduler.ThreadRef,
     data: []u8,
@@ -295,7 +297,8 @@ pub const AsyncWriteContext = struct {
 
         defer allocator.free(self.data);
         defer self.ref.deref();
-        defer if (self.list) |l|
+
+        if (self.list) |l|
             l.remove(&self.completion);
 
         if (self.err) |e| {
@@ -400,12 +403,13 @@ pub const AsyncWriteContext = struct {
             .auto_close = auto_close,
             .pos = pos,
             .file_kind = file_kind,
+            .list = list,
         };
 
         switch (file_kind) {
             .File => file.pwrite(
                 &scheduler.loop,
-                &ctx.completion.data,
+                &ctx.completion.completion,
                 .{ .slice = data },
                 pos,
                 This,
@@ -414,7 +418,7 @@ pub const AsyncWriteContext = struct {
             ),
             .Tty => file.write(
                 &scheduler.loop,
-                &ctx.completion.data,
+                &ctx.completion.completion,
                 .{ .slice = data },
                 This,
                 ctx,
@@ -731,9 +735,9 @@ fn lua_close(self: *File, L: *VM.lua.State) !i32 {
         switch (comptime builtin.os.tag) {
             .windows => _ = std.os.windows.kernel32.CancelIoEx(self.file.handle, null),
             else => {
-                var node = self.list.first;
+                var node = self.list.list.first;
                 while (node) |n| {
-                    scheduler.cancelAsyncTask(&n.data);
+                    scheduler.cancelAsyncTask(&Scheduler.CompletionLinkedList.Node.from(n).completion);
                     node = n.next;
                 }
             },
@@ -780,7 +784,7 @@ pub fn __dtor(L: *VM.lua.State, self: *File) void {
     const allocator = luau.getallocator(L);
     if (self.mode.isOpen() and self.mode.close)
         self.file.close();
-    allocator.destroy(self.list);
+    self.list.deinit(allocator);
 }
 
 pub inline fn load(L: *VM.lua.State) !void {
@@ -798,7 +802,7 @@ pub fn push(L: *VM.lua.State, file: std.fs.File, kind: FileKind, mode: OpenMode)
     const allocator = luau.getallocator(L);
     const self = try L.newuserdatataggedwithmetatable(File, TAG_FS_FILE);
     const list = try allocator.create(Scheduler.CompletionLinkedList);
-    list.* = .{};
+    list.* = .init(allocator);
     self.* = .{
         .file = file,
         .kind = kind,

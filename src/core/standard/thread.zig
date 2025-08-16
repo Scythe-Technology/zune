@@ -696,6 +696,7 @@ pub fn loadLib(L: *VM.lua.State) !void {
     {
         _ = try L.Znewmetatable(@typeName(LuaThread), .{
             .__metatable = "Metatable is locked",
+            .__type = "Thread",
         });
         try LuaThread.__index(L, -1);
         L.setreadonly(-1, true);

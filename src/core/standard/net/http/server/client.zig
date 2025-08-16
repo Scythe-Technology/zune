@@ -13,6 +13,10 @@ const LuaHelper = Zune.Utils.LuaHelper;
 const MethodMap = Zune.Utils.MethodMap;
 const Lists = Zune.Utils.Lists;
 
+const tagged = Zune.tagged;
+
+const TAG_NET_HTTP_WEBSOCKET = tagged.Tags.get("NET_HTTP_WEBSOCKET").?;
+
 const Request = @import("../request.zig");
 const WebSocket = @import("../websocket.zig");
 
@@ -268,9 +272,7 @@ pub fn onWrite(
                 const L = GL.newthread() catch |e| std.debug.panic("{}", .{e});
                 defer GL.pop(1);
 
-                const websocket = L.newuserdatadtor(ClientWebSocket, ClientWebSocket.__dtor) catch |e| std.debug.panic("{}", .{e});
-                _ = L.Lgetmetatable(@typeName(ClientWebSocket)) catch |e| std.debug.panic("{}", .{e});
-                _ = L.setmetatable(-2) catch |e| std.debug.panic("{}", .{e});
+                const websocket = L.newuserdatataggedwithmetatable(ClientWebSocket, TAG_NET_HTTP_WEBSOCKET) catch |e| std.debug.panic("{}", .{e});
 
                 websocket.* = .{
                     .client = self,

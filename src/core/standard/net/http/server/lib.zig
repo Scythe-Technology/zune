@@ -15,6 +15,9 @@ const Lists = Zune.Utils.Lists;
 
 const VM = luau.VM;
 
+const TAG_NET_HTTP_SERVER = Zune.tagged.Tags.get("NET_HTTP_SERVER").?;
+const TAG_NET_HTTP_WEBSOCKET = Zune.tagged.Tags.get("NET_HTTP_WEBSOCKET").?;
+
 /// The Zune HTTP server backend.
 const Self = @This();
 
@@ -85,8 +88,7 @@ ref: LuaHelper.Ref(void),
 callbacks: FnHandlers,
 scheduler: *Scheduler,
 
-fn __dtor(self: *Self) void {
-    const L = self.scheduler.global;
+fn __dtor(L: *VM.lua.State, self: *Self) void {
     defer self.arena.deinit();
 
     self.callbacks.derefAll(L);
@@ -397,9 +399,7 @@ pub fn lua_serve(L: *VM.lua.State) !i32 {
 
     const final_port = address.getPort();
 
-    const self = try L.newuserdatadtor(Self, __dtor);
-    _ = try L.Lgetmetatable(@typeName(Self));
-    _ = try L.setmetatable(-2);
+    const self = try L.newuserdatataggedwithmetatable(Self, TAG_NET_HTTP_SERVER);
 
     self.* = .{
         .arena = .init(allocator),
@@ -550,7 +550,7 @@ fn lua_isRunning(self: *Self, L: *VM.lua.State) !i32 {
     return 1;
 }
 
-pub const __namecall = MethodMap.CreateNamecallMap(Self, null, .{
+const __index = MethodMap.CreateStaticIndexMap(Self, TAG_NET_HTTP_SERVER, .{
     .{ "stop", lua_stop },
     .{ "getPort", lua_getPort },
     .{ "isRunning", lua_isRunning },
@@ -558,16 +558,20 @@ pub const __namecall = MethodMap.CreateNamecallMap(Self, null, .{
 
 pub fn lua_load(L: *VM.lua.State) !void {
     _ = try L.Znewmetatable(@typeName(Self), .{
-        .__namecall = __namecall,
         .__metatable = "Metatable is locked",
+        .__type = "HTTPServer",
     });
+    try __index(L, -1);
     L.setreadonly(-1, true);
-    L.pop(1);
+    L.setuserdatametatable(TAG_NET_HTTP_SERVER);
+    L.setuserdatadtor(Self, TAG_NET_HTTP_SERVER, Self.__dtor);
 
     _ = try L.Znewmetatable(@typeName(ClientWebSocket), .{
-        .__namecall = ClientWebSocket.__namecall,
         .__metatable = "Metatable is locked",
+        .__type = "HTTPWebSocket",
     });
+    try ClientWebSocket.__index(L, -1);
     L.setreadonly(-1, true);
-    L.pop(1);
+    L.setuserdatametatable(TAG_NET_HTTP_WEBSOCKET);
+    L.setuserdatadtor(ClientWebSocket, TAG_NET_HTTP_WEBSOCKET, ClientWebSocket.__dtor);
 }
