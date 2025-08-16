@@ -561,6 +561,16 @@ const AstSerializer = struct {
 
         try self.L.Zsetfield(-1, "tag", "group");
         try self.L.Zsetfield(-1, "location", node.location);
+
+        try self.serializeToken(node.location.begin, "(", null);
+        try self.L.rawsetfield(-2, "openParens");
+
+        try node.expr.visit(self);
+        try self.L.rawsetfield(-2, "expression");
+
+        try self.serializeToken(.{ .line = node.location.end.line, .column = node.location.end.column - 1 }, ")", null);
+        try self.L.rawsetfield(-2, "closeParens");
+
         return false;
     }
     pub fn visitExprConstantNil(self: *@This(), node: *Ast.ExprConstantNil) !bool {
@@ -716,10 +726,11 @@ const AstSerializer = struct {
             try self.L.rawsetfield(-2, "openGenerics");
 
             const commas = cstNode.genericsCommaPositions;
-            try self.serializePunctuated(node.generics, commas.slice(), ",");
+            const slice = commas.slice();
+            try self.serializePunctuated(node.generics, slice, ",");
             try self.L.rawsetfield(-2, "generics");
 
-            try self.serializePunctuated(node.genericPacks, commas.slice()[node.generics.size..], ",");
+            try self.serializePunctuated(node.genericPacks, if (slice.len < node.generics.size) slice else slice[node.generics.size..], ",");
             try self.L.rawsetfield(-2, "genericPacks");
 
             try self.serializeToken(cstNode.closeGenericsPosition, ">", null);
@@ -1357,10 +1368,11 @@ const AstSerializer = struct {
             try self.L.rawsetfield(-2, "openGenerics");
 
             const commas = cstNode.genericsCommaPositions;
-            try self.serializePunctuated(node.generics, commas.slice(), ",");
+            const slice = commas.slice();
+            try self.serializePunctuated(node.generics, slice, ",");
             try self.L.rawsetfield(-2, "generics");
 
-            try self.serializePunctuated(node.genericPacks, commas.slice()[node.generics.size..], ",");
+            try self.serializePunctuated(node.genericPacks, if (slice.len < node.generics.size) slice else slice[node.generics.size..], ",");
             try self.L.rawsetfield(-2, "genericPacks");
 
             try self.serializeToken(cstNode.genericsClosePosition, ">", null);
@@ -1538,7 +1550,7 @@ const AstSerializer = struct {
                 try self.L.rawsetfield(-2, "colon");
 
                 try node.indexer.?.resultType.visit(self);
-                try self.L.rawsetfield(-2, "type");
+                try self.L.rawsetfield(-2, "value");
 
                 if (item.separator.to()) |separator| {
                     try self.serializeToken(item.separatorPosition.to().?, if (separator == .comma) "," else ";", null);
@@ -1615,10 +1627,11 @@ const AstSerializer = struct {
             try self.L.rawsetfield(-2, "openGenerics");
 
             const commas = cstNode.genericsCommaPositions;
-            try self.serializePunctuated(node.generics, commas.slice(), ",");
+            const slice = commas.slice();
+            try self.serializePunctuated(node.generics, slice, ",");
             try self.L.rawsetfield(-2, "generics");
 
-            try self.serializePunctuated(node.genericPacks, commas.slice()[node.generics.size..], ",");
+            try self.serializePunctuated(node.genericPacks, if (slice.len < node.generics.size) slice else slice[node.generics.size..], ",");
             try self.L.rawsetfield(-2, "genericPacks");
 
             try self.serializeToken(cstNode.closeGenericsPosition, ">", null);
@@ -1717,7 +1730,7 @@ const AstSerializer = struct {
 
             if (typeNode.is(.type_optional)) {
                 try self.serializeToken(typeNode.location.begin, "?", 1);
-                try self.L.Zsetfield(-2, "tag", "optional");
+                try self.L.Zsetfield(-1, "tag", "optional");
                 try self.L.rawsetfield(-2, "node");
             } else {
                 try typeNode.visit(self);
@@ -1821,7 +1834,7 @@ const AstSerializer = struct {
         try self.L.Zsetfield(-1, "tag", "variadic");
         try self.L.Zsetfield(-1, "location", node.location);
 
-        if (forVarArg) {
+        if (!forVarArg) {
             try self.serializeToken(node.location.begin, "...", null);
             try self.L.rawsetfield(-2, "ellipsis");
         }
