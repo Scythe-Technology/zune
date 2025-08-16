@@ -151,7 +151,7 @@ pub const LuaDatetime = struct {
 
     pub fn __index(L: *VM.lua.State) !i32 {
         try L.Zchecktype(1, .Userdata);
-        const ptr = L.touserdata(LuaDatetime, 1) orelse unreachable;
+        const ptr = L.touserdatatagged(LuaDatetime, 1, TAG_DATETIME) orelse return L.Zerror("Expected 'datetime'");
 
         const index = L.Lcheckstring(2);
 
@@ -286,6 +286,7 @@ pub fn loadLib(L: *VM.lua.State) !void {
             .__index = LuaDatetime.__index,
             .__namecall = LuaDatetime.__namecall,
             .__metatable = "Metatable is locked",
+            .__type = "Datetime",
         });
         L.setreadonly(-1, true);
         L.setuserdatametatable(TAG_DATETIME);

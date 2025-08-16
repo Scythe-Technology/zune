@@ -358,7 +358,7 @@ const BufferSink = struct {
         return 0;
     }
 
-    pub const __namecall = MethodMap.CreateNamecallMap(BufferSink, null, .{
+    pub const __namecall = MethodMap.CreateNamecallMap(BufferSink, TAG_IO_BUFFERSINK, .{
         .{ "write", lua_write },
         .{ "writer", lua_writer },
         .{ "flush", lua_flush },

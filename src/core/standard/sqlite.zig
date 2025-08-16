@@ -420,6 +420,7 @@ pub fn loadLib(L: *VM.lua.State) !void {
     {
         _ = try L.Znewmetatable(@typeName(LuaDatabase), .{
             .__metatable = "Metatable is locked",
+            .__type = "SQLiteDatabase",
         });
         try LuaDatabase.__index(L, -1);
         L.setreadonly(-1, true);
@@ -431,6 +432,7 @@ pub fn loadLib(L: *VM.lua.State) !void {
             .__index = LuaStatement.__index,
             .__namecall = LuaStatement.__namecall,
             .__metatable = "Metatable is locked",
+            .__type = "SQLiteStatement",
         });
         L.setreadonly(-1, true);
         L.setuserdatadtor(LuaStatement, TAG_SQLITE_STATEMENT, LuaStatement.__dtor);

@@ -15,6 +15,8 @@ const Lists = Zune.Utils.Lists;
 
 const VM = luau.VM;
 
+const TAG_NET_HTTP_SERVER = Zune.tagged.Tags.get("NET_HTTP_SERVER").?;
+
 /// The Zune HTTP server backend.
 const Self = @This();
 
@@ -550,7 +552,7 @@ fn lua_isRunning(self: *Self, L: *VM.lua.State) !i32 {
     return 1;
 }
 
-pub const __namecall = MethodMap.CreateNamecallMap(Self, null, .{
+const __index = MethodMap.CreateStaticIndexMap(Self, TAG_NET_HTTP_SERVER, .{
     .{ "stop", lua_stop },
     .{ "getPort", lua_getPort },
     .{ "isRunning", lua_isRunning },
@@ -558,16 +560,18 @@ pub const __namecall = MethodMap.CreateNamecallMap(Self, null, .{
 
 pub fn lua_load(L: *VM.lua.State) !void {
     _ = try L.Znewmetatable(@typeName(Self), .{
-        .__namecall = __namecall,
         .__metatable = "Metatable is locked",
+        .__type = "HTTPServer",
     });
+    try __index(L, -1);
     L.setreadonly(-1, true);
     L.pop(1);
 
     _ = try L.Znewmetatable(@typeName(ClientWebSocket), .{
-        .__namecall = ClientWebSocket.__namecall,
         .__metatable = "Metatable is locked",
+        .__type = "HTTPWebSocket",
     });
+    try ClientWebSocket.__index(L, -1);
     L.setreadonly(-1, true);
     L.pop(1);
 }

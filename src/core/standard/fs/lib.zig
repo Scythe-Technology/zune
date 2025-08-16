@@ -768,6 +768,7 @@ pub fn loadLib(L: *VM.lua.State) !void {
     {
         _ = try L.Znewmetatable(@typeName(LuaWatch), .{
             .__metatable = "Metatable is locked",
+            .__type = "FileSystemWatcher",
         });
         try LuaWatch.__index(L, -1);
         L.setreadonly(-1, true);

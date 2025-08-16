@@ -16,6 +16,8 @@ const Lists = Zune.Utils.Lists;
 
 const VM = luau.VM;
 
+const TAG_NET_HTTP_WEBSOCKET = Zune.tagged.Tags.get("NET_HTTP_WEBSOCKET");
+
 const ClientContext = @import("client.zig");
 
 /// Zune server WebSocket client
@@ -218,7 +220,7 @@ pub fn lua_isConnected(self: *Self, L: *VM.lua.State) !i32 {
     return 1;
 }
 
-pub const __namecall = MethodMap.CreateNamecallMap(Self, null, .{
+pub const __index = MethodMap.CreateStaticIndexMap(Self, TAG_NET_HTTP_WEBSOCKET, .{
     .{ "send", lua_send },
     .{ "close", lua_close },
     .{ "isConnected", lua_isConnected },

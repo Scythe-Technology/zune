@@ -181,6 +181,7 @@ pub fn loadLib(L: *VM.lua.State) !void {
     {
         _ = try L.Znewmetatable(@typeName(LuaRegex), .{
             .__metatable = "Metatable is locked",
+            .__type = "Regex",
         });
         try LuaRegex.__index(L, -1);
         L.setreadonly(-1, true);

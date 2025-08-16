@@ -10,7 +10,7 @@ const Scheduler = Zune.Runtime.Scheduler;
 const LuaHelper = Zune.Utils.LuaHelper;
 const MethodMap = Zune.Utils.MethodMap;
 
-const tagged = @import("../../../tagged.zig");
+const tagged = Zune.tagged;
 const sysfd = @import("../../utils/sysfd.zig");
 
 const VM = luau.VM;
