@@ -568,9 +568,9 @@ pub const LuaPointer = struct {
 
                 switch (ti) {
                     .int, .float => try FFITypeConversion(T, mem, L, 3, 0),
-                    .pointer => switch (L.typeOf(-1)) {
+                    .pointer => switch (L.typeOf(3)) {
                         .Userdata => {
-                            const lua_ptr = LuaPointer.value(L, -1) orelse return error.Fail;
+                            const lua_ptr = LuaPointer.value(L, 3) orelse return error.Fail;
                             if (lua_ptr.owner == .none)
                                 return error.NoAddressAvailable;
                             var bytes: [@sizeOf(usize)]u8 = @bitCast(@as(usize, @intFromPtr(lua_ptr.ptr)));
