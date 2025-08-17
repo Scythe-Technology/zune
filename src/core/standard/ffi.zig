@@ -2273,6 +2273,10 @@ pub fn loadLib(L: *VM.lua.State) !void {
         L.pop(1);
     }
 
+    TAGGED_FFI_POINTERS = .empty;
+    CACHED_C_COMPILATON = .empty;
+    CACHED_POINTER = .{};
+
     CACHED_POINTER.table = try .init(L, true);
 
     try L.createtable(0, 16);
