@@ -8,39 +8,6 @@ local describe = testing.describe;
 local expect = testing.expect;
 local test = testing.test;
 
-type WritableSlice = buffer | FFIPointer;
-type ReadableSlice = string | buffer | FFIPointer;
-
-type MemLib = {
-    len: (src: ReadableSlice) -> number?,
-    copy: (dest: WritableSlice, destOffset: number, src: ReadableSlice, srcOffset: number, count: number?) -> (),
-    slice: (src: ReadableSlice, offset: number, count: number?) -> buffer,
-    eqlSlice: (a: ReadableSlice, aOffset: number, b: ReadableSlice, bOffset: number, count: number?) -> boolean,
-    eql: (a: ReadableSlice, b: ReadableSlice) -> boolean,
-    startsWith: (slice: ReadableSlice, needle: ReadableSlice) -> boolean,
-    endsWith: (slice: ReadableSlice, needle: ReadableSlice) -> boolean,
-    trim: (src: ReadableSlice, values_to_strip: ReadableSlice) -> buffer,
-    trimLeft: (src: ReadableSlice, values_to_strip: ReadableSlice) -> buffer,
-    trimRight: (src: ReadableSlice, values_to_strip: ReadableSlice) -> buffer,
-    indexOf: (src: ReadableSlice, needle: ReadableSlice) -> number?,
-    indexOfPos: (src: ReadableSlice, offset: number, needle: ReadableSlice) -> number?,
-    lastIndexOf: (src: ReadableSlice, needle: ReadableSlice) -> number?,
-    indexOfAny: (src: ReadableSlice, needle: ReadableSlice) -> number?,
-    indexOfAnyPos: (src: ReadableSlice, offset: number, needle: ReadableSlice) -> number?,
-    lastIndexOfAny: (src: ReadableSlice, needle: ReadableSlice) -> number?,
-    indexOfNone: (src: ReadableSlice, needle: ReadableSlice) -> number?,
-    indexOfNonePos: (src: ReadableSlice, offset: number, needle: ReadableSlice) -> number?,
-    lastIndexOfNone: (src: ReadableSlice, needle: ReadableSlice) -> number?,
-    indexOfDiff: (src: ReadableSlice, needle: ReadableSlice) -> number?,
-    indexOfMax: (src: ReadableSlice) -> number,
-    indexOfMin: (src: ReadableSlice) -> number,
-    indexOfMinMax: (src: ReadableSlice) -> (number, number),replaceScalar: (src: WritableSlice, char: number, replacement: number) -> (),
-    max: (src: ReadableSlice) -> number,
-    min: (src: ReadableSlice) -> number,
-    reverse: (src: WritableSlice) -> (),
-    rotate: (src: WritableSlice, amount: number) -> (),
-    set: (dest: WritableSlice, value: number, offset: number?, count: number?) -> (),
-}
 describe("Mem", function()
     test("len", function()
         expect(mem.len(buffer.fromstring("test"))).toBe(4);
@@ -174,6 +141,33 @@ describe("Mem", function()
         expect(mem.lastIndexOf(a, "e")).toBe(1);
         expect(mem.lastIndexOf(a, "x")).toBeNil();
         expect(mem.lastIndexOf(a, "")).toBe(4);
+    end)
+    test("indexOfScalar", function()
+        local a = buffer.fromstring("test");
+        expect(mem.indexOfScalar(a, string.byte('t'))).toBe(0);
+        expect(mem.indexOfScalar(a, string.byte('e'))).toBe(1);
+        expect(mem.indexOfScalar(a, string.byte('s'))).toBe(2);
+        expect(mem.indexOfScalar(a, string.byte('x'))).toBeNil();
+        expect(mem.indexOfScalar(a, 0)).toBeNil();
+    end)
+    test("indexOfScalarPos", function()
+        local a = buffer.fromstring("test");
+        expect(mem.indexOfScalarPos(a, 0, string.byte('t'))).toBe(0);
+        expect(mem.indexOfScalarPos(a, 1, string.byte('t'))).toBe(3);
+        expect(mem.indexOfScalarPos(a, 0, string    .byte('e'))).toBe(1);
+        expect(mem.indexOfScalarPos(a, 2, string.byte('e'))).toBeNil();
+        expect(mem.indexOfScalarPos(a, 0, string.byte('s'))).toBe(2);
+        expect(mem.indexOfScalarPos(a, 1, string.byte('s'))).toBe(2);
+        expect(mem.indexOfScalarPos(a, 0, string.byte('x'))).toBeNil();
+        expect(mem.indexOfScalarPos(a, 0, 0)).toBeNil();
+    end)
+    test("lastIndexOfScalar", function()
+        local a = buffer.fromstring("test");
+        expect(mem.lastIndexOfScalar(a, string.byte('t'))).toBe(3);
+        expect(mem.lastIndexOfScalar(a, string.byte('e'))).toBe(1);
+        expect(mem.lastIndexOfScalar(a, string.byte('s'))).toBe(2);
+        expect(mem.lastIndexOfScalar(a, string.byte('x'))).toBeNil();
+        expect(mem.lastIndexOfScalar(a, 0)).toBeNil();
     end)
     test("indexOfAny", function()
         local a = buffer.fromstring("test");

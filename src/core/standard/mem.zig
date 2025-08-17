@@ -180,6 +180,39 @@ fn lua_lastIndexOf(L: *VM.lua.State) !i32 {
     return 1;
 }
 
+fn lua_indexOfScalar(L: *VM.lua.State) !i32 {
+    const slice = try getReadableSlice(L, 1);
+    const scalar: u8 = @truncate(try L.Zcheckvalue(u32, 2, null));
+    if (std.mem.indexOfScalar(u8, slice, scalar)) |pos|
+        L.pushunsigned(@truncate(pos))
+    else
+        L.pushnil();
+    return 1;
+}
+
+fn lua_indexOfScalarPos(L: *VM.lua.State) !i32 {
+    const slice = try getReadableSlice(L, 1);
+    const offset = try L.Zcheckvalue(u32, 2, null);
+    const scalar: u8 = @truncate(try L.Zcheckvalue(u32, 3, null));
+    if (isOutOfBounds(offset, slice.len, offset))
+        return L.Zerror("access out of bounds");
+    if (std.mem.indexOfScalarPos(u8, slice, offset, scalar)) |pos|
+        L.pushunsigned(@truncate(pos))
+    else
+        L.pushnil();
+    return 1;
+}
+
+fn lua_lastIndexOfScalar(L: *VM.lua.State) !i32 {
+    const slice = try getReadableSlice(L, 1);
+    const scalar: u8 = @truncate(try L.Zcheckvalue(u32, 2, null));
+    if (std.mem.lastIndexOfScalar(u8, slice, scalar)) |pos|
+        L.pushunsigned(@truncate(pos))
+    else
+        L.pushnil();
+    return 1;
+}
+
 fn lua_indexOfAny(L: *VM.lua.State) !i32 {
     const slice = try getReadableSlice(L, 1);
     const values = try getReadableSlice(L, 2);
@@ -350,6 +383,9 @@ pub fn loadLib(L: *VM.lua.State) !void {
         .indexOf = lua_indexOf,
         .indexOfPos = lua_indexOfPos,
         .lastIndexOf = lua_lastIndexOf,
+        .indexOfScalar = lua_indexOfScalar,
+        .indexOfScalarPos = lua_indexOfScalarPos,
+        .lastIndexOfScalar = lua_lastIndexOfScalar,
         .indexOfAny = lua_indexOfAny,
         .indexOfAnyPos = lua_indexOfAnyPos,
         .lastIndexOfAny = lua_lastIndexOfAny,
