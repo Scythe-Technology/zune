@@ -420,8 +420,10 @@ fn cmdEval(allocator: std.mem.Allocator, args: []const []const u8) !void {
 }
 
 fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
-    if (comptime !Debugger.PlatformSupported())
-        return error.PlatformNotSupported;
+    if (comptime !Debugger.PlatformSupported()) {
+        Zune.debug.print("<red>error<clear>: platform not supported\n", .{});
+        std.process.exit(1);
+    }
     var history = try History.init(allocator, ".zune/.debug_history");
     errdefer history.deinit();
 
