@@ -17,5 +17,21 @@ pub const testing = @import("testing.zig");
 pub const datetime = @import("datetime/lib.zig");
 
 test {
-    @import("std").testing.refAllDecls(@This());
+    _ = fs;
+    _ = process;
+    _ = testing;
+    _ = task;
+    _ = net;
+    _ = luau;
+    _ = serde;
+    _ = io;
+    _ = crypto;
+    _ = regex;
+    _ = datetime;
+    _ = ffi;
+    _ = sqlite;
+    _ = require;
+    _ = random;
+    _ = thread;
+    _ = mem;
 }

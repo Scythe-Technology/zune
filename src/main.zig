@@ -25,6 +25,12 @@ pub const Runtime = struct {
     pub const Scheduler = @import("core/runtime/scheduler.zig");
     pub const Profiler = @import("core/runtime/profiler.zig");
     pub const Debugger = @import("core/runtime/debugger.zig");
+    test {
+        _ = Engine;
+        _ = Scheduler;
+        _ = Profiler;
+        _ = Debugger;
+    }
 };
 
 pub const Resolvers = struct {
@@ -34,6 +40,14 @@ pub const Resolvers = struct {
     pub const Require = @import("core/resolvers/require.zig");
     pub const Navigator = @import("core/resolvers/navigator.zig");
     pub const Bundle = @import("core/resolvers/bundle.zig");
+    test {
+        _ = File;
+        _ = Fmt;
+        _ = Config;
+        _ = Require;
+        _ = Navigator;
+        _ = Bundle;
+    }
 };
 
 pub const Utils = struct {
@@ -41,6 +55,12 @@ pub const Utils = struct {
     pub const EnumMap = @import("core/utils/enum_map.zig");
     pub const MethodMap = @import("core/utils/method_map.zig");
     pub const LuaHelper = @import("core/utils/luahelper.zig");
+    test {
+        _ = Lists;
+        _ = EnumMap;
+        _ = MethodMap;
+        _ = LuaHelper;
+    }
 };
 
 pub const debug = struct {
@@ -249,6 +269,18 @@ pub fn loadConfiguration(dir: std.fs.Dir) void {
     }
 }
 
+pub fn initState(L: *VM.lua.State) !void {
+    try Resolvers.Require.init(L);
+    if (FEATURES.ffi and comptime corelib.ffi.PlatformSupported())
+        try corelib.ffi.init(L);
+}
+
+pub fn deinitState(L: *VM.lua.State) void {
+    Resolvers.Require.deinit(L);
+    if (FEATURES.ffi and comptime corelib.ffi.PlatformSupported())
+        corelib.ffi.deinit(L);
+}
+
 pub fn openZune(L: *VM.lua.State, args: []const []const u8, flags: Flags) !void {
     try Resolvers.Require.load(L);
 
@@ -365,8 +397,8 @@ pub fn main() !void {
         var scheduler = try Runtime.Scheduler.init(allocator, L);
         defer scheduler.deinit();
 
-        try Resolvers.Require.init(L);
-        defer Resolvers.Require.deinit(L);
+        try initState(L);
+        defer deinitState(L);
 
         try Runtime.Scheduler.SCHEDULERS.append(&scheduler);
 
@@ -442,8 +474,15 @@ test "Zune" {
 }
 
 test {
-    std.testing.refAllDecls(Runtime);
-    std.testing.refAllDecls(Resolvers);
-    std.testing.refAllDecls(Utils);
-    std.testing.refAllDecls(@This());
+    _ = cli;
+
+    _ = toml;
+    _ = glob;
+
+    _ = Runtime;
+    _ = Resolvers;
+    _ = Utils;
+
+    _ = objects;
+    _ = corelib;
 }

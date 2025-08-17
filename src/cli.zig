@@ -20,5 +20,5 @@ pub fn start(args: [][:0]u8) !void {
 }
 
 test {
-    std.testing.refAllDecls(@This());
+    _ = Commands;
 }

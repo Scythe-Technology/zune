@@ -23,14 +23,8 @@ pub const RefTable = struct {
     free: i32 = 0,
 
     pub fn init(L: *VM.lua.State, comptime weak: bool) !RefTable {
-        try L.newtable();
+        try initTable(L, weak);
         defer L.pop(1);
-
-        if (weak) {
-            try L.Zpushvalue(.{ .__mode = "v" });
-            L.setreadonly(-1, true);
-            _ = try L.setmetatable(-2);
-        }
 
         return .{ .table_ref = .init(L, -1, undefined) };
     }
@@ -87,6 +81,18 @@ pub const RefTable = struct {
         return value;
     }
 };
+
+pub fn initTable(L: *VM.lua.State, comptime weak: bool) !void {
+    try L.newtable();
+
+    if (weak) {
+        errdefer L.pop(1);
+        try L.Zpushvalue(.{ .__mode = "v" });
+        errdefer L.pop(1);
+        L.setreadonly(-1, true);
+        _ = try L.setmetatable(-2);
+    }
+}
 
 pub fn Ref(comptime T: type) type {
     return struct {
@@ -223,4 +229,11 @@ pub fn registerModule(L: *VM.lua.State, comptime libName: [:0]const u8) !void {
         try L.rawsetfield(-2, libName);
     } else L.pop(1);
     L.pop(2);
+}
+
+pub fn getModule(L: *VM.lua.State, comptime libName: [:0]const u8) !VM.lua.Type {
+    _ = try L.Lfindtable(VM.lua.REGISTRYINDEX, "_LIBS", 1);
+    const @"type" = L.rawgetfield(-1, libName);
+    L.remove(-2); // remove _LIBS table
+    return @"type";
 }

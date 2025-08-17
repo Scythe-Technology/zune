@@ -554,7 +554,3 @@ test "Run Basic Syntax Error" {
     try std.testing.expectError(error.Syntax, loadModule(L, "test", "print('Hello, World!'\n", null));
     try std.testing.expectEqualStrings("[string \"test\"]:2: Expected ')' (to close '(' at line 1), got <eof>", L.tostring(-1) orelse "UnknownError");
 }
-
-test {
-    std.testing.refAllDecls(@This());
-}

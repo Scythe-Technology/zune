@@ -1473,7 +1473,6 @@ declare zune: {
     }?,
 
     fs: FileSystemLib,
-    mem: MemLib,
     process: ProcessLib,
     testing: TestingLib,
     task: TaskLib,
@@ -1489,4 +1488,5 @@ declare zune: {
     require: RequireLib,
     random: RandomLib,
     thread: ThreadLib,
+    mem: MemLib,
 }

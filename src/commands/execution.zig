@@ -177,8 +177,8 @@ fn cmdRun(allocator: std.mem.Allocator, args: []const []const u8) !void {
     var scheduler = try Scheduler.init(allocator, L);
     defer scheduler.deinit();
 
-    try Zune.Resolvers.Require.init(L);
-    defer Zune.Resolvers.Require.deinit(L);
+    try Zune.initState(L);
+    defer Zune.deinitState(L);
 
     try Scheduler.SCHEDULERS.append(&scheduler);
 
@@ -332,8 +332,8 @@ fn cmdTest(allocator: std.mem.Allocator, args: []const []const u8) !void {
     var scheduler = try Scheduler.init(gpa_allocator, L);
     defer scheduler.deinit();
 
-    try Zune.Resolvers.Require.init(L);
-    defer Zune.Resolvers.Require.deinit(L);
+    try Zune.initState(L);
+    defer Zune.deinitState(L);
 
     try Scheduler.SCHEDULERS.append(&scheduler);
 
@@ -387,8 +387,8 @@ fn cmdEval(allocator: std.mem.Allocator, args: []const []const u8) !void {
     var scheduler = try Scheduler.init(allocator, L);
     defer scheduler.deinit();
 
-    try Zune.Resolvers.Require.init(L);
-    defer Zune.Resolvers.Require.deinit(L);
+    try Zune.initState(L);
+    defer Zune.deinitState(L);
 
     try Scheduler.SCHEDULERS.append(&scheduler);
 
@@ -515,8 +515,8 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
         var scheduler = try Scheduler.init(allocator, L);
         defer scheduler.deinit();
 
-        try Zune.Resolvers.Require.init(L);
-        defer Zune.Resolvers.Require.deinit(L);
+        try Zune.initState(L);
+        defer Zune.deinitState(L);
 
         try Scheduler.SCHEDULERS.append(&scheduler);
 

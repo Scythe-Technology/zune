@@ -32,12 +32,8 @@ const cpu_endian = builtin.cpu.arch.endian();
 
 const Hash = std.crypto.hash.sha3.Sha3_256;
 
-threadlocal var TAGGED_FFI_POINTERS: std.StringArrayHashMapUnmanaged(bool) = .empty;
-threadlocal var CACHED_C_COMPILATON: std.StringHashMapUnmanaged(*CallableFunction) = .empty;
-pub threadlocal var CACHED_POINTER: struct {
-    map: std.AutoHashMapUnmanaged(?*anyopaque, i32) = .empty,
-    table: LuaHelper.RefTable = .{ .table_ref = .{ .value = undefined } },
-} = .{};
+threadlocal var TAGGED_FFI_POINTERS: std.StringArrayHashMapUnmanaged(bool) = undefined;
+threadlocal var CACHED_C_COMPILATON: std.StringHashMapUnmanaged(*CallableFunction) = undefined;
 
 pub const DataType = struct {
     size: usize,
@@ -250,44 +246,16 @@ pub const LuaPointer = struct {
         static,
     };
 
-    pub fn ptrFromAddress(L: *VM.lua.State) !i32 {
-        const buf = L.Lcheckbuffer(1);
-        if (buf.len < @sizeOf(usize))
-            return error.SmallBuffer;
-
-        const static_ptr: ?*anyopaque = @ptrFromInt(std.mem.bytesToValue(usize, buf[0..@sizeOf(usize)]));
-
-        if (CACHED_POINTER.map.get(static_ptr)) |ref| {
-            _ = CACHED_POINTER.table.get(L, ref) orelse @panic("unexpected value");
-            return 1;
-        }
-
-        const ptr = try L.newuserdatataggedwithmetatable(LuaPointer, TAG_FFI_POINTER);
-
-        ptr.* = .{
-            .ptr = static_ptr,
-            .owner = .user,
-            .type = .static,
-            .data = .{},
-        };
-
-        try CACHED_POINTER.map.put(Zune.DEFAULT_ALLOCATOR, static_ptr, (try CACHED_POINTER.table.ref(L, -1)).?);
-
-        return 1;
-    }
-
     pub fn allocBlockPtr(L: *VM.lua.State, size: usize, alignment: std.mem.Alignment) !*LuaPointer {
         const allocator = luau.getallocator(L);
 
         const mem: [*]u8 = blk: {
-            if (size > 0) {
-                const bytes = allocator.rawAlloc(size, alignment, @returnAddress()) orelse return std.mem.Allocator.Error.OutOfMemory;
-                @memset(bytes[0..size], 0);
-                break :blk bytes;
-            }
-            break :blk &[0]u8{};
+            const bytes = allocator.rawAlloc(@max(size, 1), alignment, @returnAddress()) orelse return std.mem.Allocator.Error.OutOfMemory;
+            @memset(bytes[0..@max(size, 1)], 0);
+            break :blk bytes;
         };
 
+        getCacheTable(L);
         const ptr = try L.newuserdatataggedwithmetatable(LuaPointer, TAG_FFI_POINTER);
 
         ptr.* = .{
@@ -299,7 +267,9 @@ pub const LuaPointer = struct {
             .data = .{},
         };
 
-        try CACHED_POINTER.map.put(Zune.DEFAULT_ALLOCATOR, @ptrCast(@alignCast(mem)), (try CACHED_POINTER.table.ref(L, -1)).?);
+        L.pushlightuserdata(@ptrCast(@alignCast(mem)));
+        L.pushvalue(-2);
+        try L.rawset(-4);
 
         try ptr.retain(L);
 
@@ -307,10 +277,13 @@ pub const LuaPointer = struct {
     }
 
     pub fn newStaticPtr(L: *VM.lua.State, static_ptr: ?*anyopaque) !*LuaPointer {
-        if (CACHED_POINTER.map.get(static_ptr)) |ref| {
-            _ = CACHED_POINTER.table.get(L, ref) orelse @panic("unexpected value");
+        getCacheTable(L);
+        L.pushlightuserdata(static_ptr);
+        if (L.rawget(-2) != .Nil) {
+            L.remove(-2);
             return L.touserdatatagged(LuaPointer, -1, TAG_FFI_POINTER) orelse @panic("expected LuaPointer");
         }
+        L.pop(1);
 
         const ptr = try L.newuserdatataggedwithmetatable(LuaPointer, TAG_FFI_POINTER);
 
@@ -321,34 +294,13 @@ pub const LuaPointer = struct {
             .data = .{},
         };
 
-        try CACHED_POINTER.map.put(Zune.DEFAULT_ALLOCATOR, static_ptr, (try CACHED_POINTER.table.ref(L, -1)).?);
+        L.pushlightuserdata(static_ptr);
+        L.pushvalue(-2);
+        try L.rawset(-4);
+
+        L.remove(-2);
 
         return ptr;
-    }
-
-    pub fn allocPtr(L: *VM.lua.State) !i32 {
-        const ref_ptr = value(L, 1) orelse return error.Failed;
-        const allocator = luau.getallocator(L);
-
-        const ptr = try L.newuserdatataggedwithmetatable(LuaPointer, TAG_FFI_POINTER);
-
-        const mem = try allocator.create(*anyopaque);
-        mem.* = @ptrCast(@alignCast(ref_ptr.ptr));
-
-        ptr.* = .{
-            .ptr = @ptrCast(@alignCast(mem)),
-            .size = @sizeOf(*anyopaque),
-            .alignment = .@"8",
-            .owner = .runtime,
-            .type = .allocated,
-            .data = .{},
-        };
-
-        try CACHED_POINTER.map.put(Zune.DEFAULT_ALLOCATOR, @ptrCast(@alignCast(mem)), (try CACHED_POINTER.table.ref(L, -1)).?);
-
-        try ptr.retain(L);
-
-        return 1;
     }
 
     pub fn retain(ptr: *LuaPointer, L: *VM.lua.State) !void {
@@ -570,10 +522,10 @@ pub const LuaPointer = struct {
                     .int, .float => try FFITypeConversion(T, mem, L, 3, 0),
                     .pointer => switch (L.typeOf(3)) {
                         .Userdata => {
-                            const lua_ptr = LuaPointer.value(L, 3) orelse return error.Fail;
-                            if (lua_ptr.owner == .none)
+                            const lptr = LuaPointer.value(L, 3) orelse return error.Fail;
+                            if (lptr.owner == .none)
                                 return error.NoAddressAvailable;
-                            var bytes: [@sizeOf(usize)]u8 = @bitCast(@as(usize, @intFromPtr(lua_ptr.ptr)));
+                            var bytes: [@sizeOf(usize)]u8 = @bitCast(@as(usize, @intFromPtr(lptr.ptr)));
                             @memcpy(mem[0..@sizeOf(usize)], &bytes);
                         },
                         else => return error.InvalidArgType,
@@ -712,20 +664,15 @@ pub const LuaPointer = struct {
     }
 
     pub fn __dtor(L: *VM.lua.State, ptr: *LuaPointer) void {
-        _ = CACHED_POINTER.map.remove(ptr.ptr);
-
         if (ptr.owner != .runtime)
             return;
         switch (ptr.type) {
             .allocated => {
-                if (ptr.retained)
-                    return;
-                if ((ptr.size orelse 1) == 0)
-                    return;
+                const size = @max(ptr.size orelse 8, 1);
                 const allocator = luau.getallocator(L);
                 ptr.owner = .none;
                 allocator.rawFree(
-                    @as([*]u8, @ptrCast(@alignCast(ptr.ptr)))[0 .. ptr.size orelse 8],
+                    @as([*]u8, @ptrCast(@alignCast(ptr.ptr)))[0..size],
                     ptr.alignment orelse .@"1",
                     @returnAddress(),
                 );
@@ -1018,12 +965,12 @@ const LuaDataType = struct {
                 .void => return error.InvalidArgType,
                 .pointer => switch (L.typeOf(-1)) {
                     .Userdata => {
-                        const lua_ptr = LuaPointer.value(L, -1) orelse return error.Failed;
-                        if (lua_ptr.owner == .none)
+                        const lptr = LuaPointer.value(L, -1) orelse return error.Failed;
+                        if (lptr.owner == .none)
                             return error.NoAddressAvailable;
-                        if (lua_ptr.data.tag != field_type.kind.pointer.tag)
+                        if (lptr.data.tag != field_type.kind.pointer.tag)
                             return error.PointerTagMismatch;
-                        var bytes: [@sizeOf(usize)]u8 = @bitCast(@as(usize, @intFromPtr(lua_ptr.ptr)));
+                        var bytes: [@sizeOf(usize)]u8 = @bitCast(@as(usize, @intFromPtr(lptr.ptr)));
                         @memcpy(mem[pos .. pos + @sizeOf(usize)], &bytes);
                     },
                     else => return error.InvalidArgType,
@@ -2035,6 +1982,28 @@ fn lua_tagName(L: *VM.lua.State) !i32 {
     return 1;
 }
 
+fn lua_ptr(L: *VM.lua.State) !i32 {
+    const ref_ptr = LuaPointer.value(L, 1) orelse return L.Zerror("invalid pointer");
+
+    const ptr = try LuaPointer.allocBlockPtr(L, @sizeOf(*anyopaque), .fromByteUnits(@alignOf(*anyopaque)));
+
+    @as(**anyopaque, @ptrCast(@alignCast(ptr.ptr))).* = @ptrCast(@alignCast(ref_ptr.ptr));
+
+    return 1;
+}
+
+fn lua_ptrFromAddress(L: *VM.lua.State) !i32 {
+    const buf = L.Lcheckbuffer(1);
+    if (buf.len < @sizeOf(usize))
+        return error.SmallBuffer;
+
+    const static_ptr: ?*anyopaque = @ptrFromInt(std.mem.bytesToValue(usize, buf[0..@sizeOf(usize)]));
+
+    _ = try LuaPointer.newStaticPtr(L, static_ptr);
+
+    return 1;
+}
+
 fn lua_alloc(L: *VM.lua.State) !i32 {
     const len = L.Lchecknumber(1);
     const alignment = L.Loptnumber(2, 1);
@@ -2065,10 +2034,9 @@ fn lua_free(L: *VM.lua.State) !i32 {
     switch (ptr.type) {
         .allocated => {
             ptr.owner = .none;
-            if ((ptr.size orelse 1) == 0)
-                return 0;
+            const size = @max(ptr.size orelse 8, 1);
             allocator.rawFree(
-                @as([*]u8, @ptrCast(@alignCast(ptr.ptr)))[0 .. ptr.size orelse 8],
+                @as([*]u8, @ptrCast(@alignCast(ptr.ptr)))[0..size],
                 ptr.alignment orelse .@"1",
                 @returnAddress(),
             );
@@ -2241,6 +2209,33 @@ fn lua_compile(L: *VM.lua.State) !i32 {
     return 1;
 }
 
+pub fn initCacheTable(L: *VM.lua.State) !void {
+    try LuaHelper.initTable(L, true);
+    try L.rawsetfield(VM.lua.REGISTRYINDEX, "_CACHED_FFI_TABLE");
+}
+
+pub fn getCacheTable(L: *VM.lua.State) void {
+    const @"type" = L.rawgetfield(VM.lua.REGISTRYINDEX, "_CACHED_FFI_TABLE");
+    std.debug.assert(@"type" == .Table);
+}
+
+pub fn deinitCacheTable(L: *VM.lua.State) void {
+    L.pushnil();
+    L.rawsetfield(VM.lua.REGISTRYINDEX, "_CACHED_FFI_TABLE") catch {};
+}
+
+pub fn init(L: *VM.lua.State) !void {
+    _ = L;
+    TAGGED_FFI_POINTERS = .empty;
+    CACHED_C_COMPILATON = .empty;
+}
+
+pub fn deinit(L: *VM.lua.State) void {
+    _ = L;
+    TAGGED_FFI_POINTERS.deinit(Zune.DEFAULT_ALLOCATOR);
+    CACHED_C_COMPILATON.deinit(Zune.DEFAULT_ALLOCATOR);
+}
+
 pub fn loadLib(L: *VM.lua.State) !void {
     {
         _ = try L.Znewmetatable(@typeName(LuaDataType), .{
@@ -2273,11 +2268,7 @@ pub fn loadLib(L: *VM.lua.State) !void {
         L.pop(1);
     }
 
-    TAGGED_FFI_POINTERS = .empty;
-    CACHED_C_COMPILATON = .empty;
-    CACHED_POINTER = .{};
-
-    CACHED_POINTER.table = try .init(L, true);
+    try initCacheTable(L);
 
     try L.createtable(0, 16);
 
@@ -2295,8 +2286,8 @@ pub fn loadLib(L: *VM.lua.State) !void {
 
     try L.Zsetfieldfn(-1, "tagName", lua_tagName);
 
-    try L.Zsetfieldfn(-1, "ptr", LuaPointer.allocPtr);
-    try L.Zsetfieldfn(-1, "ptrFromAddress", LuaPointer.ptrFromAddress);
+    try L.Zsetfieldfn(-1, "ptr", lua_ptr);
+    try L.Zsetfieldfn(-1, "ptrFromAddress", lua_ptrFromAddress);
 
     try L.Zsetfieldfn(-1, "getLuaState", lua_getLuaState);
 

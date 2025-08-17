@@ -392,7 +392,9 @@ pub fn loadLib(L: *VM.lua.State) !void {
 }
 
 test {
-    std.testing.refAllDecls(@This());
+    _ = tls;
+    _ = random;
+    _ = password;
 }
 
 test "crypto" {
