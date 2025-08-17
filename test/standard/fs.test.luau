@@ -14,19 +14,14 @@ local function isDir(path: string): boolean
     return fs.stat(path).kind == "directory";
 end
 
+local function isFile(path: string): boolean
+    return fs.stat(path).kind == "file";
+end
+
 assert(isDir(TEMP_DIR), `TEMP_DIR is not a directory, {TEMP_DIR}`);
 
 local function path(dir: string)
     return `{TEMP_DIR}/{dir}`;
-end
-
-local function isFile(path: string): boolean
-    local ok, err = pcall(fs.openFile, path);
-    if (not ok) then
-        return false;
-    end
-    err:close();
-    return true;
 end
 
 describe("Binary", function()
