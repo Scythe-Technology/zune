@@ -308,6 +308,8 @@ pub fn openZune(L: *VM.lua.State, args: []const []const u8, flags: Flags) !void 
         if (FEATURES.thread and comptime corelib.thread.PlatformSupported())
             try corelib.thread.loadLib(L);
 
+        try corelib.mem.loadLib(L);
+
         try corelib.testing.loadLib(L, STATE.RUN_MODE == .Test);
 
         if (STATE.BUNDLE) |b| {

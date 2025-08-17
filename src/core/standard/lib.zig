@@ -1,6 +1,7 @@
 pub const fs = @import("fs/lib.zig");
 pub const io = @import("io.zig");
 pub const ffi = @import("ffi.zig");
+pub const mem = @import("mem.zig");
 pub const net = @import("net/lib.zig");
 pub const task = @import("task.zig");
 pub const luau = @import("luau.zig");

@@ -1,5 +1,6 @@
 --!strict
 local ffi = zune.ffi;
+local mem = zune.mem;
 local process = zune.process;
 local testing = zune.testing;
 
@@ -27,12 +28,11 @@ expect(ffi).toBe(
         getLuaState = expect.type("function"),
         alloc = expect.type("function"),
         free = expect.type("function"),
-        copy = expect.type("function"),
-        len = expect.type("function"),
         dupe = expect.type("function"),
         tagName = expect.type("function"),
         prefix = expect.type("string"),
         suffix = expect.type("string"),
+        null = expect.type("userdata"),
         types = expect.similar({
             void = expect.type("userdata"),
             i8 = expect.type("userdata"),
@@ -92,11 +92,11 @@ describe("FFI", function()
             local src = ffi.dupe(buffer.fromstring("terminated string\0")):release();
 
             local ptr = ffi.ptr(src):release();
-            local unknown = ptr:readPtr():release();
+            local unknown = ptr:readptr():release();
 
             local buf = unknown:span(0);
 
-            expect(buffer.len(buf)).toBe(ffi.len(src));
+            expect(buffer.len(buf)).toBe(mem.len(src));
             expect(buffer.tostring(buf)).toBe("terminated string\0");
         end)
 
@@ -104,11 +104,11 @@ describe("FFI", function()
             local src = buffer.create(ffi.types.i32:size());
             buffer.writei32(src, 0, 42);
 
-            local mem = ffi.dupe(src);
-            mem:release();
+            local block = ffi.dupe(src);
+            block:release();
 
             local dest = buffer.create(ffi.types.i32:size());
-            ffi.copy(dest, 0, mem, 0, ffi.types.i32:size());
+            mem.copy(dest, 0, block, 0, ffi.types.i32:size());
 
             expect(buffer.readi32(dest, 0)).toBe(42);
         end)
@@ -120,7 +120,7 @@ describe("FFI", function()
             local ptr = ffi.alloc(ffi.types.i32:size());
             ptr:release();
 
-            ffi.copy(ptr, 0, src, 0, ffi.types.i32:size());
+            mem.copy(ptr, 0, src, 0, ffi.types.i32:size());
 
             expect(ptr:readi32()).toBe(42);
         end)
@@ -141,8 +141,8 @@ describe("FFI", function()
 
             local mem = ffi.dupe(src);
             mem:release();
-            local ptr = ffi.ptr(mem):release():readPtr();
-            local ptr2 = ffi.ptr(mem):release():readPtr();
+            local ptr = ffi.ptr(mem):release():readptr();
+            local ptr2 = ffi.ptr(mem):release():readptr();
 
             expect(ptr == ptr2).toBe(true);
 
@@ -150,7 +150,7 @@ describe("FFI", function()
 
             local null_ptr = ffi.ptrFromAddress(buffer.create(ffi.types.pointer:size()));
 
-            expect(null_ptr:isNull()).toBe(true);
+            expect(null_ptr == ffi.null).toBe(true);
             expect(null_ptr == ptr).toBe(false);
         end)
 
@@ -163,16 +163,16 @@ describe("FFI", function()
         end)
 
         test("Alloc", function()
-            local mem = ffi.alloc(24);
-            expect(mem).toBe(expect.type("userdata"));
-            expect(ffi.len(mem)).toBe(24);
-            ffi.free(mem);
+            local block = ffi.alloc(24);
+            expect(block).toBe(expect.type("userdata"));
+            expect(mem.len(block)).toBe(24);
+            ffi.free(block);
         end)
 
         test("Alloc GC", function()
-            local mem = ffi.alloc(24):release();
-            expect(mem).toBe(expect.type("userdata"));
-            expect(ffi.len(mem)).toBe(24);
+            local block = ffi.alloc(24):release();
+            expect(block).toBe(expect.type("userdata"));
+            expect(mem.len(block)).toBe(24);
         end)
 
         test("Alloc Zero", function()
@@ -182,15 +182,15 @@ describe("FFI", function()
             end
             expect(function()
                 mem:readu8(24);
-            end).toThrow("OutOfBounds");
+            end).toThrow("access out of bounds");
         end)
 
         test("Alloc Offset", function()
-            local mem = ffi.alloc(24):release();
+            local block = ffi.alloc(24):release();
             for i = 1, 23 do
-                local ptr = mem:offset(i);
-                expect(ptr == mem).toBe(false);
-                expect(ffi.len(ptr)).toBe(24 - i);
+                local ptr = block:offset(i);
+                expect(ptr == block).toBe(false);
+                expect(mem.len(ptr)).toBe(24 - i);
                 expect(ptr:readu8()).toBe(0);
             end
         end)
@@ -200,7 +200,7 @@ describe("FFI", function()
             local base = ffi.ptrFromAddress(address);
             
             expect(base == ffi.ptrFromAddress(address)).toBe(true);
-            expect(base:isNull()).toBe(true);
+            expect(base == ffi.null).toBe(true);
 
             for i = 1, 3 do
                 local ptr = base:offset(i);
@@ -208,7 +208,9 @@ describe("FFI", function()
                 local located_ptr = ffi.ptrFromAddress(address);
                 expect(ptr == base).toBe(false);
                 expect(ptr == located_ptr).toBe(true);
-                expect(ffi.len(ptr)).toBe(nil);
+                expect(function()
+                    mem.len(ptr)
+                end).toThrow("unknown size");
             end
         end);
 
@@ -1119,14 +1121,14 @@ describe("FFI", function()
                 test("Symbol<*i32 new_i32()>", function()
                     ptr = lib.new_i32();
 
-                    ptr:setSize(ffi.types.i32:size());
+                    ptr:size(ffi.types.i32:size());
                     expect(ptr).toBe(expect.type("userdata"));
 
                     expect(ptr:readi32()).toBe(123);
 
                     local src = buffer.create(ffi.types.i32:size());
                     buffer.writei32(src, 0, 42);
-                    ffi.copy(ptr, 0, src, 0, ffi.types.i32:size());
+                    mem.copy(ptr, 0, src, 0, ffi.types.i32:size());
 
                     expect(ptr:readi32()).toBe(42);
 
@@ -1144,14 +1146,14 @@ describe("FFI", function()
                 local ptr = nil;
                 test("Symbol<*i32 new_i32()>", function()
                     ptr = ffi.fn(new_i32_defintion, lib:getSymbol("new_i32"))();
-                    ptr:setSize(ffi.types.i32:size());
+                    ptr:size(ffi.types.i32:size());
                     expect(ptr).toBe(expect.type("userdata"));
 
                     expect(ptr:readi32()).toBe(123);
 
                     local src = buffer.create(ffi.types.i32:size());
                     buffer.writei32(src, 0, 42);
-                    ffi.copy(ptr, 0, src, 0, ffi.types.i32:size());
+                    mem.copy(ptr, 0, src, 0, ffi.types.i32:size());
 
                     expect(ptr:readi32()).toBe(42);
 
@@ -1169,57 +1171,52 @@ describe("FFI", function()
 
         describe("Internal Memory Management", function()
             test("Block", function()
-                local mem = ffi.alloc(24);
-                expect(mem).toBe(expect.type("userdata"));
+                local block = ffi.alloc(24);
+                expect(block).toBe(expect.type("userdata"));
 
-                expect(ffi.len(mem)).toBe(24);
+                expect(mem.len(block)).toBe(24);
 
                 expect(function()
-                    ffi.copy(mem, 24, buffer.create(1), 0, 1);
-                end).toThrow("Target OutOfBounds");
+                    mem.copy(block, 24, buffer.create(1), 0, 1);
+                end).toThrow("access out of bounds");
 
-                ffi.free(mem);
+                ffi.free(block);
             end)
 
             local block_address = buffer.create(ffi.types.pointer:size());
             test("Leaky Block, Unknown Transform", function()
-                local mem = ffi.alloc(24);
-                expect(mem).toBe(expect.type("userdata"));
+                local block = ffi.alloc(24);
+                expect(block).toBe(expect.type("userdata"));
 
-                expect(ffi.len(mem)).toBe(24);
-
-                expect(function()
-                    ffi.copy(buffer.create(1), 0, mem, 24, 1);
-                end).toThrow("Source OutOfBounds");
+                expect(mem.len(block)).toBe(24);
 
                 expect(function()
-                    mem:read(24, buffer.create(1), 0, 1);
-                end).toThrow("Source OutOfBounds");
+                    mem.copy(buffer.create(1), 0, block, 24, 1);
+                end).toThrow("access out of bounds");
+
+                expect(function()
+                    block:read(24, buffer.create(1), 0, 1);
+                end).toThrow("access out of bounds");
 
                 local temp = buffer.create(24);
                 buffer.writei32(temp, 0, -42);
                 buffer.writei32(temp, 4, 100);
                 buffer.writei32(temp, 8, 0);
                 buffer.writei32(temp, 12, -10);
-                ffi.copy(mem, 0, temp, 0, 24);
+                mem.copy(block, 0, temp, 0, 24);
 
-                ffi.copy(block_address, 0, ffi.ptr(mem):release(), 0, ffi.types.pointer:size());
+                mem.copy(block_address, 0, ffi.ptr(block):release(), 0, ffi.types.pointer:size());
 
-                mem:drop();
+                block:drop();
             end)
 
             test("Leaky Unknown Block, Free", function()
-                local mem = ffi.ptrFromAddress(block_address);
-                expect(mem:isNull()).toBe(false);
-                expect(ffi.len(mem)).toBe(nil); -- unknown size
-                
-                mem:setAlignment(1);
-                mem:setSize(24);
-
-                expect(ffi.len(mem)).toBe(24);
+                local block = ffi.ptrFromAddress(block_address);
+                expect(block == ffi.null).toBe(false);
+                expect(mem.len(block)).toBe(24);
 
                 local out = buffer.create(24);
-                ffi.copy(out, 0, mem, 0, 24);
+                mem.copy(out, 0, block, 0, 24);
 
                 expect(buffer.readi32(out, 0)).toBe(-42);
                 expect(buffer.readi32(out, 4)).toBe(100);
@@ -1227,13 +1224,13 @@ describe("FFI", function()
                 expect(buffer.readi32(out, 12)).toBe(-10);
 
                 expect(function()
-                    ffi.copy(buffer.create(1), 0, mem, 24, 1);
-                end).toThrow("Source OutOfBounds");
+                    mem.copy(buffer.create(1), 0, block, 24, 1);
+                end).toThrow("access out of bounds");
                 expect(function()
-                    mem:read(24, buffer.create(1), 0, 1);
-                end).toThrow("Source OutOfBounds");
+                    block:read(24, buffer.create(1), 0, 1);
+                end).toThrow("access out of bounds");
 
-                ffi.free(mem);
+                ffi.free(block);
             end)
         end)
 
@@ -1273,7 +1270,7 @@ describe("FFI", function()
 
             test("Pointer tagged", function()
                 for i = 1, 10 do
-                    expect(ffi.dupe(buffer.create(0)):release():setTag(i):getTag()).toBe(i);
+                    expect(ffi.dupe(buffer.create(0)):release():tag(i):tag()).toBe(i);
                 end
             end)
 
@@ -1285,22 +1282,22 @@ describe("FFI", function()
 
             test("No Conflict", function()
                 expect(any_check(ffi.dupe(buffer.create(0)):release())).toBe(0);
-                expect(ctxA_check(ffi.dupe(buffer.create(0)):release():setTag(1))).toBe(0);
-                expect(ctxB_check(ffi.dupe(buffer.create(0)):release():setTag(2))).toBe(0);
+                expect(ctxA_check(ffi.dupe(buffer.create(0)):release():tag(1))).toBe(0);
+                expect(ctxB_check(ffi.dupe(buffer.create(0)):release():tag(2))).toBe(0);
             end)
 
             test("Conflict", function()
                 expect(function()
-                    any_check(ffi.dupe(buffer.create(0)):release():setTag(1));
+                    any_check(ffi.dupe(buffer.create(0)):release():tag(1));
                 end).toThrow("Pointer tag mismatch");
                 expect(function()
-                    any_check(ffi.dupe(buffer.create(0)):release():setTag(2));
+                    any_check(ffi.dupe(buffer.create(0)):release():tag(2));
                 end).toThrow("Pointer tag mismatch");
                 expect(function()
-                    ctxA_check(ffi.dupe(buffer.create(0)):release():setTag(2));
+                    ctxA_check(ffi.dupe(buffer.create(0)):release():tag(2));
                 end).toThrow("Pointer tag mismatch");
                 expect(function()
-                    ctxB_check(ffi.dupe(buffer.create(0)):release():setTag(1));
+                    ctxB_check(ffi.dupe(buffer.create(0)):release():tag(1));
                 end).toThrow("Pointer tag mismatch");
                 expect(function()
                     ctxA_check(ffi.dupe(buffer.create(0)):release());
