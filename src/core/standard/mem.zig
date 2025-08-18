@@ -12,6 +12,8 @@ const VM = luau.VM;
 
 const ffi = @import("ffi.zig");
 
+pub const MAX_LUAU_SIZE = 1073741824; // 1 GB
+
 pub const LIB_NAME = "mem";
 
 inline fn isOutOfBounds(offset: u32, len: usize, access: usize) bool {
@@ -370,6 +372,7 @@ fn lua_set(L: *VM.lua.State) !i32 {
 
 pub fn loadLib(L: *VM.lua.State) !void {
     try L.Zpushvalue(.{
+        .MAX_SIZE = MAX_LUAU_SIZE,
         .len = lua_len,
         .copy = lua_copy,
         .slice = lua_slice,
