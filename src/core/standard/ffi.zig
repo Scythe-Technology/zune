@@ -32,8 +32,8 @@ const cpu_endian = builtin.cpu.arch.endian();
 
 const Hash = std.crypto.hash.sha3.Sha3_256;
 
-var TAGGED_FFI_POINTERS = std.StringArrayHashMap(bool).init(Zune.DEFAULT_ALLOCATOR);
-var CACHED_C_COMPILATON = std.StringHashMap(*CallableFunction).init(Zune.DEFAULT_ALLOCATOR);
+threadlocal var TAGGED_FFI_POINTERS: std.StringArrayHashMapUnmanaged(bool) = undefined;
+threadlocal var CACHED_C_COMPILATON: std.StringHashMapUnmanaged(*CallableFunction) = undefined;
 
 pub const DataType = struct {
     size: usize,
@@ -227,106 +227,80 @@ pub fn makeStruct(allocator: std.mem.Allocator, fields: []const DataType) !struc
     }, offsets };
 }
 
-const LuaPointer = struct {
+pub const LuaPointer = struct {
     ptr: ?*anyopaque,
     size: ?usize = null,
     alignment: ?std.mem.Alignment = null,
     local_ref: ?i32 = null,
-    destroyed: bool,
     retained: bool = false,
     type: PointerType,
     data: Info,
+    owner: enum { runtime, user, none },
 
     pub const Info = struct {
         tag: u32 = 0,
     };
 
     pub const PointerType = enum {
-        Allocated,
-        Static,
+        allocated,
+        static,
     };
-
-    pub fn ptrFromAddress(L: *VM.lua.State) !i32 {
-        const buf = L.Lcheckbuffer(1);
-        if (buf.len < @sizeOf(usize))
-            return error.SmallBuffer;
-
-        const ptr = try L.newuserdatataggedwithmetatable(LuaPointer, TAG_FFI_POINTER);
-
-        ptr.* = .{
-            .ptr = @ptrFromInt(std.mem.bytesToValue(usize, buf[0..@sizeOf(usize)])),
-            .destroyed = false,
-            .type = .Static,
-            .data = .{},
-        };
-
-        return 1;
-    }
 
     pub fn allocBlockPtr(L: *VM.lua.State, size: usize, alignment: std.mem.Alignment) !*LuaPointer {
         const allocator = luau.getallocator(L);
 
         const mem: [*]u8 = blk: {
-            if (size > 0) {
-                const bytes = allocator.rawAlloc(size, alignment, @returnAddress()) orelse return std.mem.Allocator.Error.OutOfMemory;
-                @memset(bytes[0..size], 0);
-                break :blk bytes;
-            }
-            break :blk &[0]u8{};
+            const bytes = allocator.rawAlloc(@max(size, 1), alignment, @returnAddress()) orelse return std.mem.Allocator.Error.OutOfMemory;
+            @memset(bytes[0..@max(size, 1)], 0);
+            break :blk bytes;
         };
 
+        getCacheTable(L);
         const ptr = try L.newuserdatataggedwithmetatable(LuaPointer, TAG_FFI_POINTER);
 
         ptr.* = .{
             .ptr = @ptrCast(@alignCast(mem)),
             .size = size,
             .alignment = alignment,
-            .destroyed = false,
-            .type = .Allocated,
+            .owner = .runtime,
+            .type = .allocated,
             .data = .{},
         };
+
+        L.pushlightuserdata(@ptrCast(@alignCast(mem)));
+        L.pushvalue(-2);
+        try L.rawset(-4);
 
         try ptr.retain(L);
 
         return ptr;
     }
 
-    pub fn newStaticPtr(L: *VM.lua.State, staticPtr: ?*anyopaque, default_retain: bool) !*LuaPointer {
+    pub fn newStaticPtr(L: *VM.lua.State, static_ptr: ?*anyopaque) !*LuaPointer {
+        getCacheTable(L);
+        L.pushlightuserdata(static_ptr);
+        if (L.rawget(-2) != .Nil) {
+            L.remove(-2);
+            return L.touserdatatagged(LuaPointer, -1, TAG_FFI_POINTER) orelse @panic("expected LuaPointer");
+        }
+        L.pop(1);
+
         const ptr = try L.newuserdatataggedwithmetatable(LuaPointer, TAG_FFI_POINTER);
 
         ptr.* = .{
-            .ptr = staticPtr,
-            .destroyed = false,
-            .type = .Static,
+            .ptr = static_ptr,
+            .owner = .user,
+            .type = .static,
             .data = .{},
         };
 
-        if (default_retain)
-            try ptr.retain(L);
+        L.pushlightuserdata(static_ptr);
+        L.pushvalue(-2);
+        try L.rawset(-4);
+
+        L.remove(-2);
 
         return ptr;
-    }
-
-    pub fn allocPtr(L: *VM.lua.State) !i32 {
-        const ref_ptr = value(L, 1) orelse return error.Failed;
-        const allocator = luau.getallocator(L);
-
-        const ptr = try L.newuserdatataggedwithmetatable(LuaPointer, TAG_FFI_POINTER);
-
-        const mem = try allocator.create(*anyopaque);
-        mem.* = @ptrCast(@alignCast(ref_ptr.ptr));
-
-        ptr.* = .{
-            .ptr = @ptrCast(@alignCast(mem)),
-            .alignment = .@"8",
-            .destroyed = false,
-            .type = .Allocated,
-            .data = .{},
-        };
-
-        try ptr.retain(L);
-
-        return 1;
     }
 
     pub fn retain(ptr: *LuaPointer, L: *VM.lua.State) !void {
@@ -349,43 +323,43 @@ const LuaPointer = struct {
 
     pub fn lua_retain(ptr: *LuaPointer, L: *VM.lua.State) !i32 {
         L.pushvalue(1);
-        try ptr.retain(L);
+        if (ptr.owner == .runtime)
+            try ptr.retain(L);
         return 1;
     }
 
     pub fn lua_release(ptr: *LuaPointer, L: *VM.lua.State) !i32 {
         ptr.retained = false;
-        if (ptr.local_ref) |ref|
-            L.unref(ref);
-        ptr.local_ref = null;
+        if (ptr.owner == .runtime) {
+            if (ptr.local_ref) |ref|
+                L.unref(ref);
+            ptr.local_ref = null;
+        }
         L.pushvalue(1);
         return 1;
     }
 
-    pub fn lua_setTag(ptr: *LuaPointer, L: *VM.lua.State) !i32 {
-        if (ptr.destroyed or ptr.ptr == null)
+    pub fn lua_tag(ptr: *LuaPointer, L: *VM.lua.State) !i32 {
+        if (ptr.owner == .none or ptr.ptr == null)
             return 0;
-        ptr.data.tag = L.Loptunsigned(2, 0);
+        const tag = L.tounsigned(2) orelse {
+            L.pushunsigned(ptr.data.tag);
+            return 1;
+        };
+        ptr.data.tag = tag;
         L.pushvalue(1);
-        return 1;
-    }
-
-    pub fn lua_getTag(ptr: *LuaPointer, L: *VM.lua.State) !i32 {
-        if (ptr.destroyed or ptr.ptr == null)
-            return 0;
-        L.pushunsigned(ptr.data.tag);
         return 1;
     }
 
     pub fn lua_drop(ptr: *LuaPointer, L: *VM.lua.State) !i32 {
-        if (ptr.destroyed or ptr.ptr == null)
+        if (ptr.owner == .none or ptr.ptr == null)
             return 0;
-        if (ptr.type == .Static)
+        if (ptr.type == .static)
             return L.Zerror("cannot drop a static pointer");
-        ptr.destroyed = true;
-        if (ptr.local_ref) |ref|
-            L.unref(ref);
-        ptr.local_ref = null;
+        ptr.owner = .user;
+        L.pushvalue(1);
+        if (ptr.local_ref == null)
+            try ptr.retain(L);
         return 1;
     }
 
@@ -394,7 +368,7 @@ const LuaPointer = struct {
         if (ptr.ptr == null) {
             if (pos < 0)
                 return L.Zerror("negative offset on null pointer is not allowed");
-            _ = try LuaPointer.newStaticPtr(L, @ptrFromInt(@as(usize, @intCast(pos))), false);
+            _ = try LuaPointer.newStaticPtr(L, @ptrFromInt(@as(usize, @intCast(pos))));
             return 1;
         }
         if (ptr.size) |size|
@@ -407,7 +381,6 @@ const LuaPointer = struct {
                 @as([*]u8, @ptrCast(ptr.ptr)) + @as(u32, @intCast(pos))
             else
                 @as([*]u8, @ptrCast(ptr.ptr)) - @abs(pos),
-            false,
         );
 
         if (ptr.size) |size|
@@ -417,7 +390,7 @@ const LuaPointer = struct {
     }
 
     pub fn lua_read(ptr: *LuaPointer, L: *VM.lua.State) !i32 {
-        if (ptr.destroyed or ptr.ptr == null)
+        if (ptr.owner == .none or ptr.ptr == null)
             return error.NoAddressAvailable;
 
         const src_offset: usize = @intFromFloat(L.Lchecknumber(2));
@@ -432,21 +405,21 @@ const LuaPointer = struct {
                 },
                 .Userdata => {
                     const other = LuaPointer.value(L, 3) orelse return error.Fail;
-                    if (other.destroyed or other.ptr == null)
+                    if (other.owner == .none or other.ptr == null)
                         return error.NoAddressAvailable;
                     dest_bounds = other.size;
                     break :blk @ptrCast(@alignCast(ptr.ptr));
                 },
-                else => return L.Zerror("Invalid type (expected buffer or userdata)"),
+                else => return L.Zerror("invalid type (expected buffer or userdata)"),
             }
         };
         const len: usize = @intCast(try L.Zcheckvalue(i32, 5, null));
 
         if (dest_bounds) |size| if (size < dest_offset + len)
-            return L.Zerror("Target OutOfBounds");
+            return L.Zerror("access out of bounds");
 
         if (ptr.size) |size| if (size < src_offset + len)
-            return L.Zerror("Source OutOfBounds");
+            return L.Zerror("access out of bounds");
 
         const src: [*]u8 = @ptrCast(@alignCast(ptr.ptr));
 
@@ -457,7 +430,7 @@ const LuaPointer = struct {
     }
 
     pub fn lua_write(ptr: *LuaPointer, L: *VM.lua.State) !i32 {
-        if (ptr.destroyed or ptr.ptr == null)
+        if (ptr.owner == .none or ptr.ptr == null)
             return error.NoAddressAvailable;
 
         const dest_offset: usize = @intCast(try L.Zcheckvalue(i32, 2, null));
@@ -472,21 +445,21 @@ const LuaPointer = struct {
                 },
                 .Userdata => {
                     const other = LuaPointer.value(L, 3) orelse return error.Fail;
-                    if (other.destroyed or other.ptr == null)
+                    if (other.owner == .none or other.ptr == null)
                         return error.NoAddressAvailable;
                     src_bounds = other.size;
                     break :blk @ptrCast(@alignCast(ptr.ptr));
                 },
-                else => return L.Zerror("Invalid type (expected buffer or userdata)"),
+                else => return L.Zerror("invalid type (expected buffer or userdata)"),
             }
         };
         const len: usize = @intCast(try L.Zcheckvalue(i32, 5, null));
 
         if (ptr.size) |size| if (size < dest_offset + len)
-            return L.Zerror("Target OutOfBounds");
+            return L.Zerror("access out of bounds");
 
         if (src_bounds) |size| if (size < src_offset + len)
-            return L.Zerror("Source OutOfBounds");
+            return L.Zerror("access out of bounds");
 
         const dest: [*]u8 = @ptrCast(@alignCast(ptr.ptr));
         @memcpy(dest[dest_offset .. dest_offset + len], src[src_offset .. src_offset + len]);
@@ -500,12 +473,12 @@ const LuaPointer = struct {
         const len = @sizeOf(T);
         return struct {
             fn inner(ptr: *LuaPointer, L: *VM.lua.State) !i32 {
-                if (ptr.destroyed or ptr.ptr == null)
+                if (ptr.owner == .none or ptr.ptr == null)
                     return error.NoAddressAvailable;
                 const pos: usize = @intCast(L.Loptinteger(2, 0));
 
                 if (ptr.size) |size| if (size < len + pos)
-                    return error.OutOfBounds;
+                    return L.Zerror("access out of bounds");
 
                 const mem: [*]u8 = @as([*]u8, @ptrCast(@alignCast(ptr.ptr)))[pos..];
 
@@ -520,7 +493,7 @@ const LuaPointer = struct {
                         16 => try L.Zpushbuffer(mem[0..len]),
                         else => return error.Unsupported,
                     },
-                    .pointer => _ = try LuaPointer.newStaticPtr(L, @ptrFromInt(std.mem.bytesToValue(usize, mem[0..@sizeOf(usize)])), false),
+                    .pointer => _ = try LuaPointer.newStaticPtr(L, @ptrFromInt(std.mem.bytesToValue(usize, mem[0..@sizeOf(usize)]))),
                     else => @compileError("Unsupported type"),
                 }
 
@@ -536,23 +509,23 @@ const LuaPointer = struct {
         const len = @sizeOf(T);
         return struct {
             fn inner(ptr: *LuaPointer, L: *VM.lua.State) !i32 {
-                if (ptr.destroyed or ptr.ptr == null)
+                if (ptr.owner == .none or ptr.ptr == null)
                     return error.NoAddressAvailable;
                 const pos: usize = @intCast(L.Loptinteger(2, 0));
 
                 if (ptr.size) |size| if (size < len + pos)
-                    return error.OutOfBounds;
+                    return L.Zerror("access out of bounds");
 
                 const mem: []u8 = @as([*]u8, @ptrCast(@alignCast(ptr.ptr)))[pos .. pos + len];
 
                 switch (ti) {
                     .int, .float => try FFITypeConversion(T, mem, L, 3, 0),
-                    .pointer => switch (L.typeOf(-1)) {
+                    .pointer => switch (L.typeOf(3)) {
                         .Userdata => {
-                            const lua_ptr = LuaPointer.value(L, -1) orelse return error.Fail;
-                            if (lua_ptr.destroyed)
+                            const lptr = LuaPointer.value(L, 3) orelse return error.Fail;
+                            if (lptr.owner == .none)
                                 return error.NoAddressAvailable;
-                            var bytes: [@sizeOf(usize)]u8 = @bitCast(@as(usize, @intFromPtr(lua_ptr.ptr)));
+                            var bytes: [@sizeOf(usize)]u8 = @bitCast(@as(usize, @intFromPtr(lptr.ptr)));
                             @memcpy(mem[0..@sizeOf(usize)], &bytes);
                         },
                         else => return error.InvalidArgType,
@@ -565,87 +538,74 @@ const LuaPointer = struct {
         }.inner;
     }
 
-    pub fn lua_isNull(ptr: *LuaPointer, L: *VM.lua.State) !i32 {
-        if (ptr.destroyed) {
-            L.pushboolean(true);
+    pub fn lua_size(ptr: *LuaPointer, L: *VM.lua.State) !i32 {
+        const size = L.tonumber(2) orelse {
+            if (ptr.owner == .none or ptr.ptr == null)
+                return 0;
+            if (ptr.size) |size|
+                L.pushnumber(@floatFromInt(size))
+            else
+                L.pushnil();
             return 1;
-        }
-        L.pushboolean(ptr.ptr == null);
-        return 1;
-    }
-
-    pub fn lua_setSize(ptr: *LuaPointer, L: *VM.lua.State) !i32 {
-        if (ptr.destroyed or ptr.ptr == null)
+        };
+        if (ptr.owner == .none or ptr.ptr == null)
             return L.Zerror("NoAddressAvailable");
-        const size = L.Lchecknumber(2);
         if (size < 0)
-            return L.Zerror("Size cannot be negative");
+            return L.Zerror("size cannot be negative");
 
-        const length: usize = @intFromFloat(size);
+        const len: usize = @intFromFloat(size);
 
         switch (ptr.type) {
-            .Allocated => return L.Zerror("Cannot set size of a known size pointer"),
-            .Static => {
-                if (ptr.size) |_|
-                    return L.Zerror("Cannot set size of a known size pointer");
-            },
+            .allocated => return L.Zerror("cannot set size of a known size pointer"),
+            .static => {},
         }
 
-        ptr.size = length;
+        ptr.size = len;
 
         return 0;
     }
 
-    pub fn lua_getSize(ptr: *LuaPointer, L: *VM.lua.State) !i32 {
-        if (ptr.destroyed or ptr.ptr == null)
-            return 0;
-        if (ptr.size) |size|
-            L.pushnumber(@floatFromInt(size))
-        else
-            L.pushnil();
-        return 1;
-    }
-
-    pub fn lua_setAlignment(ptr: *LuaPointer, L: *VM.lua.State) !i32 {
-        if (ptr.destroyed or ptr.ptr == null)
+    pub fn lua_alignment(ptr: *LuaPointer, L: *VM.lua.State) !i32 {
+        const alignment = L.tonumber(2) orelse {
+            if (ptr.owner == .none or ptr.ptr == null)
+                return 0;
+            if (ptr.alignment) |alignment|
+                L.pushnumber(@floatFromInt(alignment.toByteUnits()))
+            else
+                L.pushnil();
+            return 1;
+        };
+        if (ptr.owner == .none or ptr.ptr == null)
             return error.NoAddressAvailable;
-        const alignment = L.Lchecknumber(2);
         if (alignment < 0)
             return L.Zerror("alignment cannot be negative");
 
-        const length: usize = @intFromFloat(alignment);
+        const len: usize = @intFromFloat(alignment);
 
         switch (ptr.type) {
-            .Allocated => return L.Zerror("alignment is already known"),
-            .Static => {
+            .allocated => return L.Zerror("alignment is already known"),
+            .static => {
                 if (ptr.alignment) |_|
                     return L.Zerror("alignment is already set");
             },
         }
 
-        ptr.alignment = .fromByteUnits(length);
+        ptr.alignment = .fromByteUnits(len);
 
         return 0;
     }
 
-    pub fn lua_getAlignment(ptr: *LuaPointer, L: *VM.lua.State) !i32 {
-        if (ptr.destroyed or ptr.ptr == null)
-            return 0;
-        if (ptr.alignment) |alignment|
-            L.pushnumber(@floatFromInt(alignment.toByteUnits()))
-        else
-            L.pushnil();
-        return 1;
-    }
-
     pub fn lua_span(ptr: *LuaPointer, L: *VM.lua.State) !i32 {
-        if (ptr.destroyed or ptr.ptr == null)
+        if (ptr.owner == .none or ptr.ptr == null)
             return 0;
         const src_offset: usize = @intCast(L.Loptinteger(2, 0));
 
         const target: [*c]u8 = @ptrCast(@alignCast(ptr.ptr));
 
         const bytes: [:0]const u8 = std.mem.span(target[src_offset..]);
+
+        if (ptr.size == null)
+            ptr.size = bytes.len;
 
         const buf = try L.newbuffer(bytes.len + 1);
         @memcpy(buf[0..bytes.len], bytes);
@@ -657,8 +617,7 @@ const LuaPointer = struct {
     pub const __index = MethodMap.CreateStaticIndexMap(LuaPointer, TAG_FFI_POINTER, .{
         .{ "retain", lua_retain },
         .{ "release", lua_release },
-        .{ "setTag", lua_setTag },
-        .{ "getTag", lua_getTag },
+        .{ "tag", lua_tag },
         .{ "drop", lua_drop },
         .{ "offset", lua_offset },
         .{ "read", lua_read },
@@ -673,7 +632,7 @@ const LuaPointer = struct {
         .{ "readu64", GenerateReadLuaMethod(u64) },
         .{ "readf32", GenerateReadLuaMethod(f32) },
         .{ "readf64", GenerateReadLuaMethod(f64) },
-        .{ "readPtr", GenerateReadLuaMethod(*anyopaque) },
+        .{ "readptr", GenerateReadLuaMethod(*anyopaque) },
         .{ "writei8", GenerateWriteLuaMethod(i8) },
         .{ "writeu8", GenerateWriteLuaMethod(u8) },
         .{ "writei16", GenerateWriteLuaMethod(i16) },
@@ -684,36 +643,11 @@ const LuaPointer = struct {
         .{ "writeu64", GenerateWriteLuaMethod(u64) },
         .{ "writef32", GenerateWriteLuaMethod(f32) },
         .{ "writef64", GenerateWriteLuaMethod(f64) },
-        .{ "writePtr", GenerateWriteLuaMethod(*anyopaque) },
-        .{ "isNull", lua_isNull },
-        .{ "setSize", lua_setSize },
-        .{ "getSize", lua_getSize },
-        .{ "setAlignment", lua_setAlignment },
-        .{ "getAlignment", lua_getAlignment },
+        .{ "writeptr", GenerateWriteLuaMethod(*anyopaque) },
+        .{ "size", lua_size },
+        .{ "alignment", lua_alignment },
         .{ "span", lua_span },
     });
-
-    pub fn __eq(L: *VM.lua.State) !i32 {
-        try L.Zchecktype(1, .Userdata);
-        const ptr1 = L.touserdata(LuaPointer, 1) orelse return L.Zerror("Invalid pointer");
-
-        switch (L.typeOf(2)) {
-            .Userdata => {
-                const ptr2 = value(L, 2) orelse {
-                    L.pushboolean(false);
-                    return 1;
-                };
-
-                L.pushboolean(ptr1.ptr == ptr2.ptr);
-
-                return 1;
-            },
-            else => {
-                L.pushboolean(false);
-                return 1;
-            },
-        }
-    }
 
     pub fn __tostring(L: *VM.lua.State) !i32 {
         try L.Zchecktype(1, .Userdata);
@@ -730,23 +664,20 @@ const LuaPointer = struct {
     }
 
     pub fn __dtor(L: *VM.lua.State, ptr: *LuaPointer) void {
-        if (ptr.destroyed)
+        if (ptr.owner != .runtime)
             return;
         switch (ptr.type) {
-            .Allocated => {
-                if (ptr.retained)
-                    return;
-                if ((ptr.size orelse 1) == 0)
-                    return;
+            .allocated => {
+                const size = @max(ptr.size orelse 8, 1);
                 const allocator = luau.getallocator(L);
-                ptr.destroyed = true;
+                ptr.owner = .none;
                 allocator.rawFree(
-                    @as([*]u8, @ptrCast(@alignCast(ptr.ptr)))[0 .. ptr.size orelse 8],
+                    @as([*]u8, @ptrCast(@alignCast(ptr.ptr)))[0..size],
                     ptr.alignment orelse .@"1",
                     @returnAddress(),
                 );
             },
-            .Static => {},
+            .static => {},
         }
     }
 };
@@ -761,7 +692,7 @@ const LuaHandle = struct {
             L.pushnil();
             return 1;
         };
-        _ = try LuaPointer.newStaticPtr(L, sym_ptr, false);
+        _ = try LuaPointer.newStaticPtr(L, sym_ptr);
         return 1;
     }
 
@@ -941,7 +872,7 @@ fn fetchCallableFunction(returns: DataType, args: []const DataType) !*CallableFu
     code.hash = hash_key;
     code_ptr.* = code;
 
-    try CACHED_C_COMPILATON.put(hash_key, code_ptr);
+    try CACHED_C_COMPILATON.put(allocator, hash_key, code_ptr);
 
     code_ptr.ref();
 
@@ -981,7 +912,7 @@ const LuaDataType = struct {
 
         const unique = try L.Zcheckvalue([]const u8, 2, null);
 
-        const result = try TAGGED_FFI_POINTERS.getOrPut(unique);
+        const result = try TAGGED_FFI_POINTERS.getOrPut(Zune.DEFAULT_ALLOCATOR, unique);
         result.value_ptr.* = true;
 
         if (result.index + 1 > std.math.maxInt(u32))
@@ -1034,12 +965,12 @@ const LuaDataType = struct {
                 .void => return error.InvalidArgType,
                 .pointer => switch (L.typeOf(-1)) {
                     .Userdata => {
-                        const lua_ptr = LuaPointer.value(L, -1) orelse return error.Failed;
-                        if (lua_ptr.destroyed)
+                        const lptr = LuaPointer.value(L, -1) orelse return error.Failed;
+                        if (lptr.owner == .none)
                             return error.NoAddressAvailable;
-                        if (lua_ptr.data.tag != field_type.kind.pointer.tag)
+                        if (lptr.data.tag != field_type.kind.pointer.tag)
                             return error.PointerTagMismatch;
-                        var bytes: [@sizeOf(usize)]u8 = @bitCast(@as(usize, @intFromPtr(lua_ptr.ptr)));
+                        var bytes: [@sizeOf(usize)]u8 = @bitCast(@as(usize, @intFromPtr(lptr.ptr)));
                         @memcpy(mem[pos .. pos + @sizeOf(usize)], &bytes);
                     },
                     else => return error.InvalidArgType,
@@ -1270,7 +1201,7 @@ const ffi_c_interface = struct {
     pub const pushf64 = FFIArgumentPush(f64);
 
     pub fn pushpointer(L: *VM.lua.State, ptr: ?*anyopaque) callconv(.c) void {
-        _ = LuaPointer.newStaticPtr(L, ptr, false) catch (L.LerrorL("Failed to create pointer", .{}) catch |e| std.debug.panic("{}", .{e}));
+        _ = LuaPointer.newStaticPtr(L, ptr) catch (L.LerrorL("Failed to create pointer", .{}) catch |e| std.debug.panic("{}", .{e}));
     }
 
     pub fn pushmem(L: *VM.lua.State, ptr: [*c]u8, size: usize) callconv(.c) void {
@@ -1677,7 +1608,7 @@ fn FFIReturnTypeConversion(
                 return std.debug.panic("Small buffer ('{s}')", .{@typeName(T)});
             @memcpy(mem, lua_buf[0..size]);
         },
-        else => std.debug.panic("Invalid return type (expected number for '{s}')", .{@typeName(T)}),
+        else => std.debug.panic("invalid return type (expected number for '{s}')", .{@typeName(T)}),
     }
 }
 
@@ -1725,7 +1656,7 @@ fn ffi_closure_inner(call_info: *const LuaClosure.CallInfo, extern_args: [*]?*an
     defer call_info.thread.pop(1);
     var ref: LuaHelper.Ref(void) = .{
         .ref = .{
-            .registry = call_info.ref orelse return std.debug.panic("Invalid call info: no reference to call", .{}),
+            .registry = call_info.ref orelse return std.debug.panic("invalid call info: no reference to call", .{}),
         },
         .value = undefined,
     };
@@ -1736,7 +1667,7 @@ fn ffi_closure_inner(call_info: *const LuaClosure.CallInfo, extern_args: [*]?*an
         switch (arg_type.kind) {
             .void => unreachable,
             .pointer => {
-                const ptr = LuaPointer.newStaticPtr(L, @as(*[*]u8, @ptrCast(@alignCast(args[i]))).*, false) catch |err| std.debug.panic("Failed: {}", .{err});
+                const ptr = LuaPointer.newStaticPtr(L, @as(*[*]u8, @ptrCast(@alignCast(args[i]))).*) catch |err| std.debug.panic("Failed: {}", .{err});
                 ptr.data = arg_type.kind.pointer;
             },
             .@"struct" => {
@@ -1759,8 +1690,8 @@ fn ffi_closure_inner(call_info: *const LuaClosure.CallInfo, extern_args: [*]?*an
             .void => unreachable,
             .pointer => switch (L.typeOf(-1)) {
                 .Userdata => {
-                    const ptr = LuaPointer.value(L, -1) orelse std.debug.panic("Invalid pointer", .{});
-                    if (ptr.destroyed or ptr.ptr == null)
+                    const ptr = LuaPointer.value(L, -1) orelse std.debug.panic("invalid pointer", .{});
+                    if (ptr.owner == .none or ptr.ptr == null)
                         std.debug.panic("No address available", .{});
                     if (ptr.data.tag != call_info.type.returns.kind.pointer.tag)
                         std.debug.panic("Pointer tag mismatch", .{});
@@ -1770,14 +1701,14 @@ fn ffi_closure_inner(call_info: *const LuaClosure.CallInfo, extern_args: [*]?*an
                 .Nil => {
                     @as(*?*anyopaque, @ptrCast(@alignCast(ret))).* = null;
                 },
-                else => return std.debug.panic("Invalid return type (expected buffer/nil for '*anyopaque')", .{}),
+                else => return std.debug.panic("invalid return type (expected buffer/nil for '*anyopaque')", .{}),
             },
             .@"struct" => {
                 if (L.typeOf(-1) != .Buffer)
-                    return std.debug.panic("Invalid return type (expected buffer for struct)", .{});
+                    return std.debug.panic("invalid return type (expected buffer for struct)", .{});
                 const buf = L.tobuffer(-1) orelse unreachable;
                 if (buf.len != call_info.type.returns.size)
-                    return std.debug.panic("Invalid return type (expected buffer of size {d} for struct)", .{call_info.type.returns.size});
+                    return std.debug.panic("invalid return type (expected buffer of size {d} for struct)", .{call_info.type.returns.size});
                 @memcpy(@as([*]u8, @ptrCast(@alignCast(ret))), buf);
             },
             inline else => |_, T| FFIReturnTypeConversion(T.asType(), ret.?, L),
@@ -1897,7 +1828,8 @@ fn lua_closure(L: *VM.lua.State) !i32 {
 
     _ = try L.ref(-1); // permenently reference the closure
 
-    const ptr = try LuaPointer.newStaticPtr(L, data.callable, true);
+    const ptr = try LuaPointer.newStaticPtr(L, data.callable);
+    try ptr.retain(L);
     ptr.size = 0;
 
     return 1;
@@ -1942,7 +1874,7 @@ const FFIFunction = struct {
                         switch (L.typeOf(idx)) {
                             .Userdata => {
                                 const ptr = LuaPointer.value(L, idx) orelse return L.Zerrorf("userdata is not a Pointer", .{});
-                                if (ptr.destroyed)
+                                if (ptr.owner == .none)
                                     return L.Zerrorf("Pointer no address available", .{});
                                 if (ptr.data.tag != arg.kind.pointer.tag)
                                     return L.Zerrorf("Pointer tag mismatch", .{});
@@ -2008,7 +1940,7 @@ fn lua_fn(L: *VM.lua.State) !i32 {
     try L.Zchecktype(1, .Table);
     const src = LuaPointer.value(L, 2) orelse return L.Zerror("invalid pointer");
     switch (src.type) {
-        .Allocated => return error.PointerNotCallable,
+        .allocated => return error.PointerNotCallable,
         else => {},
     }
     const ptr: *anyopaque = src.ptr orelse return error.NoAddressAvailable;
@@ -2034,62 +1966,6 @@ fn lua_fn(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn lua_copy(L: *VM.lua.State) !i32 {
-    const target_offset: usize = @intFromFloat(L.Lchecknumber(2));
-    var target_bounds: ?usize = null;
-    const target: [*]u8 = blk: {
-        switch (L.typeOf(1)) {
-            .Buffer => {
-                const buf = L.tobuffer(1) orelse unreachable;
-                target_bounds = buf.len;
-                break :blk @ptrCast(@alignCast(buf.ptr));
-            },
-            .Userdata => {
-                const ptr = LuaPointer.value(L, 1) orelse return L.Zerror("Invalid pointer");
-                if (ptr.destroyed or ptr.ptr == null)
-                    return L.Zerror("No address available");
-                target_bounds = ptr.size;
-                break :blk @ptrCast(@alignCast(ptr.ptr));
-            },
-            else => return L.Zerror("Invalid type (expected buffer or userdata)"),
-        }
-    };
-    const src_offset: usize = @intFromFloat(L.Lchecknumber(4));
-    var src_bounds: ?usize = null;
-    const src: [*]u8 = blk: {
-        switch (L.typeOf(3)) {
-            .Buffer => {
-                const buf = L.tobuffer(3) orelse unreachable;
-                src_bounds = buf.len;
-                break :blk @ptrCast(@alignCast(buf.ptr));
-            },
-            .Userdata => {
-                const ptr = LuaPointer.value(L, 3) orelse return L.Zerror("Invalid pointer");
-                if (ptr.destroyed or ptr.ptr == null)
-                    return L.Zerror("No address available");
-                src_bounds = ptr.size;
-                break :blk @ptrCast(@alignCast(ptr.ptr));
-            },
-            else => return L.Zerror("Invalid type (expected buffer or userdata)"),
-        }
-    };
-    const len: usize = @intCast(try L.Zcheckvalue(i32, 5, null));
-
-    if (target_bounds) |bounds| if (target_offset + len > bounds)
-        return L.Zerror("Target OutOfBounds");
-
-    if (src_bounds) |bounds| if (src_offset + len > bounds)
-        return L.Zerror("Source OutOfBounds");
-
-    @memcpy(target[target_offset .. target_offset + len], src[src_offset .. src_offset + len]);
-
-    return 0;
-}
-
-fn lua_unsupported(L: *VM.lua.State) !i32 {
-    return L.Zerror("ffi is not supported on this platform");
-}
-
 fn lua_tagName(L: *VM.lua.State) !i32 {
     const id = L.Lcheckunsigned(1);
     if (id == 0) {
@@ -2106,77 +1982,78 @@ fn lua_tagName(L: *VM.lua.State) !i32 {
     return 1;
 }
 
+fn lua_ptr(L: *VM.lua.State) !i32 {
+    const ref_ptr = LuaPointer.value(L, 1) orelse return L.Zerror("invalid pointer");
+
+    const ptr = try LuaPointer.allocBlockPtr(L, @sizeOf(*anyopaque), .fromByteUnits(@alignOf(*anyopaque)));
+
+    @as(**anyopaque, @ptrCast(@alignCast(ptr.ptr))).* = @ptrCast(@alignCast(ref_ptr.ptr));
+
+    return 1;
+}
+
+fn lua_ptrFromAddress(L: *VM.lua.State) !i32 {
+    const buf = L.Lcheckbuffer(1);
+    if (buf.len < @sizeOf(usize))
+        return error.SmallBuffer;
+
+    const static_ptr: ?*anyopaque = @ptrFromInt(std.mem.bytesToValue(usize, buf[0..@sizeOf(usize)]));
+
+    _ = try LuaPointer.newStaticPtr(L, static_ptr);
+
+    return 1;
+}
+
 fn lua_alloc(L: *VM.lua.State) !i32 {
     const len = L.Lchecknumber(1);
     const alignment = L.Loptnumber(2, 1);
     if (alignment <= 0)
-        return L.Zerror("Invalid alignment");
+        return L.Zerror("invalid alignment");
     _ = try LuaPointer.allocBlockPtr(L, @intFromFloat(len), .fromByteUnits(@intFromFloat(alignment)));
     return 1;
 }
 
 fn lua_getLuaState(L: *VM.lua.State) !i32 {
     if (try L.Zcheckvalue(?bool, 1, null) orelse false) {
-        _ = try LuaPointer.newStaticPtr(L, @ptrCast(L.mainthread()), false);
+        _ = try LuaPointer.newStaticPtr(L, @ptrCast(L.mainthread()));
         return 1;
     }
-    _ = try LuaPointer.newStaticPtr(L, @ptrCast(L), false);
+    _ = try LuaPointer.newStaticPtr(L, @ptrCast(L));
     return 1;
 }
 
 fn lua_free(L: *VM.lua.State) !i32 {
-    const ptr = LuaPointer.value(L, 1) orelse return L.Zerror("Invalid pointer");
-    if (!ptr.destroyed) {
-        const allocator = luau.getallocator(L);
-        if (ptr.local_ref) |ref| {
-            L.unref(ref);
-            ptr.local_ref = null;
-        }
-        switch (ptr.type) {
-            .Allocated => {
-                ptr.destroyed = true;
-                if ((ptr.size orelse 1) == 0)
-                    return 0;
-                allocator.rawFree(
-                    @as([*]u8, @ptrCast(@alignCast(ptr.ptr)))[0 .. ptr.size orelse 8],
-                    ptr.alignment orelse .@"1",
-                    @returnAddress(),
-                );
-            },
-            .Static => {
-                ptr.destroyed = true;
-                if (ptr.size) |size| {
-                    if (size > 0)
-                        allocator.rawFree(
-                            @as([*]u8, @ptrCast(@alignCast(ptr.ptr)))[0..size],
-                            ptr.alignment orelse .@"1",
-                            @returnAddress(),
-                        );
-                }
-            },
-        }
-    } else return L.Zerror("Double free");
-    return 0;
-}
-
-fn lua_len(L: *VM.lua.State) !i32 {
-    switch (L.typeOf(1)) {
-        .Buffer => {
-            const buf = L.tobuffer(1) orelse unreachable;
-            L.pushinteger(@intCast(buf.len));
-        },
-        .Userdata => {
-            const ptr = LuaPointer.value(L, 1) orelse return L.Zerror("Invalid pointer");
-            if (ptr.destroyed or ptr.ptr == null)
-                return L.Zerror("No address available");
-            if (ptr.size) |size|
-                L.pushinteger(@intCast(size))
-            else
-                L.pushnil();
-        },
-        else => return L.Zerror("Invalid type (expected buffer or userdata)"),
+    const ptr = LuaPointer.value(L, 1) orelse return L.Zerror("invalid pointer");
+    if (ptr.owner == .none)
+        return L.Zerror("Double free");
+    const allocator = luau.getallocator(L);
+    if (ptr.local_ref) |ref| {
+        L.unref(ref);
+        ptr.local_ref = null;
     }
-    return 1;
+    switch (ptr.type) {
+        .allocated => {
+            ptr.owner = .none;
+            const size = @max(ptr.size orelse 8, 1);
+            allocator.rawFree(
+                @as([*]u8, @ptrCast(@alignCast(ptr.ptr)))[0..size],
+                ptr.alignment orelse .@"1",
+                @returnAddress(),
+            );
+        },
+        .static => {
+            ptr.owner = .none;
+            if (ptr.size) |size| {
+                if (size > 0)
+                    allocator.rawFree(
+                        @as([*]u8, @ptrCast(@alignCast(ptr.ptr)))[0..size],
+                        ptr.alignment orelse .@"1",
+                        @returnAddress(),
+                    );
+            }
+        },
+    }
+    return 0;
 }
 
 fn lua_dupe(L: *VM.lua.State) !i32 {
@@ -2191,9 +2068,9 @@ fn lua_dupe(L: *VM.lua.State) !i32 {
         },
         .Userdata => {
             const ptr = LuaPointer.value(L, 1) orelse return error.Fail;
-            if (ptr.destroyed or ptr.ptr == null)
+            if (ptr.owner == .none or ptr.ptr == null)
                 return error.NoAddressAvailable;
-            const len = ptr.size orelse return L.Zerror("Unknown sized pointer");
+            const len = ptr.size orelse return L.Zerror("unknown sized pointer");
             const dup_ptr = try LuaPointer.allocBlockPtr(L, len, ptr.alignment orelse .@"1");
             dup_ptr.data = ptr.data;
             @memcpy(
@@ -2201,7 +2078,7 @@ fn lua_dupe(L: *VM.lua.State) !i32 {
                 @as([*]u8, @ptrCast(@alignCast(ptr.ptr)))[0..len],
             );
         },
-        else => return L.Zerror("Invalid type (expected buffer or userdata)"),
+        else => return L.Zerror("invalid type (expected buffer or userdata)"),
     }
     return 1;
 }
@@ -2215,7 +2092,7 @@ const LuaCompiled = struct {
 
     pub fn lua_getSymbol(self: *LuaCompiled, L: *VM.lua.State) !i32 {
         if (self.state.get_symbol(L.Lcheckstring(2))) |ptr| {
-            _ = try LuaPointer.newStaticPtr(L, ptr, false);
+            _ = try LuaPointer.newStaticPtr(L, ptr);
             return 1;
         }
         return 0;
@@ -2332,6 +2209,33 @@ fn lua_compile(L: *VM.lua.State) !i32 {
     return 1;
 }
 
+pub fn initCacheTable(L: *VM.lua.State) !void {
+    try LuaHelper.initTable(L, true);
+    try L.rawsetfield(VM.lua.REGISTRYINDEX, "_CACHED_FFI_TABLE");
+}
+
+pub fn getCacheTable(L: *VM.lua.State) void {
+    const @"type" = L.rawgetfield(VM.lua.REGISTRYINDEX, "_CACHED_FFI_TABLE");
+    std.debug.assert(@"type" == .Table);
+}
+
+pub fn deinitCacheTable(L: *VM.lua.State) void {
+    L.pushnil();
+    L.rawsetfield(VM.lua.REGISTRYINDEX, "_CACHED_FFI_TABLE") catch {};
+}
+
+pub fn init(L: *VM.lua.State) !void {
+    _ = L;
+    TAGGED_FFI_POINTERS = .empty;
+    CACHED_C_COMPILATON = .empty;
+}
+
+pub fn deinit(L: *VM.lua.State) void {
+    _ = L;
+    TAGGED_FFI_POINTERS.deinit(Zune.DEFAULT_ALLOCATOR);
+    CACHED_C_COMPILATON.deinit(Zune.DEFAULT_ALLOCATOR);
+}
+
 pub fn loadLib(L: *VM.lua.State) !void {
     {
         _ = try L.Znewmetatable(@typeName(LuaDataType), .{
@@ -2345,7 +2249,6 @@ pub fn loadLib(L: *VM.lua.State) !void {
     }
     {
         _ = try L.Znewmetatable(@typeName(LuaPointer), .{
-            .__eq = LuaPointer.__eq,
             .__tostring = LuaPointer.__tostring,
             .__metatable = "Metatable is locked",
             .__type = "FFIPointer",
@@ -2365,7 +2268,12 @@ pub fn loadLib(L: *VM.lua.State) !void {
         L.pop(1);
     }
 
-    try L.createtable(0, 17);
+    try initCacheTable(L);
+
+    try L.createtable(0, 16);
+
+    _ = try LuaPointer.newStaticPtr(L, null);
+    try L.rawsetfield(-2, "null");
 
     try L.Zsetfieldfn(-1, "dlopen", lua_dlopen);
     try L.Zsetfieldfn(-1, "struct", lua_struct);
@@ -2374,14 +2282,12 @@ pub fn loadLib(L: *VM.lua.State) !void {
 
     try L.Zsetfieldfn(-1, "alloc", lua_alloc);
     try L.Zsetfieldfn(-1, "free", lua_free);
-    try L.Zsetfieldfn(-1, "copy", lua_copy);
-    try L.Zsetfieldfn(-1, "len", lua_len);
     try L.Zsetfieldfn(-1, "dupe", lua_dupe);
 
     try L.Zsetfieldfn(-1, "tagName", lua_tagName);
 
-    try L.Zsetfieldfn(-1, "ptr", LuaPointer.allocPtr);
-    try L.Zsetfieldfn(-1, "ptrFromAddress", LuaPointer.ptrFromAddress);
+    try L.Zsetfieldfn(-1, "ptr", lua_ptr);
+    try L.Zsetfieldfn(-1, "ptrFromAddress", lua_ptrFromAddress);
 
     try L.Zsetfieldfn(-1, "getLuaState", lua_getLuaState);
 

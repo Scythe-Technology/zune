@@ -141,7 +141,7 @@ pub fn sendFrame(self: *Self, loop: *xev.Loop, dataframe: WebSocket.DataFrame) !
 
 pub fn lua_send(self: *Self, L: *VM.lua.State) !i32 {
     if (self.closed)
-        return error.WebSocketClosed;
+        return error.Closed;
     const scheduler = Scheduler.getScheduler(L);
 
     const message = try L.Zcheckvalue([]const u8, 2, null);

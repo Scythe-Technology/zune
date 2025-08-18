@@ -48,3 +48,14 @@ pub const CommandMap = initCommands(&.{
 
     @import("version.zig").Command,
 });
+
+test {
+    _ = Execution;
+    _ = @import("setup.zig");
+    _ = @import("repl/lib.zig");
+    _ = @import("init.zig");
+    _ = @import("bundle.zig");
+    _ = @import("luau.zig");
+    _ = @import("help.zig");
+    _ = @import("version.zig");
+}

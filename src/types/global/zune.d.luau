@@ -43,11 +43,11 @@ export type FileStat = {
 
 declare class FileHandle
     read:
-        & ((self: FileHandle, amount: number?, useBuffer: false?) -> string)
-        & ((self: FileHandle, amount: number?, useBuffer: true) -> buffer)
+        & ((self: FileHandle, amount: number?, bytes: false?) -> string)
+        & ((self: FileHandle, amount: number?, bytes: true) -> buffer)
     readSync:
-        & ((self: FileHandle, amount: number?, useBuffer: false?) -> string)
-        & ((self: FileHandle, amount: number?, useBuffer: true) -> buffer)
+        & ((self: FileHandle, amount: number?, bytes: false?) -> string)
+        & ((self: FileHandle, amount: number?, bytes: true) -> buffer)
     function write(self, contents: string | buffer): ()
     function writeSync(self, contents: string | buffer): ()
     function append(self, contents: string | buffer): ()
@@ -88,7 +88,7 @@ type FileSystemLib = {
     openFile: (path: string, opts: OpenFileOptions?) -> FileHandle,
     readFile:
         & ((path: string) -> string)
-        & ((path: string, useBuffer: true) -> buffer),
+        & ((path: string, bytes: true) -> buffer),
     readDir: (path: string) -> { DirectoryEntry },
     writeFile: (path: string, contents: string | buffer) -> (),
     writeDir:  (path: string, recursive: boolean?) -> (),
@@ -266,7 +266,7 @@ type ProcessLib = {
     args: { string },
     env: { [string]: string },
     loadEnv: () -> { [string]: string },
-    getCwd: () ->string,
+    cwd: () -> string,
     create: (exec: string, args: {string}?, procOpts: ProcessOptions?) -> ProcessChild,
     run: (exec: string, args: {string}?, procOpts: ProcessOptions?) -> ProcessRunResult,
     exit: (code: number) -> never,
@@ -1034,7 +1034,6 @@ type BufferSinkOptions = {
 }
 
 type IoLib = {
-    MAX_READ: number,
     format: (...any) -> string,
     createBufferSink: (opts: BufferSinkOptions?) -> BufferSink,
     createFixedBufferStream: (buffer: buffer) -> BufferStream,
@@ -1260,8 +1259,9 @@ export type FFIFunctionDef = {
 export type FFIPointer = {
     release: (self: FFIPointer) -> FFIPointer,
     retain: (self: FFIPointer) -> FFIPointer,
-    setTag: (self: FFIPointer, tag: number) -> FFIPointer,
-    getTag: (self: FFIPointer) -> number,
+    tag: 
+        & ((self: FFIPointer) -> number)
+        & ((self: FFIPointer, tag: number) -> FFIPointer),
     drop: (self: FFIPointer) -> FFIPointer,
     offset: (self: FFIPointer, offset: number) -> FFIPointer,
     read: (self: FFIPointer, srcOffset: number, dest: buffer | FFIPointer, destOffset: number, count: number) -> buffer,
@@ -1276,7 +1276,7 @@ export type FFIPointer = {
     readu64: (self: FFIPointer, offset: number?) -> buffer,
     readf32: (self: FFIPointer, offset: number?) -> number,
     readf64: (self: FFIPointer, offset: number?) -> number,
-    readPtr: (self: FFIPointer, offset: number?) -> FFIPointer,
+    readptr: (self: FFIPointer, offset: number?) -> FFIPointer,
     writei8: (self: FFIPointer, offset: number, value: number | buffer | boolean) -> (),
     writei16: (self: FFIPointer, offset: number, value: number | buffer | boolean) -> (),
     writei32: (self: FFIPointer, offset: number, value: number | buffer | boolean) -> (),
@@ -1287,12 +1287,13 @@ export type FFIPointer = {
     writeu64: (self: FFIPointer, offset: number, value: number | buffer | boolean) -> (),
     writef32: (self: FFIPointer, offset: number, value: number | buffer | boolean) -> (),
     writef64: (self: FFIPointer, offset: number, value: number | buffer | boolean) -> (),
-    writePtr: (self: FFIPointer, offset: number, value: FFIPointer) -> (),
-    isNull: (self: FFIPointer) -> boolean,
-    setSize: (self: FFIPointer, size: number) -> (),
-    getSize: (self: FFIPointer) -> number?,
-    setAlignment: (self: FFIPointer, alignment: number) -> (),
-    getAlignment: (self: FFIPointer) -> number?,
+    writeptr: (self: FFIPointer, offset: number, value: FFIPointer) -> (),
+    size:
+        & ((self: FFIPointer) -> number?)
+        & ((self: FFIPointer, size: number) -> ()),
+    alignment:
+        & ((self: FFIPointer) -> number?)
+        & ((self: FFIPointer, alignment: number) -> ()),
     span: (self: FFIPointer, offset: number?) -> buffer,
 }
 
@@ -1325,14 +1326,13 @@ type FFILib = {
     c: {
         compile: (src: string, opts: FFICompileOptions?) -> FFICompiled,
     },
+    null: FFIPointer,
     ptr: (src: FFIPointer) -> FFIPointer,
     ptrFromAddress: (src: buffer) -> FFIPointer,
     getLuaState: (mainthread: boolean?) -> FFIPointer,
     alloc: (size: number, alignment: number?) -> FFIPointer,
     free: (src: FFIPointer) -> (),
     dupe: (src: buffer | FFIPointer) -> FFIPointer,
-    len: (src: buffer | FFIPointer) -> number?,
-    copy: (dest: buffer | FFIPointer, destOffset: number, src: buffer | FFIPointer, srcOffset: number, count: number) -> (),
     tagName: (tag: number) -> string?,
     struct: (fields: {{ [string]: AnyDataType }}) -> FFIStructureType,
     fn: (definition: FFIFunctionDef, srcPtr: FFIPointer) -> ((...any) -> any),
@@ -1425,6 +1425,46 @@ export type ThreadLib = {
 }
 --[======[ Thread ]======]--
 
+--[======[ Memory ]======]--
+type WritableSlice = buffer | FFIPointer;
+type ReadableSlice = string | buffer | FFIPointer;
+export type MemLib = {
+    MAX_SIZE: number,
+    len: (src: ReadableSlice) -> number?,
+    copy: (dest: WritableSlice, destOffset: number, src: ReadableSlice, srcOffset: number, count: number?) -> (),
+    slice: (src: ReadableSlice, offset: number, count: number?) -> buffer,
+    eqlSlice: (a: ReadableSlice, aOffset: number, b: ReadableSlice, bOffset: number, count: number?) -> boolean,
+    eql: (a: ReadableSlice, b: ReadableSlice) -> boolean,
+    startsWith: (slice: ReadableSlice, needle: ReadableSlice) -> boolean,
+    endsWith: (slice: ReadableSlice, needle: ReadableSlice) -> boolean,
+    trim: (src: ReadableSlice, values_to_strip: ReadableSlice) -> buffer,
+    trimLeft: (src: ReadableSlice, values_to_strip: ReadableSlice) -> buffer,
+    trimRight: (src: ReadableSlice, values_to_strip: ReadableSlice) -> buffer,
+    indexOf: (src: ReadableSlice, needle: ReadableSlice) -> number?,
+    indexOfPos: (src: ReadableSlice, offset: number, needle: ReadableSlice) -> number?,
+    lastIndexOf: (src: ReadableSlice, needle: ReadableSlice) -> number?,
+    indexOfScalar: (src: ReadableSlice, char: number) -> number?,
+    indexOfScalarPos: (src: ReadableSlice, offset: number, char: number) -> number?,
+    lastIndexOfScalar: (src: ReadableSlice, char: number) -> number?,
+    indexOfAny: (src: ReadableSlice, needle: ReadableSlice) -> number?,
+    indexOfAnyPos: (src: ReadableSlice, offset: number, needle: ReadableSlice) -> number?,
+    lastIndexOfAny: (src: ReadableSlice, needle: ReadableSlice) -> number?,
+    indexOfNone: (src: ReadableSlice, needle: ReadableSlice) -> number?,
+    indexOfNonePos: (src: ReadableSlice, offset: number, needle: ReadableSlice) -> number?,
+    lastIndexOfNone: (src: ReadableSlice, needle: ReadableSlice) -> number?,
+    indexOfDiff: (src: ReadableSlice, needle: ReadableSlice) -> number?,
+    indexOfMax: (src: ReadableSlice) -> number,
+    indexOfMin: (src: ReadableSlice) -> number,
+    indexOfMinMax: (src: ReadableSlice) -> (number, number),
+    replaceScalar: (src: WritableSlice, char: number, replacement: number) -> (),
+    max: (src: ReadableSlice) -> number,
+    min: (src: ReadableSlice) -> number,
+    reverse: (src: WritableSlice) -> (),
+    rotate: (src: WritableSlice, amount: number) -> (),
+    set: (dest: WritableSlice, value: number, offset: number?, count: number?) -> (),
+}
+--[======[ Memory ]======]--
+
 declare zune: {
     compiled: {
         optimize: number,
@@ -1448,4 +1488,5 @@ declare zune: {
     require: RequireLib,
     random: RandomLib,
     thread: ThreadLib,
+    mem: MemLib,
 }

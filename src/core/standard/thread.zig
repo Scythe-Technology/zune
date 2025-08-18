@@ -212,8 +212,8 @@ pub const Runtime = struct {
         const ML = self.L.tothread(1).?;
 
         jmp: {
-            Zune.Resolvers.Require.init(self.L) catch break :jmp;
-            defer Zune.Resolvers.Require.deinit(self.L);
+            Zune.initState(self.L) catch break :jmp;
+            defer Zune.deinitState(self.L);
 
             Zune.Runtime.Engine.runAsync(ML, &self.scheduler, .{ .cleanUp = false }) catch {};
         }

@@ -162,7 +162,8 @@ pub fn finish_testing(L: *VM.lua.State, rawstart: f64) !TestResult {
         0;
     L.pop(1);
 
-    _ = L.gc(.Collect, 0);
+    for (0..4) |_|
+        _ = L.gc(.Collect, 0);
 
     stepCheckLeakedReferences(L);
 
@@ -206,6 +207,9 @@ pub fn runTestAsync(L: *VM.lua.State, sched: *Scheduler) !TestResult {
     const start = VM.lperf.clock();
 
     Engine.runAsync(L, sched, .{ .cleanUp = true, .mode = .Test }) catch {};
+
+    if (Zune.FEATURES.ffi and comptime Zune.corelib.ffi.PlatformSupported())
+        Zune.corelib.ffi.deinitCacheTable(L);
 
     return try finish_testing(L, start);
 }

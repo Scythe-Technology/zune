@@ -17,9 +17,9 @@ const File = @import("../objects/filesystem/File.zig");
 
 const Terminal = @import("../../commands/repl/Terminal.zig");
 
-const VM = luau.VM;
+const mem = @import("./mem.zig");
 
-const MAX_LUAU_SIZE = 1073741824; // 1 GB
+const VM = luau.VM;
 
 const TAG_IO_STREAM = tagged.Tags.get("IO_STREAM").?;
 const TAG_IO_BUFFERSINK = tagged.Tags.get("IO_BUFFERSINK").?;
@@ -156,7 +156,7 @@ const Stream = struct {
         if (!self.mode.read)
             return L.Zerror("Stream is not readable");
         std.debug.assert(self.vtable.read != null);
-        const amount = L.Loptunsigned(2, MAX_LUAU_SIZE);
+        const amount = L.Loptunsigned(2, mem.MAX_LUAU_SIZE);
         const use_buffer = L.Loptboolean(3, true);
         const data = try self.vtable.read.?(self.ref.value, amount, false) orelse "";
         if (use_buffer)
@@ -270,7 +270,7 @@ const Stream = struct {
 const BufferSink = struct {
     alloc: std.mem.Allocator,
     buf: std.ArrayListUnmanaged(u8),
-    limit: u32 = MAX_LUAU_SIZE,
+    limit: u32 = mem.MAX_LUAU_SIZE,
     closed: bool = false,
 
     ref_table: LuaHelper.RefTable,
@@ -397,7 +397,7 @@ const BufferStream = struct {
     }
 
     pub fn lua_read(self: *BufferStream, L: *VM.lua.State) !i32 {
-        const amount = L.Loptunsigned(2, MAX_LUAU_SIZE);
+        const amount = L.Loptunsigned(2, mem.MAX_LUAU_SIZE);
         const use_buffer = L.Loptboolean(3, true);
         const data = try self.stream_read(amount, false) orelse "";
         if (use_buffer)
@@ -535,7 +535,7 @@ pub fn lua_createBufferSink(L: *VM.lua.State) !i32 {
     self.* = .{
         .alloc = allocator,
         .buf = .{},
-        .limit = if (opts) |o| o.limit orelse MAX_LUAU_SIZE else MAX_LUAU_SIZE,
+        .limit = if (opts) |o| o.limit orelse mem.MAX_LUAU_SIZE else mem.MAX_LUAU_SIZE,
         .closed = false,
         .ref_table = try .init(L, true),
     };
@@ -591,9 +591,7 @@ pub fn loadLib(L: *VM.lua.State) !void {
         L.setuserdatametatable(TAG_IO_BUFFERSTREAM);
         L.setuserdatadtor(BufferStream, TAG_IO_BUFFERSTREAM, BufferStream.__dtor);
     }
-    try L.createtable(0, 16);
-
-    try L.Zsetfield(-1, "MAX_READ", MAX_LUAU_SIZE);
+    try L.createtable(0, 15);
 
     const stdIn = std.io.getStdIn();
     const stdOut = std.io.getStdOut();

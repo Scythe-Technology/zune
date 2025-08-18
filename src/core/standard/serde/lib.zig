@@ -143,7 +143,15 @@ pub fn loadLib(L: *VM.lua.State) !void {
 }
 
 test {
-    std.testing.refAllDecls(@This());
+    _ = json;
+    _ = toml;
+    _ = yaml;
+    _ = base64;
+    _ = gzip;
+    _ = zlib;
+    _ = flate;
+    _ = lz4;
+    _ = zstd;
 }
 
 test "serde" {

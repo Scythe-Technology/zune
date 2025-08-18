@@ -143,7 +143,7 @@ fn encodeArrayPartial(L: *VM.lua.State, allocator: std.mem.Allocator, arraySize:
             .String, .Number, .Boolean => {},
             .Table => {
                 size += 1;
-                const tablePtr = L.topointer(-1) orelse return error.Failed;
+                const tablePtr = L.topointer(-1).?;
 
                 if (info.tracked.contains(tablePtr))
                     return L.Zerror("table circular reference");

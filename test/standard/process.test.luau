@@ -21,7 +21,7 @@ test("Context", function()
 	expect(process.arch).toBe(expect.any("string"));
 	expect(#process.arch).toBeGreaterThan(0);
 
-	local cwd = process.getCwd();
+	local cwd = process.cwd();
 	expect(cwd).toBe(expect.any("string"));
 	expect(#cwd).toBeGreaterThan(0);
 

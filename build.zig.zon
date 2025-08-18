@@ -16,8 +16,8 @@
             .hash = "lz4-0.2.0-OvBcTytgAAC95acrxK1s8UwtlTWR-7J4UvEkgstnvN1p",
         },
         .luau = .{
-            .url = "https://codeload.github.com/Scythe-Technology/zig-luau/tar.gz/15ee81f10ac71e5e0aa9aef25b215d20f8a3c3d2",
-            .hash = "luau-0.0.0+687-uDAGpxS5CQD53Thoxq279zF2LEDH63cHXtFSkjIoqozh",
+            .url = "https://codeload.github.com/Scythe-Technology/zig-luau/tar.gz/52b4f9505796876a371b9f21bbbdf5cb7c6af855",
+            .hash = "luau-0.0.0+687-uDAGp864CQBH3Kg4OOuFQ3Cp8BG5d5jZRXImGLTNRQCQ",
         },
         .pcre2 = .{
             .url = "https://codeload.github.com/Scythe-Technology/zpcre2/tar.gz/9e6a4e39b585e6ab6b759a949469755625e81418",
@@ -44,8 +44,8 @@
             .hash = "tinycc-0.0.2-T6dU8_3FAAAVHDvXDJaSfS1srHGOuUmdXCt2MWKEjlBh",
         },
         .libxev = .{
-            .url = "https://codeload.github.com/Scythe-Technology/libxev/tar.gz/4140a41602af6930c95219848a183a73323fc559",
-            .hash = "libxev-0.0.0-Gdacvn35CwD7-TFtvabpIUMUolCWHRNpDYrclSoGepfK",
+            .url = "https://codeload.github.com/Scythe-Technology/libxev/tar.gz/7bf6dbed9945b16127784b0c3c4b61a26996c0ad",
+            .hash = "libxev-0.0.0-Gdacvq37CwBxqcuheDOZlHMrwRtNAqSLz6oTH98D04W0",
         },
         .tls = .{
             .url = "https://codeload.github.com/ianic/tls.zig/tar.gz/7428921d2d5c397324d3e0343d7d8c90c2d35d31",

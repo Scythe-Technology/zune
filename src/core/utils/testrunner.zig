@@ -41,8 +41,8 @@ pub fn runTest(comptime testFile: TestFile, args: []const []const u8, comptime o
     var scheduler = try Scheduler.init(allocator, L);
     defer scheduler.deinit();
 
-    try Zune.Resolvers.Require.init(L);
-    defer Zune.Resolvers.Require.deinit(L);
+    try Zune.initState(L);
+    defer Zune.deinitState(L);
 
     var temporaryDir = std.testing.tmpDir(std.fs.Dir.OpenDirOptions{
         .access_sub_paths = true,
@@ -70,8 +70,8 @@ pub fn runTest(comptime testFile: TestFile, args: []const []const u8, comptime o
 
     Zune.loadConfiguration(dir);
 
-    try Engine.prepAsync(L, &scheduler);
     const current_top = L.gettop();
+    try Engine.prepAsync(L, &scheduler);
     try Zune.openZune(L, args, .{});
 
     L.setsafeenv(VM.lua.GLOBALSINDEX, true);
