@@ -1034,7 +1034,6 @@ type BufferSinkOptions = {
 }
 
 type IoLib = {
-    MAX_READ: number,
     format: (...any) -> string,
     createBufferSink: (opts: BufferSinkOptions?) -> BufferSink,
     createFixedBufferStream: (buffer: buffer) -> BufferStream,
@@ -1430,6 +1429,7 @@ export type ThreadLib = {
 type WritableSlice = buffer | FFIPointer;
 type ReadableSlice = string | buffer | FFIPointer;
 export type MemLib = {
+    MAX_SIZE: number,
     len: (src: ReadableSlice) -> number?,
     copy: (dest: WritableSlice, destOffset: number, src: ReadableSlice, srcOffset: number, count: number?) -> (),
     slice: (src: ReadableSlice, offset: number, count: number?) -> buffer,
