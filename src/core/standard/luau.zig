@@ -465,16 +465,23 @@ const AstSerializer = struct {
         try self.L.createtable(@truncate(attrs.size), nrec);
 
         for (attrs.slice(), 1..) |attr, i| {
-            try self.L.createtable(0, nrec);
-
-            switch (attr.type) {
-                .Checked => try self.serializeToken(attr.location.begin, "@checked", null),
-                .Native => try self.serializeToken(attr.location.begin, "@native", null),
-                .Deprecated => try self.serializeToken(attr.location.begin, "@deprecated", null),
-            }
+            // TODO: handle "@[" and "]" but at the moment there is no position for it
+            // it will show up as whitespace
+            try self.serializeToken(attr.location.begin, switch (attr.type) {
+                .Checked => if (attr.args.size > 0) "checked" else "@checked",
+                .Native => if (attr.args.size > 0) "native" else "@native",
+                .Deprecated => if (attr.args.size > 0) "deprecated" else "@deprecated",
+            }, 1);
 
             try self.L.Zsetfield(-1, "tag", "attribute");
             try self.L.Zsetfield(-1, "location", attr.location);
+
+            try self.L.createtable(@truncate(attr.args.size), 0);
+            for (attr.args.slice(), 1..) |arg, j| {
+                try arg.visit(self);
+                try self.L.rawseti(-2, @intCast(j));
+            }
+            try self.L.rawsetfield(-2, "args");
 
             try self.L.rawseti(-2, @intCast(i));
         }
@@ -1360,7 +1367,7 @@ const AstSerializer = struct {
         try self.serializeToken(cstNode.typeKeywordPosition, "type", null);
         try self.L.rawsetfield(-2, "typeToken");
 
-        try self.serializeToken(node.nameLocation.begin, "name", null);
+        try self.serializeToken(node.nameLocation.begin, std.mem.span(node.name.value), null);
         try self.L.rawsetfield(-2, "name");
 
         if (node.generics.size > 0 or node.genericPacks.size > 0) {
