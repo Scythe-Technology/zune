@@ -1579,8 +1579,8 @@ const AstSerializer = struct {
                         try self.serializeToken(item.stringPosition, item.stringInfo.?.sourceString.slice(), null);
 
                         switch (item.stringInfo.?.quoteStyle) {
-                            .quoted_single => try self.L.Zsetfield(-2, "quoteStyle", "single"),
-                            .quoted_double => try self.L.Zsetfield(-2, "quoteStyle", "double"),
+                            .quoted_single => try self.L.Zsetfield(-1, "quoteStyle", "single"),
+                            .quoted_double => try self.L.Zsetfield(-1, "quoteStyle", "double"),
                             else => unreachable,
                         }
 
