@@ -65,7 +65,7 @@ fn lua_compile(L: *VM.lua.State) !i32 {
         return error.RaiseLuauError;
     }
 
-    try L.pushlstring(bytecode);
+    try L.Zpushbuffer(bytecode);
 
     return 1;
 }
