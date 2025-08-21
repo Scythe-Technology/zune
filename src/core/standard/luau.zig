@@ -65,7 +65,7 @@ fn lua_compile(L: *VM.lua.State) !i32 {
         return error.RaiseLuauError;
     }
 
-    try L.pushlstring(bytecode);
+    try L.Zpushbuffer(bytecode);
 
     return 1;
 }
@@ -1481,7 +1481,7 @@ const AstSerializer = struct {
         if (node.hasParameterList) {
             std.debug.assert(cstNode != null);
             try self.serializeToken(cstNode.?.openParametersPosition, "<", null);
-            try self.L.rawsetfield(-2, "openParens");
+            try self.L.rawsetfield(-2, "openParameters");
 
             try self.serializePunctuatedTypeOrPack(node.parameters, cstNode.?.parametersCommaPositions.slice(), ",");
             try self.L.rawsetfield(-2, "parameters");
@@ -1579,8 +1579,8 @@ const AstSerializer = struct {
                         try self.serializeToken(item.stringPosition, item.stringInfo.?.sourceString.slice(), null);
 
                         switch (item.stringInfo.?.quoteStyle) {
-                            .quoted_single => try self.L.Zsetfield(-2, "quoteStyle", "single"),
-                            .quoted_double => try self.L.Zsetfield(-2, "quoteStyle", "double"),
+                            .quoted_single => try self.L.Zsetfield(-1, "quoteStyle", "single"),
+                            .quoted_double => try self.L.Zsetfield(-1, "quoteStyle", "double"),
                             else => unreachable,
                         }
 
