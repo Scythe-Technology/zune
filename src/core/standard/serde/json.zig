@@ -86,9 +86,11 @@ fn encode(
                         defer appended = true;
                         if (appended) {
                             try buf.append(',');
-                            if (kind != .NO_LINE)
-                                try buf.append(' ');
                         }
+
+                        if (kind != .NO_LINE)
+                            try buf.append('\n');
+                        try writeIndent(buf, kind, depth + 1);
 
                         switch (L.typeOf(-2)) {
                             .Number => {},
@@ -101,7 +103,12 @@ fn encode(
                     }
                     if (n != tableSize)
                         return L.Zerrorf("array size mismatch (expected {d}, got {d})", .{ tableSize, n });
+
+                    if (kind != .NO_LINE)
+                        try buf.append('\n');
+                    try writeIndent(buf, kind, depth);
                 }
+
                 try buf.append(']');
             } else {
                 try buf.appendSlice("{");
