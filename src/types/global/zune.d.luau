@@ -1,12 +1,157 @@
---  https://github.com/JohnnyMorganz/luau-lsp/issues/271
+-- This file was auto-generated with "zune-docs"
 
-declare _FILE: {
-    source: string?,
-    main: boolean,
+--[[ serde ]]
+type JsonEncodeConfig = {
+    pretty_indent: number?, 
 }
-
---[======[ FileSystem ]======]--
-export type MetadataKind = "file"
+type JsonDecodeConfig = {
+    preserve_null: boolean?, 
+}
+type JsonEncoder = {
+    encode: (value: any, config: JsonEncodeConfig?) -> string,
+    decode: (json: string, config: JsonDecodeConfig?) -> any,
+    indents: {
+        none: number,
+        two_spaces: number,
+        four_spaces: number,
+        tabs: number, 
+    },
+    values: {
+        null: any, 
+    }
+}
+type TomlEncoder = {
+    encode: (object: {[string]: any}) -> string,
+    decode: (toml: string | buffer) -> {[string]: any}, 
+}
+type YamlInput = string | number | boolean | {
+    [string]: YamlInput
+}
+type YamlOuput = string | {
+    [string]: YamlOuput
+}
+type YamlEncoder = {
+    encode: (object: YamlInput) -> string,
+    decode: (yaml: string | buffer) -> YamlOuput, 
+}
+type Base64Encoder = {
+    encode: 
+        & ((value: string) -> string)
+        & ((value: buffer) -> buffer),
+    decode: 
+        & ((base64: string) -> string)
+        & ((base64: buffer) -> buffer), 
+}
+type GenericCompressionOptions = {
+    level: number?, 
+}
+type CompressionFn = 
+    & ((raw: string) -> string)
+    & ((raw: buffer) -> buffer)
+type AdvancedCompressionFn = 
+    & ((raw: string, opts: GenericCompressionOptions?) -> string)
+    & ((raw: buffer, opts: GenericCompressionOptions?) -> buffer)
+type DecompressionFn = 
+    & ((compressed: string) -> string)
+    & ((compressed: buffer) -> buffer)
+export type _zune_serde_json = {
+    encode: (value: any, config: JsonEncodeConfig?) -> string,
+    decode: (json: string, config: JsonDecodeConfig?) -> any,
+    indents: {
+        none: number,
+        two_spaces: number,
+        four_spaces: number,
+        tabs: number, 
+    },
+    values: {
+        null: any, 
+    }
+}
+export type _zune_serde_json5 = {
+    encode: (value: any, config: JsonEncodeConfig?) -> string,
+    decode: (json: string, config: JsonDecodeConfig?) -> any,
+    indents: {
+        none: number,
+        two_spaces: number,
+        four_spaces: number,
+        tabs: number, 
+    },
+    values: {
+        null: any, 
+    }
+}
+export type _zune_serde_toml = {
+    encode: (object: {[string]: any}) -> string,
+    decode: (toml: string | buffer) -> {[string]: any}, 
+}
+export type _zune_serde_yaml = {
+    encode: (object: YamlInput) -> string,
+    decode: (yaml: string | buffer) -> YamlOuput, 
+}
+export type _zune_serde_base64 = {
+    encode: 
+        & ((value: string) -> string)
+        & ((value: buffer) -> buffer),
+    decode: 
+        & ((base64: string) -> string)
+        & ((base64: buffer) -> buffer), 
+}
+export type _zune_serde_gzip = {
+    compress: 
+        & ((raw: string, opts: GenericCompressionOptions?) -> string)
+        & ((raw: buffer, opts: GenericCompressionOptions?) -> buffer),
+    decompress: 
+        & ((compressed: string) -> string)
+        & ((compressed: buffer) -> buffer), 
+}
+export type _zune_serde_zlib = {
+    compress: 
+        & ((raw: string, opts: GenericCompressionOptions?) -> string)
+        & ((raw: buffer, opts: GenericCompressionOptions?) -> buffer),
+    decompress: 
+        & ((compressed: string) -> string)
+        & ((compressed: buffer) -> buffer), 
+}
+export type _zune_serde_lz4 = {
+    compress: 
+        & ((raw: string) -> string)
+        & ((raw: buffer) -> buffer),
+    compressFrame: 
+        & ((raw: string, opts: GenericCompressionOptions?) -> string)
+        & ((raw: buffer, opts: GenericCompressionOptions?) -> buffer),
+    decompress: 
+        & ((compressed: string, size: number) -> string)
+        & ((compressed: buffer, size: number) -> buffer),
+    decompressFrame: 
+        & ((compressed: string) -> string)
+        & ((compressed: buffer) -> buffer), 
+}
+export type _zune_serde_zstd = {
+    compress: 
+        & ((raw: string, opts: GenericCompressionOptions?) -> string)
+        & ((raw: buffer, opts: GenericCompressionOptions?) -> buffer),
+    decompress: 
+        & ((compressed: string) -> string)
+        & ((compressed: buffer) -> buffer), 
+}
+type GenericCompressor = {
+    compress: AdvancedCompressionFn,
+    decompress: DecompressionFn, 
+}
+export type _zune_serde = {
+    json: _zune_serde_json,
+    json5: _zune_serde_json5,
+    toml: _zune_serde_toml,
+    yaml: _zune_serde_yaml,
+    base64: _zune_serde_base64,
+    gzip: _zune_serde_gzip,
+    zlib: _zune_serde_zlib,
+    lz4: _zune_serde_lz4,
+    zstd: _zune_serde_zstd, 
+}
+--[[ fs ]]
+export type MetadataKind = 
+    | "file"
     | "directory"
     | "sym_link"
     | "door"
@@ -17,7 +162,6 @@ export type MetadataKind = "file"
     | "named_pipe"
     | "whiteout"
     | "unknown"
-
 export type Metadata = {
     kind: MetadataKind,
     symlink: boolean,
@@ -26,72 +170,77 @@ export type Metadata = {
     accessed_at: number,
     size: number,
     permissions: {
-        read_only: boolean,
-    },
+        read_only: boolean, 
+    }, 
 }
-
 export type FileStat = {
     kind: MetadataKind,
     changed_at: number,
     modified_at: number,
     accessed_at: number,
     size: number,
-    mode: number,
+    mode: number, 
 } | {
-    kind: "none",
+    kind: "none", 
 }
-
 declare class FileHandle
-    read:
+    read: 
         & ((self: FileHandle, amount: number?, bytes: false?) -> string)
         & ((self: FileHandle, amount: number?, bytes: true) -> buffer)
-    readSync:
+    readSync: 
         & ((self: FileHandle, amount: number?, bytes: false?) -> string)
         & ((self: FileHandle, amount: number?, bytes: true) -> buffer)
-    function write(self, contents: string | buffer): ()
-    function writeSync(self, contents: string | buffer): ()
-    function append(self, contents: string | buffer): ()
-    function appendSync(self, contents: string | buffer): ()
-    function getSize(self): number
-    function getSeekPosition(self): number
-    function seekFromEnd(self, amount: number?): ()
-    function seekTo(self, amount: number?): ()
-    function seekBy(self, amount: number?): ()
-    function lock(self, lockMode: ("shared" | "exclusive" | "none")?): boolean
-    function unlock(self): ()
-    function sync(self): ()
-    readonly:
+    write: (self: FileHandle, contents: string | buffer) -> ()
+    writeSync: (self: FileHandle, contents: string | buffer) -> ()
+    append: (self: FileHandle, contents: string | buffer) -> ()
+    appendSync: (self: FileHandle, contents: string | buffer) -> ()
+    getSize: (self: FileHandle) -> number
+    getSeekPosition: (self: FileHandle) -> number
+    seekFromEnd: (self: FileHandle, amount: number?) -> ()
+    seekTo: (self: FileHandle, amount: number?) -> ()
+    seekBy: (self: FileHandle, amount: number?) -> ()
+    lock: (self: FileHandle, lockMode: ("shared" | "exclusive" | "none")?) -> boolean
+    unlock: (self: FileHandle) -> ()
+    sync: (self: FileHandle) -> ()
+    readonly: 
         & ((self: FileHandle) -> boolean)
         & ((self: FileHandle, enabled: boolean) -> ())
-    function close(self): ()
+    close: (self: FileHandle) -> () 
 end
-
-export type FileWatcher = {
-    stop: (self: FileWatcher) -> (),
-}
-
+declare class FileWatcher
+    stop: (self: FileWatcher) -> () 
+end
 type CreateFileOptions = {
-    exclusive: boolean?,
+    exclusive: boolean?, 
 }
-
 type OpenFileOptions = {
-    mode: string?,
+    mode: string?, 
 }
-
 type DirectoryEntry = {
     name: string,
-    kind: MetadataKind,
+    kind: MetadataKind, 
 }
-
-type FileSystemLib = {
+export type _zune_fs_path = {
+    join: (...string) -> string,
+    relative: (from: string, to: string) -> string,
+    resolve: (...string) -> string,
+    dirname: (path: string) -> string?,
+    basename: (path: string) -> string,
+    stem: (path: string) -> string,
+    extension: (path: string) -> string,
+    isAbsolute: (path: string) -> boolean,
+    globMatch: (path: string, pattern: string) -> boolean, 
+}
+type WatchEvent = "created" | "modified" | "moved" | "renamed" | "deleted" | "metadata"
+export type _zune_fs = {
     createFile: (path: string, opts: CreateFileOptions?) -> FileHandle,
     openFile: (path: string, opts: OpenFileOptions?) -> FileHandle,
-    readFile:
+    readFile: 
         & ((path: string) -> string)
         & ((path: string, bytes: true) -> buffer),
-    readDir: (path: string) -> { DirectoryEntry },
+    readDir: (path: string) -> {DirectoryEntry},
     writeFile: (path: string, contents: string | buffer) -> (),
-    writeDir:  (path: string, recursive: boolean?) -> (),
+    writeDir: (path: string, recursive: boolean?) -> (),
     removeFile: (path: string) -> (),
     removeDir: (path: string, recursive: boolean?) -> (),
     metadata: (path: string) -> Metadata,
@@ -101,467 +250,495 @@ type FileSystemLib = {
     symlink: (from: string, to: string) -> (),
     getExePath: () -> string,
     realPath: (path: string) -> string,
-    watch: (path: string, callback: (path: string, events: {"created" | "modified" | "moved" | "renamed" | "deleted" | "metadata"}) -> ()) -> FileWatcher,
+    watch: (path: string, callback: (path: string, events: {WatchEvent}) -> ()) -> FileWatcher,
     embedFile: (path: string) -> buffer,
-    embeddedFiles: () -> { string },
-    embeddedScripts: () -> { string },
+    embeddedFiles: () -> {string},
+    embeddedScripts: () -> {string},
+    path: _zune_fs_path, 
+}
+--[[ crypto ]]
+type Input = string | buffer
+declare class CryptoHash
+    digest: 
+        & ((self: CryptoHash) -> buffer)
+        & ((self: CryptoHash, encoding: "binary") -> buffer)
+        & ((self: CryptoHash, encoding: "hex" | "base64") -> string)
+    update: (self: CryptoHash, value: string | buffer) -> ()
+    copy: (self: CryptoHash) -> CryptoHash 
+end
+declare class TlsCertBundle
 
-    path: {
-        join: (...string) -> string,
-        relative: (from: string, to: string) -> string,
-        resolve: (...string) -> string,
-        dirname: (path: string) -> string?,
-        basename: (path: string, ext: string?) -> string,
-        stem: (path: string) -> string,
-        extension: (path: string) -> string,
-        isAbsolute: (path: string) -> boolean,
-        globMatch: (path: string, pattern: string) -> boolean,
+end
+declare class TlsCertKeyPair
+
+end
+type HashAlgorithms = 
+    | "sha1"
+    | "md5"
+    | "blake3"
+    | "sha224"
+    | "sha256"
+    | "sha384"
+    | "sha512"
+    | "sha3_224"
+    | "sha3_256"
+    | "sha3_384"
+    | "sha3_512"
+    | "blake2b128"
+    | "blake2b160"
+    | "blake2b256"
+    | "blake2b384"
+    | "blake2b512"
+    | "blake2s128"
+    | "blake2s160"
+    | "blake2s224"
+    | "blake2s256"
+type BcryptPasswordOptions = {
+    algorithm: "bcrypt"?,
+    cost: number?, 
+}
+type Argon2PasswordOptions = {
+    algorithm: ("argon2d" | "argon2i" | "argon2id")?,
+    time_cost: number?,
+    memory_cost: number?,
+    threads: number?, 
+}
+type PasswordOptions = BcryptPasswordOptions | Argon2PasswordOptions
+type EncryptedData = {
+    cipher: buffer,
+    tag: buffer, 
+}
+type Aead = {
+    encrypt: (data: Input, key: Input, nonce: Input, ad: Input?) -> EncryptedData,
+    decrypt: (cipher: Input, tag: Input, key: Input, nonce: Input, ad: Input?) -> string, 
+}
+type TlsClientSetupConfig = {
+    host: string,
+    ca: TlsCertBundle, 
+}
+export type _zune_crypto_password = {
+    hash: (password: string | buffer, opts: PasswordOptions?) -> string,
+    verify: (password: string | buffer, hash: string | buffer) -> boolean, 
+}
+export type _zune_crypto_random = {
+    nextNumber: 
+        & (() -> number)
+        & ((min: number, max: number) -> number),
+    nextInteger: 
+        & (() -> number)
+        & ((min: number, max: number) -> number),
+    nextBoolean: () -> boolean,
+    fill: (buffer: buffer, offset: number, length: number) -> (), 
+}
+export type _zune_crypto_aead = {
+    aes_gcm: {
+        Aes128Gcm: {
+            encrypt: (data: Input, key: Input, nonce: Input, ad: Input?) -> EncryptedData,
+            decrypt: (cipher: Input, tag: Input, key: Input, nonce: Input, ad: Input?) -> string, 
+        },
+        Aes256Gcm: {
+            encrypt: (data: Input, key: Input, nonce: Input, ad: Input?) -> EncryptedData,
+            decrypt: (cipher: Input, tag: Input, key: Input, nonce: Input, ad: Input?) -> string, 
+        }, 
     },
+    aes_ocb: {
+        Aes128Ocb: {
+            encrypt: (data: Input, key: Input, nonce: Input, ad: Input?) -> EncryptedData,
+            decrypt: (cipher: Input, tag: Input, key: Input, nonce: Input, ad: Input?) -> string, 
+        },
+        Aes256Ocb: {
+            encrypt: (data: Input, key: Input, nonce: Input, ad: Input?) -> EncryptedData,
+            decrypt: (cipher: Input, tag: Input, key: Input, nonce: Input, ad: Input?) -> string, 
+        }, 
+    },
+    aegis: {
+        Aegis128X4: {
+            encrypt: (data: Input, key: Input, nonce: Input, ad: Input?) -> EncryptedData,
+            decrypt: (cipher: Input, tag: Input, key: Input, nonce: Input, ad: Input?) -> string, 
+        },
+        Aegis128X2: {
+            encrypt: (data: Input, key: Input, nonce: Input, ad: Input?) -> EncryptedData,
+            decrypt: (cipher: Input, tag: Input, key: Input, nonce: Input, ad: Input?) -> string, 
+        },
+        Aegis128L: {
+            encrypt: (data: Input, key: Input, nonce: Input, ad: Input?) -> EncryptedData,
+            decrypt: (cipher: Input, tag: Input, key: Input, nonce: Input, ad: Input?) -> string, 
+        },
+        Aegis256X4: {
+            encrypt: (data: Input, key: Input, nonce: Input, ad: Input?) -> EncryptedData,
+            decrypt: (cipher: Input, tag: Input, key: Input, nonce: Input, ad: Input?) -> string, 
+        },
+        Aegis256X2: {
+            encrypt: (data: Input, key: Input, nonce: Input, ad: Input?) -> EncryptedData,
+            decrypt: (cipher: Input, tag: Input, key: Input, nonce: Input, ad: Input?) -> string, 
+        },
+        Aegis256: {
+            encrypt: (data: Input, key: Input, nonce: Input, ad: Input?) -> EncryptedData,
+            decrypt: (cipher: Input, tag: Input, key: Input, nonce: Input, ad: Input?) -> string, 
+        },
+        Aegis128X4_256: {
+            encrypt: (data: Input, key: Input, nonce: Input, ad: Input?) -> EncryptedData,
+            decrypt: (cipher: Input, tag: Input, key: Input, nonce: Input, ad: Input?) -> string, 
+        },
+        Aegis128X2_256: {
+            encrypt: (data: Input, key: Input, nonce: Input, ad: Input?) -> EncryptedData,
+            decrypt: (cipher: Input, tag: Input, key: Input, nonce: Input, ad: Input?) -> string, 
+        },
+        Aegis128L_256: {
+            encrypt: (data: Input, key: Input, nonce: Input, ad: Input?) -> EncryptedData,
+            decrypt: (cipher: Input, tag: Input, key: Input, nonce: Input, ad: Input?) -> string, 
+        },
+        Aegis256X4_256: {
+            encrypt: (data: Input, key: Input, nonce: Input, ad: Input?) -> EncryptedData,
+            decrypt: (cipher: Input, tag: Input, key: Input, nonce: Input, ad: Input?) -> string, 
+        },
+        Aegis256X2_256: {
+            encrypt: (data: Input, key: Input, nonce: Input, ad: Input?) -> EncryptedData,
+            decrypt: (cipher: Input, tag: Input, key: Input, nonce: Input, ad: Input?) -> string, 
+        },
+        Aegis256_256: {
+            encrypt: (data: Input, key: Input, nonce: Input, ad: Input?) -> EncryptedData,
+            decrypt: (cipher: Input, tag: Input, key: Input, nonce: Input, ad: Input?) -> string, 
+        }, 
+    },
+    chacha_poly: {
+        ChaCha8Poly1305: {
+            encrypt: (data: Input, key: Input, nonce: Input, ad: Input?) -> EncryptedData,
+            decrypt: (cipher: Input, tag: Input, key: Input, nonce: Input, ad: Input?) -> string, 
+        },
+        ChaCha12Poly1305: {
+            encrypt: (data: Input, key: Input, nonce: Input, ad: Input?) -> EncryptedData,
+            decrypt: (cipher: Input, tag: Input, key: Input, nonce: Input, ad: Input?) -> string, 
+        },
+        ChaCha20Poly1305: {
+            encrypt: (data: Input, key: Input, nonce: Input, ad: Input?) -> EncryptedData,
+            decrypt: (cipher: Input, tag: Input, key: Input, nonce: Input, ad: Input?) -> string, 
+        },
+        XChaCha8Poly1305: {
+            encrypt: (data: Input, key: Input, nonce: Input, ad: Input?) -> EncryptedData,
+            decrypt: (cipher: Input, tag: Input, key: Input, nonce: Input, ad: Input?) -> string, 
+        },
+        XChaCha12Poly1305: {
+            encrypt: (data: Input, key: Input, nonce: Input, ad: Input?) -> EncryptedData,
+            decrypt: (cipher: Input, tag: Input, key: Input, nonce: Input, ad: Input?) -> string, 
+        },
+        XChaCha20Poly1305: {
+            encrypt: (data: Input, key: Input, nonce: Input, ad: Input?) -> EncryptedData,
+            decrypt: (cipher: Input, tag: Input, key: Input, nonce: Input, ad: Input?) -> string, 
+        }, 
+    },
+    salsa_poly: {
+        XSalsa20Poly1305: {
+            encrypt: (data: Input, key: Input, nonce: Input, ad: Input?) -> EncryptedData,
+            decrypt: (cipher: Input, tag: Input, key: Input, nonce: Input, ad: Input?) -> string, 
+        }, 
+    },
+    isap: {
+        IsapA128A: {
+            encrypt: (data: Input, key: Input, nonce: Input, ad: Input?) -> EncryptedData,
+            decrypt: (cipher: Input, tag: Input, key: Input, nonce: Input, ad: Input?) -> string, 
+        }, 
+    }, 
 }
---[======[ FileSystem ]======]--
-
---[======[ Process ]======]--
-export type CPUArchitecture =
-	| "aarch64"
-	| "x86_64"
-	-- | "x86"
-	-- | "arm"
-	-- | "aarch64_be"
-	-- | "aarch64_32"
-	-- | "riscv32"
-	| "riscv64"
-	-- | "wasm32"
-	-- | "wasm64"
-	-- | "armeb"
-	-- | "arc"
-	-- | "avr"
-	-- | "bpfel"
-	-- | "bpfeb"
-	-- | "csky"
-	-- | "dxil"
-	-- | "hexagon"
-	-- | "loongarch32"
-	-- | "loongarch64"
-	-- | "m68k"
-	-- | "mips"
-	-- | "mipsel"
-	-- | "mips64"
-	-- | "mips64el"
-	-- | "msp430"
-	-- | "powerpc"
-	-- | "powerpcle"
-	-- | "powerpc64"
-	-- | "powerpc64le"
-	-- | "r600"
-	-- | "amdgcn"
-	-- | "sparc"
-	-- | "sparc64"
-	-- | "sparcel"
-	-- | "s390x"
-	-- | "tce"
-	-- | "tcele"
-	-- | "thumb"
-	-- | "thumbeb"
-	-- | "xcore"
-	-- | "xtensa"
-	-- | "nvptx"
-	-- | "nvptx64"
-	-- | "le32"
-	-- | "le64"
-	-- | "amdil"
-	-- | "amdil64"
-	-- | "hsail"
-	-- | "hsail64"
-	-- | "spir"
-	-- | "spir64"
-	-- | "spirv"
-	-- | "spirv32"
-	-- | "spirv64"
-	-- | "kalimba"
-	-- | "shave"
-	-- | "lanai"
-	-- | "renderscript32"
-	-- | "renderscript64"
-	-- | "ve"
-	-- | "spu_2"
-
-export type OS =
-	| "linux"
-	| "windows"
-	| "macos"
-	-- | "freestanding"
-	-- | "ananas"
-	-- | "cloudabi"
-	-- | "dragonfly"
-	-- | "freebsd"
-	-- | "fuchsia"
-	-- | "ios"
-	-- | "kfreebsd"
-	-- | "lv2"
-	-- | "netbsd"
-	-- | "openbsd"
-	-- | "solaris"
-	-- | "uefi"
-	-- | "zos"
-	-- | "haiku"
-	-- | "minix"
-	-- | "rtems"
-	-- | "nacl"
-	-- | "aix"
-	-- | "cuda"
-	-- | "nvcl"
-	-- | "amdhsa"
-	-- | "ps4"
-	-- | "ps5"
-	-- | "elfiamcu"
-	-- | "tvos"
-	-- | "watchos"
-	-- | "driverkit"
-	-- | "visionos"
-	-- | "mesa3d"
-	-- | "contiki"
-	-- | "amdpal"
-	-- | "hermit"
-	-- | "hurd"
-	-- | "wasi"
-	-- | "emscripten"
-	-- | "shadermodel"
-	-- | "liteos"
-	-- | "serenity"
-	-- | "opencl"
-	-- | "glsl450"
-	-- | "vulkan"
-	-- | "plan9"
-	-- | "illumos"
-	-- | "other"
-
+export type _zune_crypto_tls = {
+    bundleFromSystem: () -> TlsCertBundle,
+    bundleFromFile: (file: string) -> TlsCertBundle,
+    keyPairFromFile: (certFile: string, keyFile: string) -> TlsCertKeyPair,
+    setupClient: (socket: NetworkSocket, config: TlsClientSetupConfig) -> (),
+    setupServer: (socket: NetworkSocket, config: TlsServerSetupConfig) -> (), 
+}
+type TlsServerSetupConfig = {
+    auth: TlsCertKeyPair, 
+}
+export type _zune_crypto = {
+    createHash: (algorithm: HashAlgorithms, secret: string?) -> CryptoHash,
+    password: _zune_crypto_password,
+    random: _zune_crypto_random,
+    aead: _zune_crypto_aead,
+    tls: _zune_crypto_tls, 
+}
+--[[ thread ]]
+declare class Thread
+    start: (self: Thread) -> ()
+    join: (self: Thread) -> ()
+    status: (self: Thread) -> "ready" | "running" | "dead"
+    receive: (self: Thread) -> (...any)
+    send: (self: Thread, ...any) -> () 
+end
+type ThreadLoadOptions = {
+    chunk_name: string?,
+    native_code_gen: boolean?, 
+}
+export type _zune_thread = {
+    fromModule: (module: string) -> Thread,
+    fromBytecode: (bytecode: string | buffer, opts: ThreadLoadOptions?) -> Thread,
+    receive: () -> ...any,
+    send: (...any) -> (),
+    getCpuCount: () -> number,
+    isThread: boolean, 
+}
+--[[ process ]]
+export type CPUArchitecture = 
+    | "aarch64"
+    | "x86_64"
+    | "riscv64"
+export type OS = 
+    | "linux"
+    | "windows"
+    | "macos"
 export type ProcessOptions = {
-	cwd: string?,
-	env: { [string]: string }?,
-	shell: (boolean | string)?,
-    stdio: ("inherit" | "pipe" | "ignore")?,
+    cwd: string?,
+    env: {
+        [string]: string
+    }?,
+    shell: (boolean | string)?,
+    stdio: ("inherit" | "pipe" | "ignore")?, 
 }
-
 export type ProcessResult = {
-	ok: boolean,
-	code: number,
+    ok: boolean,
+    code: number, 
 }
-
 export type ProcessRunResult = ProcessResult & {
-	stdout: string,
-	stderr: string,
+    stdout: string,
+    stderr: string, 
 }
-
+export type _zune_process_env = {
+    [string]: string
+}
 declare class ProcessChild
     stdin: FileHandle?
     stdout: FileHandle?
     stderr: FileHandle?
-    function wait(self): ProcessResult
-    function kill(self): ProcessResult
+    wait: (self: ProcessChild) -> ProcessResult
+    kill: (self: ProcessChild) -> ProcessResult 
 end
-
-type ProcessLib = {
-    os: OS,
-    arch: CPUArchitecture,
-    args: { string },
-    env: { [string]: string },
-    loadEnv: () -> { [string]: string },
+export type _zune_process = {
+    os: 
+        | "linux"
+        | "windows"
+        | "macos",
+    arch: 
+        | "aarch64"
+        | "x86_64"
+        | "riscv64",
+    args: {string},
+    env: _zune_process_env,
+    loadEnv: () -> {[string]: string},
     cwd: () -> string,
-    create: (exec: string, args: {string}?, procOpts: ProcessOptions?) -> ProcessChild,
-    run: (exec: string, args: {string}?, procOpts: ProcessOptions?) -> ProcessRunResult,
+    create: (exec: string, args: {string}?, opts: ProcessOptions?) -> ProcessChild,
+    run: (exec: string, args: {string}?, opts: ProcessOptions?) -> ProcessRunResult,
     exit: (code: number) -> never,
-    onSignal: (signal: "INT", callback: () -> ()) -> (),
+    onSignal: (signal: "INT", callback: () -> ()) -> (), 
 }
---[======[ Process ]======]--
-
---[======[ Testing ]======]--
+--[[ regex ]]
+export type RegexMatch = {
+    string: string,
+    index: number, 
+}
+declare class Regex
+    match: (self: Regex, input: string | buffer) -> {RegexMatch}?
+    search: (self: Regex, input: string | buffer) -> {RegexMatch}?
+    captures: (self: Regex, input: string | buffer, global: boolean?) -> {{RegexMatch}}
+    isMatch: (self: Regex, input: string | buffer) -> boolean
+    format: (self: Regex, str: string, format: string) -> string
+    replace: (self: Regex, str: string, replacement: string) -> string
+    replaceAll: (self: Regex, str: string, replacement: string) -> string 
+end
+export type _zune_regex = {
+    create: (pattern: string | buffer, flags: string?) -> Regex, 
+}
+--[[ random ]]
+declare class Random
+    nextNumber: 
+        & ((self: Random) -> number)
+        & ((self: Random, min: number, max: number) -> number)
+    nextInteger: (self: Random, min: number, max: number) -> number
+    nextBoolean: (self: Random) -> boolean
+    clone: (self: Random) -> Random 
+end
+type RandomNewFn = (seed: number?) -> Random
+export type _zune_random_LuauPcg32 = {
+    new: (seed: number?) -> Random, 
+}
+export type _zune_random_Isaac64 = {
+    new: (seed: number?) -> Random, 
+}
+export type _zune_random_Pcg32 = {
+    new: (seed: number?) -> Random, 
+}
+export type _zune_random_Xoroshiro128 = {
+    new: (seed: number?) -> Random, 
+}
+export type _zune_random_Xoshiro256 = {
+    new: (seed: number?) -> Random, 
+}
+export type _zune_random_Sfc64 = {
+    new: (seed: number?) -> Random, 
+}
+export type _zune_random_RomuTrio = {
+    new: (seed: number?) -> Random, 
+}
+type RandomConstructor = {
+    new: RandomNewFn, 
+}
+export type _zune_random = {
+    new: (seed: number?) -> Random,
+    LuauPcg32: _zune_random_LuauPcg32,
+    Isaac64: _zune_random_Isaac64,
+    Pcg32: _zune_random_Pcg32,
+    Xoroshiro128: _zune_random_Xoroshiro128,
+    Xoshiro256: _zune_random_Xoshiro256,
+    Sfc64: _zune_random_Sfc64,
+    RomuTrio: _zune_random_RomuTrio, 
+}
+--[[ testing ]]
 type BasicCases = {
-    --[[
-        Expects the value to be equal to the expected value.
-
-        @param expected The expected value.
-    ]]
     toBe: (expected: any) -> (),
-    --[[
-        Expects the value to be defined.
-    ]]
     toBeDefined: () -> (),
-    --[[
-        Expects the value to be close to the expected value.
-
-        Formula: `abs(value - expected) < 10 ^ -precision`
-
-        #### Example
-        ```luau
-        expect(1.1).toBeCloseTo(1, -1) -- Within 5
-        expect(1.1).toBeCloseTo(1, 0) -- Within 0.5
-        expect(1.1).toBeCloseTo(1, 1) -- Within 0.05
-        expect(1.1).toBeCloseTo(1, 2) -- Within 0.005
-        ```
-
-        @param expected The expected value.
-        @param precision The precision of the comparison.
-    ]]
     toBeCloseTo: (expected: number, precision: number) -> (),
-    --[[
-        Expects the value to be greater than the expected value.
-
-        @param expected The expected value.
-    ]]
     toBeGreaterThan: (expected: number) -> (),
-    --[[
-        Expects the value to be greater than or equal to the expected value.
-
-        @param expected The expected value.
-    ]]
     toBeGreaterThanOrEqual: (expected: number) -> (),
-    --[[
-        Expects the value to be less than the expected value.
-
-        @param expected The expected value.
-    ]]
     toBeLessThan: (expected: number) -> (),
-    --[[
-        Expects the value to be less than or equal to the expected value.
-
-        @param expected The expected value.
-    ]]
     toBeLessThanOrEqual: (expected: number) -> (),
-    --[[
-        Expects the value to be nil.
-    ]]
     toBeNil: () -> (),
-    --[[
-        Expects the value to be not a number.
-    ]]
     toBeNan: () -> (),
-    --[[
-        Expect the length of the value to be equal to the expected length.
-
-        - Tables
-        - Strings
-
-        @param expected The expected length
-    ]]
     toHaveLength: (expected: number) -> (),
-    --[[
-        Expects the value to be falsy.
-
-        False or nil.
-    ]]
     toBeFalsy: () -> (),
-    --[[
-        Expects the value to be truthy.
-
-        True or non nil.
-    ]]
-    toBeTruthy: () -> (),
+    toBeTruthy: () -> (), 
 }
-
 type ExpectCases = BasicCases & {
-    --[[
-        never
-
-        Flipped expectations.
-    ]]
-    never: BasicCases,
+    never: BasicCases, 
 }
-
 type FunctionalCases = ExpectCases & {
-    --[[
-        toThrow
-
-        Expects a function to throw an error.
-
-        Optionally, the error message can be checked.
-
-        @param expected The expected error message.
-    ]]
     toThrow: (expected: string?) -> (),
-    --[[
-        never
-
-        Flipped expectations.
-    ]]
-    never: FunctionalCases,
+    never: FunctionalCases, 
 }
-
 type ExpectHandler = {
-    --[[
-        [Jest compatibliity]: `expect.any(type)`
-
-        Recommend using `expect.type` instead.
-
-        Expects a value to be a type.
-    ]]
     any: (type: string) -> any,
-
-    --[[
-        Expects a value to be a type.
-    ]]
     type: (type: "nil" | "boolean" | "number" | "string" | "function" | "table" | "userdata" | "thread" | "buffer" | "vector") -> any,
-
-    --[[
-        Expects a value to be similar to the expected table.
-
-        @param expected The expected table.
-    ]]
-    similar: (expected: {[any]: any} | {any}) -> any,
+    similar: (expected: {[any]: any} | {any}) -> any, 
 }
-
-type TestingLib = {
-    --[[
-        Whether the testing suite is running.
-    ]]
+export type _zune_testing = {
     running: boolean,
-
-    --[[
-        [Internal]
-
-        The number of tests that have failed.
-    ]]
     _failed: number,
-
-    --[[
-        [Internal]
-
-        The number of tests conducted.
-    ]]
     _count: number,
-
-    --[[
-        [Internal]
-
-        The number of tests that have passed.
-    ]]
     _start: number,
-
-    --[[
-        Conducts a test.
-
-        *Will be ignored if the testing suite is not running.*
-
-        @param name The name of the test.
-        @param callback The callback to run the test.
-        @param timeout The timeout on how long a test should last.
-    ]]
     test: (name: string, callback: () -> (), timeout: number?) -> (),
-
-    --[[
-        Describes a test suite.
-
-        *Will be ignored if the testing suite is not running.*
-
-        @param name The name of the suite.
-        @param callback The callback to run the suite.
-    ]]
     describe: (name: string, callback: () -> ()) -> (),
-
-    --[[
-        Defers a function.
-
-        Deferred function will be executed after a test completes.
-        Useful for cleaning up resources.
-
-        @param callback The callback to defer.
-    ]]
     defer: (fn: () -> ()) -> (),
-
-    --[[
-        Expects a value.
-
-        @param value The value to expect.
-        @return Handler for expectations.
-    ]]
     expect: ((value: (...any) -> ...any) -> FunctionalCases) & ((value: any) -> ExpectCases) & ExpectHandler,
-
-    --[[
-        Expects a value to be true or non nil.
-
-        Similar to `assert(value)`
-
-        @param value The value to expect.
-    ]]
     expected: (value: any) -> (),
-
-    --[[
-        Expects a value to equal another.
-
-        Similar to `assert(value == expected, ...)`
-
-        @param expected The expected value.
-        @param value The value to test.
-    ]]
-    expectEqual: ((expected: any, value: any) -> ()),
+    expectEqual: ((expected: any, value: any) -> ()), 
 }
---[======[ Testing ]======]--
-
---[======[ Task ]======]--
-type TaskLib = {
-    cancel: (thread: thread) -> (),
-    defer: <A..., R...>(f: ((A...) -> R...) | thread, A...) -> thread,
-    delay: <A..., R...>(sec: number, f: ((A...) -> (R...)) | thread, A...) -> thread,
-    spawn: <A..., R...>(f: ((A...) -> (R...)) | thread, A...) -> thread,
-    wait: (sec: number?) -> number,
-    count: (() -> number) & ((kinds: string?) -> ...number),
+--[[ luau ]]
+export type CompileOptions = {
+    debug_level: number?,
+    optimization_level: number?,
+    coverage_level: number?, 
 }
---[======[ Task ]======]--
-
---[======[ Network ]======]--
+export type LoadOptions = {
+    env: {
+        [any]: any
+    }?,
+    chunk_name: string?,
+    native_code_gen: boolean?, 
+}
+export type CoverageData = {
+    name: string,
+    line: number,
+    depth: number,
+    [number]: number, 
+}
+type Position = {
+    line: number,
+    column: number, 
+}
+export type Location = {
+    begin: Position,
+    ["end"]: Position, 
+}
+export type ParseResult = {
+    errors: {{
+        message: string,
+        location: Location, 
+    }}
+} | {
+    root: {any},
+    eof: {
+        text: "",
+        position: Position,
+        tag: "eof"
+    },
+    lines: number,
+    lineOffsets: {number},
+    hotcomments: {{
+        header: boolean,
+        content: string,
+        location: Location, 
+    }}
+}
+export type _zune_luau = {
+    compile: (source: string | buffer, opts: CompileOptions?) -> buffer,
+    load: (bytecode: string | buffer, opts: LoadOptions?) -> ((...any) -> ...any),
+    coverage: (fn: (...any) -> ...any) -> {CoverageData},
+    parse: (src: string | buffer) -> ParseResult,
+    parseExpr: (src: string | buffer) -> any,
+    garbagecollect: () -> (), 
+}
+--[[ net ]]
 declare class NetworkSocket
-    function send(self, data: string | buffer, offset: number?): number
-    function sendMsg(self, port: number, address: string, data: string | buffer, offset: number?): number
-    function recv(self, max_size: number?): buffer
-    function recvMsg(self, max_size: number?): (NetworkAddress, buffer)
-    function accept(self): NetworkSocket
-    function connect(self, address: string, port: number): ()
-    function listen(self, backlog: number?): ()
-    function bindIp(self, address: string, port: number): ()
-    function getName(self): NetworkAddress
-    function setOption(self, level: number, optname: number, value: boolean | string | buffer): ()
-    function close(self): ()
-    function isOpen(self): boolean
+    send: (self: NetworkSocket, data: string | buffer, offset: number?) -> number
+    sendMsg: (self: NetworkSocket, port: number, address: string, data: string | buffer, offset: number?) -> number
+    recv: (self: NetworkSocket, max_size: number?) -> buffer
+    recvMsg: (self: NetworkSocket, max_size: number?) -> (NetworkAddress, buffer)
+    accept: (self: NetworkSocket) -> NetworkSocket
+    connect: (self: NetworkSocket, address: string, port: number) -> ()
+    listen: (self: NetworkSocket, backlog: number?) -> ()
+    bindIp: (self: NetworkSocket, address: string, port: number) -> ()
+    getName: (self: NetworkSocket) -> NetworkAddress
+    setOption: (self: NetworkSocket, level: number, optname: number, value: boolean | string | buffer) -> ()
+    close: (self: NetworkSocket) -> ()
+    isOpen: (self: NetworkSocket) -> boolean 
 end
-
 declare class HttpServer
-    function stop(self): ()
-    function getPort(self): number
-    function isRunning(self): boolean
+    stop: (self: HttpServer) -> ()
+    getPort: (self: HttpServer) -> number
+    isRunning: (self: HttpServer) -> boolean 
 end
-
 declare class HttpWebSocket
-    function isConnected(self): boolean
-    function send(self, message: string | buffer): ()
-    function close(self, code: number?): ()
+    send: (self: HttpWebSocket, message: string | buffer) -> ()
+    close: (self: HttpWebSocket, code: number?) -> ()
+    isConnected: (self: HttpWebSocket) -> boolean 
 end
-
 export type NetworkAddress = {
     family: number,
     port: number,
-    address: string,
+    address: string, 
 }
-
 export type HttpServerRequest = {
     method: string,
     path: string,
-    query: {[string | number]: string},
-    headers: {[string]: string},
-    body: string?,
+    query: {
+        [string | number]: string
+    },
+    headers: {
+        [string]: string
+    },
+    body: string?, 
 }
-
 export type HttpServerResponse = {
     status_code: number,
-    headers: {[string]: string}?,
-    body: (string | buffer)?,
+    headers: {
+        [string]: string
+    }?,
+    body: (string | buffer)?, 
 }
-
 export type ServerWebSocketHandlers = {
     upgrade: ((request: HttpServerRequest) -> boolean)?,
     open: ((websocket: HttpWebSocket) -> ())?,
     message: ((websocket: HttpWebSocket, message: string) -> ())?,
-    close: ((websocket: HttpWebSocket, code: number) -> ())?,
+    close: ((websocket: HttpWebSocket, code: number) -> ())?, 
 }
-
 export type ServeOptions = {
     port: number,
     address: string?,
@@ -571,33 +748,33 @@ export type ServeOptions = {
     client_timeout: number?,
     max_connections: number?,
     request: (request: HttpServerRequest) -> string | buffer | HttpServerResponse,
-    websocket: ServerWebSocketHandlers?,
+    websocket: ServerWebSocketHandlers?, 
 }
-
 export type HttpResponse<T> = {
     ok: boolean,
     status_code: number,
     status_reason: string,
-    headers: {[string]: string},
-    body: T,
+    headers: {
+        [string]: string
+    },
+    body: T, 
 }
-
 export type RequestOptions = {
-    headers: {[string]: string}?,
+    headers: {
+        [string]: string
+    }?,
     method: ("GET" | "HEAD" | "POST" | "PUT" | "DELETE" | "CONNECT" | "OPTIONS" | "TRACE" | "PATCH")?,
     body: (string | buffer)?,
-    allow_redirects: boolean?,
+    allow_redirects: boolean?, 
 }
-
 export type WebSocketOptions = {
     protocols: {string}?,
     timeout: number?,
     accept: ((socket: HttpWebSocket, request: HttpServerResponse) -> boolean)?,
     open: ((socket: HttpWebSocket) -> ())?,
     close: ((socket: HttpWebSocket, close: number?) -> ())?,
-    message: ((socket: HttpWebSocket, message: string) -> ())?,
+    message: ((socket: HttpWebSocket, message: string) -> ())?, 
 }
-
 type NetworkAddressFamily = {
     RDS: number,
     ROSE: number,
@@ -647,9 +824,8 @@ type NetworkAddressFamily = {
     ECONET: number,
     IRDA: number,
     SECURITY: number,
-    X25: number,
+    X25: number, 
 }
-
 type NetworkSocketFlags = {
     DCCP: number,
     RAW: number,
@@ -659,9 +835,8 @@ type NetworkSocketFlags = {
     STREAM: number,
     SEQPACKET: number,
     CLOEXEC: number,
-    NONBLOCK: number,
+    NONBLOCK: number, 
 }
-
 type NetworkIPProtocols = {
     COMP: number,
     ICMP: number,
@@ -695,9 +870,8 @@ type NetworkIPProtocols = {
     ROUTING: number,
     EGP: number,
     TP: number,
-    IP: number,
+    IP: number, 
 }
-
 type NetworkSocketOptionLevel = {
     PPPOL2TP: number,
     RDS: number,
@@ -726,9 +900,8 @@ type NetworkSocketOptionLevel = {
     DCCP: number,
     IRDA: number,
     ATM: number,
-    IP: number,
+    IP: number, 
 }
-
 type NetworkSocketOption = {
     ATTACH_FILTER: number,
     CNX_ADVICE: number,
@@ -797,535 +970,323 @@ type NetworkSocketOption = {
     SECURITY_AUTHENTICATION: number,
     PROTOCOL: number,
     ACCEPTCONN: number,
-    RCVTIMEO: number,
+    RCVTIMEO: number, 
 }
-
-type NetworkLib = {
-    ADDRF: NetworkAddressFamily,
-    SOCKF: NetworkSocketFlags,
-    SOCKOPT: NetworkSocketOption,
-    SOCKOPTLV: NetworkSocketOptionLevel,
-    IPPROTO: NetworkIPProtocols,
-
+export type _zune_net_ADDRF = {
+    RDS: number,
+    ROSE: number,
+    BRIDGE: number,
+    PHONET: number,
+    SNA: number,
+    FILE: number,
+    MPLS: number,
+    ROUTE: number,
+    WANPIPE: number,
+    UNSPEC: number,
+    CAIF: number,
+    NETROM: number,
+    UNIX: number,
+    INET: number,
+    ATMSVC: number,
+    MAX: number,
+    NETLINK: number,
+    IUCV: number,
+    SMC: number,
+    INET6: number,
+    TIPC: number,
+    KEY: number,
+    QIPCRTR: number,
+    VSOCK: number,
+    IPX: number,
+    ASH: number,
+    IB: number,
+    PACKET: number,
+    KCM: number,
+    DECnet: number,
+    RXRPC: number,
+    NETBEUI: number,
+    NFC: number,
+    ALG: number,
+    IEEE802154: number,
+    ISDN: number,
+    XDP: number,
+    LOCAL: number,
+    BLUETOOTH: number,
+    CAN: number,
+    LLC: number,
+    APPLETALK: number,
+    PPPOX: number,
+    ATMPVC: number,
+    AX25: number,
+    ECONET: number,
+    IRDA: number,
+    SECURITY: number,
+    X25: number, 
+}
+export type _zune_net_SOCKF = {
+    DCCP: number,
+    RAW: number,
+    RDM: number,
+    DGRAM: number,
+    PACKET: number,
+    STREAM: number,
+    SEQPACKET: number,
+    CLOEXEC: number,
+    NONBLOCK: number, 
+}
+export type _zune_net_SOCKOPT = {
+    ATTACH_FILTER: number,
+    CNX_ADVICE: number,
+    PEERCRED: number,
+    LINGER: number,
+    DEBUG: number,
+    RXQ_OVFL: number,
+    SNDBUF: number,
+    DONTROUTE: number,
+    ZEROCOPY: number,
+    PASSCRED: number,
+    DETACH_REUSEPORT_BPF: number,
+    ATTACH_REUSEPORT_EBPF: number,
+    MEMINFO: number,
+    COOKIE: number,
+    SNDBUFFORCE: number,
+    PRIORITY: number,
+    BSDCOMPAT: number,
+    SNDTIMEO: number,
+    BINDTODEVICE: number,
+    OOBINLINE: number,
+    BPF_EXTENSIONS: number,
+    TIMESTAMP_NEW: number,
+    NO_CHECK: number,
+    WIFI_STATUS: number,
+    PEERGROUPS: number,
+    TYPE: number,
+    NOFCS: number,
+    DOMAIN: number,
+    TIMESTAMPNS_NEW: number,
+    SNDLOWAT: number,
+    KEEPALIVE: number,
+    PEEK_OFF: number,
+    PEERSEC: number,
+    PEERNAME: number,
+    RCVBUF: number,
+    REUSEPORT: number?,
+    INCOMING_NAPI_ID: number,
+    TIMESTAMPING_OLD: number,
+    RCVBUFFORCE: number,
+    REUSEADDR: number,
+    MAX_PACING_RATE: number,
+    MARK: number,
+    RCVTIMEO_NEW: number,
+    BUSY_POLL: number,
+    TIMESTAMPING_NEW: number,
+    BINDTOIFINDEX: number,
+    TXTIME: number,
+    SECURITY_ENCRYPTION_NETWORK: number,
+    LOCK_FILTER: number,
+    RCVLOWAT: number,
+    SECURITY_ENCRYPTION_TRANSPORT: number,
+    ATTACH_BPF: number,
+    INCOMING_CPU: number,
+    ERROR: number,
+    SELECT_ERR_QUEUE: number,
+    DETACH_BPF: number,
+    SNDTIMEO_NEW: number,
+    TIMESTAMPNS_OLD: number,
+    PASSSEC: number,
+    TIMESTAMP_OLD: number,
+    GET_FILTER: number,
+    DETACH_FILTER: number,
+    ATTACH_REUSEPORT_CBPF: number,
+    BROADCAST: number,
+    SECURITY_AUTHENTICATION: number,
+    PROTOCOL: number,
+    ACCEPTCONN: number,
+    RCVTIMEO: number, 
+}
+export type _zune_net_SOCKOPTLV = {
+    PPPOL2TP: number,
+    RDS: number,
+    TIPC: number,
+    ALG: number,
+    PNPIPE: number,
+    BLUETOOTH: number,
+    PACKET: number,
+    IPV6: number,
+    KCM: number,
+    RXRPC: number,
+    NETBEUI: number,
+    DECNET: number,
+    TLS: number,
+    ICMPV6: number,
+    RAW: number,
+    XDP: number,
+    SOCKET: number,
+    LLC: number,
+    NFC: number,
+    CAIF: number,
+    IUCV: number,
+    X25: number,
+    AAL: number,
+    NETLINK: number,
+    DCCP: number,
+    IRDA: number,
+    ATM: number,
+    IP: number, 
+}
+export type _zune_net_IPPROTO = {
+    COMP: number,
+    ICMP: number,
+    ESP: number,
+    IGMP: number,
+    TCP: number,
+    ICMPV6: number,
+    MTP: number,
+    GRE: number,
+    SCTP: number,
+    MAX: number,
+    NONE: number,
+    FRAGMENT: number,
+    IDP: number,
+    UDPLITE: number,
+    HOPOPTS: number,
+    MH: number,
+    BEETPH: number,
+    AH: number,
+    IPIP: number,
+    IPV6: number,
+    PIM: number,
+    DSTOPTS: number,
+    UDP: number,
+    DCCP: number,
+    RAW: number,
+    PUP: number,
+    MPLS: number,
+    ENCAP: number,
+    RSVP: number,
+    ROUTING: number,
+    EGP: number,
+    TP: number,
+    IP: number, 
+}
+export type _zune_net_http = {
+    serve: (opts: ServeOptions) -> HttpServer,
+    request: 
+        & ((host: string, opts: RequestOptionsType<"string"?>?) -> HttpResponse<string>)
+        & ((host: string, opts: RequestOptionsType<"buffer">?) -> HttpResponse<buffer>)
+        & ((host: string, opts: RequestOptionsType<"string" | "buffer" | nil>?) -> HttpResponse<string | buffer>),
+    websocket: (host: string, opts: WebSocketOptions) -> HttpWebSocket, 
+}
+type RequestOptionsType<T> = (RequestOptions & {
+    response_body_type: T
+})
+export type _zune_net = {
+    ADDRF: _zune_net_ADDRF,
+    SOCKF: _zune_net_SOCKF,
+    SOCKOPT: _zune_net_SOCKOPT,
+    SOCKOPTLV: _zune_net_SOCKOPTLV,
+    IPPROTO: _zune_net_IPPROTO,
     createSocket: (address_family: number, flags: number, protocol: number) -> NetworkSocket,
     getAddressList: (name: string, port: number) -> {NetworkAddress},
-
-    http: {
-        serve: (opts: ServeOptions) -> HttpServer,
-        request:
-            & ((host: string, opts: (RequestOptions & { response_body_type: "string"? })?) -> HttpResponse<string>)
-            & ((host: string, opts: (RequestOptions & { response_body_type: "buffer" })) -> HttpResponse<buffer>)
-            & ((host: string, opts: (RequestOptions | { response_body_type: "string" | "buffer" | nil })?) -> HttpResponse<string | buffer>),
-        websocket: (host: string, opts: WebSocketOptions) -> HttpWebSocket,
-    }
+    http: _zune_net_http
 }
---[======[ Network ]======]--
-
---[======[ Luau ]======]--
-export type CompileOptions = {
-    debug_level: number?,
-    optimization_level: number?,
-    coverage_level: number?,
-}
-
-export type LoadOptions = {
-    env: {[any]: any}?,
-    chunk_name: string?,
-    native_code_gen: boolean?,
-}
-
-export type CoverageData = {
-    name: string,
-    line: number,
-    depth: number,
-    [number]: number,
-};
-
-type Position = {
-    line: number,
-    column: number,
-}
-
-export type Location = {
-    begin: Position,
-    ["end"]: Position,
-}
-
-export type ParseResult = {
-    errors: {
-        {
-            message: string,
-            location: Location,
-        }
-    }
-} | {
-    root: {any},
-    eof: { text: "", position: Position, tag: "eof" },
-    lines: number,
-    lineOffsets: {number},
-    hotcomments: {
-        {
-            header: boolean,
-            content: string,
-            location: Location,
-        }
-    }
-};
-
-type LuauLib = {
-    compile: (source: string, opts: CompileOptions?) -> string,
-    load: (bytecode: string, opts: LoadOptions?) -> ((...any) -> ...any),
-    coverage: (fn: (...any) -> ...any) -> {CoverageData},
-    parse: (src: string) -> ParseResult,
-    parseExpr: (src: string) -> any,
-    garbagecollect: () -> (),
-}
---[======[ Luau ]======]--
-
---[======[ Serde ]======]--
-type JsonEncodeConfig = {
-    pretty_indent: number,
-}
-
-type JsonDecodeConfig = {
-    preserve_null: boolean,
-}
-
-type JsonEncoder = {
-    encode: (value: any, config: JsonEncodeConfig?) -> string,
-    decode: (json: string, config: JsonDecodeConfig?) -> any,
-    indents: {
-        none: number,
-        two_spaces: number,
-        four_spaces: number,
-        tabs: number,
-    },
-    values: {
-        null: any,
-    }
-}
-
-type TomlEncoder = {
-    encode: (object: {[string]: any}) -> string,
-    decode: (toml: string) -> {[string]: any},
-}
-
-type YamlInput = string | number | boolean | {[string]: YamlInput}
-type YamlOuput = string | {[string]: YamlOuput}
-
-type YamlEncoder = {
-    encode: (object: YamlInput) -> string,
-    decode: (yaml: string) -> YamlOuput,
-}
-
-type Base64Encoder = {
-    encode: (value: string) -> string,
-    decode: (base64: string) -> string,
-}
-
-type GenericCompressionOptions = {
-    level: number?,
-}
-
-type CompressionFn =
-& ((raw: string) -> string)
-& ((raw: buffer) -> buffer)
-
-type AdvancedCompressionFn =
-& ((raw: string, opts: GenericCompressionOptions?) -> string)
-& ((raw: buffer, opts: GenericCompressionOptions?) -> buffer)
-
-type DecompressionFn =
-& ((compressed: string) -> string)
-& ((compressed: buffer) -> buffer)
-
-type GenericCompressor = {
-    compress : AdvancedCompressionFn,
-    decompress : DecompressionFn,
-}
-
-type SerdeLib = {
-    json: JsonEncoder,
-    json5: JsonEncoder,
-    toml: TomlEncoder,
-    yaml: YamlEncoder,
-    base64: Base64Encoder,
-    gzip: GenericCompressor,
-    zlib: GenericCompressor,
-    lz4: {
-        compress : CompressionFn,
-        compressFrame : AdvancedCompressionFn,
-        decompress :
-            & ((compressed: string, size: number) -> string)
-            & ((compressed: buffer, size: number) -> buffer),
-        decompressFrame : DecompressionFn,
-    },
-    zstd: GenericCompressor,
-}
---[======[ Serde ]======]--
-
---[======[ Io ]======]--
-declare class IoReadable
-    read:
-    & ((self: IoReadable, amount: number?, bytes: true?) -> buffer)
-    & ((self: IoReadable, amount: number?, bytes: false) -> string)
-
-    function readu8(self): number
-    function readu16(self): number
-    function readu32(self): number
-    function readi8(self): number
-    function readi16(self): number
-    function readi32(self): number
-    function readf32(self): number
-    function readf64(self): number
-end
-
-declare class IoWritable
-    function write(self, data: string | buffer): ()
-    function writeu8(self, value: number): ()
-    function writeu16(self, value: number): ()
-    function writeu32(self, value: number): ()
-    function writei8(self, value: number): ()
-    function writei16(self, value: number): ()
-    function writei32(self, value: number): ()
-    function writef32(self, value: number): ()
-    function writef64(self, value: number): ()
-end
-
-declare class BufferStream
-    read:
-        & ((self: BufferStream, amount: number?, bytes: true?) -> buffer?)
-        & ((self: BufferStream, amount: number?, bytes: false) -> string?)
-
-    function write(self, data: string | buffer): ()
-    function pos(self): number
-    function size(self): number
-    function seekTo(self, pos: number): ()
-    function seekBy(self, offset: number): ()
-    function canRead(self, amount: number?): ()
-    function writer(self): IoWritable
-    function reader(self): IoReadable
-end
-
-declare class BufferSink
-    len: number
-    closed: boolean
-
-    flush:
-        & ((self: BufferSink) -> buffer)
-        & ((self: BufferSink, true) -> buffer)
-        & ((self: BufferSink, false) -> string)
-
-    function write(self, data: string | buffer): ()
-    function writer(self): IoWritable
-    function close(self): ()
-end
-
-export type Terminal = {
-    isTTY: boolean,
-    getCurrentMode: () -> "normal" | "raw",
-    enableRawMode: () -> boolean,
-    restoreMode: () -> boolean,
-    getSize: () -> (number?, number?),
-}
-
-type BufferSinkOptions = {
-    limit: number?,
-}
-
-type IoLib = {
-    format: (...any) -> string,
-    createBufferSink: (opts: BufferSinkOptions?) -> BufferSink,
-    createFixedBufferStream: (buffer: buffer) -> BufferStream,
-    terminal: Terminal,
-    stdout: FileHandle,
-    stderr: FileHandle,
-    stdin: FileHandle,
-}
---[======[ Io ]======]--
-
---[======[ Crypto ]======]--
-declare class CryptoHash
-    digest:
-        & ((self: CryptoHash) -> buffer)
-        & ((self: CryptoHash, encoding: "binary") -> buffer)
-        & ((self: CryptoHash, encoding: "hex" | "base64") -> string)
-    function update(self, value: string | buffer): ()
-    function copy(self): CryptoHash
-end
-
-declare class TlsCertBundle
-end
-
-declare class TlsCertKeyPair
-end
-
-type HashAlgorithms =
-    | "sha1"
-    | "md5"
-    | "blake3"
-    | "sha224"
-    | "sha256"
-    | "sha384"
-    | "sha512"
-    | "sha3_224"
-    | "sha3_256"
-    | "sha3_384"
-    | "sha3_512"
-    | "blake2b128"
-    | "blake2b160"
-    | "blake2b256"
-    | "blake2b384"
-    | "blake2b512"
-    | "blake2s128"
-    | "blake2s160"
-    | "blake2s224"
-    | "blake2s256"
-
-type BcryptPasswordOptions = {
-    algorithm: "bcrypt"?,
-    cost: number?,
-}
-
-type Argon2PasswordOptions = {
-    algorithm: ("argon2d" | "argon2i" | "argon2id")?,
-    time_cost: number?,
-    memory_cost: number?,
-    threads: number?,
-}
-
-type PasswordOptions = BcryptPasswordOptions | Argon2PasswordOptions
-
-type EncryptedData = {
-    cipher: buffer,
-    tag: buffer,
-}
-
-type Aead = {
-    encrypt: (data: string | buffer, key: string | buffer, nonce: string | buffer, ad: (string | buffer)?) -> EncryptedData,
-    decrypt: (cipher: string | buffer, tag: string | buffer, key: string | buffer, nonce: string | buffer, ad: (string | buffer)?) -> string,
-}
-
-type CryptoLib = {
-    createHash: (algorithm: HashAlgorithms, secret: string?) -> CryptoHash,
-    password: {
-        hash: (password: string, opts: PasswordOptions?) -> string,
-        verify: (password: string, hash: string) -> boolean,
-    },
-    random: {
-        nextNumber:
-            & (() -> number)
-            & ((min: number, max: number) -> number),
-        nextInteger:
-            & (() -> number)
-            & ((min: number, max: number) -> number),
-        nextBoolean: () -> boolean,
-        fill: (buffer: buffer, offset: number, length: number) -> (),
-    },
-    aead: {
-        aes_gcm: {
-            Aes128Gcm: Aead,
-            Aes256Gcm: Aead,
-        },
-        aes_ocb: {
-            Aes128Ocb: Aead,
-            Aes256Ocb: Aead,
-        },
-        aegis: {
-            Aegis128X4: Aead,
-            Aegis128X2: Aead,
-            Aegis128L: Aead,
-            Aegis256X4: Aead,
-            Aegis256X2: Aead,
-            Aegis256: Aead,
-            Aegis128X4_256: Aead,
-            Aegis128X2_256: Aead,
-            Aegis128L_256: Aead,
-            Aegis256X4_256: Aead,
-            Aegis256X2_256: Aead,
-            Aegis256_256: Aead,
-        },
-        chacha_poly: {
-            ChaCha8Poly1305: Aead,
-            ChaCha12Poly1305: Aead,
-            ChaCha20Poly1305: Aead,
-            XChaCha8Poly1305: Aead,
-            XChaCha12Poly1305: Aead,
-            XChaCha20Poly1305: Aead,
-        },
-        salsa_poly: {
-            XSalsa20Poly1305: Aead,
-        },
-        isap: {
-            IsapA128A: Aead,
-        },
-    },
-
-    tls: {
-        bundleFromSystem: () -> TlsCertBundle,
-        bundleFromFile: (file: string) -> TlsCertBundle,
-        keyPairFromFile: (certFile: string, keyFile: string) -> TlsCertKeyPair,
-        setupClient: (socket: NetworkSocket, config: { host: string, ca: TlsCertBundle }) -> (),
-        setupServer: (socket: NetworkSocket, config: { auth: TlsCertKeyPair }) -> (),
-    },
-}
---[======[ Crypto ]======]--
-
---[======[ Regex ]======]--
-export type RegexMatch = {
-    string: string,
-    index: number,
-}
-
-export type Regex = {
-    match: (self: Regex, input: string | buffer) -> {RegexMatch}?,
-    search: (self: Regex, input: string | buffer) -> {RegexMatch}?,
-    captures: (self: Regex, input: string | buffer, global: boolean?) -> {{RegexMatch}},
-    isMatch: (self: Regex, input: string | buffer) -> boolean,
-    format: (self: Regex, str: string, format: string) -> string,
-    replace: (self: Regex, str: string, replacement: string) -> string,
-    replaceAll: (self: Regex, str: string, replacement: string) -> string,
-}
-
-type RegexLib = {
-    create: (pattern: string | buffer, flags: string?) -> Regex,
-}
---[======[ Regex ]======]--
-
---[======[ Datetime ]======]--
-export type TimeDictionary = {
-    year: number,
-    month: number,
-    day: number,
-    hour: number,
-    minute: number,
-    second: number,
-    millisecond: number,
-}
-
-declare class DateTime
-    timestamp: number
-    timestamp_millis: number
-    function toLocalTime(self): TimeDictionary
-    function toUniversalTime(self): TimeDictionary
-    function toIsoDate(self): string
-    function formatLocalTime(self, format: string): string
-    function formatUniversalTime(self, format: string): string
-end
-
-type DatetimeLib = {
-    now: () -> DateTime,
-    fromIsoDate: (date: string) -> DateTime,
-    fromUnixTimestamp: (timestamp: number) -> DateTime,
-    fromUnixTimestampMillis: (timestamp: number) -> DateTime,
-    fromLocalTime: (year: number, month: number, day: number, hour: number, minute: number, second: number, millisecond: number) -> DateTime,
-    fromUniversalTime: (year: number, month: number, day: number, hour: number, minute: number, second: number, millisecond: number) -> DateTime,
-    parse: (date: string) -> DateTime,
-}
---[======[ Datetime ]======]--
-
---[======[ FFI ]======]--
+--[[ ffi ]]
 export type FFILibrary = {
     getSymbol: (self: FFILibrary, symbol: string) -> FFIPointer?,
-    [string]: (...any) -> any,
+    [string]: (...any) -> any, 
 }
-
 declare class FFICompiled
-    function getSymbol(self, symbol: string): FFIPointer?
+    getSymbol: (self: FFICompiled, symbol: string) -> FFIPointer?
 end
-
 declare class FFIDataType
-    function size(self): number
-    function alignment(self): number
+    size: (self: FFIDataType) -> number
+    alignment: (self: FFIDataType) -> number 
 end
-
 declare class FFIStructureType extends FFIDataType
-    function offset(self, field: string): number
-    function new(self, fields: {{ [string]: buffer | number }}): buffer
+    offset: (self: FFIStructureType, field: string) -> number
+    new: (self: FFIStructureType, fields: {{[string]: buffer | number}}) -> buffer 
 end
-
 declare class FFIPointerType extends FFIDataType
-    function tag(self): number
-    function newTag(self, tag: string | buffer): FFIPointerType
+    tag: (self: FFIPointerType) -> number
+    newTag: (self: FFIPointerType, tag: string | buffer) -> FFIPointerType 
 end
-
 type AnyDataType = FFIDataType | FFIStructureType | FFIPointerType
-
-export type FFIFunctionDef = {
+type FFIFunctionDef = {
     returns: AnyDataType,
-    args: { AnyDataType }
+    args: {AnyDataType}
 }
-
-export type FFIPointer = {
-    release: (self: FFIPointer) -> FFIPointer,
-    retain: (self: FFIPointer) -> FFIPointer,
+declare class FFIPointer
+    release: (self: FFIPointer) -> FFIPointer
+    retain: (self: FFIPointer) -> FFIPointer
     tag: 
         & ((self: FFIPointer) -> number)
-        & ((self: FFIPointer, tag: number) -> FFIPointer),
-    drop: (self: FFIPointer) -> FFIPointer,
-    offset: (self: FFIPointer, offset: number) -> FFIPointer,
-    read: (self: FFIPointer, srcOffset: number, dest: buffer | FFIPointer, destOffset: number, count: number) -> buffer,
-    write: (self: FFIPointer, destOffset: number, src: buffer | FFIPointer, srcOffset: number, count: number) -> (),
-    readi8: (self: FFIPointer, offset: number?) -> number,
-    readi16: (self: FFIPointer, offset: number?) -> number,
-    readi32: (self: FFIPointer, offset: number?) -> number,
-    readi64: (self: FFIPointer, offset: number?) -> buffer,
-    readu8: (self: FFIPointer, offset: number?) -> number,
-    readu16: (self: FFIPointer, offset: number?) -> number,
-    readu32: (self: FFIPointer, offset: number?) -> number,
-    readu64: (self: FFIPointer, offset: number?) -> buffer,
-    readf32: (self: FFIPointer, offset: number?) -> number,
-    readf64: (self: FFIPointer, offset: number?) -> number,
-    readptr: (self: FFIPointer, offset: number?) -> FFIPointer,
-    writei8: (self: FFIPointer, offset: number, value: number | buffer | boolean) -> (),
-    writei16: (self: FFIPointer, offset: number, value: number | buffer | boolean) -> (),
-    writei32: (self: FFIPointer, offset: number, value: number | buffer | boolean) -> (),
-    writei64: (self: FFIPointer, offset: number, value: number | buffer | boolean) -> (),
-    writeu8: (self: FFIPointer, offset: number, value: number | buffer | boolean) -> (),
-    writeu16: (self: FFIPointer, offset: number, value: number | buffer | boolean) -> (),
-    writeu32: (self: FFIPointer, offset: number, value: number | buffer | boolean) -> (),
-    writeu64: (self: FFIPointer, offset: number, value: number | buffer | boolean) -> (),
-    writef32: (self: FFIPointer, offset: number, value: number | buffer | boolean) -> (),
-    writef64: (self: FFIPointer, offset: number, value: number | buffer | boolean) -> (),
-    writeptr: (self: FFIPointer, offset: number, value: FFIPointer) -> (),
-    size:
+        & ((self: FFIPointer, tag: number) -> FFIPointer)
+    drop: (self: FFIPointer) -> FFIPointer
+    offset: (self: FFIPointer, offset: number) -> FFIPointer
+    read: (self: FFIPointer, srcOffset: number, dest: buffer | FFIPointer, destOffset: number, count: number) -> buffer
+    write: (self: FFIPointer, destOffset: number, src: buffer | FFIPointer, srcOffset: number, count: number) -> ()
+    readi8: (self: FFIPointer, offset: number?) -> number
+    readi16: (self: FFIPointer, offset: number?) -> number
+    readi32: (self: FFIPointer, offset: number?) -> number
+    readi64: (self: FFIPointer, offset: number?) -> buffer
+    readu8: (self: FFIPointer, offset: number?) -> number
+    readu16: (self: FFIPointer, offset: number?) -> number
+    readu32: (self: FFIPointer, offset: number?) -> number
+    readu64: (self: FFIPointer, offset: number?) -> buffer
+    readf32: (self: FFIPointer, offset: number?) -> number
+    readf64: (self: FFIPointer, offset: number?) -> number
+    readptr: (self: FFIPointer, offset: number?) -> FFIPointer
+    writei8: (self: FFIPointer, offset: number, value: number | buffer | boolean) -> ()
+    writei16: (self: FFIPointer, offset: number, value: number | buffer | boolean) -> ()
+    writei32: (self: FFIPointer, offset: number, value: number | buffer | boolean) -> ()
+    writei64: (self: FFIPointer, offset: number, value: number | buffer | boolean) -> ()
+    writeu8: (self: FFIPointer, offset: number, value: number | buffer | boolean) -> ()
+    writeu16: (self: FFIPointer, offset: number, value: number | buffer | boolean) -> ()
+    writeu32: (self: FFIPointer, offset: number, value: number | buffer | boolean) -> ()
+    writeu64: (self: FFIPointer, offset: number, value: number | buffer | boolean) -> ()
+    writef32: (self: FFIPointer, offset: number, value: number | buffer | boolean) -> ()
+    writef64: (self: FFIPointer, offset: number, value: number | buffer | boolean) -> ()
+    writeptr: (self: FFIPointer, offset: number, value: FFIPointer) -> ()
+    size: 
         & ((self: FFIPointer) -> number?)
-        & ((self: FFIPointer, size: number) -> ()),
-    alignment:
+        & ((self: FFIPointer, size: number) -> ())
+    alignment: 
         & ((self: FFIPointer) -> number?)
-        & ((self: FFIPointer, alignment: number) -> ()),
-    span: (self: FFIPointer, offset: number?) -> buffer,
+        & ((self: FFIPointer, alignment: number) -> ())
+    span: (self: FFIPointer, offset: number?) -> buffer 
+end
+export type _zune_ffi_types = {
+    void: FFIDataType,
+    i8: FFIDataType,
+    u8: FFIDataType,
+    i16: FFIDataType,
+    u16: FFIDataType,
+    i32: FFIDataType,
+    u32: FFIDataType,
+    i64: FFIDataType,
+    u64: FFIDataType,
+    float: FFIDataType,
+    double: FFIDataType,
+    pointer: FFIPointerType, 
 }
-
+export type _zune_ffi_c = {
+    compile: (src: string, opts: FFICompileOptions?) -> FFICompiled, 
+}
 type FFICompileOptions = {
     options: string?,
     files: {string}?,
     libraries: {string}?,
     includes: {string}?,
     sysincludes: {string}?,
-    symbols: {[string]: FFIPointer}?,
+    symbols: {
+        [string]: FFIPointer
+    }?, 
 }
-
-type FFILib = {
+export type _zune_ffi = {
     prefix: string,
     suffix: string,
-    types: {
-        void: FFIDataType,
-        i8: FFIDataType,
-        u8: FFIDataType,
-        i16: FFIDataType,
-        u16: FFIDataType,
-        i32: FFIDataType,
-        u32: FFIDataType,
-        i64: FFIDataType,
-        u64: FFIDataType,
-        float: FFIDataType,
-        double: FFIDataType,
-        pointer: FFIPointerType,
-    },
-    c: {
-        compile: (src: string, opts: FFICompileOptions?) -> FFICompiled,
-    },
+    types: _zune_ffi_types,
+    c: _zune_ffi_c,
     null: FFIPointer,
     ptr: (src: FFIPointer) -> FFIPointer,
     ptrFromAddress: (src: buffer) -> FFIPointer,
@@ -1334,101 +1295,94 @@ type FFILib = {
     free: (src: FFIPointer) -> (),
     dupe: (src: buffer | FFIPointer) -> FFIPointer,
     tagName: (tag: number) -> string?,
-    struct: (fields: {{ [string]: AnyDataType }}) -> FFIStructureType,
+    struct: (fields: {{[string]: AnyDataType}}) -> FFIStructureType,
     fn: (definition: FFIFunctionDef, srcPtr: FFIPointer) -> ((...any) -> any),
     closure: (definition: FFIFunctionDef, handler: (...any) -> any) -> FFIPointer,
-    dlopen: (path: string, { [string]: FFIFunctionDef }) -> FFILibrary,
+    dlopen: (path: string, functions: {[string]: FFIFunctionDef}) -> FFILibrary, 
 }
---[======[ FFI ]======]--
-
---[======[ SQLite ]======]--
-export type SQLite3Values = {[string]: number | string | buffer};
-export type SQLite3Result = {
-    last_insert_row_id: number,
-    changes: number,
-}
-
-declare class SQLite3Statement
-    function run(self, args: SQLite3Values?): SQLite3Result
-    function get(self, args: SQLite3Values?): SQLite3Values?
-    function all(self, args: SQLite3Values?): {SQLite3Values}
-    function finalize(self): ()
+--[[ io ]]
+declare class IoReadable
+    read: 
+        & ((self: IoReadable, amount: number?, bytes: true?) -> buffer)
+        & ((self: IoReadable, amount: number?, bytes: false) -> string)
+    readu8: (self: IoReadable) -> number
+    readu16: (self: IoReadable) -> number
+    readu32: (self: IoReadable) -> number
+    readi8: (self: IoReadable) -> number
+    readi16: (self: IoReadable) -> number
+    readi32: (self: IoReadable) -> number
+    readf32: (self: IoReadable) -> number
+    readf64: (self: IoReadable) -> number 
 end
-
-type TransactionFn = <A..., R...>(self: SQLite3Database, callback: ((A...) -> R...), kind: ("deferred" | "immediate" | "exclusive")?) -> ((A...) -> R...)
-
-declare class SQLite3Database
-    transaction: TransactionFn
-    function query(self, query: string): SQLite3Statement
-    function exec(self, query: string, args: SQLite3Values?): SQLite3Result
-    function close(self): ()
+declare class IoWritable
+    write: (self: IoWritable, data: string | buffer) -> ()
+    writeu8: (self: IoWritable, value: number) -> ()
+    writeu16: (self: IoWritable, value: number) -> ()
+    writeu32: (self: IoWritable, value: number) -> ()
+    writei8: (self: IoWritable, value: number) -> ()
+    writei16: (self: IoWritable, value: number) -> ()
+    writei32: (self: IoWritable, value: number) -> ()
+    writef32: (self: IoWritable, value: number) -> ()
+    writef64: (self: IoWritable, value: number) -> () 
 end
-
-export type SQLiteLib = {
-    open: (path: string?) -> SQLite3Database,
+declare class BufferStream
+    read: 
+        & ((self: BufferStream, amount: number?, bytes: true?) -> buffer)
+        & ((self: BufferStream, amount: number?, bytes: false) -> string)
+    write: (self: BufferStream, data: string | buffer) -> ()
+    pos: (self: BufferStream) -> number
+    size: (self: BufferStream) -> number
+    seekTo: (self: BufferStream, pos: number) -> ()
+    seekBy: (self: BufferStream, offset: number) -> ()
+    canRead: (self: BufferStream, amount: number?) -> boolean
+    writer: (self: BufferStream) -> IoWritable
+    reader: (self: BufferStream) -> IoReadable 
+end
+declare class BufferSink
+    len: number
+    closed: boolean
+    flush: 
+        & ((self: BufferSink, bytes: true?) -> buffer)
+        & ((self: BufferSink, bytes: false) -> string)
+    write: (self: BufferSink, data: string | buffer) -> ()
+    writer: (self: BufferSink) -> IoWritable
+    close: (self: BufferSink) -> () 
+end
+export type Terminal = {
+    isTTY: boolean,
+    getCurrentMode: () -> "normal" | "raw",
+    enableRawMode: () -> boolean,
+    restoreMode: () -> boolean,
+    getSize: () -> (number?, number?), 
 }
---[======[ SQLite ]======]--
-
---[======[ Require ]======]--
-export type RequireLib = {
+export type _zune_io_terminal = {
+    isTTY: boolean,
+    getCurrentMode: () -> "normal" | "raw",
+    enableRawMode: () -> boolean,
+    restoreMode: () -> boolean,
+    getSize: () -> (number?, number?), 
+}
+type BufferSinkOptions = {
+    limit: number?, 
+}
+export type _zune_io = {
+    format: (...any) -> string,
+    createBufferSink: (opts: BufferSinkOptions?) -> BufferSink,
+    createFixedBufferStream: (buffer: buffer) -> BufferStream,
+    terminal: _zune_io_terminal,
+    stdout: FileHandle,
+    stderr: FileHandle,
+    stdin: FileHandle, 
+}
+--[[ require ]]
+export type _zune_require = {
     navigate: (path: string, from: string?, config: string?) -> string,
-    getCached: (resolvedPath: string) -> any?,
+    getCached: (resolvedPath: string) -> any?, 
 }
---[======[ Require ]======]--
-
---[======[ Random ]======]--
-declare class Random
-    nextNumber:
-        & ((self: Random) -> number)
-        & ((self: Random, min: number, max: number) -> number)
-    function nextInteger(self, min: number, max: number): number
-    function nextBoolean(self): boolean
-    function clone(self): Random
-end
-
-type RandomConstructor = {
-    new: (seed: number?) -> Random,
-}
-
-export type RandomLib = RandomConstructor & {
-    LuauPcg32: RandomConstructor,
-    Isaac64: RandomConstructor,
-    Pcg32: RandomConstructor,
-    Xoroshiro128: RandomConstructor,
-    Xoshiro256: RandomConstructor,
-    Sfc64: RandomConstructor,
-    RomuTrio: RandomConstructor,
-}
---[======[ Random ]======]--
-
---[======[ Thread ]======]--
-declare class Thread
-    function start(self): ()
-    function join(self): ()
-    function status(self): "ready" | "running" | "dead"
-    function receive(self): (...any)
-    function send(self, ...: any): ()
-end
-
-type ThreadLoadOptions = {
-    chunk_name: string?,
-    native_code_gen: boolean?,
-}
-
-export type ThreadLib = {
-    fromModule: (module: string) -> Thread,
-    fromBytecode: (bytecode: string | buffer, opts: ThreadLoadOptions?) -> Thread,
-    receive: () -> ...any,
-    send: (...any) -> (),
-    getCpuCount: () -> number,
-    isThread: boolean,
-}
---[======[ Thread ]======]--
-
---[======[ Memory ]======]--
-type WritableSlice = buffer | FFIPointer;
-type ReadableSlice = string | buffer | FFIPointer;
-export type MemLib = {
+--[[ mem ]]
+type WritableSlice = buffer | FFIPointer
+type ReadableSlice = string | buffer | FFIPointer
+export type _zune_mem = {
     MAX_SIZE: number,
     len: (src: ReadableSlice) -> number?,
     copy: (dest: WritableSlice, destOffset: number, src: ReadableSlice, srcOffset: number, count: number?) -> (),
@@ -1461,32 +1415,95 @@ export type MemLib = {
     min: (src: ReadableSlice) -> number,
     reverse: (src: WritableSlice) -> (),
     rotate: (src: WritableSlice, amount: number) -> (),
-    set: (dest: WritableSlice, value: number, offset: number?, count: number?) -> (),
+    set: (dest: WritableSlice, value: number, offset: number?, count: number?) -> (), 
 }
---[======[ Memory ]======]--
-
+--[[ task ]]
+export type _zune_task = {
+    cancel: (thread: thread) -> (),
+    defer: <A...,  R...>(f: ((A...) ->  R...) | thread,  A...) -> thread,
+    delay: <A...,  R...>(sec: number, f: ((A...) -> (R...)) | thread,  A...) -> thread,
+    spawn: <A...,  R...>(f: ((A...) -> (R...)) | thread,  A...) -> thread,
+    wait: (sec: number?) -> number,
+    count: (() -> number) & ((kinds: string) -> ...number), 
+}
+--[[ sqlite ]]
+export type SQLite3Values = {
+    [string]: number | string | buffer
+}
+export type SQLite3Result = {
+    last_insert_row_id: number,
+    changes: number, 
+}
+declare class SQLite3Statement
+    run: (self: SQLite3Statement, args: SQLite3Values?) -> SQLite3Result
+    get: (self: SQLite3Statement, args: SQLite3Values?) -> SQLite3Values?
+    all: (self: SQLite3Statement, args: SQLite3Values?) -> {SQLite3Values}
+    finalize: (self: SQLite3Statement) -> () 
+end
+type TransactionKind = "deferred" | "immediate" | "exclusive"
+type TransactionFn = <A...,  R...>(self: SQLite3Database, callback: ((A...) ->  R...), kind: TransactionKind?) -> ((A...) ->  R...)
+declare class SQLite3Database
+    transaction: TransactionFn
+    query: (self: SQLite3Database, query: string) -> SQLite3Statement
+    exec: (self: SQLite3Database, query: string, args: SQLite3Values?) -> SQLite3Result
+    close: (self: SQLite3Database) -> () 
+end
+export type _zune_sqlite = {
+    open: (path: string?) -> SQLite3Database, 
+}
+--[[ datetime ]]
+export type TimeDictionary = {
+    year: number,
+    month: number,
+    day: number,
+    hour: number,
+    minute: number,
+    second: number,
+    millisecond: number, 
+}
+declare class DateTime
+    timestamp: number
+    timestamp_millis: number
+    toLocalTime: (self: DateTime) -> TimeDictionary
+    toUniversalTime: (self: DateTime) -> TimeDictionary
+    toIsoDate: (self: DateTime) -> string
+    formatLocalTime: (self: DateTime, format: string) -> string
+    formatUniversalTime: (self: DateTime, format: string) -> string 
+end
+export type _zune_datetime = {
+    now: () -> DateTime,
+    fromIsoDate: (date: string) -> DateTime,
+    fromUnixTimestamp: (timestamp: number) -> DateTime,
+    fromUnixTimestampMillis: (timestamp: number) -> DateTime,
+    fromLocalTime: (year: number, month: number, day: number, hour: number, minute: number, second: number, millisecond: number) -> DateTime,
+    fromUniversalTime: (year: number, month: number, day: number, hour: number, minute: number, second: number, millisecond: number) -> DateTime,
+    parse: (date: string) -> DateTime, 
+}
+declare _FILE: {
+    source: string?,
+    main: boolean, 
+}
 declare zune: {
     compiled: {
         optimize: number,
         debug: number,
-        mode: "debug" | "release",
+        mode: "debug" | "release", 
     }?,
-
-    fs: FileSystemLib,
-    process: ProcessLib,
-    testing: TestingLib,
-    task: TaskLib,
-    net: NetworkLib,
-    luau: LuauLib,
-    serde: SerdeLib,
-    io: IoLib,
-    crypto: CryptoLib,
-    regex: RegexLib,
-    datetime: DatetimeLib,
-    ffi: FFILib,
-    sqlite: SQLiteLib,
-    require: RequireLib,
-    random: RandomLib,
-    thread: ThreadLib,
-    mem: MemLib,
+    fs: _zune_fs,
+    process: _zune_process,
+    testing: _zune_testing,
+    task: _zune_task,
+    net: _zune_net,
+    luau: _zune_luau,
+    serde: _zune_serde,
+    io: _zune_io,
+    crypto: _zune_crypto,
+    regex: _zune_regex,
+    datetime: _zune_datetime,
+    ffi: _zune_ffi,
+    sqlite: _zune_sqlite,
+    require: _zune_require,
+    random: _zune_random,
+    thread: _zune_thread,
+    mem: _zune_mem, 
 }
