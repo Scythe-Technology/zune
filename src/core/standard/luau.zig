@@ -1481,7 +1481,7 @@ const AstSerializer = struct {
         if (node.hasParameterList) {
             std.debug.assert(cstNode != null);
             try self.serializeToken(cstNode.?.openParametersPosition, "<", null);
-            try self.L.rawsetfield(-2, "openParens");
+            try self.L.rawsetfield(-2, "openParameters");
 
             try self.serializePunctuatedTypeOrPack(node.parameters, cstNode.?.parametersCommaPositions.slice(), ",");
             try self.L.rawsetfield(-2, "parameters");
