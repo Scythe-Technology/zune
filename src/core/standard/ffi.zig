@@ -340,8 +340,10 @@ pub const LuaPointer = struct {
     }
 
     pub fn lua_tag(ptr: *LuaPointer, L: *VM.lua.State) !i32 {
-        if (ptr.owner == .none or ptr.ptr == null)
-            return 0;
+        if (ptr.owner == .none or ptr.ptr == null) {
+            L.pushnil();
+            return 1;
+        }
         const tag = L.tounsigned(2) orelse {
             L.pushunsigned(ptr.data.tag);
             return 1;
@@ -352,8 +354,10 @@ pub const LuaPointer = struct {
     }
 
     pub fn lua_drop(ptr: *LuaPointer, L: *VM.lua.State) !i32 {
-        if (ptr.owner == .none or ptr.ptr == null)
-            return 0;
+        if (ptr.owner == .none or ptr.ptr == null) {
+            L.pushnil();
+            return 1;
+        }
         if (ptr.type == .static)
             return L.Zerror("cannot drop a static pointer");
         ptr.owner = .user;
@@ -540,8 +544,10 @@ pub const LuaPointer = struct {
 
     pub fn lua_size(ptr: *LuaPointer, L: *VM.lua.State) !i32 {
         const size = L.tonumber(2) orelse {
-            if (ptr.owner == .none or ptr.ptr == null)
-                return 0;
+            if (ptr.owner == .none or ptr.ptr == null) {
+                L.pushnil();
+                return 1;
+            }
             if (ptr.size) |size|
                 L.pushnumber(@floatFromInt(size))
             else
@@ -567,8 +573,10 @@ pub const LuaPointer = struct {
 
     pub fn lua_alignment(ptr: *LuaPointer, L: *VM.lua.State) !i32 {
         const alignment = L.tonumber(2) orelse {
-            if (ptr.owner == .none or ptr.ptr == null)
-                return 0;
+            if (ptr.owner == .none or ptr.ptr == null) {
+                L.pushnil();
+                return 1;
+            }
             if (ptr.alignment) |alignment|
                 L.pushnumber(@floatFromInt(alignment.toByteUnits()))
             else
@@ -2095,7 +2103,8 @@ const LuaCompiled = struct {
             _ = try LuaPointer.newStaticPtr(L, ptr);
             return 1;
         }
-        return 0;
+        L.pushnil();
+        return 1;
     }
 
     pub const __namecall = MethodMap.CreateNamecallMap(LuaCompiled, null, .{
@@ -2200,12 +2209,16 @@ fn lua_compile(L: *VM.lua.State) !i32 {
 
     try state.relocate();
 
+    getCacheTable(L);
+    const id = L.objlen(-1) + 1;
     const obj = try L.newuserdatadtor(LuaCompiled, LuaCompiled.deinit);
     obj.* = .{
         .state = state,
     };
     std.debug.assert(!(try L.Lgetmetatable(@typeName(LuaCompiled))).isnoneornil());
     _ = try L.setmetatable(-2);
+    L.pushvalue(-1);
+    try L.rawseti(-3, @intCast(id));
     return 1;
 }
 
