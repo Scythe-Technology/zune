@@ -139,13 +139,55 @@ in it.g'''
                 ["ab.c"] = "ab",
             }));
         end)
-
         test("Test 5", function()
             local sample = [[
             "file://ab/c.luau"      =        "ab"
             ]];
             expect(serde.toml.decode(sample)).toBe(expect.similar({
                 ["file://ab/c.luau"] = "ab",
+            }));
+        end)
+        test("Test 6", function()
+            local sample = [=[
+            [a]
+            test = 1
+            [a]
+            test2 = 4
+            [something]
+            test = 2
+            ]=];
+            expect(serde.toml.decode(sample)).toBe(expect.similar({
+                a = {
+                    test = 1,
+                    test2 = 4,
+                },
+                something = {
+                    test = 2,
+                },
+            }));
+        end)
+        test("Test 7", function()
+            local sample = [=[
+            [a]
+            test = 1
+            [[b]]
+            [[b]]
+            [[b]]
+            [[b]]
+            test = 4
+            [something]
+            test = 2
+            ]=];
+            expect(serde.toml.decode(sample)).toBe(expect.similar({
+                a = {
+                    test = 1,
+                },
+                b = {{}, {}, {}, {
+                    test = 4
+                }},
+                something = {
+                    test = 2,
+                },
             }));
         end)
         test("Test 1 - Error", function()
@@ -157,7 +199,21 @@ in it.g'''
             -- based on https://github.com/mattyhall/tomlz/blob/9a16dd53927ef2012478b6494bafb4475e44f4c9/tests/fuzzing/id-000000%2Csig-06%2Csrc-000052%2B000007%2Ctime-701543%2Cexecs-28399%2Cop-splice%2Crep-2
             local sample = [=[answej4 = """"\u03B4"
 answer8 = "\U000003B4"]]=];
-            expect(function() serde.toml.decode(sample) end).toThrow(`InvalidString at line 1, col 44`);
+            expect(function() serde.toml.decode(sample) end).toThrow(`InvalidString at line 2, col 22`);
+        end)
+        test("Test 3 - Error", function()
+            local sample = [=[
+            [a]
+            test = 1
+            [[b]]=];
+            expect(function() serde.toml.decode(sample) end).toThrow(`InvalidArray at line 3, col 12`);
+        end)
+        test("Test 4 - Error", function()
+            local sample = [=[
+            [a]
+            test = 1
+            [[b]=];
+            expect(function() serde.toml.decode(sample) end).toThrow(`InvalidArray at line 3, col 12`);
         end)
     end)
 end)
