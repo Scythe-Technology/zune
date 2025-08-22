@@ -751,11 +751,35 @@ fn decode(L: *VM.lua.State, string: []const u8, info: *DecodeInfo) !void {
 
             returnTop(L, @intCast(main));
 
+            if (string[pos + 1] == '[') {
+                const slice = string[pos + 2 ..];
+                const last = std.mem.indexOfScalar(u8, slice, ']') orelse slice.len;
+                const array_name = Parser.trimSpace(slice[0..last]);
+
+                info.pos = pos;
+                if (!std.mem.startsWith(u8, slice[last..], "]]"))
+                    return Error.InvalidArray;
+
+                info.pos = pos + 2;
+                try decodeGenerateName(L, array_name, true);
+                const array_size = L.objlen(-1);
+                try L.newtable();
+                L.pushvalue(-1);
+                try L.rawseti(-3, @intCast(array_size + 1));
+
+                pos += 2;
+                continue;
+            }
+
             const slice = string[pos + 1 ..];
             const last = std.mem.indexOfScalar(u8, slice, ']') orelse slice.len;
             const table_name = Parser.trimSpace(slice[0..last]);
 
             info.pos = pos;
+            if (slice[last..][0] != ']')
+                return Error.InvalidTable;
+
+            info.pos = pos + 1;
             try decodeGenerateName(L, table_name, true);
 
             pos += 1;
