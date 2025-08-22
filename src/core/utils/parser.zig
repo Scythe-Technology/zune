@@ -11,7 +11,7 @@ pub fn getLineInfo(string: []const u8, pos: usize) LineInfo {
     for (0..pos) |p| {
         if (p >= string.len)
             break;
-        switch (string[pos]) {
+        switch (string[p]) {
             '\n' => {
                 line += 1;
                 col = 0;

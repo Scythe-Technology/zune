@@ -139,7 +139,6 @@ in it.g'''
                 ["ab.c"] = "ab",
             }));
         end)
-
         test("Test 5", function()
             local sample = [[
             "file://ab/c.luau"      =        "ab"
@@ -157,7 +156,7 @@ in it.g'''
             -- based on https://github.com/mattyhall/tomlz/blob/9a16dd53927ef2012478b6494bafb4475e44f4c9/tests/fuzzing/id-000000%2Csig-06%2Csrc-000052%2B000007%2Ctime-701543%2Cexecs-28399%2Cop-splice%2Crep-2
             local sample = [=[answej4 = """"\u03B4"
 answer8 = "\U000003B4"]]=];
-            expect(function() serde.toml.decode(sample) end).toThrow(`InvalidString at line 1, col 44`);
+            expect(function() serde.toml.decode(sample) end).toThrow(`InvalidString at line 2, col 22`);
         end)
     end)
 end)
