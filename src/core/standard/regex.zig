@@ -39,7 +39,8 @@ const LuaRegex = struct {
             }
             return 1;
         }
-        return 0;
+        L.pushnil();
+        return 1;
     }
 
     pub fn search(self: *LuaRegex, L: *VM.lua.State) !i32 {
@@ -63,7 +64,8 @@ const LuaRegex = struct {
             }
             return 1;
         }
-        return 0;
+        L.pushnil();
+        return 1;
     }
 
     pub fn captures(self: *LuaRegex, L: *VM.lua.State) !i32 {
