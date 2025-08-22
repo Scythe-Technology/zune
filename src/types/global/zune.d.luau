@@ -1,15 +1,15 @@
 -- This file was auto-generated with "zune-docs"
 
 --[[ serde ]]
-type JsonEncodeConfig = {
+export type SerdeJsonEncodeConfig = {
     pretty_indent: number?, 
 }
-type JsonDecodeConfig = {
+export type SerdeJsonDecodeConfig = {
     preserve_null: boolean?, 
 }
 type JsonEncoder = {
-    encode: (value: any, config: JsonEncodeConfig?) -> string,
-    decode: (json: string, config: JsonDecodeConfig?) -> any,
+    encode: (value: any, config: SerdeJsonEncodeConfig?) -> string,
+    decode: (json: string, config: SerdeJsonDecodeConfig?) -> any,
     indents: {
         none: number,
         two_spaces: number,
@@ -42,21 +42,21 @@ type Base64Encoder = {
         & ((base64: string) -> string)
         & ((base64: buffer) -> buffer), 
 }
-type GenericCompressionOptions = {
+export type SerdeGenericCompressionOptions = {
     level: number?, 
 }
 type CompressionFn = 
     & ((raw: string) -> string)
     & ((raw: buffer) -> buffer)
 type AdvancedCompressionFn = 
-    & ((raw: string, opts: GenericCompressionOptions?) -> string)
-    & ((raw: buffer, opts: GenericCompressionOptions?) -> buffer)
+    & ((raw: string, opts: SerdeGenericCompressionOptions?) -> string)
+    & ((raw: buffer, opts: SerdeGenericCompressionOptions?) -> buffer)
 type DecompressionFn = 
     & ((compressed: string) -> string)
     & ((compressed: buffer) -> buffer)
 export type _zune_serde_json = {
-    encode: (value: any, config: JsonEncodeConfig?) -> string,
-    decode: (json: string, config: JsonDecodeConfig?) -> any,
+    encode: (value: any, config: SerdeJsonEncodeConfig?) -> string,
+    decode: (json: string, config: SerdeJsonDecodeConfig?) -> any,
     indents: {
         none: number,
         two_spaces: number,
@@ -68,8 +68,8 @@ export type _zune_serde_json = {
     }
 }
 export type _zune_serde_json5 = {
-    encode: (value: any, config: JsonEncodeConfig?) -> string,
-    decode: (json: string, config: JsonDecodeConfig?) -> any,
+    encode: (value: any, config: SerdeJsonEncodeConfig?) -> string,
+    decode: (json: string, config: SerdeJsonDecodeConfig?) -> any,
     indents: {
         none: number,
         two_spaces: number,
@@ -98,16 +98,16 @@ export type _zune_serde_base64 = {
 }
 export type _zune_serde_gzip = {
     compress: 
-        & ((raw: string, opts: GenericCompressionOptions?) -> string)
-        & ((raw: buffer, opts: GenericCompressionOptions?) -> buffer),
+        & ((raw: string, opts: SerdeGenericCompressionOptions?) -> string)
+        & ((raw: buffer, opts: SerdeGenericCompressionOptions?) -> buffer),
     decompress: 
         & ((compressed: string) -> string)
         & ((compressed: buffer) -> buffer), 
 }
 export type _zune_serde_zlib = {
     compress: 
-        & ((raw: string, opts: GenericCompressionOptions?) -> string)
-        & ((raw: buffer, opts: GenericCompressionOptions?) -> buffer),
+        & ((raw: string, opts: SerdeGenericCompressionOptions?) -> string)
+        & ((raw: buffer, opts: SerdeGenericCompressionOptions?) -> buffer),
     decompress: 
         & ((compressed: string) -> string)
         & ((compressed: buffer) -> buffer), 
@@ -117,8 +117,8 @@ export type _zune_serde_lz4 = {
         & ((raw: string) -> string)
         & ((raw: buffer) -> buffer),
     compressFrame: 
-        & ((raw: string, opts: GenericCompressionOptions?) -> string)
-        & ((raw: buffer, opts: GenericCompressionOptions?) -> buffer),
+        & ((raw: string, opts: SerdeGenericCompressionOptions?) -> string)
+        & ((raw: buffer, opts: SerdeGenericCompressionOptions?) -> buffer),
     decompress: 
         & ((compressed: string, size: number) -> string)
         & ((compressed: buffer, size: number) -> buffer),
@@ -128,8 +128,8 @@ export type _zune_serde_lz4 = {
 }
 export type _zune_serde_zstd = {
     compress: 
-        & ((raw: string, opts: GenericCompressionOptions?) -> string)
-        & ((raw: buffer, opts: GenericCompressionOptions?) -> buffer),
+        & ((raw: string, opts: SerdeGenericCompressionOptions?) -> string)
+        & ((raw: buffer, opts: SerdeGenericCompressionOptions?) -> buffer),
     decompress: 
         & ((compressed: string) -> string)
         & ((compressed: buffer) -> buffer), 
@@ -210,10 +210,10 @@ end
 declare class FileWatcher
     stop: (self: FileWatcher) -> () 
 end
-type CreateFileOptions = {
+export type FileCreateOptions = {
     exclusive: boolean?, 
 }
-type OpenFileOptions = {
+export type FileOpenOptions = {
     mode: string?, 
 }
 type DirectoryEntry = {
@@ -233,8 +233,8 @@ export type _zune_fs_path = {
 }
 type WatchEvent = "created" | "modified" | "moved" | "renamed" | "deleted" | "metadata"
 export type _zune_fs = {
-    createFile: (path: string, opts: CreateFileOptions?) -> FileHandle,
-    openFile: (path: string, opts: OpenFileOptions?) -> FileHandle,
+    createFile: (path: string, opts: FileCreateOptions?) -> FileHandle,
+    openFile: (path: string, opts: FileOpenOptions?) -> FileHandle,
     readFile: 
         & ((path: string) -> string)
         & ((path: string, bytes: true) -> buffer),
@@ -272,7 +272,7 @@ end
 declare class TlsCertKeyPair
 
 end
-type HashAlgorithms = 
+export type CryptoHashAlgorithms = 
     | "sha1"
     | "md5"
     | "blake3"
@@ -303,7 +303,7 @@ type Argon2PasswordOptions = {
     memory_cost: number?,
     threads: number?, 
 }
-type PasswordOptions = BcryptPasswordOptions | Argon2PasswordOptions
+export type CryptoPasswordOptions = BcryptPasswordOptions | Argon2PasswordOptions
 type EncryptedData = {
     cipher: buffer,
     tag: buffer, 
@@ -312,12 +312,12 @@ type Aead = {
     encrypt: (data: Input, key: Input, nonce: Input, ad: Input?) -> EncryptedData,
     decrypt: (cipher: Input, tag: Input, key: Input, nonce: Input, ad: Input?) -> string, 
 }
-type TlsClientSetupConfig = {
+export type CryptoTlsClientConfig = {
     host: string,
     ca: TlsCertBundle, 
 }
 export type _zune_crypto_password = {
-    hash: (password: string | buffer, opts: PasswordOptions?) -> string,
+    hash: (password: string | buffer, opts: CryptoPasswordOptions?) -> string,
     verify: (password: string | buffer, hash: string | buffer) -> boolean, 
 }
 export type _zune_crypto_random = {
@@ -444,14 +444,14 @@ export type _zune_crypto_tls = {
     bundleFromSystem: () -> TlsCertBundle,
     bundleFromFile: (file: string) -> TlsCertBundle,
     keyPairFromFile: (certFile: string, keyFile: string) -> TlsCertKeyPair,
-    setupClient: (socket: NetworkSocket, config: TlsClientSetupConfig) -> (),
-    setupServer: (socket: NetworkSocket, config: TlsServerSetupConfig) -> (), 
+    setupClient: (socket: NetworkSocket, config: CryptoTlsClientConfig) -> (),
+    setupServer: (socket: NetworkSocket, config: CryptoTlsServerConfig) -> (), 
 }
-type TlsServerSetupConfig = {
+export type CryptoTlsServerConfig = {
     auth: TlsCertKeyPair, 
 }
 export type _zune_crypto = {
-    createHash: (algorithm: HashAlgorithms, secret: string?) -> CryptoHash,
+    createHash: (algorithm: CryptoHashAlgorithms, secret: string?) -> CryptoHash,
     password: _zune_crypto_password,
     random: _zune_crypto_random,
     aead: _zune_crypto_aead,
@@ -465,7 +465,7 @@ declare class Thread
     receive: (self: Thread) -> (...any)
     send: (self: Thread, ...any) -> () 
 end
-type ThreadLoadOptions = {
+export type ThreadLoadOptions = {
     chunk_name: string?,
     native_code_gen: boolean?, 
 }
@@ -631,19 +631,19 @@ export type _zune_testing = {
     expectEqual: ((expected: any, value: any) -> ()), 
 }
 --[[ luau ]]
-export type CompileOptions = {
+export type LuauCompileOptions = {
     debug_level: number?,
     optimization_level: number?,
     coverage_level: number?, 
 }
-export type LoadOptions = {
+export type LuauLoadOptions = {
     env: {
         [any]: any
     }?,
     chunk_name: string?,
     native_code_gen: boolean?, 
 }
-export type CoverageData = {
+export type LuauCoverageData = {
     name: string,
     line: number,
     depth: number,
@@ -678,9 +678,9 @@ export type ParseResult = {
     }}
 }
 export type _zune_luau = {
-    compile: (source: string | buffer, opts: CompileOptions?) -> buffer,
-    load: (bytecode: string | buffer, opts: LoadOptions?) -> ((...any) -> ...any),
-    coverage: (fn: (...any) -> ...any) -> {CoverageData},
+    compile: (source: string | buffer, opts: LuauCompileOptions?) -> buffer,
+    load: (bytecode: string | buffer, opts: LuauLoadOptions?) -> ((...any) -> ...any),
+    coverage: (fn: (...any) -> ...any) -> {LuauCoverageData},
     parse: (src: string | buffer) -> ParseResult,
     parseExpr: (src: string | buffer) -> any,
     garbagecollect: () -> (), 
@@ -739,7 +739,7 @@ export type ServerWebSocketHandlers = {
     message: ((websocket: HttpWebSocket, message: string) -> ())?,
     close: ((websocket: HttpWebSocket, code: number) -> ())?, 
 }
-export type ServeOptions = {
+export type HttpServeOptions = {
     port: number,
     address: string?,
     reuse_address: boolean?,
@@ -759,7 +759,7 @@ export type HttpResponse<T> = {
     },
     body: T, 
 }
-export type RequestOptions = {
+export type HttpRequestOptions = {
     headers: {
         [string]: string
     }?,
@@ -767,7 +767,7 @@ export type RequestOptions = {
     body: (string | buffer)?,
     allow_redirects: boolean?, 
 }
-export type WebSocketOptions = {
+export type HttpWebSocketOptions = {
     protocols: {string}?,
     timeout: number?,
     accept: ((socket: HttpWebSocket, request: HttpServerResponse) -> boolean)?,
@@ -1170,14 +1170,14 @@ export type _zune_net_IPPROTO = {
     IP: number, 
 }
 export type _zune_net_http = {
-    serve: (opts: ServeOptions) -> HttpServer,
+    serve: (opts: HttpServeOptions) -> HttpServer,
     request: 
-        & ((host: string, opts: RequestOptionsType<"string"?>?) -> HttpResponse<string>)
-        & ((host: string, opts: RequestOptionsType<"buffer">?) -> HttpResponse<buffer>)
-        & ((host: string, opts: RequestOptionsType<"string" | "buffer" | nil>?) -> HttpResponse<string | buffer>),
-    websocket: (host: string, opts: WebSocketOptions) -> HttpWebSocket, 
+        & ((host: string, opts: HttpRequestOptionsType<"string"?>?) -> HttpResponse<string>)
+        & ((host: string, opts: HttpRequestOptionsType<"buffer">?) -> HttpResponse<buffer>)
+        & ((host: string, opts: HttpRequestOptionsType<"string" | "buffer" | nil>?) -> HttpResponse<string | buffer>),
+    websocket: (host: string, opts: HttpWebSocketOptions) -> HttpWebSocket, 
 }
-type RequestOptionsType<T> = (RequestOptions & {
+export type HttpRequestOptionsType<T> = (HttpRequestOptions & {
     response_body_type: T
 })
 export type _zune_net = {
@@ -1210,10 +1210,10 @@ declare class FFIPointerType extends FFIDataType
     tag: (self: FFIPointerType) -> number
     newTag: (self: FFIPointerType, tag: string | buffer) -> FFIPointerType 
 end
-type AnyDataType = FFIDataType | FFIStructureType | FFIPointerType
-type FFIFunctionDef = {
-    returns: AnyDataType,
-    args: {AnyDataType}
+export type FFIAnyDataType = FFIDataType | FFIStructureType | FFIPointerType
+export type FFIFunctionDefintion = {
+    returns: FFIAnyDataType,
+    args: {FFIAnyDataType}
 }
 declare class FFIPointer
     release: (self: FFIPointer) -> FFIPointer
@@ -1272,7 +1272,7 @@ export type _zune_ffi_types = {
 export type _zune_ffi_c = {
     compile: (src: string, opts: FFICompileOptions?) -> FFICompiled, 
 }
-type FFICompileOptions = {
+export type FFICompileOptions = {
     options: string?,
     files: {string}?,
     libraries: {string}?,
@@ -1295,10 +1295,10 @@ export type _zune_ffi = {
     free: (src: FFIPointer) -> (),
     dupe: (src: buffer | FFIPointer) -> FFIPointer,
     tagName: (tag: number) -> string?,
-    struct: (fields: {{[string]: AnyDataType}}) -> FFIStructureType,
-    fn: (definition: FFIFunctionDef, srcPtr: FFIPointer) -> ((...any) -> any),
-    closure: (definition: FFIFunctionDef, handler: (...any) -> any) -> FFIPointer,
-    dlopen: (path: string, functions: {[string]: FFIFunctionDef}) -> FFILibrary, 
+    struct: (fields: {{[string]: FFIAnyDataType}}) -> FFIStructureType,
+    fn: (definition: FFIFunctionDefintion, srcPtr: FFIPointer) -> ((...any) -> any),
+    closure: (definition: FFIFunctionDefintion, handler: (...any) -> any) -> FFIPointer,
+    dlopen: (path: string, functions: {[string]: FFIFunctionDefintion}) -> FFILibrary, 
 }
 --[[ io ]]
 declare class IoReadable
@@ -1348,7 +1348,7 @@ declare class BufferSink
     writer: (self: BufferSink) -> IoWritable
     close: (self: BufferSink) -> () 
 end
-export type Terminal = {
+type Terminal = {
     isTTY: boolean,
     getCurrentMode: () -> "normal" | "raw",
     enableRawMode: () -> boolean,
@@ -1362,7 +1362,7 @@ export type _zune_io_terminal = {
     restoreMode: () -> boolean,
     getSize: () -> (number?, number?), 
 }
-type BufferSinkOptions = {
+export type BufferSinkOptions = {
     limit: number?, 
 }
 export type _zune_io = {
@@ -1376,46 +1376,46 @@ export type _zune_io = {
 }
 --[[ require ]]
 export type _zune_require = {
-    navigate: (path: string, from: string?, config: string?) -> string,
+    navigate: (path: string | buffer, from: (string | buffer)?, config: string | buffer?) -> string,
     getCached: (resolvedPath: string) -> any?, 
 }
 --[[ mem ]]
-type WritableSlice = buffer | FFIPointer
-type ReadableSlice = string | buffer | FFIPointer
+export type MemWritableSlice = buffer | FFIPointer
+export type MemReadableSlice = string | buffer | FFIPointer
 export type _zune_mem = {
     MAX_SIZE: number,
-    len: (src: ReadableSlice) -> number?,
-    copy: (dest: WritableSlice, destOffset: number, src: ReadableSlice, srcOffset: number, count: number?) -> (),
-    slice: (src: ReadableSlice, offset: number, count: number?) -> buffer,
-    eqlSlice: (a: ReadableSlice, aOffset: number, b: ReadableSlice, bOffset: number, count: number?) -> boolean,
-    eql: (a: ReadableSlice, b: ReadableSlice) -> boolean,
-    startsWith: (slice: ReadableSlice, needle: ReadableSlice) -> boolean,
-    endsWith: (slice: ReadableSlice, needle: ReadableSlice) -> boolean,
-    trim: (src: ReadableSlice, values_to_strip: ReadableSlice) -> buffer,
-    trimLeft: (src: ReadableSlice, values_to_strip: ReadableSlice) -> buffer,
-    trimRight: (src: ReadableSlice, values_to_strip: ReadableSlice) -> buffer,
-    indexOf: (src: ReadableSlice, needle: ReadableSlice) -> number?,
-    indexOfPos: (src: ReadableSlice, offset: number, needle: ReadableSlice) -> number?,
-    lastIndexOf: (src: ReadableSlice, needle: ReadableSlice) -> number?,
-    indexOfScalar: (src: ReadableSlice, char: number) -> number?,
-    indexOfScalarPos: (src: ReadableSlice, offset: number, char: number) -> number?,
-    lastIndexOfScalar: (src: ReadableSlice, char: number) -> number?,
-    indexOfAny: (src: ReadableSlice, needle: ReadableSlice) -> number?,
-    indexOfAnyPos: (src: ReadableSlice, offset: number, needle: ReadableSlice) -> number?,
-    lastIndexOfAny: (src: ReadableSlice, needle: ReadableSlice) -> number?,
-    indexOfNone: (src: ReadableSlice, needle: ReadableSlice) -> number?,
-    indexOfNonePos: (src: ReadableSlice, offset: number, needle: ReadableSlice) -> number?,
-    lastIndexOfNone: (src: ReadableSlice, needle: ReadableSlice) -> number?,
-    indexOfDiff: (src: ReadableSlice, needle: ReadableSlice) -> number?,
-    indexOfMax: (src: ReadableSlice) -> number,
-    indexOfMin: (src: ReadableSlice) -> number,
-    indexOfMinMax: (src: ReadableSlice) -> (number, number),
-    replaceScalar: (src: WritableSlice, char: number, replacement: number) -> (),
-    max: (src: ReadableSlice) -> number,
-    min: (src: ReadableSlice) -> number,
-    reverse: (src: WritableSlice) -> (),
-    rotate: (src: WritableSlice, amount: number) -> (),
-    set: (dest: WritableSlice, value: number, offset: number?, count: number?) -> (), 
+    len: (src: MemReadableSlice) -> number?,
+    copy: (dest: MemWritableSlice, destOffset: number, src: MemReadableSlice, srcOffset: number, count: number?) -> (),
+    slice: (src: MemReadableSlice, offset: number, count: number?) -> buffer,
+    eqlSlice: (a: MemReadableSlice, aOffset: number, b: MemReadableSlice, bOffset: number, count: number?) -> boolean,
+    eql: (a: MemReadableSlice, b: MemReadableSlice) -> boolean,
+    startsWith: (slice: MemReadableSlice, needle: MemReadableSlice) -> boolean,
+    endsWith: (slice: MemReadableSlice, needle: MemReadableSlice) -> boolean,
+    trim: (src: MemReadableSlice, values_to_strip: MemReadableSlice) -> buffer,
+    trimLeft: (src: MemReadableSlice, values_to_strip: MemReadableSlice) -> buffer,
+    trimRight: (src: MemReadableSlice, values_to_strip: MemReadableSlice) -> buffer,
+    indexOf: (src: MemReadableSlice, needle: MemReadableSlice) -> number?,
+    indexOfPos: (src: MemReadableSlice, offset: number, needle: MemReadableSlice) -> number?,
+    lastIndexOf: (src: MemReadableSlice, needle: MemReadableSlice) -> number?,
+    indexOfScalar: (src: MemReadableSlice, char: number) -> number?,
+    indexOfScalarPos: (src: MemReadableSlice, offset: number, char: number) -> number?,
+    lastIndexOfScalar: (src: MemReadableSlice, char: number) -> number?,
+    indexOfAny: (src: MemReadableSlice, needle: MemReadableSlice) -> number?,
+    indexOfAnyPos: (src: MemReadableSlice, offset: number, needle: MemReadableSlice) -> number?,
+    lastIndexOfAny: (src: MemReadableSlice, needle: MemReadableSlice) -> number?,
+    indexOfNone: (src: MemReadableSlice, needle: MemReadableSlice) -> number?,
+    indexOfNonePos: (src: MemReadableSlice, offset: number, needle: MemReadableSlice) -> number?,
+    lastIndexOfNone: (src: MemReadableSlice, needle: MemReadableSlice) -> number?,
+    indexOfDiff: (src: MemReadableSlice, needle: MemReadableSlice) -> number?,
+    indexOfMax: (src: MemReadableSlice) -> number,
+    indexOfMin: (src: MemReadableSlice) -> number,
+    indexOfMinMax: (src: MemReadableSlice) -> (number, number),
+    replaceScalar: (src: MemWritableSlice, char: number, replacement: number) -> (),
+    max: (src: MemReadableSlice) -> number,
+    min: (src: MemReadableSlice) -> number,
+    reverse: (src: MemWritableSlice) -> (),
+    rotate: (src: MemWritableSlice, amount: number) -> (),
+    set: (dest: MemWritableSlice, value: number, offset: number?, count: number?) -> (), 
 }
 --[[ task ]]
 export type _zune_task = {
@@ -1444,8 +1444,8 @@ type TransactionKind = "deferred" | "immediate" | "exclusive"
 type TransactionFn = <A...,  R...>(self: SQLite3Database, callback: ((A...) ->  R...), kind: TransactionKind?) -> ((A...) ->  R...)
 declare class SQLite3Database
     transaction: TransactionFn
-    query: (self: SQLite3Database, query: string) -> SQLite3Statement
-    exec: (self: SQLite3Database, query: string, args: SQLite3Values?) -> SQLite3Result
+    query: (self: SQLite3Database, query: string | buffer) -> SQLite3Statement
+    exec: (self: SQLite3Database, query: string | buffer, args: SQLite3Values?) -> SQLite3Result
     close: (self: SQLite3Database) -> () 
 end
 export type _zune_sqlite = {

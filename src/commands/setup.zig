@@ -180,7 +180,7 @@ fn setup(editor: EditorKind, allocator: std.mem.Allocator, setupInfo: SetupInfo)
                     \\        "ext": {{
                     \\          "definitions": [
                     \\            "{s}/.zune/typedefs/global/zune.d.luau"
-                    \\          ]
+                    \\          ],
                     \\          "documentations": [
                     \\            "{s}/.zune/typedefs/global/zune.d.json"
                     \\          ]
@@ -279,7 +279,7 @@ fn setup(editor: EditorKind, allocator: std.mem.Allocator, setupInfo: SetupInfo)
                 \\        "ext": {{
                 \\          "definitions": [
                 \\            "{s}/.zune/typedefs/global/zune.d.luau"
-                \\          ]
+                \\          ],
                 \\          "documentations": [
                 \\            "{s}/.zune/typedefs/global/zune.d.json"
                 \\          ]
