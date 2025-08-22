@@ -43,7 +43,11 @@ const LuaTerminal = struct {
     pub fn lua_getSize(L: *VM.lua.State) !i32 {
         const term = &(TERMINAL orelse return L.Zerror("Terminal not initialized"));
         const x, const y = term.getSize() catch |err| {
-            if (err == error.NotATerminal) return 0;
+            if (err == error.NotATerminal) {
+                L.pushnil();
+                L.pushnil();
+                return 2;
+            }
             return err;
         };
         L.pushinteger(x);
@@ -278,7 +282,7 @@ const BufferSink = struct {
 
     pub fn __index(L: *VM.lua.State) !i32 {
         try L.Zchecktype(1, .Userdata);
-        const self = L.touserdata(BufferSink, 1) orelse return 0;
+        const self = L.touserdata(BufferSink, 1) orelse return L.Zerror("invalid userdata");
         const index = try L.Zcheckvalue([:0]const u8, 2, null);
 
         if (std.mem.eql(u8, index, "len")) {
@@ -288,8 +292,7 @@ const BufferSink = struct {
             L.pushboolean(self.closed);
             return 1;
         }
-
-        return 0;
+        return L.Zerrorf("Unknown index: {s}", .{index});
     }
 
     pub fn write(self: *BufferSink, value: []const u8) !void {
@@ -335,8 +338,10 @@ const BufferSink = struct {
         if (self.closed)
             return error.Closed;
         const use_buffer = L.Loptboolean(2, true);
-        if (self.buf.items.len == 0)
-            return 0;
+        if (self.buf.items.len == 0) {
+            L.pushnil();
+            return 1;
+        }
         const buf = self.buf.items;
         defer self.buf.clearAndFree(self.alloc);
         if (use_buffer)

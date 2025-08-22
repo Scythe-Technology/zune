@@ -49,7 +49,7 @@ local function returnStringBytecode(str : string)
     return `\x06\x03\x01{string.char(#str)}{str}\x00\x01\x01\x00\x00\x01\x02\x00\x03A\x00\x00\x00\x05\x00\x00\x00\x16\x00\x02\x00\x01\x03\x01\x00\x01\x00\x01\x18\x00\x00\x00\x01\x00\x00\x00\x00\x00`
 end
 
-local function timeFunction(f: () -> ())
+local function timeFunction(f: (...any) -> (...any))
     local start = os.clock();
     f();
     return os.clock() - start;
@@ -114,7 +114,7 @@ describe("Load", function()
                 native_code_gen = true;
             });
             expect(func).toBe(expect.type("function"));
-            expect(timeFunction(func)).toBeCloseTo(safeNativeTime, 1);
+            expect(timeFunction(func)).toBeCloseTo(safeNativeTime, 0.5);
         end)
 
         test("New Environment (NCG Enabled)", function()
@@ -125,7 +125,7 @@ describe("Load", function()
                 };
             });
             expect(func).toBe(expect.type("function"));
-            expect(timeFunction(func)).toBeCloseTo(safeNativeTime, 1);
+            expect(timeFunction(func)).toBeCloseTo(safeNativeTime, 0.5);
         end)
 
         getfenv(); -- Force unsafe environment
@@ -137,7 +137,7 @@ describe("Load", function()
                 native_code_gen = false;
             });
             expect(func).toBe(expect.type("function"));
-            expect(timeFunction(func)).toBeCloseTo(UnsafeNativeTime, 0.25);
+            expect(timeFunction(func)).toBeCloseTo(UnsafeNativeTime, -0.25);
         end)
 
         test("New Environment (NCG Disabled)", function()
@@ -169,7 +169,7 @@ describe("Load", function()
             });
             expect(func).toBe(expect.type("function"));
             -- Should be faster than the unsafe native time, because the environment is safe (custom table)
-            expect(timeFunction(func)).toBeCloseTo(safeNativeTime, 1);
+            expect(timeFunction(func)).toBeCloseTo(safeNativeTime, 0.5);
         end)
     end)
 

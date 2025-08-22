@@ -188,7 +188,7 @@ pub const IndexMap = std.StaticStringMap(enum {
 
 pub fn __index(L: *VM.lua.State) !i32 {
     try L.Zchecktype(1, .Userdata);
-    const self = L.touserdatatagged(Child, 1, TAG_PROCESS_CHILD) orelse return 0;
+    const self = L.touserdatatagged(Child, 1, TAG_PROCESS_CHILD) orelse return L.Zerror("invalid userdata");
     const index = L.Lcheckstring(2);
 
     switch (IndexMap.get(index) orelse return L.Zerrorf("Unknown index: {s}", .{index})) {

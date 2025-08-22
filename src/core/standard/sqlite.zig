@@ -69,7 +69,7 @@ const LuaStatement = struct {
 
     pub fn __namecall(L: *VM.lua.State) !i32 {
         try L.Zchecktype(1, .Userdata);
-        const ptr = L.touserdatatagged(LuaStatement, 1, TAG_SQLITE_STATEMENT) orelse unreachable;
+        const ptr = L.touserdatatagged(LuaStatement, 1, TAG_SQLITE_STATEMENT) orelse return L.Zerror("invalid userdata");
         const namecall = L.namecallstr() orelse return 0;
         const allocator = luau.getallocator(L);
         // TODO: prob should switch to static string map
@@ -149,8 +149,8 @@ const LuaStatement = struct {
             return 1;
         } else if (std.mem.eql(u8, namecall, "finalize")) {
             ptr.close(L);
-        } else return L.Zerrorf("Unknown method: {s}", .{namecall});
-        return 0;
+        }
+        return L.Zerrorf("Unknown method: {s}", .{namecall});
     }
 
     pub fn close(ptr: *LuaStatement, L: *VM.lua.State) void {
