@@ -51,7 +51,7 @@ describe("Json", function()
 
             expect(serde.json.encode({1,2,3}, {
                 pretty_indent = serde.json.indents.two_spaces
-            })).toBe(`[1, 2, 3]`);
+            })).toBe(`[\n  1,\n  2,\n  3\n]`);
             expect(serde.json.encode({a = 1, b = 2, c = 3}, {
                 pretty_indent = serde.json.indents.two_spaces
             })).toBe(`\{\n  "a": 1,\n  "c": 3,\n  "b": 2\n\}`);
