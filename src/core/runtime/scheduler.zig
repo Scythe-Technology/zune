@@ -261,7 +261,6 @@ timer: xev.Dynamic.Timer,
 loop: xev.Dynamic.Loop,
 @"async": xev.Dynamic.Async,
 pools: Pool,
-async_tasks: usize = 0,
 now_clock: f64 = 0,
 
 running: bool = false,
@@ -390,7 +389,6 @@ pub fn completeAsync(
     self: *Scheduler,
     data: anytype,
 ) void {
-    defer self.async_tasks -= 1;
     self.allocator.destroy(data);
 }
 
@@ -399,7 +397,6 @@ pub fn createAsyncCtx(
     comptime T: type,
 ) std.mem.Allocator.Error!*T {
     const ptr = try self.allocator.create(T);
-    defer self.async_tasks += 1;
     return ptr;
 }
 
@@ -542,7 +539,7 @@ inline fn hasPendingWork(self: *Scheduler) bool {
     return self.sleeping.items.len > 0 or
         self.deferred.len > 0 or
         self.awaits.items.len > 0 or
-        self.async_tasks > 0 or
+        self.loop.countPending() > 0 or
         self.sync.hasPending();
 }
 

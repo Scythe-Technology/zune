@@ -92,8 +92,6 @@ fn __dtor(L: *VM.lua.State, self: *Self) void {
     defer self.arena.deinit();
 
     self.callbacks.derefAll(L);
-
-    self.scheduler.async_tasks -= 1;
 }
 
 pub fn emitError(
@@ -362,8 +360,6 @@ pub fn lua_serve(L: *VM.lua.State) !i32 {
         L.pop(1);
     }
     L.pop(1);
-
-    scheduler.async_tasks += 1;
 
     const address_str = serve_info.address orelse "127.0.0.1";
 
