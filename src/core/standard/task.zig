@@ -133,6 +133,7 @@ fn lua_count(L: *VM.lua.State) !i32 {
             if (item.priority == .User)
                 total += 1;
         }
+        total += scheduler.loop.countPending();
         L.pushnumber(@floatFromInt(total));
         return 1;
     };
