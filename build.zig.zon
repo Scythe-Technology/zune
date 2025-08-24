@@ -4,8 +4,8 @@
     .minimum_zig_version = "0.14.0",
     .dependencies = .{
         .json = .{
-            .url = "https://codeload.github.com/Scythe-Technology/zig-json/tar.gz/169d325128b76b2bb79456357871f42ff339b98e",
-            .hash = "json-0.1.3-yTw8kwGEAQC8CcGSBwBruB9HiwGFu5lWNs0l64cVhWFQ",
+            .url = "https://codeload.github.com/Scythe-Technology/zig-json/tar.gz/a0f8f487893aafa7ea3393a3d9d2b28f31772918",
+            .hash = "json-0.1.3-yTw8k06KAQBADDSNAOzYxLQbsqods4dKH2sIFeAB7JFf",
         },
         .yaml = .{
             .url = "https://codeload.github.com/kubkon/zig-yaml/tar.gz/9b19ff52d2ee41ecbb55cb844771b3c52fb19dbb",

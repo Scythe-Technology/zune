@@ -7,30 +7,45 @@ const VM = luau.VM;
 var NULL_PTR: ?*const anyopaque = null;
 
 const charset = "0123456789abcdef";
-fn escape_string(bytes: *std.ArrayList(u8), str: []const u8) !void {
-    errdefer bytes.deinit();
+const escape_seq: []const u8 = blk: {
+    var seq: []const u8 = "\"\\";
+    for (0..32) |i|
+        seq = seq ++ [_]u8{i};
+    break :blk seq;
+};
+fn escapeString(bytes: *std.ArrayList(u8), str: []const u8) !void {
     try bytes.append('"');
-    for (str) |c| switch (c) {
-        0...31, '"', '\\' => {
-            switch (c) {
-                8 => try bytes.appendSlice("\\b"),
-                '\t' => try bytes.appendSlice("\\t"),
-                '\n' => try bytes.appendSlice("\\n"),
-                12 => try bytes.appendSlice("\\f"),
-                '\r' => try bytes.appendSlice("\\r"),
-                '"', '\\' => {
-                    try bytes.append('\\');
-                    try bytes.append(c);
-                },
-                else => {
-                    try bytes.appendSlice("\\u00");
-                    try bytes.append(charset[c >> 4]);
-                    try bytes.append(charset[c & 15]);
-                },
-            }
-        },
-        else => try bytes.append(c),
-    };
+
+    var pos: usize = 0;
+    while (pos < str.len) {
+        const c = std.mem.indexOfAny(u8, str[pos..], escape_seq) orelse break;
+        try bytes.appendSlice(str[pos .. pos + c]);
+        pos += c;
+        switch (str[pos]) {
+            0...31, '"', '\\' => |char| {
+                pos += 1;
+                switch (char) {
+                    8 => try bytes.appendSlice("\\b"),
+                    '\t' => try bytes.appendSlice("\\t"),
+                    '\n' => try bytes.appendSlice("\\n"),
+                    12 => try bytes.appendSlice("\\f"),
+                    '\r' => try bytes.appendSlice("\\r"),
+                    '"', '\\' => {
+                        try bytes.append('\\');
+                        try bytes.append(char);
+                    },
+                    else => {
+                        try bytes.appendSlice("\\u00");
+                        try bytes.append(charset[char >> 4]);
+                        try bytes.append(charset[char & 15]);
+                    },
+                }
+            },
+            else => unreachable,
+        }
+    }
+    if (pos < str.len)
+        try bytes.appendSlice(str[pos..]);
     try bytes.append('"');
 }
 
@@ -165,7 +180,7 @@ fn encode(
         },
         .String => {
             const str = L.tolstring(-1).?;
-            try escape_string(buf, str);
+            try escapeString(buf, str);
         },
         .Boolean => if (L.toboolean(-1))
             try buf.appendSlice("true")
@@ -334,7 +349,7 @@ test "Escaped Strings" {
         var buf = std.ArrayList(u8).init(std.testing.allocator);
         defer buf.deinit();
 
-        try escape_string(&buf, &[1]u8{c});
+        try escapeString(&buf, &[1]u8{c});
 
         const res = buf.items;
 
