@@ -70,6 +70,7 @@ pub const State = struct {
     address_index: usize = 0,
     sending: bool = false,
     closed: enum { none, received, emitted } = .none,
+    @"error": ?anyerror = null,
     frame: WebSocketFrame,
 
     pub const WebSocketFrame = struct {
@@ -804,10 +805,7 @@ pub const UpgradeHandshake = struct {
     }
 };
 
-fn safeResumeWithError(
-    self: *Self,
-    err: anyerror,
-) xev.CallbackAction {
+fn resumeError(self: *Self, err: anyerror) void {
     const L = self.lua_ref.value;
     defer self.ref.deref(L);
     defer self.lua_ref.deref();
@@ -815,9 +813,30 @@ fn safeResumeWithError(
     std.posix.close(self.state.socket);
 
     if (L.status() != .Yield)
-        return .disarm;
+        return;
     L.pushfstring("{s}", .{@errorName(err)}) catch |e| std.debug.panic("{}", .{e});
     _ = Scheduler.resumeStateError(L, null) catch {};
+}
+
+fn safeResumeWithError(
+    self: *Self,
+    err: anyerror,
+) xev.CallbackAction {
+    const scheduler = Scheduler.getScheduler(self.lua_ref.value);
+    if (self.timer.started) {
+        self.state.@"error" = err;
+        self.state.stage = .closed;
+        var timer = xev.Timer.init() catch unreachable;
+        timer.reset(
+            &scheduler.loop,
+            &self.timer.completion,
+            &self.timer.reset_completion,
+            0,
+            Self,
+            self,
+            onTimerComplete,
+        );
+    } else self.resumeError(err);
     return .disarm;
 }
 
@@ -845,6 +864,11 @@ fn onTimerComplete(
     r: xev.Timer.RunError!void,
 ) xev.CallbackAction {
     const self = ud orelse unreachable;
+
+    if (self.state.stage == .closed and self.state.@"error" != null) {
+        self.resumeError(self.state.@"error".?);
+        return .disarm;
+    }
 
     self.timer.started = false;
     r catch |err| switch (err) {

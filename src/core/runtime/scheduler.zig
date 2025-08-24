@@ -261,7 +261,6 @@ timer: xev.Dynamic.Timer,
 loop: xev.Dynamic.Loop,
 @"async": xev.Dynamic.Async,
 pools: Pool,
-async_tasks: usize = 0,
 now_clock: f64 = 0,
 
 running: bool = false,
@@ -390,7 +389,6 @@ pub fn completeAsync(
     self: *Scheduler,
     data: anytype,
 ) void {
-    defer self.async_tasks -= 1;
     self.allocator.destroy(data);
 }
 
@@ -399,7 +397,6 @@ pub fn createAsyncCtx(
     comptime T: type,
 ) std.mem.Allocator.Error!*T {
     const ptr = try self.allocator.create(T);
-    defer self.async_tasks += 1;
     return ptr;
 }
 
@@ -542,7 +539,7 @@ inline fn hasPendingWork(self: *Scheduler) bool {
     return self.sleeping.items.len > 0 or
         self.deferred.len > 0 or
         self.awaits.items.len > 0 or
-        self.async_tasks > 0 or
+        self.loop.countPending(.{ .timers = true }) > 0 or
         self.sync.hasPending();
 }
 
@@ -678,16 +675,12 @@ pub fn run(self: *Scheduler, comptime mode: Zune.RunMode) void {
             break;
         const now = VM.lperf.clock();
         self.now_clock = now;
-        const sleep_time: ?u64 = if (self.sleeping.peek()) |lowest|
-            @intFromFloat(@max(lowest.wake - now, 0) * std.time.ms_per_s)
-        else
-            null;
-        if (sleep_time) |time|
+        if (self.sleeping.peek()) |lowest|
             self.timer.reset(
                 &self.loop,
                 &timer_completion,
                 &timer_cancel_completion,
-                time,
+                @intFromFloat(@max(lowest.wake - now, 0) * std.time.ms_per_s),
                 void,
                 null,
                 XevNoopCallback(xev.Dynamic.Timer.RunError!void, .disarm),

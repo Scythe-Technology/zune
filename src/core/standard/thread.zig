@@ -1,5 +1,6 @@
 const std = @import("std");
 const luau = @import("luau");
+const builtin = @import("builtin");
 
 const Zune = @import("zune");
 
@@ -19,6 +20,16 @@ pub fn PlatformSupported() bool {
 }
 
 pub threadlocal var THREADS: Lists.DoublyLinkedList = .{};
+
+const ACQUIRE_ORDER: std.builtin.AtomicOrder = switch (builtin.cpu.arch) {
+    .x86_64 => .acquire,
+    else => .seq_cst,
+};
+
+const RELEASE_ORDER: std.builtin.AtomicOrder = switch (builtin.cpu.arch) {
+    .x86_64 => .release,
+    else => .seq_cst,
+};
 
 pub const Sync = struct {
     node: Lists.DoublyLinkedList.Node = .{},
@@ -228,7 +239,7 @@ pub const Runtime = struct {
             sync.scheduler.synchronize(sync);
         }
 
-        self.status.store(.dead, .release);
+        self.status.store(.dead, RELEASE_ORDER);
     }
 
     pub fn deinit(self: *Runtime) void {
@@ -244,13 +255,13 @@ const LuaThread = struct {
 
     pub fn lua_start(self: *LuaThread, L: *VM.lua.State) !i32 {
         const runtime = self.runtime;
-        if (runtime.status.load(.acquire) != .ready) {
+        if (runtime.status.load(ACQUIRE_ORDER) != .ready) {
             return L.Zerror("thread is already running or dead");
         }
 
-        runtime.status.store(.running, .release);
+        runtime.status.store(.running, RELEASE_ORDER);
         runtime.thread = std.Thread.spawn(.{}, Runtime.entry, .{runtime}) catch |err| {
-            runtime.status.store(.dead, .release);
+            runtime.status.store(.dead, RELEASE_ORDER);
             return L.Zerrorf("failed to start thread: {}", .{err});
         };
 
@@ -343,7 +354,7 @@ const LuaThread = struct {
         const runtime = self.runtime;
         runtime.access_mutex.lock();
         defer runtime.access_mutex.unlock();
-        switch (runtime.status.load(.acquire)) {
+        switch (runtime.status.load(ACQUIRE_ORDER)) {
             .ready, .dead => return 0,
             .running => {},
         }
@@ -364,7 +375,7 @@ const LuaThread = struct {
 
     pub fn lua_status(self: *LuaThread, L: *VM.lua.State) !i32 {
         const runtime = self.runtime;
-        try L.pushlstring(@tagName(runtime.status.load(.acquire)));
+        try L.pushlstring(@tagName(runtime.status.load(ACQUIRE_ORDER)));
         return 1;
     }
 
@@ -380,7 +391,7 @@ const LuaThread = struct {
         _ = L;
         const runtime = self.runtime;
         runtime.access_mutex.lock();
-        if (runtime.status.load(.acquire) == .running) {
+        if (runtime.status.load(ACQUIRE_ORDER) == .running) {
             defer runtime.access_mutex.unlock();
             runtime.owner = .thread; // TODO: maybe atomic owner?
             return;
