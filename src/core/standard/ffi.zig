@@ -2175,6 +2175,17 @@ fn lua_compile(L: *VM.lua.State) !i32 {
         }
         L.pop(1);
 
+        if (LuaHelper.maybeKnownType(L.rawgetfield(2, "library_paths"))) |@"type"| {
+            if (@"type" != .Table)
+                return L.Zerrorf("library_paths must be a table (got {s})", .{VM.lapi.typename(@"type")});
+            var iter: LuaHelper.ArrayIterator = .{ .L = L, .idx = -1 };
+            while (try iter.next()) |t| switch (t) {
+                .String => state.add_library_path(L.tostring(-1).?),
+                else => return L.Zerrorf("path must be a string (got {s})", .{VM.lapi.typename(t)}),
+            };
+        }
+        L.pop(1);
+
         if (LuaHelper.maybeKnownType(L.rawgetfield(2, "includes"))) |@"type"| {
             if (@"type" != .Table)
                 return L.Zerrorf("includes must be a table (got {s})", .{VM.lapi.typename(@"type")});
