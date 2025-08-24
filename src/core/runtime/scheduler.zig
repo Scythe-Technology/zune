@@ -539,7 +539,7 @@ inline fn hasPendingWork(self: *Scheduler) bool {
     return self.sleeping.items.len > 0 or
         self.deferred.len > 0 or
         self.awaits.items.len > 0 or
-        self.loop.countPending() > 0 or
+        self.loop.countPending(.{ .timers = true }) > 0 or
         self.sync.hasPending();
 }
 
@@ -675,16 +675,12 @@ pub fn run(self: *Scheduler, comptime mode: Zune.RunMode) void {
             break;
         const now = VM.lperf.clock();
         self.now_clock = now;
-        const sleep_time: ?u64 = if (self.sleeping.peek()) |lowest|
-            @intFromFloat(@max(lowest.wake - now, 0) * std.time.ms_per_s)
-        else
-            null;
-        if (sleep_time) |time|
+        if (self.sleeping.peek()) |lowest|
             self.timer.reset(
                 &self.loop,
                 &timer_completion,
                 &timer_cancel_completion,
-                time,
+                @intFromFloat(@max(lowest.wake - now, 0) * std.time.ms_per_s),
                 void,
                 null,
                 XevNoopCallback(xev.Dynamic.Timer.RunError!void, .disarm),
