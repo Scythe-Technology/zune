@@ -63,9 +63,11 @@ fn prebuild(b: *std.Build, step: *std.Build.Step) !void {
         const dep_luau = b.dependency("luau", .{ .target = build_native_target, .optimize = .Debug, .Analysis = false });
         const bytecode_builder = b.addExecutable(.{
             .name = "bytecode_builder",
-            .root_source_file = b.path("prebuild/bytecode.zig"),
-            .target = build_native_target,
-            .optimize = .Debug,
+            .root_module = b.createModule(.{
+                .target = build_native_target,
+                .optimize = .Debug,
+                .root_source_file = b.path("prebuild/bytecode.zig"),
+            }),
         });
 
         bytecode_builder.root_module.addImport("luau", dep_luau.module("luau"));
@@ -83,9 +85,11 @@ fn prebuild(b: *std.Build, step: *std.Build.Step) !void {
     { // Compress files
         const embedded_compressor = b.addExecutable(.{
             .name = "embedded_compressor",
-            .root_source_file = b.path("prebuild/compressor.zig"),
-            .target = build_native_target,
-            .optimize = .Debug,
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("prebuild/compressor.zig"),
+                .target = build_native_target,
+                .optimize = .Debug,
+            }),
         });
 
         try compressRecursive(b, embedded_compressor, compress, compile, "src/types/");
@@ -126,13 +130,15 @@ pub fn build(b: *std.Build) !void {
 
     const exe = b.addExecutable(.{
         .name = "zune",
-        .root_source_file = b.path("src/main.zig"),
-        .target = target,
-        .optimize = optimize,
-        .strip = switch (optimize) {
-            .Debug, .ReleaseSafe => null,
-            .ReleaseFast, .ReleaseSmall => true,
-        },
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/main.zig"),
+            .target = target,
+            .optimize = optimize,
+            .strip = switch (optimize) {
+                .Debug, .ReleaseSafe => null,
+                .ReleaseFast, .ReleaseSmall => true,
+            },
+        }),
     });
 
     exe.step.dependOn(prebuild_step);
@@ -160,12 +166,15 @@ pub fn build(b: *std.Build) !void {
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
 
-    const sample_dylib = b.addSharedLibrary(.{
+    const sample_dylib = b.addLibrary(.{
         .name = "sample",
-        .root_source_file = b.path("test/standard/ffi/sample.zig"),
-        .link_libc = false,
-        .target = target,
-        .optimize = .ReleaseSafe,
+        .linkage = .dynamic,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/standard/ffi/sample.zig"),
+            .link_libc = false,
+            .target = target,
+            .optimize = .ReleaseSafe,
+        }),
     });
 
     sample_dylib.step.dependOn(prebuild_step);
@@ -175,14 +184,16 @@ pub fn build(b: *std.Build) !void {
     });
 
     const exe_unit_tests = b.addTest(.{
-        .root_source_file = b.path("src/main.zig"),
-        .target = target,
-        .optimize = optimize,
         .filters = b.args orelse &.{},
         .test_runner = .{
             .mode = .simple,
             .path = b.path("test/runner.zig"),
         },
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/main.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
     });
 
     exe_unit_tests.step.dependOn(prebuild_step);
