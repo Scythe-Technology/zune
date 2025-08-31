@@ -90,7 +90,7 @@ pub const Message = struct {
         const struct_size = @sizeOf(Message);
         const total_size = struct_size + size;
 
-        const raw_ptr = try allocator.alignedAlloc(u8, @alignOf(Message), total_size);
+        const raw_ptr = try allocator.alignedAlloc(u8, .fromByteUnits(@alignOf(Message)), total_size);
         const message_ptr: *Message = @ptrCast(raw_ptr);
 
         message_ptr.* = .{
@@ -110,9 +110,12 @@ pub const Message = struct {
 };
 
 const TlsContext = struct {
-    record: std.fifo.LinearFifo(u8, .{ .Static = tls.max_ciphertext_record_len }) = .init(),
-    cleartext: std.fifo.LinearFifo(u8, .{ .Static = tls.max_ciphertext_record_len }) = .init(),
-    ciphertext: std.fifo.LinearFifo(u8, .{ .Static = tls.max_ciphertext_record_len }) = .init(),
+    record_buffer: [tls.max_ciphertext_record_len]u8 = undefined,
+    cleartext_buffer: [tls.max_ciphertext_record_len]u8 = undefined,
+    ciphertext_buffer: [tls.max_ciphertext_record_len]u8 = undefined,
+    record: std.Io.Reader,
+    cleartext: std.Io.Reader,
+    ciphertext: std.Io.Reader,
     connection: union(enum) {
         handshake: struct {
             client: tls.nonblock.Client,
@@ -145,15 +148,16 @@ const TlsContext = struct {
                 error.Canceled => return self.safeResumeWithError(error.Timeout),
                 else => return self.safeResumeWithError(err),
             };
-            ctx.record.update(read);
-            const result = handshake.client.run(ctx.record.readableSlice(0), ctx.ciphertext.writableSlice(0)) catch |err| return self.safeResumeWithError(err);
-            ctx.ciphertext.update(result.send.len);
-            ctx.record.discard(result.recv_pos);
+            ctx.record.end += read;
+            const result = handshake.client.run(ctx.record.buffered(), ctx.ciphertext.buffer[ctx.ciphertext.end..]) catch |err| return self.safeResumeWithError(err);
+            ctx.ciphertext.end += result.send.len;
+            ctx.record.toss(result.recv_pos);
+            ctx.record.rebase(ctx.record.buffer.len) catch unreachable; // shouldn't fail
             if (result.send.len > 0) {
                 tcp.write(
                     l,
                     c,
-                    .{ .slice = ctx.ciphertext.readableSlice(0) },
+                    .{ .slice = ctx.ciphertext.buffered() },
                     Self,
                     self,
                     Handshake.onSendComplete,
@@ -163,7 +167,7 @@ const TlsContext = struct {
                 tcp.read(
                     l,
                     c,
-                    .{ .slice = ctx.record.writableSlice(0) },
+                    .{ .slice = ctx.record.buffer[ctx.record.end..] },
                     Self,
                     self,
                     Handshake.onRecvComplete,
@@ -187,11 +191,12 @@ const TlsContext = struct {
                 error.Canceled => return self.safeResumeWithError(error.Timeout),
                 else => return self.safeResumeWithError(err),
             };
-            ctx.ciphertext.discard(written);
-            if (ctx.ciphertext.count > 0) {
-                tcp.write(l, c, .{ .slice = ctx.ciphertext.readableSlice(0) }, Self, self, onSendComplete);
+            ctx.ciphertext.toss(written);
+            if (ctx.ciphertext.bufferedLen() > 0) {
+                tcp.write(l, c, .{ .slice = ctx.ciphertext.buffered() }, Self, self, onSendComplete);
                 return .disarm;
             }
+            ctx.ciphertext.rebase(ctx.ciphertext.buffer.len) catch unreachable; // shouldn't fail
             if (handshake.client.done()) {
                 const cipher = handshake.client.cipher().?;
                 handshake.deinit(self.allocator);
@@ -201,7 +206,7 @@ const TlsContext = struct {
                 tcp.read(
                     l,
                     c,
-                    .{ .slice = ctx.record.writableSlice(0) },
+                    .{ .slice = ctx.record.buffer[ctx.record.end..] },
                     Self,
                     self,
                     Handshake.onRecvComplete,
@@ -210,6 +215,13 @@ const TlsContext = struct {
             return .disarm;
         }
     };
+
+    pub fn endingStream(r: *std.Io.Reader, w: *std.Io.Writer, limit: std.Io.Limit) std.Io.Reader.StreamError!usize {
+        _ = r;
+        _ = w;
+        _ = limit;
+        return error.EndOfStream;
+    }
 };
 
 fn stream_write(
@@ -228,7 +240,7 @@ fn stream_write(
     ) xev.CallbackAction,
 ) void {
     if (self.state.tls) |ctx| {
-        const res = ctx.connection.active.client.encrypt(buf, ctx.ciphertext.writableSlice(0)) catch |err| {
+        const res = ctx.connection.active.client.encrypt(buf, ctx.ciphertext.buffer[ctx.ciphertext.end..]) catch |err| {
             if (self.lua_ref.value == self.lua_ref.value.mainthread())
                 self.emitError(.tls, err);
             _ = @call(.always_inline, callback, .{
@@ -243,11 +255,11 @@ fn stream_write(
         };
         ctx.connection.active.consumed = res.cleartext_pos;
         ctx.connection.active.write_buffer = buf;
-        ctx.ciphertext.update(res.ciphertext.len);
+        ctx.ciphertext.end += res.ciphertext.len;
         tcp.write(
             loop,
             completion,
-            .{ .slice = ctx.ciphertext.readableSlice(0) },
+            .{ .slice = ctx.ciphertext.buffered() },
             Self,
             self,
             struct {
@@ -269,12 +281,13 @@ fn stream_write(
                         xev.WriteBuffer{ .slice = inner_ctx.connection.active.write_buffer },
                         err,
                     });
-                    inner_ctx.ciphertext.discard(ciphertext_written);
-                    if (inner_ctx.ciphertext.count > 0) {
+                    inner_ctx.ciphertext.toss(ciphertext_written);
+                    inner_ctx.ciphertext.rebase(inner_ctx.ciphertext.buffer.len) catch unreachable; // shouldn't fail
+                    if (inner_ctx.ciphertext.end > 0) {
                         inner_tcp.write(
                             l,
                             c,
-                            .{ .slice = inner_ctx.ciphertext.readableSlice(0) },
+                            .{ .slice = inner_ctx.ciphertext.buffered() },
                             Self,
                             inner_self,
                             @This().inner,
@@ -319,8 +332,9 @@ fn stream_read(
     ) xev.CallbackAction,
 ) void {
     if (self.state.tls) |ctx| {
-        if (ctx.cleartext.count > 0) {
-            const amount = ctx.cleartext.read(&self.read_buffer);
+        if (ctx.cleartext.bufferedLen() > 0) {
+            const amount = ctx.cleartext.readSliceShort(&self.read_buffer) catch unreachable; // shouldn't fail, entirely buffered
+            ctx.cleartext.rebase(ctx.cleartext.buffer.len) catch unreachable; // shouldn't fail
             switch (@call(.always_inline, callback, .{
                 self,
                 loop,
@@ -343,7 +357,7 @@ fn stream_read(
         tcp.read(
             loop,
             completion,
-            .{ .slice = ctx.record.writableSlice(0) },
+            .{ .slice = ctx.record.buffer[ctx.record.end..] },
             Self,
             self,
             struct {
@@ -357,15 +371,15 @@ fn stream_read(
                 ) xev.CallbackAction {
                     const inner_self = ud orelse unreachable;
                     const inner_ctx = inner_self.state.tls orelse unreachable;
-                    inner_ctx.record.update(r catch |err| return @call(.always_inline, callback, .{
+                    inner_ctx.record.end += r catch |err| return @call(.always_inline, callback, .{
                         ud,
                         l,
                         c,
                         inner_tcp,
                         xev.ReadBuffer{ .slice = &inner_self.read_buffer },
                         err,
-                    }));
-                    const res = inner_ctx.connection.active.client.decrypt(inner_ctx.record.readableSlice(0), inner_ctx.cleartext.writableSlice(0)) catch |err| {
+                    });
+                    const res = inner_ctx.connection.active.client.decrypt(inner_ctx.record.buffered(), inner_ctx.cleartext.buffer[inner_ctx.cleartext.end..]) catch |err| {
                         if (inner_self.lua_ref.value == inner_self.lua_ref.value.mainthread())
                             inner_self.emitError(.tls, err);
                         _ = @call(.always_inline, callback, .{
@@ -378,10 +392,11 @@ fn stream_read(
                         });
                         return .disarm;
                     };
-                    inner_ctx.record.discard(res.ciphertext_pos);
-                    inner_ctx.cleartext.update(res.cleartext.len);
+                    inner_ctx.record.toss(res.ciphertext_pos);
+                    inner_ctx.record.rebase(inner_ctx.record.buffer.len) catch unreachable; // shouldn't fail
+                    inner_ctx.cleartext.end += res.cleartext.len;
                     if (res.cleartext.len > 0) {
-                        const amount = inner_ctx.cleartext.read(&inner_self.read_buffer);
+                        const amount = inner_ctx.cleartext.readSliceShort(&inner_self.read_buffer) catch unreachable; // shouldn't fail;
                         switch (@call(.always_inline, callback, .{
                             ud,
                             l,
@@ -403,7 +418,7 @@ fn stream_read(
                     inner_tcp.read(
                         l,
                         c,
-                        .{ .slice = inner_ctx.record.writableSlice(0) },
+                        .{ .slice = inner_ctx.record.buffer[inner_ctx.record.end..] },
                         Self,
                         inner_self,
                         @This().inner,
@@ -720,7 +735,7 @@ pub const UpgradeHandshake = struct {
                 _ = self.callbacks.accept.push(L);
                 L.pushvalue(-1);
                 _ = self.ref.push(L);
-                parser.push(L) catch |e| std.debug.panic("{}", .{e});
+                parser.push(L, false) catch |e| std.debug.panic("{}", .{e});
                 _ = L.pcall(2, 1, 0).check() catch {
                     Zune.Runtime.Engine.logFnDef(L, 1);
                     return .disarm;
@@ -932,13 +947,13 @@ fn onConnectComplete(
         return self.safeResumeWithError(error.Timeout);
     if (self.state.tls) |ctx| {
         // start handshake
-        const res = ctx.connection.handshake.client.run(&[_]u8{}, ctx.ciphertext.writableSlice(0)) catch |err| return self.safeResumeWithError(err);
+        const res = ctx.connection.handshake.client.run(&[_]u8{}, ctx.ciphertext.buffer[0..]) catch |err| return self.safeResumeWithError(err);
         std.debug.assert(res.send.len > 0); // client should always send first.
-        ctx.ciphertext.update(res.send.len);
+        ctx.ciphertext.end += res.send.len;
         tcp.write(
             l,
             c,
-            .{ .slice = ctx.ciphertext.readableSlice(0) },
+            .{ .slice = ctx.ciphertext.buffered() },
             Self,
             self,
             TlsContext.Handshake.onSendComplete,
@@ -1114,8 +1129,8 @@ pub fn __dtor(L: *VM.lua.State, self: *Self) void {
 }
 
 // based on std.http.Client.validateUri
-pub fn validateUri(uri: std.Uri, arena: std.mem.Allocator) !struct { std.http.Client.Connection.Protocol, std.Uri } {
-    const protocol_map = std.StaticStringMap(std.http.Client.Connection.Protocol).initComptime(.{
+pub fn validateUri(uri: std.Uri, arena: std.mem.Allocator) !struct { std.http.Client.Protocol, std.Uri } {
+    const protocol_map = std.StaticStringMap(std.http.Client.Protocol).initComptime(.{
         .{ "ws", .plain },
         .{ "wss", .tls },
     });
@@ -1312,8 +1327,32 @@ pub fn lua_websocket(L: *VM.lua.State) !i32 {
         tls_ctx = try allocator.create(TlsContext);
         const host_copy = try allocator.dupe(u8, host);
         errdefer allocator.free(host_copy);
-        const ca_bundle = try tls.config.CertBundle.fromSystem(allocator);
+        const ca_bundle = try tls.config.cert.fromSystem(allocator);
         tls_ctx.?.* = .{
+            .record = .{
+                .buffer = &tls_ctx.?.record_buffer,
+                .end = 0,
+                .seek = 0,
+                .vtable = &.{
+                    .stream = TlsContext.endingStream,
+                },
+            },
+            .cleartext = .{
+                .buffer = &tls_ctx.?.cleartext_buffer,
+                .end = 0,
+                .seek = 0,
+                .vtable = &.{
+                    .stream = TlsContext.endingStream,
+                },
+            },
+            .ciphertext = .{
+                .buffer = &tls_ctx.?.ciphertext_buffer,
+                .end = 0,
+                .seek = 0,
+                .vtable = &.{
+                    .stream = TlsContext.endingStream,
+                },
+            },
             .connection = .{
                 .handshake = .{
                     .client = .init(.{

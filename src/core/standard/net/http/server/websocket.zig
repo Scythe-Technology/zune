@@ -40,7 +40,7 @@ pub const Message = struct {
         const struct_size = @sizeOf(Message);
         const total_size = struct_size + size;
 
-        const raw_ptr = try allocator.alignedAlloc(u8, @alignOf(Message), total_size);
+        const raw_ptr = try allocator.alignedAlloc(u8, .fromByteUnits(@alignOf(Message)), total_size);
         const message_ptr: *Message = @ptrCast(raw_ptr);
 
         message_ptr.* = .{
