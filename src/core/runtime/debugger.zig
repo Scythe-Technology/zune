@@ -297,13 +297,13 @@ fn tostring(L: *VM.lua.State, idx: i32) []const u8 {
         .Boolean => L.pushlstring(if (L.toboolean(idx)) "true" else "false") catch |e| std.debug.panic("{}", .{e}),
         .Number => {
             const number = L.tonumber(idx).?;
-            var s: [std.fmt.format_float.bufferSize(.decimal, f64)]u8 = undefined;
+            var s: [std.fmt.float.bufferSize(.decimal, f64)]u8 = undefined;
             const buf = std.fmt.bufPrint(&s, "{d}", .{number}) catch unreachable; // should be able to fit
             L.pushlstring(buf) catch |e| std.debug.panic("{}", .{e});
         },
         .Vector => {
             const vec = L.tovector(idx).?;
-            var s: [(std.fmt.format_float.bufferSize(.decimal, f64) * VM.lua.config.VECTOR_SIZE) + ((VM.lua.config.VECTOR_SIZE - 1) * 2)]u8 = undefined;
+            var s: [(std.fmt.float.bufferSize(.decimal, f64) * VM.lua.config.VECTOR_SIZE) + ((VM.lua.config.VECTOR_SIZE - 1) * 2)]u8 = undefined;
             const buf = if (VM.lua.config.VECTOR_SIZE == 3)
                 std.fmt.bufPrint(&s, "{d}, {d}, {d}", .{ vec[0], vec[1], vec[2] }) catch unreachable // should be able to fit
             else
@@ -547,12 +547,13 @@ fn promptOpLocals(L: *VM.lua.State, allocator: std.mem.Allocator, locals_args: [
                             if (level_in.len == 0)
                                 continue;
 
-                            var buf = std.ArrayList(u8).init(allocator);
-                            defer buf.deinit();
+                            var allocating: std.Io.Writer.Allocating = .init(allocator);
+                            defer allocating.deinit();
 
-                            const writer = buf.writer();
+                            const writer = &allocating.writer;
+
                             try Fmt.writeIdx(allocator, L, writer, @intCast(L.gettop()), Zune.STATE.FORMAT.MAX_DEPTH);
-                            var iter = std.mem.splitScalar(u8, buf.items, '\n');
+                            var iter = std.mem.splitScalar(u8, allocating.written(), '\n');
                             printResult(" | Value: {s}\n", .{iter.first()});
                             while (iter.next()) |line|
                                 printResult(" |  {s}\n", .{line});
@@ -565,11 +566,12 @@ fn promptOpLocals(L: *VM.lua.State, allocator: std.mem.Allocator, locals_args: [
                     try L.rawcheckstack(6);
                     var iter = std.mem.splitScalar(u8, std.mem.trimLeft(u8, args_rest, " "), ',');
 
-                    var buf = std.ArrayList(u8).init(allocator);
-                    defer buf.deinit();
-                    const writer = buf.writer();
+                    var allocating: std.Io.Writer.Allocating = .init(allocator);
+                    defer allocating.deinit();
 
-                    try buf.append('[');
+                    const writer = &allocating.writer;
+
+                    try writer.writeByte('[');
                     const first_iter = iter.first();
                     if (first_iter.len > 0) {
                         const initial_idx = std.fmt.parseInt(u32, first_iter, 10) catch |err| {
@@ -588,7 +590,7 @@ fn promptOpLocals(L: *VM.lua.State, allocator: std.mem.Allocator, locals_args: [
                             if (L.getlocal(level, i)) |name| {
                                 defer L.pop(1);
                                 if (first)
-                                    try buf.append(',');
+                                    try writer.writeByte(',');
                                 first = true;
                                 const typename = VM.lapi.typename(L.typeOf(-1));
                                 const value = tostring(L, -1);
@@ -605,8 +607,8 @@ fn promptOpLocals(L: *VM.lua.State, allocator: std.mem.Allocator, locals_args: [
                             } else break;
                         }
                     }
-                    try buf.append(']');
-                    printResult("{s}\n", .{buf.items});
+                    try writer.writeByte(']');
+                    printResult("{s}\n", .{allocating.written()});
                 },
             }
         },
@@ -656,12 +658,13 @@ fn promptOpParams(L: *VM.lua.State, allocator: std.mem.Allocator, params_args: [
                             if (level_in.len == 0)
                                 continue;
 
-                            var buf = std.ArrayList(u8).init(allocator);
-                            defer buf.deinit();
+                            var allocating: std.Io.Writer.Allocating = .init(allocator);
+                            defer allocating.deinit();
 
-                            const writer = buf.writer();
+                            const writer = &allocating.writer;
+
                             try Fmt.writeIdx(allocator, L, writer, @intCast(L.gettop()), Zune.STATE.FORMAT.MAX_DEPTH);
-                            var iter = std.mem.splitScalar(u8, buf.items, '\n');
+                            var iter = std.mem.splitScalar(u8, allocating.written(), '\n');
                             printResult(" | Value: {s}\n", .{iter.first()});
                             while (iter.next()) |line|
                                 printResult(" |  {s}\n", .{line});
@@ -676,11 +679,12 @@ fn promptOpParams(L: *VM.lua.State, allocator: std.mem.Allocator, params_args: [
                         return printResult("[]\n", .{}); // nothing
                     var iter = std.mem.splitScalar(u8, std.mem.trimLeft(u8, args_rest, " "), ',');
 
-                    var buf = std.ArrayList(u8).init(allocator);
-                    defer buf.deinit();
-                    const writer = buf.writer();
+                    var allocating: std.Io.Writer.Allocating = .init(allocator);
+                    defer allocating.deinit();
 
-                    try buf.append('[');
+                    const writer = &allocating.writer;
+
+                    try writer.writeByte('[');
                     const first_iter = iter.first();
                     if (first_iter.len > 0) {
                         const initial_idx = std.fmt.parseInt(u32, first_iter, 10) catch |err| {
@@ -698,7 +702,7 @@ fn promptOpParams(L: *VM.lua.State, allocator: std.mem.Allocator, params_args: [
                             if (L.getargument(level, i)) {
                                 defer L.pop(1);
                                 if (first)
-                                    try buf.append(',');
+                                    try writer.writeByte(',');
                                 first = true;
                                 const typename = VM.lapi.typename(L.typeOf(-1));
                                 const value = tostring(L, -1);
@@ -723,8 +727,8 @@ fn promptOpParams(L: *VM.lua.State, allocator: std.mem.Allocator, params_args: [
                             } else break;
                         }
                     }
-                    try buf.append(']');
-                    printResult("{s}\n", .{buf.items});
+                    try writer.writeByte(']');
+                    printResult("{s}\n", .{allocating.written()});
                 },
             }
         },
@@ -773,12 +777,13 @@ fn promptOpUpvalues(L: *VM.lua.State, allocator: std.mem.Allocator, params_args:
                             if (level_in.len == 0)
                                 continue;
 
-                            var buf = std.ArrayList(u8).init(allocator);
-                            defer buf.deinit();
+                            var allocating: std.Io.Writer.Allocating = .init(allocator);
+                            defer allocating.deinit();
 
-                            const writer = buf.writer();
+                            const writer = &allocating.writer;
+
                             try Fmt.writeIdx(allocator, L, writer, @intCast(L.gettop()), Zune.STATE.FORMAT.MAX_DEPTH);
-                            var iter = std.mem.splitScalar(u8, buf.items, '\n');
+                            var iter = std.mem.splitScalar(u8, allocating.written(), '\n');
                             printResult(" | Value: {s}\n", .{iter.first()});
                             while (iter.next()) |line|
                                 printResult(" |  {s}\n", .{line});
@@ -795,11 +800,12 @@ fn promptOpUpvalues(L: *VM.lua.State, allocator: std.mem.Allocator, params_args:
                     const fn_idx = L.gettop();
                     var iter = std.mem.splitScalar(u8, std.mem.trimLeft(u8, args_rest, " "), ',');
 
-                    var buf = std.ArrayList(u8).init(allocator);
-                    defer buf.deinit();
-                    const writer = buf.writer();
+                    var allocating: std.Io.Writer.Allocating = .init(allocator);
+                    defer allocating.deinit();
 
-                    try buf.append('[');
+                    const writer = &allocating.writer;
+
+                    try writer.writeByte('[');
                     const first_iter = iter.first();
                     if (first_iter.len > 0) {
                         const initial_idx = std.fmt.parseInt(u32, first_iter, 10) catch |err| {
@@ -818,7 +824,7 @@ fn promptOpUpvalues(L: *VM.lua.State, allocator: std.mem.Allocator, params_args:
                             if (L.getupvalue(@intCast(fn_idx), i)) |name| {
                                 defer L.pop(1);
                                 if (first)
-                                    try buf.append(',');
+                                    try writer.writeByte(',');
                                 first = true;
                                 const typename = VM.lapi.typename(L.typeOf(-1));
                                 const value = tostring(L, -1);
@@ -835,8 +841,8 @@ fn promptOpUpvalues(L: *VM.lua.State, allocator: std.mem.Allocator, params_args:
                             } else break;
                         }
                     }
-                    try buf.append(']');
-                    printResult("{s}\n", .{buf.items});
+                    try writer.writeByte(']');
+                    printResult("{s}\n", .{allocating.written()});
                 },
             }
         },
@@ -888,12 +894,14 @@ fn promptOpGlobals(L: *VM.lua.State, allocator: std.mem.Allocator, globals_args:
                         printResult(" {s} ->> ({s})\n", .{ key, @tagName(L.typeOf(-1)) });
                         if (level_in.len == 0)
                             continue;
-                        var buf = std.ArrayList(u8).init(allocator);
-                        defer buf.deinit();
 
-                        const writer = buf.writer();
+                        var allocating: std.Io.Writer.Allocating = .init(allocator);
+                        defer allocating.deinit();
+
+                        const writer = &allocating.writer;
+
                         try Fmt.writeIdx(allocator, L, writer, @intCast(L.gettop()), Zune.STATE.FORMAT.MAX_DEPTH);
-                        var iter = std.mem.splitScalar(u8, buf.items, '\n');
+                        var iter = std.mem.splitScalar(u8, allocating.written(), '\n');
                         printResult(" | Value: {s}\n", .{iter.first()});
                         while (iter.next()) |line|
                             printResult(" |  {s}\n", .{line});
@@ -912,11 +920,12 @@ fn promptOpGlobals(L: *VM.lua.State, allocator: std.mem.Allocator, globals_args:
                         return printResult("[]\n", .{}); // invalid
                     var iter = std.mem.splitScalar(u8, std.mem.trimLeft(u8, args_rest, " "), ',');
 
-                    var buf = std.ArrayList(u8).init(allocator);
-                    defer buf.deinit();
-                    const writer = buf.writer();
+                    var allocating: std.Io.Writer.Allocating = .init(allocator);
+                    defer allocating.deinit();
 
-                    try buf.append('[');
+                    const writer = &allocating.writer;
+
+                    try writer.writeByte('[');
                     const first_iter = iter.first();
                     if (first_iter.len > 0) {
                         iter.reset();
@@ -930,7 +939,7 @@ fn promptOpGlobals(L: *VM.lua.State, allocator: std.mem.Allocator, globals_args:
                             defer L.pop(4); // remove str_value, str_key, value, key
                             order += 1;
                             if (first)
-                                try buf.append(',');
+                                try writer.writeByte(',');
                             first = true;
                             const key_typename = VM.lapi.typename(L.typeOf(-2));
                             const value_typename = VM.lapi.typename(L.typeOf(-1));
@@ -950,8 +959,8 @@ fn promptOpGlobals(L: *VM.lua.State, allocator: std.mem.Allocator, globals_args:
                             });
                         }
                     }
-                    try buf.append(']');
-                    printResult("{s}\n", .{buf.items});
+                    try writer.writeByte(']');
+                    printResult("{s}\n", .{allocating.written()});
                 },
             }
         },
@@ -990,14 +999,16 @@ pub var DEBUG: DebugState = .{};
 pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c.lua_Debug) !void {
     const allocator = luau.getallocator(L);
 
-    var stdin = std.io.getStdIn();
-    var in_reader = stdin.reader();
+    var stdin = std.fs.File.stdin();
+    var buf: [128]u8 = undefined;
+    var stdin_reader = stdin.reader(&buf);
+    var reader = &stdin_reader.interface;
 
     const terminal = &(Zune.corelib.io.TERMINAL orelse std.debug.panic("Terminal not initialized", .{}));
     const history = HISTORY orelse std.debug.panic("History not initialized", .{});
 
-    var buffer = std.ArrayList(u8).init(allocator);
-    defer buffer.deinit();
+    var input_buffer: std.ArrayList(u8) = .empty;
+    defer input_buffer.deinit(allocator);
 
     var position: usize = 0;
 
@@ -1030,17 +1041,17 @@ pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c
     std.debug.print(DEBUG_TAG, .{});
 
     while (true) {
-        switch (try in_reader.readByte()) {
+        switch (try reader.takeByte()) {
             0x1B => {
-                if (try in_reader.readByte() != '[')
+                if (try reader.takeByte() != '[')
                     continue;
-                var currentByte = try in_reader.readByte();
+                var currentByte = try reader.takeByte();
                 var modifier: Terminal.MODIFIER = .{};
                 switch (currentByte) {
                     '1' => {
-                        if (try in_reader.readByte() != ';')
+                        if (try reader.takeByte() != ';')
                             continue;
-                        switch (try in_reader.readByte()) {
+                        switch (try reader.takeByte()) {
                             '2' => modifier = .init(false, true, false),
                             '3' => modifier = .init(false, false, true),
                             '4' => modifier = .init(false, true, true),
@@ -1048,7 +1059,7 @@ pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c
                             '6' => modifier = .init(true, false, true),
                             else => continue,
                         }
-                        currentByte = try in_reader.readByte();
+                        currentByte = try reader.takeByte();
                     },
                     else => {},
                 }
@@ -1057,41 +1068,42 @@ pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c
                         if (history.size() == 0)
                             continue;
                         if (history.isLatest())
-                            history.saveTemp(buffer.items);
+                            history.saveTemp(input_buffer.items);
                         if (history.previous()) |line| {
-                            buffer.clearRetainingCapacity();
-                            try buffer.appendSlice(line);
+                            input_buffer.clearRetainingCapacity();
+                            try input_buffer.appendSlice(allocator, line);
                             position = line.len;
 
                             try terminal.clearLine();
-                            print("{s}", .{buffer.items});
+                            print("{s}", .{input_buffer.items});
                         }
                     },
                     'B' => { // Down Arrow
                         if (history.next()) |line| {
-                            buffer.clearRetainingCapacity();
-                            try buffer.appendSlice(line);
+                            input_buffer.clearRetainingCapacity();
+                            try input_buffer.appendSlice(allocator, line);
                             position = line.len;
 
                             try terminal.clearLine();
-                            print("{s}", .{buffer.items});
+                            print("{s}", .{input_buffer.items});
                         }
                         if (history.isLatest())
                             history.clearTemp();
                     },
                     'C' => { // Right Arrow
-                        if (position == buffer.items.len)
+                        const written = input_buffer.items;
+                        if (position == written.len)
                             continue;
                         if (modifier.onlyCtrl()) {
-                            const slice = buffer.items[position..];
+                            const slice = written[position..];
                             const front = std.mem.indexOfAny(u8, slice, Terminal.NON_LETTER) orelse {
                                 try terminal.moveCursor(.Right, slice.len);
-                                position = buffer.items.len;
+                                position = written.len;
                                 continue;
                             };
                             const index = (std.mem.indexOfNone(u8, slice[front..], Terminal.NON_LETTER) orelse {
                                 try terminal.moveCursor(.Right, slice.len);
-                                position = buffer.items.len;
+                                position = written.len;
                                 continue;
                             }) + front;
                             try terminal.moveCursor(.Right, index);
@@ -1104,8 +1116,9 @@ pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c
                     'D' => { // Left Arrow
                         if (position == 0)
                             continue;
+                        const written = input_buffer.items;
                         if (modifier.onlyCtrl()) {
-                            const slice = buffer.items[0..position];
+                            const slice = written[0..position];
                             const back = std.mem.lastIndexOfNone(u8, slice, Terminal.NON_LETTER) orelse {
                                 try terminal.moveCursor(.Left, @intCast(position));
                                 position = 0;
@@ -1130,15 +1143,18 @@ pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c
                 std.debug.print("\n", .{});
                 out: {
                     defer position = 0;
-                    defer buffer.clearAndFree();
+                    defer input_buffer.clearRetainingCapacity();
 
                     defer history.reset();
 
-                    history.save(buffer.items);
+                    const written = input_buffer.items;
 
-                    if (buffer.items.len == 0)
+                    if (written.len == 0)
                         break :out;
-                    const command_input, const rest = getNextArg(buffer.items);
+
+                    history.save(written);
+
+                    const command_input, const rest = getNextArg(written);
                     switch (COMMAND_MAP.get(command_input) orelse {
                         break :out printResult("unknown command '{s}'\n", .{command_input});
                     }) {
@@ -1251,15 +1267,17 @@ pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c
                                     }
                                 },
                                 .Json => {
-                                    var buf = std.ArrayList(u8).init(allocator);
-                                    defer buf.deinit();
-                                    const writer = buf.writer();
-                                    try buf.append('[');
+                                    var allocating: std.Io.Writer.Allocating = .init(allocator);
+                                    defer allocating.deinit();
+
+                                    const writer = &allocating.writer;
+
+                                    try writer.writeByte('[');
                                     while (L.getinfo(@intCast(level_depth), "sln", &ar)) : (level_depth += 1) {
                                         if (level_depth > levels and levels != 0)
                                             break;
                                         if (level_depth > 0)
-                                            try buf.append(',');
+                                            try writer.writeByte(',');
                                         const src_base64_buf, const base64_src = try toBase64(allocator, ar.short_src.?);
                                         defer allocator.free(src_base64_buf);
                                         if (ar.name) |fn_name|
@@ -1276,8 +1294,8 @@ pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c
                                                 @intFromEnum(ar.what),
                                             });
                                     }
-                                    try buf.append(']');
-                                    printResult("{s}\n", .{buf.items});
+                                    try writer.writeByte(']');
+                                    printResult("{s}\n", .{allocating.written()});
                                 },
                             }
                         },
@@ -1303,25 +1321,26 @@ pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c
                                     break :out;
                                 },
                                 .Json => {
-                                    var buf = std.ArrayList(u8).init(allocator);
-                                    defer buf.deinit();
-                                    const writer = buf.writer();
+                                    var allocating: std.Io.Writer.Allocating = .init(allocator);
+                                    defer allocating.deinit();
 
-                                    try buf.append('[');
+                                    const writer = &allocating.writer;
+
+                                    try writer.writeByte('[');
                                     var count: usize = 0;
                                     var i: i32 = L.rawiter(-1, 0);
                                     while (i >= 0) : (i = L.rawiter(-1, i)) {
                                         defer L.pop(2);
                                         if (count > 0)
-                                            try buf.append(',');
+                                            try writer.writeByte(',');
                                         switch (L.typeOf(-2)) {
                                             .String => try writer.print("\"{s}\"", .{L.tostring(-2).?}),
                                             else => try writer.print("\"<unknown>\"", .{}),
                                         }
                                         count += 1;
                                     }
-                                    try buf.append(']');
-                                    printResult("{s}\n", .{buf.items});
+                                    try writer.writeByte(']');
+                                    printResult("{s}\n", .{allocating.written()});
 
                                     break :out;
                                 },
@@ -1444,19 +1463,19 @@ pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c
             127 => {
                 if (position == 0)
                     continue;
-                const append = position < buffer.items.len;
+                const append = position < input_buffer.items.len;
                 std.debug.print("{c}", .{8});
                 position -= 1;
-                _ = buffer.orderedRemove(position);
+                _ = input_buffer.orderedRemove(position);
                 try terminal.clearEndToCursor();
                 if (append)
-                    try terminal.writeAllRetainCursor(buffer.items[position..]);
+                    try terminal.writeAllRetainCursor(input_buffer.items[position..]);
             },
             23 => { // Ctrl+Backspace
-                const slice = buffer.items[0..position];
+                const slice = input_buffer.items[0..position];
                 if (slice.len == 0)
                     continue;
-                const append = position < buffer.items.len;
+                const append = position < input_buffer.items.len;
                 const index: usize = blk: {
                     const back = std.mem.lastIndexOfNone(u8, slice, Terminal.NON_LETTER) orelse break :blk position;
                     break :blk slice.len - (std.mem.lastIndexOfAny(u8, slice[0..back], Terminal.NON_LETTER) orelse break :blk position) - 1;
@@ -1464,10 +1483,10 @@ pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c
                 for (0..index) |_| {
                     std.debug.print("{c}", .{8});
                     position -= 1;
-                    _ = buffer.orderedRemove(position);
+                    _ = input_buffer.orderedRemove(position);
                     try terminal.clearEndToCursor();
                     if (append)
-                        try terminal.writeAllRetainCursor(buffer.items[position..]);
+                        try terminal.writeAllRetainCursor(input_buffer.items[position..]);
                 }
             },
             3, 4 => { // Ctrl+C, Ctrl+D
@@ -1482,18 +1501,18 @@ pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c
                     9 => byte = ' ',
                     else => {},
                 }
-                const append = position < buffer.items.len;
-                try buffer.insert(position, byte);
+                const append = position < input_buffer.items.len;
+                try input_buffer.insert(allocator, position, byte);
                 std.debug.print("{c}", .{byte});
                 position += 1;
                 if (append)
-                    try terminal.writeAllRetainCursor(buffer.items[position..]);
+                    try terminal.writeAllRetainCursor(input_buffer.items[position..]);
             },
         }
     }
 }
 
-pub fn debugstep(L: *VM.lua.State, ar: *VM.lua.c.lua_Debug) callconv(.C) void {
+pub fn debugstep(L: *VM.lua.State, ar: *VM.lua.c.lua_Debug) callconv(.c) void {
     MAIN_MUTEX.lock();
     defer MAIN_MUTEX.unlock();
     updateBreakpoints(L) catch |err| switch (err) {
@@ -1518,7 +1537,7 @@ pub fn debugstep(L: *VM.lua.State, ar: *VM.lua.c.lua_Debug) callconv(.C) void {
     };
 }
 
-pub fn debugbreak(L: *VM.lua.State, ar: *VM.lua.c.lua_Debug) callconv(.C) void {
+pub fn debugbreak(L: *VM.lua.State, ar: *VM.lua.c.lua_Debug) callconv(.c) void {
     MAIN_MUTEX.lock();
     defer MAIN_MUTEX.unlock();
     if (DEBUG.dead)
@@ -1539,7 +1558,7 @@ pub fn luau_panic(L: *VM.lua.State, errcode: i32) void {
     };
 }
 
-pub fn debugprotectederror(L: *VM.lua.State) callconv(.C) void {
+pub fn debugprotectederror(L: *VM.lua.State) callconv(.c) void {
     MAIN_MUTEX.lock();
     defer MAIN_MUTEX.unlock();
     if (DEBUG.dead or !DEBUG.handled_exception)
