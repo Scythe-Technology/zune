@@ -156,7 +156,8 @@ const LuaStatement = struct {
     pub fn close(ptr: *LuaStatement, L: *VM.lua.State) void {
         if (ptr.closed)
             return;
-        defer ptr.statement.deinit();
+        const allocator = luau.getallocator(L);
+        defer ptr.statement.deinit(allocator);
         ptr.closed = true;
         if (ptr.ref) |ref| {
             defer L.unref(ref);
@@ -292,8 +293,9 @@ const LuaDatabase = struct {
     pub fn lua_query(self: *LuaDatabase, L: *VM.lua.State) !i32 {
         if (self.closed)
             return L.Zerror("Database is closed");
+        const allocator = luau.getallocator(L);
         const query = try L.Zcheckvalue([]const u8, 2, null);
-        try self.statements.ensureTotalCapacity(self.statements.items.len + 1);
+        try self.statements.ensureTotalCapacity(allocator, self.statements.items.len + 1);
         const statement = self.db.prepare(query) catch |err| switch (err) {
             error.OutOfMemory => return err,
             error.InvalidParameter => return L.Zerrorf("SQLite Query Error ({}): must have '$', ':', '?', or '@'", .{err}),
@@ -301,7 +303,7 @@ const LuaDatabase = struct {
         };
         const ptr = try L.newuserdatataggedwithmetatable(LuaStatement, TAG_SQLITE_STATEMENT);
         const ref = try L.ref(-1) orelse unreachable;
-        self.statements.append(ref) catch unreachable; // should have enough capacity
+        self.statements.appendAssumeCapacity(ref);
         ptr.* = .{
             .db = self,
             .ref = ref,
@@ -318,12 +320,12 @@ const LuaDatabase = struct {
 
         const query = try L.Zcheckvalue([]const u8, 2, null);
 
-        const stmt = self.db.prepare(query) catch |err| switch (err) {
+        var stmt = self.db.prepare(query) catch |err| switch (err) {
             error.OutOfMemory => return err,
             error.InvalidParameter => return L.Zerrorf("SQLite Query Error ({}): must have '$', ':', '?', or '@'", .{err}),
             else => return L.Zerrorf("SQLite Error ({}): {s}", .{ err, self.db.getErrorMessage() }),
         };
-        defer stmt.deinit();
+        defer stmt.deinit(allocator);
 
         var params: ?[]?sqlite.Value = null;
         defer if (params) |p| allocator.free(p);
@@ -379,7 +381,8 @@ const LuaDatabase = struct {
         if (ptr.closed)
             return;
         ptr.closed = true;
-        defer ptr.statements.deinit();
+        const allocator = luau.getallocator(L);
+        defer ptr.statements.deinit(allocator);
         try L.rawcheckstack(2);
         if (ptr.statements.items.len > 0) {
             var i = ptr.statements.items.len;
@@ -415,7 +418,7 @@ fn sqlite_open(L: *VM.lua.State) !i32 {
     const ptr = try L.newuserdatataggedwithmetatable(LuaDatabase, TAG_SQLITE_DATABASE);
     ptr.* = .{
         .db = db,
-        .statements = std.ArrayList(i32).init(allocator),
+        .statements = .empty,
     };
     return 1;
 }
