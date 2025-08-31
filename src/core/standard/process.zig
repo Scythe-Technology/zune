@@ -51,11 +51,11 @@ const ProcessEnvError = error{
     InvalidValueType,
 };
 
-fn getProcessArgs(L: *VM.lua.State, array: *std.ArrayList([]const u8), idx: i32) !void {
+fn getProcessArgs(L: *VM.lua.State, allocator: std.mem.Allocator, array: *std.ArrayList([]const u8), idx: i32) !void {
     try L.Zchecktype(idx, .Table);
     var iter: LuaHelper.ArrayIterator = .{ .L = L, .idx = idx };
     while (try iter.next()) |i| switch (i) {
-        .String => try array.append(L.tostring(-1).?),
+        .String => try array.append(allocator, L.tostring(-1).?),
         else => return L.Zerrorf("invalid process argument type (string expected, got {s})", .{VM.lapi.typename(L.typeOf(-1))}),
     };
 }
@@ -77,27 +77,26 @@ const ProcessChildOptions = struct {
     cwd: ?[]const u8 = null,
     env: ?process.EnvMap = null,
     joined: ?[]const u8 = null,
-    argArray: std.ArrayList([]const u8),
+    args: std.ArrayList([]const u8),
     stdio: enum { inherit, pipe, ignore } = .pipe,
 
-    pub fn init(L: *VM.lua.State) !ProcessChildOptions {
+    pub fn init(L: *VM.lua.State, allocator: std.mem.Allocator) !ProcessChildOptions {
         const cmd = try L.Zcheckvalue([:0]const u8, 1, null);
         const options = !L.typeOf(3).isnoneornil();
-
-        const allocator = luau.getallocator(L);
 
         var shell: ?[]const u8 = null;
         var shell_inline: ?[]const u8 = "-c";
 
         var childOptions: ProcessChildOptions = .{
-            .argArray = std.ArrayList([]const u8).init(allocator),
+            .args = .empty,
         };
-        errdefer childOptions.argArray.deinit();
+        errdefer childOptions.args.deinit(allocator);
 
         if (options) {
             try L.Zchecktype(3, .Table);
 
             childOptions.cwd = try L.Zcheckfield(?[]const u8, 3, "cwd");
+            L.pop(1);
 
             if (LuaHelper.maybeKnownType(L.rawgetfield(3, "env"))) |@"type"| {
                 if (@"type" != .Table)
@@ -166,31 +165,31 @@ const ProcessChildOptions = struct {
             L.pop(1);
         }
 
-        try childOptions.argArray.append(cmd);
+        try childOptions.args.append(allocator, cmd);
 
         if (L.typeOf(2) == .Table)
-            try getProcessArgs(L, &childOptions.argArray, 2);
+            try getProcessArgs(L, allocator, &childOptions.args, 2);
 
         if (shell) |s| {
-            const joined = try std.mem.join(allocator, " ", childOptions.argArray.items);
+            const joined = try std.mem.join(allocator, " ", childOptions.args.items);
             errdefer allocator.free(joined);
             childOptions.joined = joined;
-            childOptions.argArray.clearRetainingCapacity();
-            try childOptions.argArray.append(s);
-            if (shell_inline) |inlineCmd|
-                try childOptions.argArray.append(inlineCmd);
-            try childOptions.argArray.append(joined);
+            childOptions.args.clearRetainingCapacity();
+            try childOptions.args.append(allocator, s);
+            if (shell_inline) |inline_cmd|
+                try childOptions.args.append(allocator, inline_cmd);
+            try childOptions.args.append(allocator, joined);
         }
 
         return childOptions;
     }
 
-    fn deinit(self: *ProcessChildOptions) void {
+    fn deinit(self: *ProcessChildOptions, allocator: std.mem.Allocator) void {
         if (self.env) |*env|
             env.deinit();
         if (self.joined) |mem|
-            self.argArray.allocator.free(mem);
-        self.argArray.deinit();
+            allocator.free(mem);
+        self.args.deinit(allocator);
     }
 };
 
@@ -244,16 +243,14 @@ const ProcessAsyncRunContext = struct {
         };
 
         if (self.poller) |*poller| {
-            const stdout_fifo = poller.fifo(.stdout);
-            const stdout = stdout_fifo.readableSliceOfLen(@min(stdout_fifo.count, LuaHelper.MAX_LUAU_SIZE));
-            const stderr_fifo = poller.fifo(.stderr);
-            const stderr = stderr_fifo.readableSliceOfLen(@min(stderr_fifo.count, LuaHelper.MAX_LUAU_SIZE));
+            const stdout_reader = poller.reader(.stdout);
+            const stderr_reader = poller.reader(.stderr);
 
             L.Zpushvalue(.{
                 .code = code,
                 .ok = code == 0,
-                .stdout = stdout,
-                .stderr = stderr,
+                .stdout = stdout_reader.buffered()[0..@min(stdout_reader.bufferedLen(), LuaHelper.MAX_LUAU_SIZE)],
+                .stderr = stderr_reader.buffered()[0..@min(stderr_reader.bufferedLen(), LuaHelper.MAX_LUAU_SIZE)],
             }) catch |e| std.debug.panic("{}", .{e});
         } else {
             L.Zpushvalue(.{
@@ -276,10 +273,10 @@ fn lua_run(L: *VM.lua.State) !i32 {
     const scheduler = Scheduler.getScheduler(L);
     const allocator = luau.getallocator(L);
 
-    var options = try ProcessChildOptions.init(L);
-    defer options.deinit();
+    var options = try ProcessChildOptions.init(L, allocator);
+    defer options.deinit(allocator);
 
-    var child = process.Child.init(options.argArray.items, allocator);
+    var child = process.Child.init(options.args.items, allocator);
     child.stdin_behavior = if (options.stdio == .inherit) .Inherit else .Ignore;
     child.stdout_behavior = switch (options.stdio) {
         .inherit => .Inherit,
@@ -339,10 +336,10 @@ fn lua_create(L: *VM.lua.State) !i32 {
         return error.UnsupportedPlatform;
     const allocator = luau.getallocator(L);
 
-    var options = try ProcessChildOptions.init(L);
-    defer options.deinit();
+    var options = try ProcessChildOptions.init(L, allocator);
+    defer options.deinit(allocator);
 
-    var child = process.Child.init(options.argArray.items, allocator);
+    var child = process.Child.init(options.args.items, allocator);
     child.expand_arg0 = .no_expand;
     child.stdin_behavior = .Pipe;
     child.stdout_behavior = .Pipe;
@@ -379,15 +376,19 @@ const DotEnvError = error{
 };
 
 fn decodeString(L: *VM.lua.State, slice: []const u8) !usize {
-    var buf = std.ArrayList(u8).init(luau.getallocator(L));
-    defer buf.deinit();
-
     if (slice.len < 2)
         return DotEnvError.InvalidString;
     if (slice[0] == slice[1]) {
         try L.pushstring("");
         return 2;
     }
+
+    const allocator = luau.getallocator(L);
+
+    var allocating: std.Io.Writer.Allocating = .init(allocator);
+    defer allocating.deinit();
+
+    const writer = &allocating.writer;
 
     const stringQuote: u8 = slice[0];
     var pos: usize = 1;
@@ -399,23 +400,23 @@ fn decodeString(L: *VM.lua.State, slice: []const u8) !usize {
                 if (pos >= slice.len)
                     return DotEnvError.InvalidString;
                 switch (slice[pos]) {
-                    'n' => try buf.append('\n'),
-                    '"', '`', '\'' => |b| try buf.append(b),
+                    'n' => try writer.writeByte('\n'),
+                    '"', '`', '\'' => |b| try writer.writeByte(b),
                     else => return DotEnvError.InvalidString,
                 }
-            } else try buf.append('\\'),
+            } else try writer.writeByte('\\'),
             '"', '`', '\'' => |c| if (c == stringQuote) {
                 eof = true;
                 pos += 1;
                 break;
-            } else try buf.append(c),
+            } else try writer.writeByte(c),
             '\r' => {},
-            else => |b| try buf.append(b),
+            else => |b| try writer.writeByte(b),
         }
         pos += 1;
     }
     if (eof) {
-        try L.pushlstring(buf.items);
+        try L.pushlstring(allocating.written());
         return pos;
     } else try L.pushstring("");
     return 0;
