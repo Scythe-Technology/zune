@@ -10,8 +10,7 @@ const Fmt = Zune.Resolvers.Fmt;
 
 const LuaHelper = Zune.Utils.LuaHelper;
 
-const test_lib_gz = @embedFile("../lua/testing_lib.luac.gz");
-const test_lib_size = @embedFile("../lua/testing_lib.luac").len;
+const test_lib_bytecode = @embedFile("../lua/testing_lib.luauc");
 
 const VM = luau.VM;
 
@@ -78,10 +77,10 @@ fn testing_checkLeakedReferences(L: *VM.lua.State) !i32 {
 
         const scope_copy = try allocator.dupe(u8, scope);
 
-        var buf = std.ArrayList(u8).init(allocator);
-        try Fmt.writeIdx(allocator, L, buf.writer(), @intCast(L.gettop()), Zune.STATE.FORMAT.MAX_DEPTH);
+        var allocating: std.Io.Writer.Allocating = .init(allocator);
+        try Fmt.writeIdx(allocator, L, &allocating.writer, @intCast(L.gettop()), Zune.STATE.FORMAT.MAX_DEPTH);
 
-        try REF_LEAKED_SOURCE.put(store_index, .{ .scope = scope_copy, .value = try buf.toOwnedSlice() });
+        try REF_LEAKED_SOURCE.put(store_index, .{ .scope = scope_copy, .value = try allocating.toOwnedSlice() });
     }
     return 0;
 }
@@ -215,7 +214,6 @@ pub fn runTestAsync(L: *VM.lua.State, sched: *Scheduler) !TestResult {
 }
 
 pub fn loadLib(L: *VM.lua.State, enabled: bool) !void {
-    const allocator = luau.getallocator(L);
     if (enabled) {
         const GL = L.mainthread();
         const ML = try GL.newthread();
@@ -231,14 +229,7 @@ pub fn loadLib(L: *VM.lua.State, enabled: bool) !void {
         try ML.Zsetfieldfn(VM.lua.GLOBALSINDEX, "scheduler_droptasks", testing_droptasks);
         try ML.Zsetfield(VM.lua.GLOBALSINDEX, "_FILE", false);
 
-        const bytecode_buf = allocator.alloc(u8, test_lib_size) catch |err| std.debug.panic("Unable to allocate space for testing framework: {}", .{err});
-        defer allocator.free(bytecode_buf);
-        var bytecode_buf_stream = std.io.fixedBufferStream(bytecode_buf);
-        var bytecode_gz_buf_stream = std.io.fixedBufferStream(test_lib_gz);
-
-        std.compress.gzip.decompress(bytecode_gz_buf_stream.reader(), bytecode_buf_stream.writer()) catch |err| std.debug.panic("Failed to decompress testing framework: {}", .{err});
-
-        ML.load("test_framework", bytecode_buf, 0) catch |err|
+        ML.load("test_framework", test_lib_bytecode, 0) catch |err|
             std.debug.panic("Error loading test framework: {}\n", .{err});
         _ = ML.pcall(0, 1, 0).check() catch |err| {
             Zune.debug.print("Error loading test framework (2): {}\n", .{err});
