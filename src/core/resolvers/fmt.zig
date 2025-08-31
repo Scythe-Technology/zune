@@ -15,7 +15,7 @@ fn tostring(allocator: std.mem.Allocator, L: *VM.lua.State, idx: i32) !?[]const 
     return null;
 }
 
-fn writeMetamethod__tostring(L: *VM.lua.State, writer: anytype, idx: i32) !bool {
+fn writeMetamethod__tostring(L: *VM.lua.State, writer: *std.Io.Writer, idx: i32) !bool {
     if (!try L.checkstack(2))
         return error.StackOverflow;
     L.pushvalue(idx);
@@ -53,7 +53,7 @@ fn isPlainText(slice: []const u8) bool {
 
 pub fn printValue(
     L: *VM.lua.State,
-    writer: anytype,
+    writer: *std.Io.Writer,
     idx: i32,
     depth: usize,
     asKey: bool,
@@ -155,7 +155,10 @@ pub fn printValue(
             },
             .Vector => {
                 const v = L.tovector(idx) orelse unreachable;
-                try Zune.debug.writerPrint(writer, "<bmagenta><<vector {d}>><clear>", .{v});
+                if (comptime luau.VM.lua.config.VECTOR_SIZE == 3)
+                    try Zune.debug.writerPrint(writer, "<bmagenta><<vector ({d}, {d}, {d})>><clear>", .{ v[0], v[1], v[2] })
+                else
+                    try Zune.debug.writerPrint(writer, "<bmagenta><<vector ({d}, {d}, {d}, {d})>><clear>", .{ v[0], v[1], v[2], v[3] });
             },
             else => {
                 if (try writeMetamethod__tostring(L, writer, -1))
@@ -169,7 +172,7 @@ pub fn printValue(
     }
 }
 
-pub fn writeIdx(allocator: std.mem.Allocator, L: *VM.lua.State, writer: anytype, idx: i32, max_depth: usize) !void {
+pub fn writeIdx(allocator: std.mem.Allocator, L: *VM.lua.State, writer: *std.Io.Writer, idx: i32, max_depth: usize) !void {
     switch (L.typeOf(idx)) {
         .Nil => try writer.print("nil", .{}),
         .String => try writer.print("{s}", .{L.tostring(idx) orelse @panic("Failed Conversion")}),
@@ -191,7 +194,7 @@ pub fn writeIdx(allocator: std.mem.Allocator, L: *VM.lua.State, writer: anytype,
     }
 }
 
-fn writeBuffer(L: *VM.lua.State, allocator: std.mem.Allocator, writer: anytype, top: usize, max_depth: usize) !void {
+fn writeBuffer(L: *VM.lua.State, allocator: std.mem.Allocator, writer: *std.Io.Writer, top: usize, max_depth: usize) !void {
     for (1..top + 1) |i| {
         if (i > 1)
             try writer.print("\t", .{});
@@ -207,14 +210,14 @@ pub fn args(L: *VM.lua.State) !i32 {
         try L.pushlstring("");
         return 1;
     }
-    var buffer = std.ArrayList(u8).init(allocator);
-    defer buffer.deinit();
+    var allocating: std.Io.Writer.Allocating = .init(allocator);
+    defer allocating.deinit();
 
-    const writer = buffer.writer();
+    const writer = &allocating.writer;
 
     try writeBuffer(L, allocator, writer, @intCast(top), Zune.STATE.FORMAT.MAX_DEPTH);
 
-    try L.pushlstring(buffer.items);
+    try L.pushlstring(allocating.written());
 
     return 1;
 }
@@ -226,14 +229,14 @@ pub fn print(L: *VM.lua.State) !i32 {
         std.debug.print("\n", .{});
         return 0;
     }
-    var buffer = std.ArrayList(u8).init(allocator);
-    defer buffer.deinit();
+    var allocating: std.Io.Writer.Allocating = .init(allocator);
+    defer allocating.deinit();
 
-    const writer = buffer.writer();
+    const writer = &allocating.writer;
 
     try writeBuffer(L, allocator, writer, @intCast(top), Zune.STATE.FORMAT.MAX_DEPTH);
 
-    std.debug.print("{s}\n", .{buffer.items});
+    std.debug.print("{s}\n", .{allocating.written()});
 
     return 0;
 }
