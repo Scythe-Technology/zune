@@ -33,9 +33,12 @@ pub const TlsContext = union(enum) {
 
     pub const Client = struct {
         allocator: std.mem.Allocator,
-        record: std.fifo.LinearFifo(u8, .{ .Static = tls.max_ciphertext_record_len }) = .init(),
-        cleartext: std.fifo.LinearFifo(u8, .{ .Static = tls.max_ciphertext_record_len }) = .init(),
-        ciphertext: std.fifo.LinearFifo(u8, .{ .Static = tls.max_ciphertext_record_len }) = .init(),
+        record_buffer: [tls.max_ciphertext_record_len]u8 = undefined,
+        cleartext_buffer: [tls.max_ciphertext_record_len]u8 = undefined,
+        ciphertext_buffer: [tls.max_ciphertext_record_len]u8 = undefined,
+        record: std.Io.Reader,
+        cleartext: std.Io.Reader,
+        ciphertext: std.Io.Reader,
         connection: union(enum) {
             handshake: struct {
                 GL: *VM.lua.State,
@@ -64,9 +67,12 @@ pub const TlsContext = union(enum) {
 
     pub const Server = struct {
         allocator: std.mem.Allocator,
-        record: std.fifo.LinearFifo(u8, .{ .Static = tls.max_ciphertext_record_len }) = .init(),
-        cleartext: std.fifo.LinearFifo(u8, .{ .Static = tls.max_ciphertext_record_len }) = .init(),
-        ciphertext: std.fifo.LinearFifo(u8, .{ .Static = tls.max_ciphertext_record_len }) = .init(),
+        record_buffer: [tls.max_ciphertext_record_len]u8 = undefined,
+        cleartext_buffer: [tls.max_ciphertext_record_len]u8 = undefined,
+        ciphertext_buffer: [tls.max_ciphertext_record_len]u8 = undefined,
+        record: std.Io.Reader,
+        cleartext: std.Io.Reader,
+        ciphertext: std.Io.Reader,
         connection: union(enum) {
             handshake: struct {
                 GL: *VM.lua.State,
@@ -97,6 +103,13 @@ pub const TlsContext = union(enum) {
         }
     };
 
+    pub fn endingStream(r: *std.Io.Reader, w: *std.Io.Writer, limit: std.Io.Limit) std.Io.Reader.StreamError!usize {
+        _ = r;
+        _ = w;
+        _ = limit;
+        return error.EndOfStream;
+    }
+
     pub fn deinit(self: *TlsContext) void {
         switch (self.*) {
             .none => {},
@@ -124,13 +137,13 @@ pub const LONGEST_ADDRESS = 108;
 pub fn AddressToString(buf: []u8, address: std.net.Address) []const u8 {
     switch (address.any.family) {
         std.posix.AF.INET, std.posix.AF.INET6 => {
-            const b = std.fmt.bufPrint(buf, "{}", .{address}) catch @panic("OutOfMemory");
+            const b = std.fmt.bufPrint(buf, "{f}", .{address}) catch @panic("OutOfMemory");
             var iter = std.mem.splitBackwardsAny(u8, b, ":");
             _ = iter.first();
             return iter.rest();
         },
         else => {
-            return std.fmt.bufPrint(buf, "{}", .{address}) catch @panic("OutOfMemory");
+            return std.fmt.bufPrint(buf, "{f}", .{address}) catch @panic("OutOfMemory");
         },
     }
 }
@@ -224,16 +237,16 @@ const AsyncSendContext = struct {
                 callback,
             ),
             inline .server, .client => |ctx, e| {
-                const res = ctx.connection.active.tls.encrypt(self.buffer, ctx.ciphertext.writableSlice(0)) catch |err| {
+                const res = ctx.connection.active.tls.encrypt(self.buffer, ctx.ciphertext.buffer[ctx.ciphertext.end..]) catch |err| {
                     _ = self.resumeWithError(err);
                     return;
                 };
                 self.consumed = res.cleartext_pos;
-                ctx.ciphertext.update(res.ciphertext.len);
+                ctx.ciphertext.end += res.ciphertext.len;
                 tcp.write(
                     loop,
                     completion,
-                    .{ .slice = ctx.ciphertext.readableSlice(0) },
+                    .{ .slice = ctx.ciphertext.buffered() },
                     AsyncSendContext,
                     self,
                     struct {
@@ -255,12 +268,13 @@ const AsyncSendContext = struct {
                                 xev.WriteBuffer{ .slice = inner_self.buffer },
                                 err,
                             });
-                            inner_ctx.ciphertext.discard(ciphertext_written);
-                            if (inner_ctx.ciphertext.count > 0) {
+                            inner_ctx.ciphertext.toss(ciphertext_written);
+                            inner_ctx.ciphertext.rebase(inner_ctx.ciphertext.buffer.len) catch unreachable; // shouldn't fail
+                            if (inner_ctx.ciphertext.end > 0) {
                                 inner_tcp.write(
                                     l,
                                     c,
-                                    .{ .slice = inner_ctx.ciphertext.readableSlice(0) },
+                                    .{ .slice = inner_ctx.ciphertext.buffered() },
                                     AsyncSendContext,
                                     inner_self,
                                     @This().inner,
@@ -422,8 +436,9 @@ const AsyncRecvContext = struct {
                 );
             },
             inline .server, .client => |ctx, e| {
-                if (ctx.cleartext.count > 0) {
-                    const amount = ctx.cleartext.read(self.buffer);
+                if (ctx.cleartext.bufferedLen() > 0) {
+                    const amount = ctx.cleartext.readSliceShort(self.buffer) catch unreachable; // shouldn't fail, entirely buffered
+                    ctx.cleartext.rebase(ctx.cleartext.buffer.len) catch unreachable; // shouldn't fail
                     _ = @call(.always_inline, callback, .{
                         self,
                         loop,
@@ -438,7 +453,7 @@ const AsyncRecvContext = struct {
                 tcp.read(
                     loop,
                     completion,
-                    .{ .slice = ctx.record.writableSlice(0) },
+                    .{ .slice = ctx.record.buffer[ctx.record.end..] },
                     AsyncRecvContext,
                     self,
                     struct {
@@ -452,22 +467,24 @@ const AsyncRecvContext = struct {
                         ) xev.CallbackAction {
                             const inner_self = ud orelse unreachable;
                             const inner_ctx = @field(inner_self.tls, @tagName(e));
-                            inner_ctx.record.update(r catch |err| return @call(.always_inline, callback, .{
+                            inner_ctx.record.end += r catch |err| return @call(.always_inline, callback, .{
                                 ud,
                                 l,
                                 c,
                                 inner_tcp,
                                 xev.ReadBuffer{ .slice = inner_self.buffer },
                                 err,
-                            }));
+                            });
                             const res = inner_ctx.connection.active.tls.decrypt(
-                                inner_ctx.record.readableSlice(0),
-                                inner_ctx.cleartext.writableSlice(0),
+                                inner_ctx.record.buffered(),
+                                inner_ctx.cleartext.buffer[inner_ctx.cleartext.end..],
                             ) catch |err| return inner_self.resumeWithError(err);
-                            inner_ctx.record.discard(res.ciphertext_pos);
-                            inner_ctx.cleartext.update(res.cleartext.len);
+                            inner_ctx.record.toss(res.ciphertext_pos);
+                            inner_ctx.record.rebase(inner_ctx.record.buffer.len) catch unreachable; // shouldn't fail
+                            inner_ctx.cleartext.end += res.cleartext.len;
                             if (res.cleartext.len > 0) {
-                                const amount = inner_ctx.cleartext.read(inner_self.buffer);
+                                const amount = inner_ctx.cleartext.readSliceShort(inner_self.buffer) catch unreachable; // shouldn't fail, entirely buffered
+                                inner_ctx.cleartext.rebase(inner_ctx.cleartext.buffer.len) catch unreachable; // shouldn't fail
                                 _ = @call(.always_inline, callback, .{
                                     ud,
                                     l,
@@ -481,7 +498,7 @@ const AsyncRecvContext = struct {
                             inner_tcp.read(
                                 l,
                                 c,
-                                .{ .slice = inner_ctx.record.writableSlice(0) },
+                                .{ .slice = inner_ctx.record.buffer[inner_ctx.record.end..] },
                                 AsyncRecvContext,
                                 inner_self,
                                 @This().inner,
@@ -606,6 +623,9 @@ const AsyncAcceptContext = struct {
                 };
                 context.* = .{
                     .allocator = scheduler.allocator,
+                    .record = .fixed(&context.record_buffer),
+                    .cleartext = .fixed(&context.cleartext_buffer),
+                    .ciphertext = .fixed(&context.ciphertext_buffer),
                     .connection = .{
                         .handshake = .{
                             .GL = L.mainthread(),
@@ -627,7 +647,7 @@ const AsyncAcceptContext = struct {
                 tcp.read(
                     l,
                     c,
-                    .{ .slice = server_tls.record.writableSlice(0) },
+                    .{ .slice = server_tls.record.buffer[server_tls.record.end..] },
                     AsyncAcceptContext,
                     self,
                     Handshake.onRecvComplete,
@@ -677,16 +697,17 @@ const AsyncAcceptContext = struct {
             const handshake = &ctx.connection.handshake;
             const read = r catch |err| return self.resumeWithError(err);
 
-            ctx.record.update(read);
+            ctx.record.end += read;
 
-            const result = handshake.server.run(ctx.record.readableSlice(0), ctx.ciphertext.writableSlice(0)) catch |err| return self.resumeWithError(err);
-            ctx.ciphertext.update(result.send.len);
-            ctx.record.discard(result.recv_pos);
+            const result = handshake.server.run(ctx.record.buffered(), ctx.ciphertext.buffer[ctx.ciphertext.end..]) catch |err| return self.resumeWithError(err);
+            ctx.ciphertext.end += result.send.len;
+            ctx.record.toss(result.recv_pos);
+            ctx.record.rebase(ctx.record.buffer.len) catch unreachable; // shouldn't fail
             if (result.send.len > 0) {
                 tcp.write(
                     l,
                     c,
-                    .{ .slice = ctx.ciphertext.readableSlice(0) },
+                    .{ .slice = ctx.ciphertext.buffered() },
                     AsyncAcceptContext,
                     self,
                     onSendComplete,
@@ -717,7 +738,7 @@ const AsyncAcceptContext = struct {
                     tcp.read(
                         l,
                         c,
-                        .{ .slice = ctx.record.writableSlice(0) },
+                        .{ .slice = ctx.record.buffer[ctx.record.end..] },
                         AsyncAcceptContext,
                         self,
                         onRecvComplete,
@@ -739,16 +760,16 @@ const AsyncAcceptContext = struct {
             const ctx = self.tls.server;
             const written = r catch |err| return self.resumeWithError(err);
 
-            ctx.ciphertext.discard(written);
-
-            if (ctx.ciphertext.count > 0) {
-                tcp.write(l, c, .{ .slice = ctx.ciphertext.readableSlice(0) }, AsyncAcceptContext, self, onSendComplete);
+            ctx.ciphertext.toss(written);
+            if (ctx.ciphertext.bufferedLen() > 0) {
+                tcp.write(l, c, .{ .slice = ctx.ciphertext.buffered() }, AsyncAcceptContext, self, onSendComplete);
                 return .disarm;
             }
+            ctx.ciphertext.rebase(ctx.ciphertext.buffer.len) catch unreachable; // shouldn't fail
             tcp.read(
                 l,
                 c,
-                .{ .slice = ctx.record.writableSlice(0) },
+                .{ .slice = ctx.record.buffer[ctx.record.end..] },
                 AsyncAcceptContext,
                 self,
                 onRecvComplete,
@@ -792,17 +813,17 @@ const AsyncConnectContext = struct {
 
             if (self.tls == .client) {
                 const ctx = self.tls.client;
-                const res = ctx.connection.handshake.client.run(&[_]u8{}, ctx.ciphertext.writableSlice(0)) catch |err| {
+                const res = ctx.connection.handshake.client.run(&[_]u8{}, ctx.ciphertext.buffer[ctx.ciphertext.end..]) catch |err| {
                     L.pushlstring(@errorName(err)) catch |e| std.debug.panic("{}", .{e});
                     _ = Scheduler.resumeStateError(L, null) catch {};
                     break :jmp;
                 };
                 std.debug.assert(res.send.len > 0);
-                ctx.ciphertext.update(res.send.len);
+                ctx.ciphertext.end += res.send.len;
                 tcp.write(
                     l,
                     c,
-                    .{ .slice = ctx.ciphertext.readableSlice(0) },
+                    .{ .slice = ctx.ciphertext.buffered() },
                     AsyncConnectContext,
                     self,
                     Handshake.onSendComplete,
@@ -852,16 +873,17 @@ const AsyncConnectContext = struct {
 
             const read = r catch |err| return self.resumeWithError(err);
 
-            ctx.record.update(read);
+            ctx.record.end += read;
 
-            const result = handshake.client.run(ctx.record.readableSlice(0), ctx.ciphertext.writableSlice(0)) catch |err| return self.resumeWithError(err);
-            ctx.ciphertext.update(result.send.len);
-            ctx.record.discard(result.recv_pos);
+            const result = handshake.client.run(ctx.record.buffered(), ctx.ciphertext.buffer[ctx.ciphertext.end..]) catch |err| return self.resumeWithError(err);
+            ctx.ciphertext.end += result.send.len;
+            ctx.record.toss(result.recv_pos);
+            ctx.record.rebase(ctx.record.buffer.len) catch unreachable; // shouldn't fail
             if (result.send.len > 0) {
                 tcp.write(
                     l,
                     c,
-                    .{ .slice = ctx.ciphertext.readableSlice(0) },
+                    .{ .slice = ctx.ciphertext.buffered() },
                     AsyncConnectContext,
                     self,
                     onSendComplete,
@@ -871,7 +893,7 @@ const AsyncConnectContext = struct {
                 tcp.read(
                     l,
                     c,
-                    .{ .slice = ctx.record.writableSlice(0) },
+                    .{ .slice = ctx.record.buffer[ctx.record.end..] },
                     AsyncConnectContext,
                     self,
                     onRecvComplete,
@@ -895,12 +917,19 @@ const AsyncConnectContext = struct {
 
             const written = r catch |err| return self.resumeWithError(err);
 
-            ctx.ciphertext.discard(written);
-
-            if (ctx.ciphertext.count > 0) {
-                tcp.write(l, c, .{ .slice = ctx.ciphertext.readableSlice(0) }, AsyncConnectContext, self, onSendComplete);
+            ctx.ciphertext.toss(written);
+            if (ctx.ciphertext.bufferedLen() > 0) {
+                tcp.write(
+                    l,
+                    c,
+                    .{ .slice = ctx.ciphertext.buffered() },
+                    AsyncConnectContext,
+                    self,
+                    onSendComplete,
+                );
                 return .disarm;
             }
+            ctx.ciphertext.rebase(ctx.ciphertext.buffer.len) catch unreachable; // shouldn't fail
             if (handshake.client.done()) {
                 const cipher = handshake.client.cipher().?;
                 handshake.deinit(ctx.allocator);
@@ -920,7 +949,7 @@ const AsyncConnectContext = struct {
                 tcp.read(
                     l,
                     c,
-                    .{ .slice = ctx.record.writableSlice(0) },
+                    .{ .slice = ctx.record.buffer[ctx.record.end..] },
                     AsyncConnectContext,
                     self,
                     onRecvComplete,
