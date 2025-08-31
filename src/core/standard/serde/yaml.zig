@@ -4,57 +4,21 @@ const luau = @import("luau");
 
 const VM = luau.VM;
 
-const charset = "0123456789abcdef";
-const escape_seq = blk: {
-    var seq: []const u8 = "\"\\";
-    for (0..32) |i|
-        seq = seq ++ [_]u8{i};
-    break :blk seq;
-};
-fn escapeString(bytes: *std.ArrayList(u8), str: []const u8) !void {
-    try bytes.append('"');
-
-    var pos: usize = 0;
-    while (pos < str.len) {
-        const c = std.mem.indexOfAny(u8, str[pos..], escape_seq) orelse break;
-        try bytes.appendSlice(str[pos .. pos + c]);
-        pos += c;
-        switch (str[pos]) {
-            0...31, '"', '\\' => |char| {
-                pos += 1;
-                switch (char) {
-                    8 => try bytes.appendSlice("\\b"),
-                    '\t' => try bytes.appendSlice("\\t"),
-                    '\n' => try bytes.appendSlice("\\n"),
-                    12 => try bytes.appendSlice("\\f"),
-                    '\r' => try bytes.appendSlice("\\r"),
-                    '"', '\\' => {
-                        try bytes.append('\\');
-                        try bytes.append(char);
-                    },
-                    else => {
-                        try bytes.appendSlice("\\u00");
-                        try bytes.append(charset[char >> 4]);
-                        try bytes.append(charset[char & 15]);
-                    },
-                }
-            },
-            else => unreachable,
-        }
-    }
-    if (pos < str.len)
-        try bytes.appendSlice(str[pos..]);
-    try bytes.append('"');
-}
+const json = @import("json.zig");
 
 fn encodeValue(L: *VM.lua.State, allocator: std.mem.Allocator, tracked: *std.AutoHashMap(*const anyopaque, void)) !yaml.Yaml.Value {
     switch (L.typeOf(-1)) {
         .String => {
-            var buf = std.ArrayList(u8).init(allocator);
-            errdefer buf.deinit();
-            const string = L.Lcheckstring(-1);
-            try escapeString(&buf, string);
-            return yaml.Yaml.Value{ .scalar = try buf.toOwnedSlice() };
+            const str = L.Lcheckstring(-1);
+
+            var allocating: std.Io.Writer.Allocating = try .initCapacity(allocator, str.len);
+            defer allocating.deinit();
+
+            const writer = &allocating.writer;
+
+            try json.escapeString(writer, str);
+
+            return yaml.Yaml.Value{ .scalar = try allocating.toOwnedSlice() };
         },
         .Number => {
             const num = L.Lchecknumber(-1);
@@ -107,14 +71,20 @@ fn encodeValue(L: *VM.lua.State, allocator: std.mem.Allocator, tracked: *std.Aut
                     }
 
                     const str = L.tolstring(-2).?;
-                    var buf = try std.ArrayList(u8).initCapacity(allocator, str.len);
-                    errdefer buf.deinit();
-                    if (std.mem.indexOfNone(u8, str, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-")) |_|
-                        try escapeString(&buf, str)
-                    else
-                        try buf.appendSlice(str);
+                    var allocating: std.Io.Writer.Allocating = try .initCapacity(allocator, str.len);
+                    defer allocating.deinit();
 
-                    try map.put(allocator, try buf.toOwnedSlice(), try encodeValue(L, allocator, tracked));
+                    const writer = &allocating.writer;
+
+                    if (std.mem.indexOfNone(u8, str, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-")) |_|
+                        try json.escapeString(writer, str)
+                    else
+                        try writer.writeAll(str);
+
+                    const encoded_value = try encodeValue(L, allocator, tracked);
+
+                    try map.put(allocator, try allocating.toOwnedSlice(), encoded_value);
+
                     L.pop(2); // drop: value
                 }
                 return yaml.Yaml.Value{ .map = map };
@@ -135,10 +105,14 @@ pub fn lua_encode(L: *VM.lua.State) !i32 {
 
     const value = try encodeValue(L, arena.allocator(), &tracked);
 
-    var buf = std.ArrayList(u8).init(arena.allocator());
-    try value.stringify(buf.writer(), .{});
+    var allocating: std.Io.Writer.Allocating = .init(allocator);
+    defer allocating.deinit();
 
-    try L.pushlstring(buf.items);
+    const writer = &allocating.writer;
+
+    try value.stringify(writer, .{});
+
+    try L.pushlstring(allocating.written());
 
     return 1;
 }
@@ -152,6 +126,7 @@ fn decodeList(L: *VM.lua.State, list: yaml.Yaml.List) anyerror!void {
     for (list, 1..) |val, key| {
         switch (val) {
             .scalar => |str| try L.pushlstring(str),
+            .boolean => |b| L.pushboolean(b),
             .map => |m| try decodeMap(L, m),
             .list => |ls| try decodeList(L, ls),
             .empty => continue,
@@ -173,6 +148,7 @@ fn decodeMap(L: *VM.lua.State, map: yaml.Yaml.Map) anyerror!void {
         try L.pushlstring(key);
         switch (value) {
             .scalar => |str| try L.pushlstring(str),
+            .boolean => |b| L.pushboolean(b),
             .map => |m| try decodeMap(L, m),
             .list => |ls| try decodeList(L, ls),
             .empty => continue,
@@ -205,6 +181,7 @@ pub fn lua_decode(L: *VM.lua.State) !i32 {
 
     switch (raw.docs.items[0]) {
         .scalar => |str| try L.pushlstring(str),
+        .boolean => |b| L.pushboolean(b),
         .map => |m| try decodeMap(L, m),
         .list => |ls| try decodeList(L, ls),
         .empty => return 0,

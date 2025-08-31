@@ -13,31 +13,31 @@ const escape_seq: []const u8 = blk: {
         seq = seq ++ [_]u8{i};
     break :blk seq;
 };
-fn escapeString(bytes: *std.ArrayList(u8), str: []const u8) !void {
-    try bytes.append('"');
+pub fn escapeString(writer: *std.Io.Writer, str: []const u8) !void {
+    try writer.writeByte('"');
 
     var pos: usize = 0;
     while (pos < str.len) {
         const c = std.mem.indexOfAny(u8, str[pos..], escape_seq) orelse break;
-        try bytes.appendSlice(str[pos .. pos + c]);
+        try writer.writeAll(str[pos .. pos + c]);
         pos += c;
         switch (str[pos]) {
             0...31, '"', '\\' => |char| {
                 pos += 1;
                 switch (char) {
-                    8 => try bytes.appendSlice("\\b"),
-                    '\t' => try bytes.appendSlice("\\t"),
-                    '\n' => try bytes.appendSlice("\\n"),
-                    12 => try bytes.appendSlice("\\f"),
-                    '\r' => try bytes.appendSlice("\\r"),
+                    8 => try writer.writeAll("\\b"),
+                    '\t' => try writer.writeAll("\\t"),
+                    '\n' => try writer.writeAll("\\n"),
+                    12 => try writer.writeAll("\\f"),
+                    '\r' => try writer.writeAll("\\r"),
                     '"', '\\' => {
-                        try bytes.append('\\');
-                        try bytes.append(char);
+                        try writer.writeByte('\\');
+                        try writer.writeByte(char);
                     },
                     else => {
-                        try bytes.appendSlice("\\u00");
-                        try bytes.append(charset[char >> 4]);
-                        try bytes.append(charset[char & 15]);
+                        try writer.writeAll("\\u00");
+                        try writer.writeByte(charset[char >> 4]);
+                        try writer.writeByte(charset[char & 15]);
                     },
                 }
             },
@@ -45,11 +45,11 @@ fn escapeString(bytes: *std.ArrayList(u8), str: []const u8) !void {
         }
     }
     if (pos < str.len)
-        try bytes.appendSlice(str[pos..]);
-    try bytes.append('"');
+        try writer.writeAll(str[pos..]);
+    try writer.writeByte('"');
 }
 
-fn writeIndent(buf: *std.ArrayList(u8), kind: json.JsonIndent, depth: u32) !void {
+fn writeIndent(writer: *std.Io.Writer, kind: json.JsonIndent, depth: u32) !void {
     const indent = switch (kind) {
         .NO_LINE => return,
         .SPACES_2 => "  ",
@@ -57,7 +57,7 @@ fn writeIndent(buf: *std.ArrayList(u8), kind: json.JsonIndent, depth: u32) !void
         .TABS => "\t",
     };
     for (0..depth) |_| {
-        try buf.appendSlice(indent);
+        try writer.writeAll(indent);
     }
 }
 
@@ -69,19 +69,19 @@ const JsonKind = enum {
 fn encode(
     L: *VM.lua.State,
     allocator: std.mem.Allocator,
-    buf: *std.ArrayList(u8),
+    writer: *std.Io.Writer,
     tracked: *std.AutoHashMapUnmanaged(*const anyopaque, void),
     kind: json.JsonIndent,
     depth: u32,
     comptime json_kind: JsonKind,
 ) !void {
     switch (L.typeOf(-1)) {
-        .Nil => try buf.appendSlice("null"),
+        .Nil => try writer.writeAll("null"),
         .Table => {
             const tablePtr = L.topointer(-1).?;
 
             if (NULL_PTR) |ptr| if (tablePtr == ptr) {
-                try buf.appendSlice("null");
+                try writer.writeAll("null");
                 return;
             };
 
@@ -93,26 +93,26 @@ fn encode(
             const tableSize = L.objlen(-1);
             var i: i32 = L.rawiter(-1, 0);
             if (tableSize > 0 or i < 0) {
-                try buf.append('[');
+                try writer.writeByte('[');
                 if (i >= 0) {
                     var n: i32 = 0;
                     var appended = false;
                     while (i >= 0) : (i = L.rawiter(-1, i)) {
                         defer appended = true;
                         if (appended) {
-                            try buf.append(',');
+                            try writer.writeByte(',');
                         }
 
                         if (kind != .NO_LINE)
-                            try buf.append('\n');
-                        try writeIndent(buf, kind, depth + 1);
+                            try writer.writeByte('\n');
+                        try writeIndent(writer, kind, depth + 1);
 
                         switch (L.typeOf(-2)) {
                             .Number => {},
                             else => |t| return L.Zerrorf("invalid key type (expected number, got {s})", .{(VM.lapi.typename(t))}),
                         }
 
-                        try encode(L, allocator, buf, tracked, kind, depth + 1, json_kind);
+                        try encode(L, allocator, writer, tracked, kind, depth + 1, json_kind);
                         L.pop(2); // drop: value, key
                         n += 1;
                     }
@@ -120,42 +120,42 @@ fn encode(
                         return L.Zerrorf("array size mismatch (expected {d}, got {d})", .{ tableSize, n });
 
                     if (kind != .NO_LINE)
-                        try buf.append('\n');
-                    try writeIndent(buf, kind, depth);
+                        try writer.writeByte('\n');
+                    try writeIndent(writer, kind, depth);
                 }
 
-                try buf.append(']');
+                try writer.writeByte(']');
             } else {
-                try buf.appendSlice("{");
+                try writer.writeAll("{");
                 var appended = false;
                 while (i >= 0) : (i = L.rawiter(-1, i)) {
                     defer appended = true;
                     if (appended)
-                        try buf.append(',');
+                        try writer.writeByte(',');
                     switch (L.typeOf(-2)) {
                         .String => {},
                         else => |t| return L.Zerrorf("invalid key type (expected string, got {s})", .{(VM.lapi.typename(t))}),
                     }
 
                     if (kind != .NO_LINE)
-                        try buf.append('\n');
-                    try writeIndent(buf, kind, depth + 1);
+                        try writer.writeByte('\n');
+                    try writeIndent(writer, kind, depth + 1);
 
                     L.pushvalue(-2); // push key [copy]
-                    try encode(L, allocator, buf, tracked, kind, depth + 1, json_kind);
-                    try buf.append(':');
+                    try encode(L, allocator, writer, tracked, kind, depth + 1, json_kind);
+                    try writer.writeByte(':');
                     if (kind != .NO_LINE)
-                        try buf.append(' ');
+                        try writer.writeByte(' ');
                     L.pop(1); // drop: key [copy]
-                    try encode(L, allocator, buf, tracked, kind, depth + 1, json_kind);
+                    try encode(L, allocator, writer, tracked, kind, depth + 1, json_kind);
                     L.pop(2); // drop: value, key
                 }
 
                 if (kind != .NO_LINE)
-                    try buf.append('\n');
-                try writeIndent(buf, kind, depth);
+                    try writer.writeByte('\n');
+                try writeIndent(writer, kind, depth);
 
-                try buf.append('}');
+                try writer.writeByte('}');
             }
         },
         .Number => {
@@ -165,27 +165,27 @@ fn encode(
                     return L.Zerror("invalid number value (cannot be inf or nan)"),
                 .JSON5 => if (std.math.isInf(num)) {
                     if (num > 0)
-                        try buf.appendSlice("Infinity")
+                        try writer.writeAll("Infinity")
                     else
-                        try buf.appendSlice("-Infinity");
+                        try writer.writeAll("-Infinity");
                     return;
                 } else if (std.math.isNan(num)) {
-                    try buf.appendSlice("NaN");
+                    try writer.writeAll("NaN");
                     return;
                 },
             }
 
             const str = L.tolstring(-1).?;
-            try buf.appendSlice(str);
+            try writer.writeAll(str);
         },
         .String => {
             const str = L.tolstring(-1).?;
-            try escapeString(buf, str);
+            try escapeString(writer, str);
         },
         .Boolean => if (L.toboolean(-1))
-            try buf.appendSlice("true")
+            try writer.writeAll("true")
         else
-            try buf.appendSlice("false"),
+            try writer.writeAll("false"),
         else => |t| return L.Zerrorf("unsupported value type (got {s})", .{(VM.lapi.typename(t))}),
     }
 }
@@ -208,21 +208,23 @@ pub fn LuaEncoder(comptime json_kind: JsonKind) fn (L: *VM.lua.State) anyerror!i
                         1 => json.JsonIndent.SPACES_2,
                         2 => json.JsonIndent.SPACES_4,
                         3 => json.JsonIndent.TABS,
-                        else => |n| return L.Zerrorf("Unsupported indent kind {d}", .{n}),
+                        else => |n| return L.Zerrorf("unsupported indent kind {d}", .{n}),
                     };
                 }
                 L.pop(1);
             }
 
-            var buf = std.ArrayList(u8).init(allocator);
-            defer buf.deinit();
+            var allocating: std.Io.Writer.Allocating = .init(allocator);
+            defer allocating.deinit();
+
+            const writer = &allocating.writer;
 
             var tracked: std.AutoHashMapUnmanaged(*const anyopaque, void) = .empty;
             defer tracked.deinit(allocator);
 
             L.pushvalue(1);
-            try encode(L, allocator, &buf, &tracked, kind, 0, json_kind);
-            try L.pushlstring(buf.items);
+            try encode(L, allocator, writer, &tracked, kind, 0, json_kind);
+            try L.pushlstring(allocating.written());
 
             return 1;
         }
@@ -346,12 +348,14 @@ test "Escaped Strings" {
     for (0..256) |i| {
         const c: u8 = @intCast(i);
 
-        var buf = std.ArrayList(u8).init(std.testing.allocator);
-        defer buf.deinit();
+        var allocating: std.Io.Writer.Allocating = .init(std.testing.allocator);
+        defer allocating.deinit();
 
-        try escapeString(&buf, &[1]u8{c});
+        const writer = &allocating.writer;
 
-        const res = buf.items;
+        try escapeString(writer, &[1]u8{c});
+
+        const res = allocating.written();
 
         switch (c) {
             8 => try std.testing.expectEqualSlices(u8, "\"\\b\"", res),

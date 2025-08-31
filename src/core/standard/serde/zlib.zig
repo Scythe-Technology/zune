@@ -1,14 +1,20 @@
 const std = @import("std");
 const luau = @import("luau");
+const lcompress = @import("lcompress");
 
 const VM = luau.VM;
+
+const OldWriter = @import("../../utils/old_writer.zig");
 
 pub fn lua_compress(L: *VM.lua.State) !i32 {
     const allocator = luau.getallocator(L);
 
     const is_buffer = L.typeOf(1) == .Buffer;
 
-    const string = if (is_buffer) L.Lcheckbuffer(1) else L.Lcheckstring(1);
+    const string = if (is_buffer)
+        L.Lcheckbuffer(1)
+    else
+        L.Lcheckstring(1);
     const options = L.typeOf(2);
 
     var level: u4 = 12;
@@ -29,16 +35,19 @@ pub fn lua_compress(L: *VM.lua.State) !i32 {
         L.pop(1);
     }
 
-    var buf = std.ArrayList(u8).init(allocator);
-    defer buf.deinit();
+    var allocating: std.Io.Writer.Allocating = .init(allocator);
+    defer allocating.deinit();
 
-    var stream = std.io.fixedBufferStream(string);
+    var stream: std.Io.Reader = .fixed(string);
 
-    try std.compress.zlib.compress(stream.reader(), buf.writer(), .{
+    try lcompress.zlib.compress(stream.adaptToOldInterface(), OldWriter.adaptToOldInterface(&allocating.writer), .{
         .level = @enumFromInt(level),
     });
 
-    if (is_buffer) try L.Zpushbuffer(buf.items) else try L.pushlstring(buf.items);
+    if (is_buffer)
+        try L.Zpushbuffer(allocating.written())
+    else
+        try L.pushlstring(allocating.written());
 
     return 1;
 }
@@ -48,16 +57,25 @@ pub fn lua_decompress(L: *VM.lua.State) !i32 {
 
     const is_buffer = L.typeOf(1) == .Buffer;
 
-    const string = if (is_buffer) L.Lcheckbuffer(1) else L.Lcheckstring(1);
+    const string = if (is_buffer)
+        L.Lcheckbuffer(1)
+    else
+        L.Lcheckstring(1);
 
-    var buf = std.ArrayList(u8).init(allocator);
-    defer buf.deinit();
+    var allocating: std.Io.Writer.Allocating = .init(allocator);
+    defer allocating.deinit();
 
-    var stream = std.io.fixedBufferStream(string);
+    var stream: std.Io.Reader = .fixed(string);
 
-    try std.compress.zlib.decompress(stream.reader(), buf.writer());
+    try lcompress.zlib.decompress(
+        stream.adaptToOldInterface(),
+        OldWriter.adaptToOldInterface(&allocating.writer),
+    );
 
-    if (is_buffer) try L.Zpushbuffer(buf.items) else try L.pushlstring(buf.items);
+    if (is_buffer)
+        try L.Zpushbuffer(allocating.written())
+    else
+        try L.pushlstring(allocating.written());
 
     return 1;
 }

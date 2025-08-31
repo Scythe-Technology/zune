@@ -27,45 +27,45 @@ const Error = std.mem.Allocator.Error || error{
 };
 
 const charset = "0123456789abcdef";
-fn escape_string(bytes: *std.ArrayList(u8), str: []const u8) !void {
-    errdefer bytes.deinit();
+fn escapeString(writer: *std.Io.Writer, str: []const u8) !void {
     const multi = std.mem.indexOfScalar(u8, str, '\n') != null;
-    try bytes.append('"');
+    try writer.writeByte('"');
 
     if (str.len == 0) {
-        try bytes.append('"');
+        try writer.writeByte('"');
         return;
     }
 
     if (multi)
-        try bytes.appendSlice("\"\"");
+        try writer.writeAll("\"\"");
 
     if (str[0] == '\n')
-        try bytes.append(str[0])
+        try writer.writeByte(str[0])
     else if (str.len > 1 and str[0] == '\r' and str[1] == '\n')
-        try bytes.appendSlice("\r\n");
+        try writer.writeAll("\r\n");
 
     for (str) |c| switch (c) {
         0...9, 11...12, 14...31, '"', '\\' => {
             switch (c) {
-                8 => try bytes.appendSlice("\\b"),
-                '\t' => try bytes.appendSlice("\\t"),
-                12 => try bytes.appendSlice("\\f"),
+                8 => try writer.writeAll("\\b"),
+                '\t' => try writer.writeAll("\\t"),
+                12 => try writer.writeAll("\\f"),
                 '"', '\\' => {
-                    try bytes.append('\\');
-                    try bytes.append(c);
+                    try writer.writeByte('\\');
+                    try writer.writeByte(c);
                 },
                 else => {
-                    try bytes.appendSlice("\\u00");
-                    try bytes.append(charset[c >> 4]);
-                    try bytes.append(charset[c & 15]);
+                    try writer.writeAll("\\u00");
+                    try writer.writeByte(charset[c >> 4]);
+                    try writer.writeByte(charset[c & 15]);
                 },
             }
         },
-        else => try bytes.append(c),
+        else => try writer.writeByte(c),
     };
-    try bytes.append('"');
-    if (multi) try bytes.appendSlice("\"\"");
+    try writer.writeByte('"');
+    if (multi)
+        try writer.writeAll("\"\"");
 }
 
 const EncodeInfo = struct {
@@ -78,14 +78,14 @@ const EncodeInfo = struct {
 
 fn createIndex(allocator: std.mem.Allocator, all: []const u8, key: []const u8) ![]const u8 {
     if (!Parser.isPlainText(key)) {
-        var bytes = std.ArrayList(u8).init(allocator);
-        defer bytes.deinit();
-        try escape_string(&bytes, key);
+        var allocating: std.Io.Writer.Allocating = try .initCapacity(allocator, key.len + 2);
+        defer allocating.deinit();
+        try escapeString(&allocating.writer, key);
         if (all.len == 0)
-            return try allocator.dupe(u8, bytes.items);
+            return try allocator.dupe(u8, allocating.written());
         return try std.mem.join(allocator, ".", &[_][]const u8{
             all,
-            bytes.items,
+            allocating.written(),
         });
     }
     if (all.len == 0)
@@ -93,7 +93,7 @@ fn createIndex(allocator: std.mem.Allocator, all: []const u8, key: []const u8) !
     return try std.mem.join(allocator, ".", &[_][]const u8{ all, key });
 }
 
-fn encodeArrayPartial(L: *VM.lua.State, allocator: std.mem.Allocator, arraySize: usize, buf: *std.ArrayList(u8), info: EncodeInfo) anyerror!void {
+fn encodeArrayPartial(L: *VM.lua.State, allocator: std.mem.Allocator, arraySize: usize, writer: *std.Io.Writer, info: EncodeInfo) anyerror!void {
     var size: usize = 0;
     var i: i32 = L.rawiter(-1, 0);
     while (i >= 0) : (i = L.rawiter(-1, i)) {
@@ -105,8 +105,8 @@ fn encodeArrayPartial(L: *VM.lua.State, allocator: std.mem.Allocator, arraySize:
             .String => {
                 size += 1;
                 const value = L.tostring(-1) orelse unreachable;
-                try escape_string(buf, value);
-                if (size != arraySize) try buf.appendSlice(", ");
+                try escapeString(writer, value);
+                if (size != arraySize) try writer.writeAll(", ");
             },
             .Number => {
                 size += 1;
@@ -114,18 +114,18 @@ fn encodeArrayPartial(L: *VM.lua.State, allocator: std.mem.Allocator, arraySize:
                 if (std.math.isNan(num) or std.math.isInf(num))
                     return L.Zerror("invalid number value (cannot be inf or nan)");
                 const value = L.tostring(-1) orelse std.debug.panic("Number failed to convert to string\n", .{});
-                try buf.appendSlice(value);
+                try writer.writeAll(value);
                 if (size != arraySize)
-                    try buf.appendSlice(", ");
+                    try writer.writeAll(", ");
             },
             .Boolean => {
                 size += 1;
                 if (L.toboolean(-1))
-                    try buf.appendSlice("true")
+                    try writer.writeAll("true")
                 else
-                    try buf.appendSlice("false");
+                    try writer.writeAll("false");
                 if (size != arraySize)
-                    try buf.appendSlice(", ");
+                    try writer.writeAll(", ");
             },
             .Table => {},
             else => |t| return L.Zerrorf("unsupported value type (got {s})", .{(VM.lapi.typename(t))}),
@@ -159,29 +159,29 @@ fn encodeArrayPartial(L: *VM.lua.State, allocator: std.mem.Allocator, arraySize:
                             else => |t| return L.Zerrorf("invalid key type (expected number, got {s})", .{(VM.lapi.typename(t))}),
                         }
                         L.pop(2);
-                        try buf.append('[');
-                        try encodeArrayPartial(L, allocator, tableSize, buf, .{
+                        try writer.writeByte('[');
+                        try encodeArrayPartial(L, allocator, tableSize, writer, .{
                             .root = false,
                             .tracked = info.tracked,
                             .tagged = info.tagged,
                             .keyName = info.keyName,
                         });
-                        try buf.append(']');
-                        if (size != arraySize) try buf.appendSlice(", ");
+                        try writer.writeByte(']');
+                        if (size != arraySize) try writer.writeAll(", ");
                     } else {
-                        try buf.appendSlice("[]");
+                        try writer.writeAll("[]");
                     }
                 } else {
                     L.pop(2);
-                    try buf.appendSlice("{");
-                    try encodeTable(L, allocator, buf, .{
+                    try writer.writeAll("{");
+                    try encodeTable(L, allocator, writer, .{
                         .root = false,
                         .tracked = info.tracked,
                         .tagged = info.tagged,
                         .keyName = info.keyName,
                     });
-                    try buf.appendSlice("}");
-                    if (size != arraySize) try buf.appendSlice(", ");
+                    try writer.writeAll("}");
+                    if (size != arraySize) try writer.writeAll(", ");
                 }
             },
             else => unreachable, // checked first loop above
@@ -193,7 +193,7 @@ fn encodeArrayPartial(L: *VM.lua.State, allocator: std.mem.Allocator, arraySize:
         return L.Zerrorf("array size mismatch (expected {d}, got {d})", .{ arraySize, size });
 }
 
-fn encodeTable(L: *VM.lua.State, allocator: std.mem.Allocator, buf: *std.ArrayList(u8), info: EncodeInfo) anyerror!void {
+fn encodeTable(L: *VM.lua.State, allocator: std.mem.Allocator, writer: *std.Io.Writer, info: EncodeInfo) anyerror!void {
     var i: i32 = L.rawiter(-1, 0);
     while (i >= 0) : (i = L.rawiter(-1, i)) {
         switch (L.typeOf(-2)) {
@@ -205,11 +205,11 @@ fn encodeTable(L: *VM.lua.State, allocator: std.mem.Allocator, buf: *std.ArrayLi
             .String => {
                 const name = try createIndex(allocator, if (info.root) "" else info.keyName, key);
                 defer allocator.free(name);
-                try buf.appendSlice(name);
-                try buf.appendSlice(" = ");
+                try writer.writeAll(name);
+                try writer.writeAll(" = ");
                 const value = L.tostring(-1) orelse unreachable;
-                try escape_string(buf, value);
-                if (!info.root) try buf.appendSlice(",\n") else try buf.append('\n');
+                try escapeString(writer, value);
+                if (!info.root) try writer.writeAll(",\n") else try writer.writeByte('\n');
             },
             .Number => {
                 const num = L.Lchecknumber(-1);
@@ -217,22 +217,22 @@ fn encodeTable(L: *VM.lua.State, allocator: std.mem.Allocator, buf: *std.ArrayLi
                     return L.Zerror("invalid number value (cannot be inf or nan)");
                 const name = try createIndex(allocator, if (info.root) "" else info.keyName, key);
                 defer allocator.free(name);
-                try buf.appendSlice(name);
-                try buf.appendSlice(" = ");
+                try writer.writeAll(name);
+                try writer.writeAll(" = ");
                 const value = L.tostring(-1) orelse std.debug.panic("Number failed to convert to string\n", .{});
-                try buf.appendSlice(value);
+                try writer.writeAll(value);
                 if (!info.root)
-                    try buf.appendSlice(",\n")
+                    try writer.writeAll(",\n")
                 else
-                    try buf.append('\n');
+                    try writer.writeByte('\n');
             },
             .Boolean => {
                 const name = try createIndex(allocator, if (info.root) "" else info.keyName, key);
                 defer allocator.free(name);
-                try buf.appendSlice(name);
-                try buf.appendSlice(" = ");
-                if (L.toboolean(-1)) try buf.appendSlice("true") else try buf.appendSlice("false");
-                if (!info.root) try buf.appendSlice(",\n") else try buf.append('\n');
+                try writer.writeAll(name);
+                try writer.writeAll(" = ");
+                if (L.toboolean(-1)) try writer.writeAll("true") else try writer.writeAll("false");
+                if (!info.root) try writer.writeAll(",\n") else try writer.writeByte('\n');
             },
             .Table => {},
             else => |t| return L.Zerrorf("unsupported value type (got {s})", .{(VM.lapi.typename(t))}),
@@ -263,57 +263,57 @@ fn encodeTable(L: *VM.lua.State, allocator: std.mem.Allocator, buf: *std.ArrayLi
                 const tableSize = L.objlen(-1);
                 const j: i32 = L.rawiter(-1, 0);
                 if (tableSize > 0 or j < 0) {
-                    try buf.appendSlice(name);
-                    try buf.appendSlice(" = ");
+                    try writer.writeAll(name);
+                    try writer.writeAll(" = ");
                     if (j >= 0) {
                         L.pop(2);
-                        try buf.append('[');
-                        try encodeArrayPartial(L, allocator, tableSize, buf, .{
+                        try writer.writeByte('[');
+                        try encodeArrayPartial(L, allocator, tableSize, writer, .{
                             .root = false,
                             .tracked = info.tracked,
                             .tagged = info.tagged,
                             .keyName = info.keyName,
                         });
-                        try buf.append(']');
+                        try writer.writeByte(']');
                         if (!info.root)
-                            try buf.appendSlice(",\n")
+                            try writer.writeAll(",\n")
                         else
-                            try buf.append('\n');
+                            try writer.writeByte('\n');
                     } else {
-                        try buf.appendSlice("[]");
+                        try writer.writeAll("[]");
                         if (!info.root)
-                            try buf.appendSlice(",\n")
+                            try writer.writeAll(",\n")
                         else
-                            try buf.append('\n');
+                            try writer.writeByte('\n');
                     }
                 } else {
                     L.pop(2);
                     if (!info.root) {
-                        try buf.appendSlice(name);
-                        try buf.appendSlice(" = {");
-                        try encodeTable(L, allocator, buf, .{
+                        try writer.writeAll(name);
+                        try writer.writeAll(" = {");
+                        try encodeTable(L, allocator, writer, .{
                             .root = false,
                             .tracked = info.tracked,
                             .tagged = info.tagged,
                             .keyName = info.keyName,
                         });
-                        try buf.append('}');
+                        try writer.writeByte('}');
                         if (!info.root)
-                            try buf.appendSlice(",\n")
+                            try writer.writeAll(",\n")
                         else
-                            try buf.append('\n');
+                            try writer.writeByte('\n');
                     } else {
-                        var sub_buf = std.ArrayList(u8).init(allocator);
-                        errdefer sub_buf.deinit();
-                        try encodeTable(L, allocator, &sub_buf, .{
+                        var allocating: std.Io.Writer.Allocating = .init(allocator);
+                        defer allocating.deinit();
+                        try encodeTable(L, allocator, &allocating.writer, .{
                             .tracked = info.tracked,
                             .tagged = info.tagged,
                             .keyName = name,
                         });
-                        if (sub_buf.items.len > 0) {
+                        if (allocating.written().len > 0) {
                             const nameCopy = try allocator.dupe(u8, name);
-                            try info.tagged.put(nameCopy, try sub_buf.toOwnedSlice());
-                        } else sub_buf.deinit();
+                            try info.tagged.put(nameCopy, try allocating.toOwnedSlice());
+                        }
                     }
                 }
             },
@@ -323,12 +323,12 @@ fn encodeTable(L: *VM.lua.State, allocator: std.mem.Allocator, buf: *std.ArrayLi
     }
 }
 
-fn encode(L: *VM.lua.State, allocator: std.mem.Allocator, buf: *std.ArrayList(u8), info: EncodeInfo) !void {
-    try encodeTable(L, allocator, buf, info);
+fn encode(L: *VM.lua.State, allocator: std.mem.Allocator, writer: *std.Io.Writer, info: EncodeInfo) !void {
+    try encodeTable(L, allocator, writer, info);
 
     const tagged_count = info.tagged.count();
-    if (buf.items.len > 0 and tagged_count > 0)
-        try buf.append('\n');
+    if (writer.end > 0 and tagged_count > 0)
+        try writer.writeByte('\n');
 
     var iter = info.tagged.iterator();
     var pos: usize = 0;
@@ -339,12 +339,12 @@ fn encode(L: *VM.lua.State, allocator: std.mem.Allocator, buf: *std.ArrayList(u8
         defer allocator.free(key);
         defer allocator.free(value);
 
-        try buf.append('[');
-        try buf.appendSlice(key);
-        try buf.appendSlice("]\n");
-        try buf.appendSlice(value);
+        try writer.writeByte('[');
+        try writer.writeAll(key);
+        try writer.writeAll("]\n");
+        try writer.writeAll(value);
         if (tagged_count != pos)
-            try buf.append('\n');
+            try writer.writeByte('\n');
     }
 }
 const WHITESPACE = [_]u8{ 32, '\t' };
@@ -442,11 +442,13 @@ fn decodeString(L: *VM.lua.State, string: []const u8, comptime multi: bool, info
     const delim = string[0];
     const literal = delim == '\'';
 
-    var buf = std.ArrayList(u8).init(luau.getallocator(L));
-    defer buf.deinit();
+    const allocator = luau.getallocator(L);
+
+    var buf: std.ArrayList(u8) = .empty;
+    defer buf.deinit(allocator);
     var end: usize = if (multi) 3 else 1;
     info.pos += end;
-    try buf.ensureUnusedCapacity(string.len);
+    try buf.ensureUnusedCapacity(allocator, string.len);
     const eof = comp: {
         while (end < string.len) {
             const c = string[end];
@@ -466,7 +468,7 @@ fn decodeString(L: *VM.lua.State, string: []const u8, comptime multi: bool, info
                         for (bytes, 0..) |byte, p| if (byte != 0) break :b bytes[p..];
                         break :b bytes;
                     };
-                    try buf.appendSlice(trimmed);
+                    try buf.appendSlice(allocator, trimmed);
                     end += 4;
                     info.pos += 4;
                 } else if (string[end] == 'U') {
@@ -480,18 +482,18 @@ fn decodeString(L: *VM.lua.State, string: []const u8, comptime multi: bool, info
                         for (bytes, 0..) |byte, p| if (byte != 0) break :b bytes[p..];
                         break :b bytes[bytes.len - 1 ..];
                     };
-                    try buf.appendSlice(trimmed);
+                    try buf.appendSlice(allocator, trimmed);
                     end += 8;
                     info.pos += 8;
                 } else {
                     switch (string[end]) {
-                        'b' => try buf.append(8),
-                        't' => try buf.append(9),
-                        'n' => try buf.append(10),
-                        'f' => try buf.append(12),
-                        'r' => try buf.append(13),
-                        '"' => try buf.append('"'),
-                        '\\' => try buf.append('\\'),
+                        'b' => try buf.append(allocator, 8),
+                        't' => try buf.append(allocator, 9),
+                        'n' => try buf.append(allocator, 10),
+                        'f' => try buf.append(allocator, 12),
+                        'r' => try buf.append(allocator, 13),
+                        '"' => try buf.append(allocator, '"'),
+                        '\\' => try buf.append(allocator, '\\'),
                         else => return Error.InvalidString,
                     }
                     end += 1;
@@ -527,7 +529,7 @@ fn decodeString(L: *VM.lua.State, string: []const u8, comptime multi: bool, info
                         break :comp true;
                     }
                 } else break :comp true;
-            try buf.append(c);
+            try buf.append(allocator, c);
         }
         break :comp false;
     };
@@ -793,8 +795,8 @@ pub fn lua_encode(L: *VM.lua.State) !i32 {
     try L.Zchecktype(1, .Table);
     const allocator = luau.getallocator(L);
 
-    var buf = std.ArrayList(u8).init(allocator);
-    defer buf.deinit();
+    var allocating: std.Io.Writer.Allocating = .init(allocator);
+    defer allocating.deinit();
 
     var tagged = std.StringArrayHashMap([]const u8).init(allocator);
     defer tagged.deinit();
@@ -808,9 +810,9 @@ pub fn lua_encode(L: *VM.lua.State) !i32 {
         .tracked = &tracked,
     };
 
-    try encode(L, allocator, &buf, info);
+    try encode(L, allocator, &allocating.writer, info);
 
-    try L.pushlstring(buf.items);
+    try L.pushlstring(allocating.written());
 
     return 1;
 }
