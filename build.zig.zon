@@ -28,8 +28,8 @@
             .hash = "zpcre2-0.0.3-p7xIaFsBMgCTbBTG_CekjUxWFA2a4oLnuLtSDIeMvLkz",
         },
         .datetime = .{
-            .url = "https://codeload.github.com/Scythe-Technology/zdt/tar.gz/69f2c19dc9fa42e5f58748662cb27dfdddc3dbc8",
-            .hash = "zdt-0.8.0-xr0_vA1UDwAQNd0n4Vfe7eKf5KXrisezxCRxr60ZtPMo",
+            .url = "https://codeload.github.com/FObersteiner/zdt/tar.gz/8b551a0a3e5ae64a32b5bad0e6a93119787b43af",
+            .hash = "zdt-0.8.1-xr0_vAxUDwCJRDh9pcAS_mdZBIsvcGTtN-K8JJSWY4I6",
         },
         .toml = .{
             .url = "https://codeload.github.com/Scythe-Technology/tomlz/tar.gz/702c826500ff075302426de918f0e022911c1cc6",
