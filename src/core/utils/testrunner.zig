@@ -44,7 +44,7 @@ pub fn runTest(comptime testFile: TestFile, args: []const []const u8, comptime o
     try Zune.initState(L);
     defer Zune.deinitState(L);
 
-    var temporaryDir = std.testing.tmpDir(std.fs.Dir.OpenDirOptions{
+    var temporaryDir = std.testing.tmpDir(.{
         .access_sub_paths = true,
     });
     // FIXME: freezes windows
