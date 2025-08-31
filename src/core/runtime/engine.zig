@@ -227,8 +227,8 @@ pub fn logFnDef(L: *VM.lua.State, idx: i32) void {
 pub fn logDetailedError(L: *VM.lua.State) !void {
     const allocator = luau.getallocator(L);
 
-    var list = std.ArrayList(StackInfo).init(allocator);
-    defer list.deinit();
+    var list: std.ArrayList(StackInfo) = try .initCapacity(allocator, 4);
+    defer list.deinit(allocator);
     defer for (list.items) |item| {
         if (item.name) |name|
             allocator.free(name);
@@ -250,7 +250,7 @@ pub fn logDetailedError(L: *VM.lua.State) !void {
             info.current_line = line;
         info.source = try allocator.dupe(u8, ar.source.?);
 
-        try list.append(info);
+        try list.append(allocator, info);
     }
 
     var err_msg: []const u8 = undefined;

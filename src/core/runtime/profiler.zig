@@ -16,8 +16,8 @@ var gcstats: [16]u64 = [_]u64{0} ** 16;
 
 var callbacks: ?*VM.lua.Callbacks = null;
 
-var stack = std.ArrayList(u8).init(std.heap.page_allocator);
-var data = std.StringHashMap(u64).init(std.heap.page_allocator);
+var STACK: std.ArrayList(u8) = .empty;
+var DATA: std.StringHashMap(u64) = .init(std.heap.page_allocator);
 
 var thread: ?std.Thread = null;
 
@@ -29,33 +29,35 @@ fn interrupt(lua_state: *VM.lua.State, gc: c_int) !void {
     const elapsedTicks = currTicks - currentTicks;
 
     if (elapsedTicks > 0) {
-        stack.clearRetainingCapacity();
+        STACK.clearRetainingCapacity();
 
         if (gc > 0)
-            try stack.appendSlice("GC,GC,");
+            try STACK.appendSlice(std.heap.page_allocator, "GC,GC,");
 
         var level: i32 = 0;
         var ar: VM.lua.Debug = .{ .ssbuf = undefined };
         while (L.getinfo(level, "sn", &ar)) : (level += 1) {
-            if (stack.items.len > 0)
-                try stack.append(';');
+            if (STACK.items.len > 0)
+                try STACK.append(std.heap.page_allocator, ';');
 
-            try stack.appendSlice(ar.short_src.?);
-            try stack.append(',');
+            try STACK.appendSlice(std.heap.page_allocator, ar.short_src.?);
+            try STACK.append(std.heap.page_allocator, ',');
 
             if (ar.name) |name|
-                try stack.appendSlice(name);
+                try STACK.appendSlice(std.heap.page_allocator, name);
 
-            try stack.append(',');
+            try STACK.append(std.heap.page_allocator, ',');
 
-            try stack.writer().print("{d}", .{ar.linedefined.?});
+            var buf: [48]u8 = undefined;
+            const slice = std.fmt.bufPrint(&buf, "{d}", .{ar.linedefined.?}) catch unreachable;
+            try STACK.appendSlice(std.heap.page_allocator, slice);
         }
 
-        if (stack.items.len > 0) {
-            if (!data.contains(stack.items))
-                try data.put(try std.heap.page_allocator.dupe(u8, stack.items), elapsedTicks)
+        if (STACK.items.len > 0) {
+            if (!DATA.contains(STACK.items))
+                try DATA.put(try std.heap.page_allocator.dupe(u8, STACK.items), elapsedTicks)
             else {
-                const entry = data.getEntry(stack.items) orelse std.debug.panic("[Profiler] entry key not found", .{});
+                const entry = DATA.getEntry(STACK.items) orelse std.debug.panic("[Profiler] entry key not found", .{});
                 entry.value_ptr.* += elapsedTicks;
             }
         }
@@ -69,7 +71,7 @@ fn interrupt(lua_state: *VM.lua.State, gc: c_int) !void {
         cb.*.interrupt = null;
 }
 
-fn lua_interrupt(lua_state: ?*VM.lua.State, gc: c_int) callconv(.C) void {
+fn lua_interrupt(lua_state: ?*VM.lua.State, gc: c_int) callconv(.c) void {
     const L: *VM.lua.State = @ptrCast(lua_state.?);
     interrupt(L, gc) catch |err| std.debug.panic("{}", .{err});
 }
@@ -109,25 +111,29 @@ pub fn end() void {
     active = false;
     if (thread) |t|
         t.join();
-    stack.deinit();
+    STACK.deinit(std.heap.page_allocator);
 }
 
 pub fn dump(path: []const u8) void {
-    const data_size = data.count();
+    const data_size = DATA.count();
     var total: u64 = 0;
     {
         const file = std.fs.cwd().createFile(path, .{}) catch |err| std.debug.panic("[Profiler] Failed to create file: {}", .{err});
         defer file.close();
 
-        const writer = file.writer();
+        var buffer: [1024]u8 = undefined;
+        var file_writer = file.writer(&buffer);
 
-        var data_iter = data.iterator();
+        const writer = &file_writer.interface;
+
+        var data_iter = DATA.iterator();
         while (data_iter.next()) |entry| {
             writer.print("{d} {s}\n", .{ entry.value_ptr.*, entry.key_ptr.* }) catch |err| std.debug.panic("[Profiler] Failed to write into file: {}", .{err});
             total += entry.value_ptr.*;
             std.heap.page_allocator.free(entry.key_ptr.*);
         }
-        data.deinit();
+        writer.flush() catch |err| std.debug.panic("[Profiler] Failed to flush file: {}", .{err});
+        DATA.deinit();
     }
     std.debug.print("[Profiler] dump written to {s} (total runtime {d:.3} seconds, {d} samples, {d} stacks)\n", .{
         path,
