@@ -19,7 +19,6 @@ stdout_istty: bool,
 
 stdin_file: std.fs.File,
 stdout_file: std.fs.File,
-stdout_writer: std.fs.File.Writer,
 settings: ?if (builtin.os.tag == .windows) WindowsSettings else std.posix.termios = null,
 current_settings: if (builtin.os.tag == .windows) WindowsSettings else void = if (builtin.os.tag == .windows) .{
     .stdin_mode = 0,
@@ -70,7 +69,6 @@ pub fn init(stdin_file: std.fs.File, stdout_file: std.fs.File) Terminal {
         .stdout_istty = std.posix.isatty(stdout_file.handle),
         .stdin_file = stdin_file,
         .stdout_file = stdout_file,
-        .stdout_writer = stdout_file.writer(),
         .mode = .Plain, // prob best to assume plain text.
     };
 }
@@ -133,35 +131,44 @@ pub fn saveSettings(self: *Terminal) !void {
     }
 }
 
-pub fn gen_sequenceWriter(seq: []const u8) fn (self: *Terminal) anyerror!void {
+pub fn generateSequenceWriter(seq: []const u8) fn (self: *Terminal) anyerror!void {
     return struct {
         fn inner(self: *Terminal) !void {
-            try self.stdout_writer.writeAll(seq);
+            var buffer: [6]u8 = undefined;
+            var writer = self.stdout_file.writer(&buffer);
+            try writer.interface.writeAll(seq);
+            try writer.interface.flush();
         }
     }.inner;
 }
 
-pub const newLine = gen_sequenceWriter("\n");
-pub const clearLine = gen_sequenceWriter("\x1b[2K\r");
-pub const clearStyles = gen_sequenceWriter("\x1b[0m");
-pub const clearEndToCursor = gen_sequenceWriter("\x1b[0J");
+pub const newLine = generateSequenceWriter("\n");
+pub const clearLine = generateSequenceWriter("\x1b[2K\r");
+pub const clearStyles = generateSequenceWriter("\x1b[0m");
+pub const clearEndToCursor = generateSequenceWriter("\x1b[0J");
 
 pub fn writeAllRetainCursor(self: *Terminal, string: []const u8) !void {
-    try self.stdout_writer.writeAll(string);
-    try self.stdout_writer.print("\x1b[{d}D", .{string.len});
+    var buffer: [64]u8 = undefined;
+    var writer = self.stdout_file.writer(&buffer);
+    try writer.interface.writeAll(string);
+    try writer.interface.print("\x1b[{d}D", .{string.len});
+    try writer.interface.flush();
 }
 pub fn moveCursor(self: *Terminal, comptime action: MoveCursorAction, amount: usize) !void {
+    var buffer: [8]u8 = undefined;
+    var writer = self.stdout_file.writer(&buffer);
     switch (amount) {
         0 => return,
-        1 => try self.stdout_writer.writeAll("\x1b[" ++ switch (action) {
+        1 => try writer.interface.writeAll("\x1b[" ++ switch (action) {
             .Left => "D",
             .Right => "C",
         }),
-        else => |d| try self.stdout_writer.print("\x1b[{d}" ++ switch (action) {
+        else => |d| try writer.interface.print("\x1b[{d}" ++ switch (action) {
             .Left => "D",
             .Right => "C",
         }, .{d}),
     }
+    try writer.interface.flush();
 }
 
 pub fn setOutputMode(self: *Terminal) !void {

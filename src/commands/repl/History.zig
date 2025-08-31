@@ -18,8 +18,8 @@ pub fn init(allocator: std.mem.Allocator, comptime location: []const u8) !Histor
     } else if (std.process.getEnvVarOwned(allocator, "USERPROFILE") catch null) |path| {
         file_path = try std.fs.path.resolve(allocator, &.{ path, location });
     }
-    var history_data = std.ArrayList([]const u8).init(allocator);
-    errdefer history_data.deinit();
+    var history_data: std.ArrayList([]const u8) = .empty;
+    errdefer history_data.deinit(allocator);
     if (file_path) |path| {
         errdefer allocator.free(path);
         const file = std.fs.openFileAbsolute(path, .{}) catch |err| {
@@ -32,17 +32,26 @@ pub fn init(allocator: std.mem.Allocator, comptime location: []const u8) !Histor
                 };
             } else return err;
         };
-        const reader = file.reader();
+        var buffer: [1024]u8 = undefined;
+        var reader = file.reader(&buffer);
+
+        var allocating: std.Io.Writer.Allocating = .init(allocator);
+        defer allocating.deinit();
+
         while (true) {
-            const line = reader.readUntilDelimiterAlloc(allocator, '\n', std.math.maxInt(u32)) catch |err| {
+            allocating.clearRetainingCapacity();
+            const amt = reader.interface.streamDelimiter(&allocating.writer, '\n') catch |err| {
                 if (err == error.EndOfStream)
                     break
                 else
                     return err;
             };
+            if (amt == 0)
+                break;
+            const line = allocating.written();
             if (std.mem.trim(u8, line, " \r").len == 0)
                 continue;
-            try history_data.append(std.mem.trim(u8, line, "\r"));
+            try history_data.append(allocator, std.mem.trim(u8, line, "\r"));
             if (history_data.items.len > MAX_HISTORY_SIZE)
                 allocator.free(history_data.orderedRemove(1));
         }
@@ -66,7 +75,7 @@ pub fn save(self: *History, line: []const u8) void {
         if (std.mem.eql(u8, self.list.items[self.list.items.len - 1], line))
             return;
     const line_copy = self.allocator.dupe(u8, line) catch return;
-    self.list.append(line_copy) catch {
+    self.list.append(self.allocator, line_copy) catch {
         self.allocator.free(line_copy);
         return;
     };
@@ -128,7 +137,7 @@ pub fn deinit(self: *History) void {
         defer {
             for (self.list.items) |item|
                 self.allocator.free(item);
-            self.list.deinit();
+            self.list.deinit(self.allocator);
         }
 
         const location = std.fs.path.dirname(path) orelse return;
@@ -141,7 +150,9 @@ pub fn deinit(self: *History) void {
         const history_file = std.fs.createFileAbsolute(path, .{}) catch return;
         defer history_file.close();
 
-        const writer = history_file.writer();
+        var buffer: [1024]u8 = undefined;
+        var file_writer = history_file.writer(&buffer);
+        const writer = &file_writer.interface;
         for (self.list.items) |data| {
             writer.writeAll(data) catch break;
             writer.writeByte('\n') catch break;

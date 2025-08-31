@@ -1,9 +1,12 @@
 const std = @import("std");
 const json = @import("json");
+const lcompress = @import("lcompress");
 
 const command = @import("lib.zig");
 
 const file = @import("../core/resolvers/file.zig");
+
+const OldWriter = @import("../core/utils/old_writer.zig");
 
 const typedef = struct {
     name: []const u8,
@@ -122,7 +125,7 @@ fn setup(editor: EditorKind, allocator: std.mem.Allocator, setupInfo: SetupInfo)
                         continue;
                     const defPath_copy = try settings_root.allocator.dupe(u8, def_path);
                     errdefer allocator.free(defPath_copy);
-                    try definition_files_array.append(.{ .string = defPath_copy });
+                    try definition_files_array.append(allocator, .{ .string = defPath_copy });
                 }
                 if (type_file.docs) |_| {
                     const file_name = try std.mem.join(allocator, "", &.{ type_file.name, ".d.json" });
@@ -143,15 +146,15 @@ fn setup(editor: EditorKind, allocator: std.mem.Allocator, setupInfo: SetupInfo)
                         continue;
                     const file_path_copy = try settings_root.allocator.dupe(u8, file_path);
                     errdefer allocator.free(file_path_copy);
-                    try documentation_files_array.append(.{ .string = file_path_copy });
+                    try documentation_files_array.append(allocator, .{ .string = file_path_copy });
                 }
             }
 
             // Serialize settings.json
-            var serialized_array = std.ArrayList(u8).init(allocator);
+            var serialized_array: std.Io.Writer.Allocating = .init(allocator);
             defer serialized_array.deinit();
 
-            try settings_root.value.serialize(serialized_array.writer(), .SPACES_2, 0);
+            try settings_root.value.serialize(&serialized_array.writer, .SPACES_2, 0);
 
             std.debug.print(
                 \\{{
@@ -240,7 +243,7 @@ fn setup(editor: EditorKind, allocator: std.mem.Allocator, setupInfo: SetupInfo)
 
                     const file_path_copy = try settings_root.allocator.dupe(u8, file_path);
                     errdefer allocator.free(file_path_copy);
-                    try definition_files_array.append(.{ .string = file_path_copy });
+                    try definition_files_array.append(allocator, .{ .string = file_path_copy });
                 }
                 if (type_file.docs) |_| {
                     const file_name = try std.mem.join(allocator, "", &.{ type_file.name, ".d.luau" });
@@ -262,14 +265,15 @@ fn setup(editor: EditorKind, allocator: std.mem.Allocator, setupInfo: SetupInfo)
 
                     const file_path_copy = try settings_root.allocator.dupe(u8, file_path);
                     errdefer allocator.free(file_path_copy);
-                    try documentation_files_array.append(.{ .string = file_path_copy });
+                    try documentation_files_array.append(allocator, .{ .string = file_path_copy });
                 }
             }
 
             // Serialize settings.json
-            var serialized_array = std.ArrayList(u8).init(allocator);
+            var serialized_array: std.Io.Writer.Allocating = .init(allocator);
             defer serialized_array.deinit();
-            try settings_root.value.serialize(serialized_array.writer(), .SPACES_2, 0);
+
+            try settings_root.value.serialize(&serialized_array.writer, .SPACES_2, 0);
 
             std.debug.print(
                 \\{{
@@ -387,15 +391,15 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
         defer allocator.free(type_path);
 
         {
-            var content_stream = std.io.fixedBufferStream(type_def.content);
-            var decompressed = std.ArrayList(u8).init(allocator);
+            var reader: std.Io.Reader = .fixed(type_def.content);
+            var decompressed: std.Io.Writer.Allocating = .init(allocator);
             defer decompressed.deinit();
 
-            try std.compress.gzip.decompress(content_stream.reader(), decompressed.writer());
+            try lcompress.gzip.decompress(reader.adaptToOldInterface(), OldWriter.adaptToOldInterface(&decompressed.writer));
 
-            try cwd.writeFile(std.fs.Dir.WriteFileOptions{
+            try cwd.writeFile(.{
                 .sub_path = type_path,
-                .data = decompressed.items,
+                .data = decompressed.written(),
             });
         }
 
@@ -405,15 +409,15 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
             const docs_path = try std.fs.path.resolve(allocator, &.{ path, docs_name });
             defer allocator.free(docs_path);
 
-            var contentStream = std.io.fixedBufferStream(docs);
-            var decompressed = std.ArrayList(u8).init(allocator);
+            var reader: std.Io.Reader = .fixed(docs);
+            var decompressed: std.Io.Writer.Allocating = .init(allocator);
             defer decompressed.deinit();
 
-            try std.compress.gzip.decompress(contentStream.reader(), decompressed.writer());
+            try lcompress.gzip.decompress(reader.adaptToOldInterface(), OldWriter.adaptToOldInterface(&decompressed.writer));
 
-            try cwd.writeFile(std.fs.Dir.WriteFileOptions{
+            try cwd.writeFile(.{
                 .sub_path = docs_path,
-                .data = decompressed.items,
+                .data = decompressed.written(),
             });
         }
     }

@@ -376,7 +376,7 @@ pub fn main() !void {
             }.handler;
             std.posix.sigaction(std.posix.SIG.INT, &.{
                 .handler = .{ .handler = handle },
-                .mask = std.posix.empty_sigset,
+                .mask = std.posix.sigemptyset(),
                 .flags = 0,
             }, null);
         },
@@ -400,7 +400,7 @@ pub fn main() !void {
         try initState(L);
         defer deinitState(L);
 
-        try Runtime.Scheduler.SCHEDULERS.append(&scheduler);
+        try Runtime.Scheduler.SCHEDULERS.append(DEFAULT_ALLOCATOR, &scheduler);
 
         try Runtime.Engine.prepAsync(L, &scheduler);
         try openZune(L, args, .{ .limbo = b.mode.limbo });
