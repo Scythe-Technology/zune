@@ -79,8 +79,8 @@ const DarwinAttributes = struct {
     pub fn scanDirectory(self: *DarwinAttributes, allocator: std.mem.Allocator) ![]FileDifference {
         const dir = &(self.dir orelse return error.WatcherNotStarted);
 
-        var diff = std.ArrayList(FileDifference).init(allocator);
-        errdefer diff.deinit();
+        var diff: std.ArrayList(FileDifference) = .empty;
+        errdefer diff.deinit(allocator);
         errdefer for (diff.items) |item| allocator.free(item.name);
 
         {
@@ -180,7 +180,7 @@ const DarwinAttributes = struct {
                     continue;
                 const name = try allocator.dupe(u8, entry.key_ptr.*);
                 errdefer allocator.free(name);
-                try diff.append(.{
+                try diff.append(allocator, .{
                     .name = name,
                     .state = .deleted,
                 });
@@ -192,14 +192,14 @@ const DarwinAttributes = struct {
                     continue;
                 const name = try allocator.dupe(u8, entry.key_ptr.*);
                 errdefer allocator.free(name);
-                try diff.append(.{
+                try diff.append(allocator, .{
                     .name = name,
                     .state = .created,
                 });
             }
         }
 
-        return diff.toOwnedSlice();
+        return diff.toOwnedSlice(allocator);
     }
 
     pub fn deinit(self: *DarwinAttributes, allocator: std.mem.Allocator) void {
@@ -377,10 +377,9 @@ pub const FileSystemWatcher = struct {
             std.debug.panic("Bad kevent", .{});
 
         var watch_info: WatchInfo = .{
-            .allocator = self.allocator,
             .list = .empty,
         };
-        errdefer watch_info.deinit();
+        errdefer watch_info.deinit(self.allocator);
 
         var root = false;
         var changes = list_arr[0..@as(usize, @intCast(count))];
@@ -462,10 +461,9 @@ pub const FileSystemWatcher = struct {
                     return error.Shutdown;
                 }
                 var watch_info: WatchInfo = .{
-                    .allocator = self.allocator,
-                    .list = std.ArrayList(WatchEvent).init(self.allocator),
+                    .list = .empty,
                 };
-                errdefer watch_info.deinit();
+                errdefer watch_info.deinit(self.allocator);
 
                 var n = true;
                 var offset: usize = 0;
@@ -484,7 +482,7 @@ pub const FileSystemWatcher = struct {
                     else
                         offset += @as(usize, info.NextEntryOffset);
 
-                    try watch_info.list.append(.{
+                    try watch_info.list.append(self.allocator, .{
                         .event = WatchEvent.Event{
                             .created = action == .Added,
                             .delete = action == .Removed,

@@ -359,7 +359,7 @@ pub fn main() !void {
     switch (comptime builtin.os.tag) {
         .windows => {
             const handle = struct {
-                fn handler(dwCtrlType: std.os.windows.DWORD) callconv(std.os.windows.WINAPI) std.os.windows.BOOL {
+                fn handler(dwCtrlType: std.os.windows.DWORD) callconv(.winapi) std.os.windows.BOOL {
                     if (dwCtrlType == std.os.windows.CTRL_C_EVENT) {
                         shutdown();
                         return std.os.windows.TRUE;

@@ -150,7 +150,7 @@ fn lua_removeDir(L: *VM.lua.State) !i32 {
 
 fn internal_isDir(srcDir: fs.Dir, path: []const u8) bool {
     if (comptime builtin.os.tag == .windows) {
-        var dir = srcDir.openDir(path, fs.Dir.OpenDirOptions{
+        var dir = srcDir.openDir(path, .{
             .iterate = true,
         }) catch return false;
         defer dir.close();

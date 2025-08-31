@@ -103,7 +103,7 @@ fn lua_kill(self: *Child, L: *VM.lua.State) !i32 {
 
     switch (comptime builtin.os.tag) {
         .windows => std.os.windows.TerminateProcess(self.child.id, 1) catch |err| switch (err) {
-            error.PermissionDenied => return error.AlreadyTerminated,
+            error.AccessDenied => return error.AlreadyTerminated,
             else => return err,
         },
         else => {
