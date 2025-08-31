@@ -20,15 +20,15 @@ export fn add_ptr_ptr(a_ptr_ptr: **i32, b: i32) void {
     a_ptr_ptr.*.* += b;
 }
 
-export fn fire_callback(callback: *const fn (i32) callconv(.C) i8) bool {
+export fn fire_callback(callback: *const fn (i32) callconv(.c) i8) bool {
     return callback(123) == -1;
 }
 
-fn the_callback(a: i32) callconv(.C) i32 {
+fn the_callback(a: i32) callconv(.c) i32 {
     return a + 2555;
 }
 
-export fn double_call(callback: *const fn (*const fn (i32) callconv(.C) i32) callconv(.C) i8) bool {
+export fn double_call(callback: *const fn (*const fn (i32) callconv(.c) i32) callconv(.c) i8) bool {
     return callback(the_callback) == 1;
 }
 
