@@ -598,24 +598,24 @@ pub fn loadLib(L: *VM.lua.State) !void {
     }
     try L.createtable(0, 15);
 
-    const stdIn = std.io.getStdIn();
-    const stdOut = std.io.getStdOut();
-    const stdErr = std.io.getStdErr();
+    const stdin = std.fs.File.stdin();
+    const stdout = std.fs.File.stdout();
+    const stderr = std.fs.File.stderr();
 
     // StdIn
-    File.push(L, stdIn, .Tty, .readable(.none)) catch |err| std.debug.panic("{}", .{err});
+    File.push(L, stdin, .Tty, .readable(.none)) catch |err| std.debug.panic("{}", .{err});
     try L.rawsetfield(-2, "stdin");
 
     // StdOut
-    File.push(L, stdOut, .Tty, .writable(.none)) catch |err| std.debug.panic("{}", .{err});
+    File.push(L, stdout, .Tty, .writable(.none)) catch |err| std.debug.panic("{}", .{err});
     try L.rawsetfield(-2, "stdout");
 
     // StdErr
-    File.push(L, stdErr, .Tty, .writable(.none)) catch |err| std.debug.panic("{}", .{err});
+    File.push(L, stderr, .Tty, .writable(.none)) catch |err| std.debug.panic("{}", .{err});
     try L.rawsetfield(-2, "stderr");
 
     // Terminal
-    TERMINAL = Terminal.init(stdIn, stdOut);
+    TERMINAL = Terminal.init(stdin, stdout);
     {
         try L.newtable();
 
