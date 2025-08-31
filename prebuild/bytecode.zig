@@ -7,7 +7,7 @@ pub fn main() !void {
     defer std.process.argsFree(allocator, args);
 
     if (args.len < 3) {
-        try std.io.getStdErr().writeAll("Usage: <FilePath> <FilePath>\n");
+        try std.fs.File.stderr().writeAll("Usage: <FilePath> <FilePath>\n");
         std.process.exit(1);
     }
 
