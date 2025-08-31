@@ -50,6 +50,14 @@ fn getPackageVersion(b: *std.Build) ![]const u8 {
     return try b.allocator.dupe(u8, version[1 .. version.len - 1]);
 }
 
+fn buildLegacyCompress(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) !void {
+    _ = b.addModule("legacy-compress", .{
+        .root_source_file = b.path("legacy/compress.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+}
+
 fn prebuild(b: *std.Build, step: *std.Build.Step) !void {
     const compile = b.step("prebuild_compile", "Compile static luau");
     const compress = b.step("prebuild_compress", "Compress static files");
@@ -68,6 +76,7 @@ fn prebuild(b: *std.Build, step: *std.Build.Step) !void {
                 .optimize = .Debug,
                 .root_source_file = b.path("prebuild/bytecode.zig"),
             }),
+            .use_llvm = true,
         });
 
         bytecode_builder.root_module.addImport("luau", dep_luau.module("luau"));
@@ -76,7 +85,7 @@ fn prebuild(b: *std.Build, step: *std.Build.Step) !void {
             b,
             bytecode_builder,
             "src/core/lua/testing_lib.luau",
-            "src/core/lua/testing_lib.luac",
+            "src/core/lua/testing_lib.luauc",
         );
 
         compile.dependOn(&testing_framework_run.step);
@@ -90,18 +99,11 @@ fn prebuild(b: *std.Build, step: *std.Build.Step) !void {
                 .target = build_native_target,
                 .optimize = .Debug,
             }),
+            .use_llvm = true,
         });
+        embedded_compressor.root_module.addImport("lcompress", b.modules.get("legacy-compress").?);
 
         try compressRecursive(b, embedded_compressor, compress, compile, "src/types/");
-
-        const run = compressFile(
-            b,
-            embedded_compressor,
-            "src/core/lua/testing_lib.luac",
-            "src/core/lua/testing_lib.luac.gz",
-        );
-        run.step.dependOn(compile);
-        compress.dependOn(&run.step);
     }
 
     step.dependOn(compile);
@@ -115,6 +117,8 @@ pub fn build(b: *std.Build) !void {
     const no_bin = b.option(bool, "no-bin", "skip emitting binary") orelse false;
 
     const prebuild_step = b.step("prebuild", "Setup project for build");
+
+    try buildLegacyCompress(b, target, optimize);
 
     try prebuild(b, prebuild_step);
 
@@ -283,4 +287,6 @@ fn buildZune(
     module.addImport("sqlite", mod_sqlite);
     if (target.result.os.tag != .windows or target.result.cpu.arch != .aarch64)
         module.addImport("tinycc", mod_tinycc);
+
+    module.addImport("lcompress", b.modules.get("legacy-compress").?);
 }
