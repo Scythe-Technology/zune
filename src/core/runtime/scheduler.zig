@@ -584,10 +584,7 @@ inline fn processFrame(self: *Scheduler, comptime frame: FrameKind) void {
 }
 
 pub fn run(self: *Scheduler, comptime mode: Zune.RunMode) void {
-    if (self.running) {
-        std.debug.print("Warning: Scheduler is already running, this may lead to unexpected behavior.\n", .{});
-        return;
-    }
+    std.debug.assert(!self.running);
     self.threadId = std.Thread.getCurrentId();
     self.running = true;
     var timer_completion: xev.Dynamic.Completion = .init();
