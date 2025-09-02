@@ -173,18 +173,6 @@ const Synchronization = struct {
     }
 };
 
-const Pool = struct {
-    io: *xev.ThreadPool,
-    general: *xev.ThreadPool,
-
-    pub fn free(self: *Pool, allocator: std.mem.Allocator) void {
-        defer allocator.destroy(self.general);
-        defer allocator.destroy(self.io);
-        self.io.deinit();
-        self.general.deinit();
-    }
-};
-
 const FrameKind = enum {
     None,
     EventLoop,
@@ -260,7 +248,6 @@ awaits: std.ArrayListUnmanaged(AwaitingObject) = .empty,
 timer: xev.Dynamic.Timer,
 loop: xev.Dynamic.Loop,
 async: xev.Dynamic.Async,
-pools: Pool,
 now_clock: f64 = 0,
 
 running: bool = false,
@@ -274,11 +261,7 @@ pub fn init(allocator: std.mem.Allocator, L: *VM.lua.State) !Scheduler {
     const max_threads = std.Thread.getCpuCount() catch 1;
     const io_pool = try allocator.create(xev.ThreadPool);
     errdefer allocator.destroy(io_pool);
-    const general_pool = try allocator.create(xev.ThreadPool);
-    errdefer allocator.destroy(general_pool);
-
     io_pool.* = .init(max_threads);
-    general_pool.* = .init(max_threads);
 
     return .{
         .loop = try xev.Dynamic.Loop.init(.{
@@ -287,10 +270,6 @@ pub fn init(allocator: std.mem.Allocator, L: *VM.lua.State) !Scheduler {
         }),
         .timer = try xev.Dynamic.Timer.init(),
         .async = try xev.Dynamic.Async.init(),
-        .pools = .{
-            .io = io_pool,
-            .general = general_pool,
-        },
         .global = L,
         .allocator = allocator,
         .sleeping = SleepingQueue.init(allocator, {}),
@@ -686,7 +665,6 @@ pub fn deinit(self: *Scheduler) void {
     self.timer.deinit();
     self.loop.deinit();
     self.async.deinit();
-    self.pools.free(self.allocator);
 }
 
 pub fn getScheduler(L: anytype) *Scheduler {
