@@ -482,10 +482,10 @@ fn createThread(allocator: std.mem.Allocator, L: *VM.lua.State) !*VM.lua.State {
         .L = undefined,
         .scheduler = .{
             .allocator = allocator,
+            .thread_pool = undefined,
             .async = undefined,
             .global = undefined,
             .loop = undefined,
-            .pools = undefined,
             .sleeping = undefined,
             .sync = undefined,
             .timer = undefined,

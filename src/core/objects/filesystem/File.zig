@@ -113,7 +113,7 @@ pub const AsyncReadContext = struct {
             file.close(&scheduler.loop, completion, This, self, close_complete);
             return .disarm;
         }
-        defer scheduler.completeAsync(self);
+        defer allocator.destroy(self);
         defer self.ref.deref();
         defer self.array.deinit(allocator);
 
@@ -221,15 +221,15 @@ pub const AsyncReadContext = struct {
     ) !i32 {
         if (!L.isyieldable())
             return L.Zyielderror();
-        const scheduler = Scheduler.getScheduler(L);
         const allocator = luau.getallocator(L);
+        const scheduler = Scheduler.getScheduler(L);
 
         const file = xev.File.init(f) catch unreachable;
 
         var array: std.ArrayList(u8) = try .initCapacity(allocator, @min(pre_alloc_size, max_size));
         errdefer array.deinit(allocator);
 
-        const ctx = try scheduler.createAsyncCtx(This);
+        const ctx = try allocator.create(This);
 
         ctx.* = .{
             .ref = Scheduler.ThreadRef.init(L),
@@ -295,8 +295,8 @@ pub const AsyncWriteContext = struct {
             file.close(&scheduler.loop, completion, This, self, close_complete);
             return .disarm;
         }
-        defer scheduler.completeAsync(self);
         const allocator = luau.getallocator(L);
+        defer allocator.destroy(self);
 
         defer allocator.free(self.data);
         defer self.ref.deref();
@@ -398,7 +398,7 @@ pub const AsyncWriteContext = struct {
         errdefer allocator.free(copy);
 
         const file = try xev.File.init(f);
-        const ctx = try scheduler.createAsyncCtx(This);
+        const ctx = try allocator.create(This);
 
         ctx.* = .{
             .ref = Scheduler.ThreadRef.init(L),
@@ -710,9 +710,9 @@ pub const AsyncCloseContext = struct {
     ) xev.CallbackAction {
         const self = ud orelse unreachable;
         const L = self.ref.value;
-        const scheduler = Scheduler.getScheduler(L);
+        const allocator = luau.getallocator(L);
 
-        defer scheduler.completeAsync(self);
+        defer allocator.destroy(self);
         defer self.ref.deref();
 
         if (L.status() != .Yield)
@@ -730,10 +730,11 @@ fn lua_close(self: *File, L: *VM.lua.State) !i32 {
         if (!L.isyieldable())
             return L.Zyielderror();
         self.mode = .closed;
+        const allocator = luau.getallocator(L);
         const scheduler = Scheduler.getScheduler(L);
         const file = xev.File.init(self.file) catch unreachable;
 
-        const ctx = try scheduler.createAsyncCtx(AsyncCloseContext);
+        const ctx = try allocator.create(AsyncCloseContext);
         ctx.* = .{
             .ref = Scheduler.ThreadRef.init(L),
         };

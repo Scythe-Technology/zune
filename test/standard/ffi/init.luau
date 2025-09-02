@@ -1333,6 +1333,10 @@ describe("FFI", function()
                     }
                 ]]);
 
+                expect(compiled:listSymbols()[1]:find("hello$") ~= nil).toBeTruthy();
+                expect(compiled:listSymbols()[2]:find("add$") ~= nil).toBeTruthy();
+                expect(compiled:listSymbols()[3]:find("add_double$") ~= nil).toBeTruthy();
+
                 local hellofn = ffi.fn({ returns = ffi.types.i32, args = {} }, compiled:getSymbol("hello"));
                 local addfn = ffi.fn({ returns = ffi.types.i32, args = {ffi.types.i32} }, compiled:getSymbol("add"));
                 local add_doublefn = ffi.fn({ returns = ffi.types.double, args = {ffi.types.double} }, compiled:getSymbol("add_double"));

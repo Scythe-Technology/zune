@@ -32,7 +32,6 @@ pub const TlsContext = union(enum) {
     server_ref: *ServerRef,
 
     pub const Client = struct {
-        allocator: std.mem.Allocator,
         record_buffer: [tls.max_ciphertext_record_len]u8 = undefined,
         cleartext_buffer: [tls.max_ciphertext_record_len]u8 = undefined,
         ciphertext_buffer: [tls.max_ciphertext_record_len]u8 = undefined,
@@ -55,8 +54,7 @@ pub const TlsContext = union(enum) {
         },
         connecting: bool = false,
 
-        pub fn deinit(self: *Client) void {
-            const allocator = self.allocator;
+        pub fn deinit(self: *Client, allocator: std.mem.Allocator) void {
             defer allocator.destroy(self);
             switch (self.connection) {
                 .handshake => |*c| c.deinit(allocator),
@@ -66,7 +64,6 @@ pub const TlsContext = union(enum) {
     };
 
     pub const Server = struct {
-        allocator: std.mem.Allocator,
         record_buffer: [tls.max_ciphertext_record_len]u8 = undefined,
         cleartext_buffer: [tls.max_ciphertext_record_len]u8 = undefined,
         ciphertext_buffer: [tls.max_ciphertext_record_len]u8 = undefined,
@@ -88,9 +85,8 @@ pub const TlsContext = union(enum) {
         },
         stage: enum { nothing, handshake, completed } = .nothing,
 
-        pub fn deinit(self: *Server) void {
-            const allocator = self.allocator;
-            defer allocator.destroy(self);
+        pub fn deinit(self: *Server, allocator: std.mem.Allocator) void {
+            allocator.destroy(self);
         }
     };
 
@@ -98,7 +94,8 @@ pub const TlsContext = union(enum) {
         GL: *VM.lua.State,
         ca_keypair_ref: LuaHelper.Ref(void),
         server: tls.nonblock.Server,
-        pub fn deinit(self: *@This()) void {
+        pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+            defer allocator.destroy(self);
             self.ca_keypair_ref.deref(self.GL);
         }
     };
@@ -110,10 +107,10 @@ pub const TlsContext = union(enum) {
         return error.EndOfStream;
     }
 
-    pub fn deinit(self: *TlsContext) void {
+    pub fn deinit(self: *TlsContext, allocator: std.mem.Allocator) void {
         switch (self.*) {
             .none => {},
-            inline else => |o| o.deinit(),
+            inline else => |o| o.deinit(allocator),
         }
         self.* = .none;
     }
@@ -172,9 +169,8 @@ const AsyncSendContext = struct {
         const L = self.ref.value;
 
         const allocator = luau.getallocator(L);
-        const scheduler = Scheduler.getScheduler(L);
 
-        defer scheduler.completeAsync(self);
+        defer allocator.destroy(self);
         defer allocator.free(self.buffer);
         defer self.ref.deref();
         defer self.list.remove(&self.completion);
@@ -201,9 +197,8 @@ const AsyncSendContext = struct {
         const L = self.ref.value;
 
         const allocator = luau.getallocator(L);
-        const scheduler = Scheduler.getScheduler(L);
 
-        defer scheduler.completeAsync(self);
+        defer allocator.destroy(self);
         defer allocator.free(self.buffer);
         defer self.ref.deref();
         defer self.list.remove(&self.completion);
@@ -322,9 +317,8 @@ const AsyncSendMsgContext = struct {
         const L = self.ref.value;
 
         const allocator = luau.getallocator(L);
-        const scheduler = Scheduler.getScheduler(L);
 
-        defer scheduler.completeAsync(self);
+        defer allocator.destroy(self);
         defer allocator.free(self.buffer);
         defer self.ref.deref();
         defer self.list.remove(&self.completion);
@@ -368,9 +362,8 @@ const AsyncRecvContext = struct {
         const L = self.ref.value;
 
         const allocator = luau.getallocator(L);
-        const scheduler = Scheduler.getScheduler(L);
 
-        defer scheduler.completeAsync(self);
+        defer allocator.destroy(self);
         defer allocator.free(self.buffer);
         defer self.ref.deref();
         defer self.list.remove(&self.completion);
@@ -398,9 +391,8 @@ const AsyncRecvContext = struct {
         const L = self.ref.value;
 
         const allocator = luau.getallocator(L);
-        const scheduler = Scheduler.getScheduler(L);
 
-        defer scheduler.completeAsync(self);
+        defer allocator.destroy(self);
         defer allocator.free(self.buffer);
         defer self.ref.deref();
         defer self.list.remove(&self.completion);
@@ -538,9 +530,8 @@ const AsyncRecvMsgContext = struct {
         const L = self.ref.value;
 
         const allocator = luau.getallocator(L);
-        const scheduler = Scheduler.getScheduler(L);
 
-        defer scheduler.completeAsync(self);
+        defer allocator.destroy(self);
         defer allocator.free(self.buffer);
         defer self.ref.deref();
         defer self.list.remove(&self.completion);
@@ -589,16 +580,13 @@ const AsyncAcceptContext = struct {
         const L = self.ref.value;
 
         const scheduler = Scheduler.getScheduler(L);
+        const allocator = luau.getallocator(L);
 
         jmp: {
             if (L.status() != .Yield)
                 break :jmp;
 
-            const socket = s catch |err| {
-                L.pushlstring(@errorName(err)) catch |e| std.debug.panic("{}", .{e});
-                _ = Scheduler.resumeStateError(L, null) catch {};
-                break :jmp;
-            };
+            const socket = s catch |err| return self.resumeWithError(err);
 
             const accepted_socket = push(
                 L,
@@ -609,23 +597,37 @@ const AsyncAcceptContext = struct {
                     else => @compileError("Unsupported OS"),
                 },
                 .accepted,
-            ) catch |err| {
-                L.pushlstring(@errorName(err)) catch |e| std.debug.panic("{}", .{e});
-                _ = Scheduler.resumeStateError(L, null) catch {};
-                break :jmp;
-            };
+            ) catch |err| return self.resumeWithError(err);
             if (self.tls == .server_ref) {
                 const context = scheduler.allocator.create(TlsContext.Server) catch |err| {
                     L.pop(1);
-                    L.pushlstring(@errorName(err)) catch |e| std.debug.panic("{}", .{e});
-                    _ = Scheduler.resumeStateError(L, null) catch {};
-                    break :jmp;
+                    return self.resumeWithError(err);
                 };
                 context.* = .{
-                    .allocator = scheduler.allocator,
-                    .record = .fixed(&context.record_buffer),
-                    .cleartext = .fixed(&context.cleartext_buffer),
-                    .ciphertext = .fixed(&context.ciphertext_buffer),
+                    .record = .{
+                        .buffer = &context.record_buffer,
+                        .end = 0,
+                        .seek = 0,
+                        .vtable = &.{
+                            .stream = TlsContext.endingStream,
+                        },
+                    },
+                    .cleartext = .{
+                        .buffer = &context.cleartext_buffer,
+                        .end = 0,
+                        .seek = 0,
+                        .vtable = &.{
+                            .stream = TlsContext.endingStream,
+                        },
+                    },
+                    .ciphertext = .{
+                        .buffer = &context.ciphertext_buffer,
+                        .end = 0,
+                        .seek = 0,
+                        .vtable = &.{
+                            .stream = TlsContext.endingStream,
+                        },
+                    },
                     .connection = .{
                         .handshake = .{
                             .GL = L.mainthread(),
@@ -657,7 +659,7 @@ const AsyncAcceptContext = struct {
             } else _ = Scheduler.resumeState(L, null, 1) catch {};
         }
 
-        defer scheduler.completeAsync(self);
+        defer allocator.destroy(self);
         defer self.ref.deref();
         defer self.list.remove(&self.completion);
 
@@ -670,9 +672,9 @@ const AsyncAcceptContext = struct {
     ) xev.CallbackAction {
         const L = self.ref.value;
 
-        const scheduler = Scheduler.getScheduler(L);
+        const allocator = luau.getallocator(L);
 
-        defer scheduler.completeAsync(self);
+        defer allocator.destroy(self);
         defer self.ref.deref();
         defer self.list.remove(&self.completion);
         defer self.accepted_ref.deref(L);
@@ -695,7 +697,10 @@ const AsyncAcceptContext = struct {
             const L = self.ref.value;
             const ctx = self.tls.server;
             const handshake = &ctx.connection.handshake;
-            const read = r catch |err| return self.resumeWithError(err);
+            const read = r catch |err| switch (err) {
+                error.EOF, error.ConnectionResetByPeer => return self.resumeWithError(error.HandshakeDisconnected),
+                else => return self.resumeWithError(error.HandshakeRecvFailed),
+            };
 
             ctx.record.end += read;
 
@@ -719,9 +724,9 @@ const AsyncAcceptContext = struct {
                     handshake.deinit();
                     ctx.connection = .{ .active = .{ .tls = .init(cipher) } };
 
-                    const scheduler = Scheduler.getScheduler(L);
+                    const allocator = luau.getallocator(L);
 
-                    defer scheduler.completeAsync(self);
+                    defer allocator.destroy(self);
                     defer self.ref.deref();
                     defer self.list.remove(&self.completion);
 
@@ -754,11 +759,14 @@ const AsyncAcceptContext = struct {
             c: *xev.Completion,
             tcp: xev.TCP,
             _: xev.WriteBuffer,
-            r: xev.WriteError!usize,
+            w: xev.WriteError!usize,
         ) xev.CallbackAction {
             const self = ud orelse unreachable;
             const ctx = self.tls.server;
-            const written = r catch |err| return self.resumeWithError(err);
+            const written = w catch |err| switch (err) {
+                error.ConnectionResetByPeer => return self.resumeWithError(error.HandshakeDisconnected),
+                else => return self.resumeWithError(error.HandshakeSendFailed),
+            };
 
             ctx.ciphertext.toss(written);
             if (ctx.ciphertext.bufferedLen() > 0) {
@@ -799,25 +807,17 @@ const AsyncConnectContext = struct {
         const self = ud orelse unreachable;
         const L = self.ref.value;
 
-        const scheduler = Scheduler.getScheduler(L);
+        const allocator = luau.getallocator(L);
 
         jmp: {
             if (L.status() != .Yield)
                 break :jmp;
 
-            connect_res catch |err| {
-                L.pushlstring(@errorName(err)) catch |e| std.debug.panic("{}", .{e});
-                _ = Scheduler.resumeStateError(L, null) catch {};
-                break :jmp;
-            };
+            connect_res catch |err| return self.resumeWithError(err);
 
             if (self.tls == .client) {
                 const ctx = self.tls.client;
-                const res = ctx.connection.handshake.client.run(&[_]u8{}, ctx.ciphertext.buffer[ctx.ciphertext.end..]) catch |err| {
-                    L.pushlstring(@errorName(err)) catch |e| std.debug.panic("{}", .{e});
-                    _ = Scheduler.resumeStateError(L, null) catch {};
-                    break :jmp;
-                };
+                const res = ctx.connection.handshake.client.run(&[_]u8{}, ctx.ciphertext.buffer[ctx.ciphertext.end..]) catch |err| return self.resumeWithError(err);
                 std.debug.assert(res.send.len > 0);
                 ctx.ciphertext.end += res.send.len;
                 tcp.write(
@@ -834,7 +834,7 @@ const AsyncConnectContext = struct {
             _ = Scheduler.resumeState(L, null, 0) catch {};
         }
 
-        defer scheduler.completeAsync(self);
+        defer allocator.destroy(self);
         defer self.ref.deref();
         defer self.list.remove(&self.completion);
 
@@ -847,9 +847,9 @@ const AsyncConnectContext = struct {
     ) xev.CallbackAction {
         const L = self.ref.value;
 
-        const scheduler = Scheduler.getScheduler(L);
+        const allocator = luau.getallocator(L);
 
-        defer scheduler.completeAsync(self);
+        defer allocator.destroy(self);
         defer self.ref.deref();
         defer self.list.remove(&self.completion);
 
@@ -931,13 +931,13 @@ const AsyncConnectContext = struct {
             }
             ctx.ciphertext.rebase(ctx.ciphertext.buffer.len) catch unreachable; // shouldn't fail
             if (handshake.client.done()) {
+                const allocator = luau.getallocator(L);
+
                 const cipher = handshake.client.cipher().?;
-                handshake.deinit(ctx.allocator);
+                handshake.deinit(allocator);
                 ctx.connection = .{ .active = .{ .tls = .init(cipher) } };
 
-                const scheduler = Scheduler.getScheduler(L);
-
-                defer scheduler.completeAsync(self);
+                defer allocator.destroy(self);
                 defer self.ref.deref();
                 defer self.list.remove(&self.completion);
 
@@ -980,7 +980,7 @@ fn lua_send(self: *Socket, L: *VM.lua.State) !i32 {
     const input = try allocator.dupe(u8, buf[offset..]);
     errdefer allocator.free(input);
 
-    const ptr = try scheduler.createAsyncCtx(AsyncSendContext);
+    const ptr = try allocator.create(AsyncSendContext);
 
     ptr.* = .{
         .buffer = input,
@@ -1027,7 +1027,7 @@ fn lua_sendMsg(self: *Socket, L: *VM.lua.State) !i32 {
     else
         try std.net.Address.parseIp6(address_str, @intCast(port));
 
-    const ptr = try scheduler.createAsyncCtx(AsyncSendMsgContext);
+    const ptr = try allocator.create(AsyncSendMsgContext);
 
     ptr.* = .{
         .buffer = buf,
@@ -1071,7 +1071,7 @@ fn lua_recv(self: *Socket, L: *VM.lua.State) !i32 {
     const buf = try allocator.alloc(u8, @intCast(size));
     errdefer allocator.free(buf);
 
-    const ptr = try scheduler.createAsyncCtx(AsyncRecvContext);
+    const ptr = try allocator.create(AsyncRecvContext);
 
     ptr.* = .{
         .buffer = buf,
@@ -1107,7 +1107,7 @@ fn lua_recvMsg(self: *Socket, L: *VM.lua.State) !i32 {
     const buf = try allocator.alloc(u8, @intCast(size));
     errdefer allocator.free(buf);
 
-    const ptr = try scheduler.createAsyncCtx(AsyncRecvMsgContext);
+    const ptr = try allocator.create(AsyncRecvMsgContext);
 
     ptr.* = .{
         .buffer = buf,
@@ -1135,9 +1135,10 @@ fn lua_recvMsg(self: *Socket, L: *VM.lua.State) !i32 {
 fn lua_accept(self: *Socket, L: *VM.lua.State) !i32 {
     if (!L.isyieldable())
         return L.Zyielderror();
+    const allocator = luau.getallocator(L);
     const scheduler = Scheduler.getScheduler(L);
 
-    const ptr = try scheduler.createAsyncCtx(AsyncAcceptContext);
+    const ptr = try allocator.create(AsyncAcceptContext);
 
     ptr.* = .{
         .ref = Scheduler.ThreadRef.init(L),
@@ -1162,6 +1163,7 @@ fn lua_accept(self: *Socket, L: *VM.lua.State) !i32 {
 fn lua_connect(self: *Socket, L: *VM.lua.State) !i32 {
     if (!L.isyieldable())
         return L.Zyielderror();
+    const allocator = luau.getallocator(L);
     const scheduler = Scheduler.getScheduler(L);
 
     switch (self.tls_context) {
@@ -1185,7 +1187,7 @@ fn lua_connect(self: *Socket, L: *VM.lua.State) !i32 {
     else
         try std.net.Address.parseIp6(address_str, @intCast(port));
 
-    const ptr = try scheduler.createAsyncCtx(AsyncConnectContext);
+    const ptr = try allocator.create(AsyncConnectContext);
 
     const socket = xev.TCP.initFd(self.socket);
 
@@ -1274,9 +1276,10 @@ pub const AsyncCloseContext = struct {
     ) xev.CallbackAction {
         const self = ud orelse unreachable;
         const L = self.ref.value;
-        const scheduler = Scheduler.getScheduler(L);
 
-        defer scheduler.completeAsync(self);
+        const allocator = luau.getallocator(L);
+
+        defer allocator.destroy(self);
         defer self.ref.deref();
 
         if (L.status() != .Yield)
@@ -1292,10 +1295,11 @@ fn lua_close(self: *Socket, L: *VM.lua.State) !i32 {
         self.open = .closed;
         if (!L.isyieldable())
             return L.Zyielderror();
+        const allocator = luau.getallocator(L);
         const scheduler = Scheduler.getScheduler(L);
         const socket = xev.TCP.initFd(self.socket);
 
-        const ptr = try scheduler.createAsyncCtx(AsyncCloseContext);
+        const ptr = try allocator.create(AsyncCloseContext);
         ptr.* = .{
             .ref = Scheduler.ThreadRef.init(L),
         };
@@ -1319,7 +1323,7 @@ fn lua_close(self: *Socket, L: *VM.lua.State) !i32 {
             AsyncCloseContext.complete,
         );
 
-        self.tls_context.deinit();
+        self.tls_context.deinit(allocator);
 
         return L.yield(0);
     }
@@ -1366,7 +1370,7 @@ pub fn __dtor(L: *VM.lua.State, self: *Socket) void {
     const allocator = luau.getallocator(L);
     if (self.open != .closed)
         closesocket(self.socket);
-    self.tls_context.deinit();
+    self.tls_context.deinit(allocator);
     self.list.deinit(allocator);
 }
 

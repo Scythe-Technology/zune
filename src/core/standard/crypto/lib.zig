@@ -385,6 +385,8 @@ pub fn loadLib(L: *VM.lua.State) !void {
         });
         L.setreadonly(-1, true);
         try L.rawsetfield(-2, "tls");
+
+        tls.load(L);
     }
 
     L.setreadonly(-1, true);

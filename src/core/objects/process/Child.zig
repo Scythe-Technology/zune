@@ -52,8 +52,9 @@ pub const WaitAsyncContext = struct {
         const self = ud orelse unreachable;
         const L = self.ref.value;
 
-        const scheduler = Scheduler.getScheduler(L);
-        defer scheduler.completeAsync(self);
+        const allocator = luau.getallocator(L);
+
+        defer allocator.destroy(self);
         defer self.ref.deref();
         defer self.child.deinit();
         defer self.handle.deref(L);
@@ -96,6 +97,7 @@ fn lua_kill(self: *Child, L: *VM.lua.State) !i32 {
     if (!L.isyieldable())
         return L.Zyielderror();
 
+    const allocator = luau.getallocator(L);
     const scheduler = Scheduler.getScheduler(L);
 
     var child = try xev.Process.init(self.child.id);
@@ -112,7 +114,7 @@ fn lua_kill(self: *Child, L: *VM.lua.State) !i32 {
         },
     }
 
-    const wait = try scheduler.createAsyncCtx(WaitAsyncContext);
+    const wait = try allocator.create(WaitAsyncContext);
 
     wait.* = .{
         .completion = .init(),
@@ -144,12 +146,14 @@ fn lua_wait(self: *Child, L: *VM.lua.State) !i32 {
     }
     if (!L.isyieldable())
         return L.Zyielderror();
+
+    const allocator = luau.getallocator(L);
     const scheduler = Scheduler.getScheduler(L);
 
     var child = try xev.Process.init(self.child.id);
     errdefer child.deinit();
 
-    const wait = try scheduler.createAsyncCtx(WaitAsyncContext);
+    const wait = try allocator.create(WaitAsyncContext);
 
     wait.* = .{
         .completion = .init(),

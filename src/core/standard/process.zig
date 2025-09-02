@@ -219,8 +219,9 @@ const ProcessAsyncRunContext = struct {
         if (self.poller) |*poller|
             _ = poller.poll() catch {};
 
-        const scheduler = Scheduler.getScheduler(L);
-        defer scheduler.completeAsync(self);
+        const allocator = luau.getallocator(L);
+
+        defer allocator.destroy(self);
         defer self.ref.deref();
         defer self.proc.deinit();
         defer if (self.poller) |*poller| poller.deinit();
@@ -307,7 +308,7 @@ fn lua_run(L: *VM.lua.State) !i32 {
     var proc = try xev.Process.init(child.id);
     errdefer proc.deinit();
 
-    const self = try scheduler.createAsyncCtx(ProcessAsyncRunContext);
+    const self = try allocator.create(ProcessAsyncRunContext);
 
     self.* = .{
         .completion = .init(),

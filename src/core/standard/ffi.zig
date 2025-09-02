@@ -2103,8 +2103,27 @@ const LuaCompiled = struct {
         return 1;
     }
 
+    pub fn lua_listSymbols(self: *LuaCompiled, L: *VM.lua.State) !i32 {
+        var values: struct { u32, *VM.lua.State } = .{ 0, L };
+
+        try L.createtable(0, 0);
+
+        self.state.list_symbols(&values, struct {
+            fn callback(ud: ?*anyopaque, name: [*:0]const u8, _: ?*const anyopaque) callconv(.c) void {
+                const v: *struct { u32, *VM.lua.State } = @ptrCast(@alignCast(ud.?));
+                const l: *VM.lua.State = v[1];
+                l.pushlstring(std.mem.span(name)) catch |err| std.debug.panic("{}", .{err});
+                v[0] += 1;
+                l.rawseti(-2, @intCast(v[0])) catch |err| std.debug.panic("{}", .{err});
+            }
+        }.callback);
+
+        return 1;
+    }
+
     pub const __namecall = MethodMap.CreateNamecallMap(LuaCompiled, null, .{
         .{ "getSymbol", lua_getSymbol },
+        .{ "listSymbols", lua_listSymbols },
     });
 };
 
@@ -2152,6 +2171,17 @@ fn lua_compile(L: *VM.lua.State) !i32 {
             while (try iter.next()) |t| switch (t) {
                 .String => try state.add_library(L.tostring(-1).?),
                 else => return L.Zerrorf("library must be a string (got {s})", .{VM.lapi.typename(t)}),
+            };
+        }
+        L.pop(1);
+
+        if (LuaHelper.maybeKnownType(L.rawgetfield(2, "library_paths"))) |@"type"| {
+            if (@"type" != .Table)
+                return L.Zerrorf("library_paths must be a table (got {s})", .{VM.lapi.typename(@"type")});
+            var iter: LuaHelper.ArrayIterator = .{ .L = L, .idx = -1 };
+            while (try iter.next()) |t| switch (t) {
+                .String => state.add_library_path(L.tostring(-1).?),
+                else => return L.Zerrorf("path must be a string (got {s})", .{VM.lapi.typename(t)}),
             };
         }
         L.pop(1);
