@@ -543,44 +543,6 @@ inline fn hasPendingWork(self: *Scheduler) bool {
         self.sync.hasPending();
 }
 
-pub fn XevNoopCallback(err: type, action: xev.CallbackAction) fn (
-    _: ?*void,
-    _: *xev.Dynamic.Loop,
-    _: *xev.Dynamic.Completion,
-    _: err,
-) xev.CallbackAction {
-    return struct {
-        fn inner(
-            _: ?*void,
-            _: *xev.Dynamic.Loop,
-            _: *xev.Dynamic.Completion,
-            _: err,
-        ) xev.CallbackAction {
-            return action;
-        }
-    }.inner;
-}
-
-pub fn XevNoopWatcherCallback(watcher: type, err: type, action: xev.CallbackAction) fn (
-    _: ?*void,
-    _: *xev.Dynamic.Loop,
-    _: *xev.Dynamic.Completion,
-    _: watcher,
-    _: err,
-) xev.CallbackAction {
-    return struct {
-        fn inner(
-            _: ?*void,
-            _: *xev.Dynamic.Loop,
-            _: *xev.Dynamic.Completion,
-            _: watcher,
-            _: err,
-        ) xev.CallbackAction {
-            return action;
-        }
-    }.inner;
-}
-
 inline fn processFrame(self: *Scheduler, comptime frame: FrameKind) void {
     self.frame = frame;
     switch (frame) {
@@ -683,7 +645,16 @@ pub fn run(self: *Scheduler, comptime mode: Zune.RunMode) void {
                 @intFromFloat(@max(lowest.wake - now, 0) * std.time.ms_per_s),
                 void,
                 null,
-                XevNoopCallback(xev.Dynamic.Timer.RunError!void, .disarm),
+                struct {
+                    fn inner(
+                        _: ?*void,
+                        _: *xev.Dynamic.Loop,
+                        _: *xev.Dynamic.Completion,
+                        _: xev.Dynamic.Timer.RunError!void,
+                    ) xev.CallbackAction {
+                        return .disarm;
+                    }
+                }.inner,
             );
         self.processFrame(.EventLoop);
         if (self.sync.completed.len > 0)
