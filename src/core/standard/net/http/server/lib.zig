@@ -269,7 +269,7 @@ pub fn onTimerTick(
                 &client.cancel_completion,
                 void,
                 null,
-                Scheduler.XevNoopCallback(xev.CancelError!void, .disarm),
+                null,
             );
         }
         self.state.list.remove(&client.node);
@@ -521,7 +521,7 @@ pub fn continueShutdown(self: *Self, loop: *xev.Loop, completion: *xev.Completio
                     &client.cancel_completion,
                     void,
                     null,
-                    Scheduler.XevNoopCallback(xev.CancelError!void, .disarm),
+                    null,
                 );
             },
             .writing => client.state.stage = .closing,
@@ -543,7 +543,7 @@ fn lua_stop(self: *Self, L: *VM.lua.State) !i32 {
                 &self.close_completion,
                 void,
                 null,
-                Scheduler.XevNoopCallback(xev.CancelError!void, .disarm),
+                null,
             );
         } else continueShutdown(self, &self.scheduler.loop, &self.close_completion);
         self.state.stage = .shutdown;

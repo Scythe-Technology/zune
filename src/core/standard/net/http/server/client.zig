@@ -227,7 +227,7 @@ pub fn ws_close(self: *Self, loop: *xev.Loop) void {
             &self.completion,
             void,
             null,
-            Scheduler.XevNoopCallback(xev.CancelError!void, .disarm),
+            null,
         );
     } else self.close();
 }

@@ -688,7 +688,7 @@ fn startWebSocket(self: *Self, loop: *xev.Loop, tcp: xev.TCP) void {
             &self.timer.reset_completion,
             void,
             null,
-            Scheduler.XevNoopCallback(xev.CancelError!void, .disarm),
+            null,
         );
     }
 
@@ -900,7 +900,7 @@ fn onTimerComplete(
                 &self.close_completion,
                 void,
                 null,
-                Scheduler.XevNoopCallback(xev.CancelError!void, .disarm),
+                null,
             );
             self.state.stage = .closing;
         },
@@ -910,7 +910,7 @@ fn onTimerComplete(
                 &self.send_completion,
                 void,
                 null,
-                Scheduler.XevNoopCallback(xev.CancelError!void, .disarm),
+                null,
             );
         },
         .closed => unreachable, // should never happen

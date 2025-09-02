@@ -559,7 +559,7 @@ fn onTimerComplete(
                 &self.cancel_completion,
                 void,
                 null,
-                Scheduler.XevNoopCallback(xev.CancelError!void, .disarm),
+                null,
             );
         },
         .closed => self.close(l, xev.TCP.initFd(self.state.socket)),
