@@ -32,7 +32,6 @@ pub const TlsContext = union(enum) {
     server_ref: *ServerRef,
 
     pub const Client = struct {
-        allocator: std.mem.Allocator,
         record_buffer: [tls.max_ciphertext_record_len]u8 = undefined,
         cleartext_buffer: [tls.max_ciphertext_record_len]u8 = undefined,
         ciphertext_buffer: [tls.max_ciphertext_record_len]u8 = undefined,
@@ -55,8 +54,7 @@ pub const TlsContext = union(enum) {
         },
         connecting: bool = false,
 
-        pub fn deinit(self: *Client) void {
-            const allocator = self.allocator;
+        pub fn deinit(self: *Client, allocator: std.mem.Allocator) void {
             defer allocator.destroy(self);
             switch (self.connection) {
                 .handshake => |*c| c.deinit(allocator),
@@ -66,7 +64,6 @@ pub const TlsContext = union(enum) {
     };
 
     pub const Server = struct {
-        allocator: std.mem.Allocator,
         record_buffer: [tls.max_ciphertext_record_len]u8 = undefined,
         cleartext_buffer: [tls.max_ciphertext_record_len]u8 = undefined,
         ciphertext_buffer: [tls.max_ciphertext_record_len]u8 = undefined,
@@ -88,9 +85,8 @@ pub const TlsContext = union(enum) {
         },
         stage: enum { nothing, handshake, completed } = .nothing,
 
-        pub fn deinit(self: *Server) void {
-            const allocator = self.allocator;
-            defer allocator.destroy(self);
+        pub fn deinit(self: *Server, allocator: std.mem.Allocator) void {
+            allocator.destroy(self);
         }
     };
 
@@ -98,7 +94,8 @@ pub const TlsContext = union(enum) {
         GL: *VM.lua.State,
         ca_keypair_ref: LuaHelper.Ref(void),
         server: tls.nonblock.Server,
-        pub fn deinit(self: *@This()) void {
+        pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+            defer allocator.destroy(self);
             self.ca_keypair_ref.deref(self.GL);
         }
     };
@@ -110,10 +107,10 @@ pub const TlsContext = union(enum) {
         return error.EndOfStream;
     }
 
-    pub fn deinit(self: *TlsContext) void {
+    pub fn deinit(self: *TlsContext, allocator: std.mem.Allocator) void {
         switch (self.*) {
             .none => {},
-            inline else => |o| o.deinit(),
+            inline else => |o| o.deinit(allocator),
         }
         self.* = .none;
     }
@@ -589,11 +586,7 @@ const AsyncAcceptContext = struct {
             if (L.status() != .Yield)
                 break :jmp;
 
-            const socket = s catch |err| {
-                L.pushlstring(@errorName(err)) catch |e| std.debug.panic("{}", .{e});
-                _ = Scheduler.resumeStateError(L, null) catch {};
-                break :jmp;
-            };
+            const socket = s catch |err| return self.resumeWithError(err);
 
             const accepted_socket = push(
                 L,
@@ -604,23 +597,37 @@ const AsyncAcceptContext = struct {
                     else => @compileError("Unsupported OS"),
                 },
                 .accepted,
-            ) catch |err| {
-                L.pushlstring(@errorName(err)) catch |e| std.debug.panic("{}", .{e});
-                _ = Scheduler.resumeStateError(L, null) catch {};
-                break :jmp;
-            };
+            ) catch |err| return self.resumeWithError(err);
             if (self.tls == .server_ref) {
                 const context = scheduler.allocator.create(TlsContext.Server) catch |err| {
                     L.pop(1);
-                    L.pushlstring(@errorName(err)) catch |e| std.debug.panic("{}", .{e});
-                    _ = Scheduler.resumeStateError(L, null) catch {};
-                    break :jmp;
+                    return self.resumeWithError(err);
                 };
                 context.* = .{
-                    .allocator = scheduler.allocator,
-                    .record = .fixed(&context.record_buffer),
-                    .cleartext = .fixed(&context.cleartext_buffer),
-                    .ciphertext = .fixed(&context.ciphertext_buffer),
+                    .record = .{
+                        .buffer = &context.record_buffer,
+                        .end = 0,
+                        .seek = 0,
+                        .vtable = &.{
+                            .stream = TlsContext.endingStream,
+                        },
+                    },
+                    .cleartext = .{
+                        .buffer = &context.cleartext_buffer,
+                        .end = 0,
+                        .seek = 0,
+                        .vtable = &.{
+                            .stream = TlsContext.endingStream,
+                        },
+                    },
+                    .ciphertext = .{
+                        .buffer = &context.ciphertext_buffer,
+                        .end = 0,
+                        .seek = 0,
+                        .vtable = &.{
+                            .stream = TlsContext.endingStream,
+                        },
+                    },
                     .connection = .{
                         .handshake = .{
                             .GL = L.mainthread(),
@@ -690,7 +697,10 @@ const AsyncAcceptContext = struct {
             const L = self.ref.value;
             const ctx = self.tls.server;
             const handshake = &ctx.connection.handshake;
-            const read = r catch |err| return self.resumeWithError(err);
+            const read = r catch |err| switch (err) {
+                error.EOF, error.ConnectionResetByPeer => return self.resumeWithError(error.HandshakeDisconnected),
+                else => return self.resumeWithError(error.HandshakeRecvFailed),
+            };
 
             ctx.record.end += read;
 
@@ -749,11 +759,14 @@ const AsyncAcceptContext = struct {
             c: *xev.Completion,
             tcp: xev.TCP,
             _: xev.WriteBuffer,
-            r: xev.WriteError!usize,
+            w: xev.WriteError!usize,
         ) xev.CallbackAction {
             const self = ud orelse unreachable;
             const ctx = self.tls.server;
-            const written = r catch |err| return self.resumeWithError(err);
+            const written = w catch |err| switch (err) {
+                error.ConnectionResetByPeer => return self.resumeWithError(error.HandshakeDisconnected),
+                else => return self.resumeWithError(error.HandshakeSendFailed),
+            };
 
             ctx.ciphertext.toss(written);
             if (ctx.ciphertext.bufferedLen() > 0) {
@@ -800,19 +813,11 @@ const AsyncConnectContext = struct {
             if (L.status() != .Yield)
                 break :jmp;
 
-            connect_res catch |err| {
-                L.pushlstring(@errorName(err)) catch |e| std.debug.panic("{}", .{e});
-                _ = Scheduler.resumeStateError(L, null) catch {};
-                break :jmp;
-            };
+            connect_res catch |err| return self.resumeWithError(err);
 
             if (self.tls == .client) {
                 const ctx = self.tls.client;
-                const res = ctx.connection.handshake.client.run(&[_]u8{}, ctx.ciphertext.buffer[ctx.ciphertext.end..]) catch |err| {
-                    L.pushlstring(@errorName(err)) catch |e| std.debug.panic("{}", .{e});
-                    _ = Scheduler.resumeStateError(L, null) catch {};
-                    break :jmp;
-                };
+                const res = ctx.connection.handshake.client.run(&[_]u8{}, ctx.ciphertext.buffer[ctx.ciphertext.end..]) catch |err| return self.resumeWithError(err);
                 std.debug.assert(res.send.len > 0);
                 ctx.ciphertext.end += res.send.len;
                 tcp.write(
@@ -926,11 +931,11 @@ const AsyncConnectContext = struct {
             }
             ctx.ciphertext.rebase(ctx.ciphertext.buffer.len) catch unreachable; // shouldn't fail
             if (handshake.client.done()) {
-                const cipher = handshake.client.cipher().?;
-                handshake.deinit(ctx.allocator);
-                ctx.connection = .{ .active = .{ .tls = .init(cipher) } };
-
                 const allocator = luau.getallocator(L);
+
+                const cipher = handshake.client.cipher().?;
+                handshake.deinit(allocator);
+                ctx.connection = .{ .active = .{ .tls = .init(cipher) } };
 
                 defer allocator.destroy(self);
                 defer self.ref.deref();
@@ -1318,7 +1323,7 @@ fn lua_close(self: *Socket, L: *VM.lua.State) !i32 {
             AsyncCloseContext.complete,
         );
 
-        self.tls_context.deinit();
+        self.tls_context.deinit(allocator);
 
         return L.yield(0);
     }
@@ -1365,7 +1370,7 @@ pub fn __dtor(L: *VM.lua.State, self: *Socket) void {
     const allocator = luau.getallocator(L);
     if (self.open != .closed)
         closesocket(self.socket);
-    self.tls_context.deinit();
+    self.tls_context.deinit(allocator);
     self.list.deinit(allocator);
 }
 

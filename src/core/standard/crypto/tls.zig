@@ -110,7 +110,6 @@ pub fn lua_setupClient(L: *VM.lua.State) !i32 {
                 .stream = Socket.TlsContext.endingStream,
             },
         },
-        .allocator = allocator,
         .connection = .{
             .handshake = .{
                 .GL = L.mainthread(),
