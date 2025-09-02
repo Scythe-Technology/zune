@@ -641,9 +641,8 @@ fn connectAddress(self: *Self, addr: std.net.Address) !void {
 }
 
 fn deinit(self: *Self) void {
-    const scheduler = Scheduler.getScheduler(self.lua_ref.value);
     const allocator = self.parser.arena.child_allocator;
-    defer scheduler.completeAsync(self);
+    defer allocator.destroy(self);
     defer self.lua_ref.deref();
     if (self.state.tls) |ctx| {
         switch (ctx.connection) {
@@ -844,7 +843,7 @@ pub fn lua_request(L: *VM.lua.State) !i32 {
         };
     }
 
-    const self = try scheduler.createAsyncCtx(Self);
+    const self = try allocator.create(Self);
     self.* = .{
         .lua_ref = .init(L),
         .parser = .init(allocator, 100),

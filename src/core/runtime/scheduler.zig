@@ -88,22 +88,16 @@ pub const DeferredThread = struct {
 
 const Scheduler = @This();
 
-pub const TaskResult = enum {
-    Continue,
-    ContinueFast,
-    Stop,
-};
-
-pub const AwaitTaskPriority = enum { Internal, User };
-
-const AwaitedFn = fn (ctx: *anyopaque, L: *VM.lua.State, scheduler: *Scheduler) void;
-
-const AwaitingObject = struct {
+pub const Awaiting = struct {
     data: *anyopaque,
     state: ThreadRef,
-    resumeFn: *const AwaitedFn,
-    virtualDtor: *const AwaitedFn,
-    priority: AwaitTaskPriority,
+    resumeFn: *const Fn,
+    virtualDtor: *const Fn,
+    priority: Priority,
+
+    pub const Fn = fn (ctx: *anyopaque, L: *VM.lua.State, scheduler: *Scheduler) void;
+
+    pub const Priority = enum { Internal, User };
 };
 
 const Synchronization = struct {
@@ -244,10 +238,11 @@ global: *VM.lua.State,
 allocator: std.mem.Allocator,
 sleeping: SleepingQueue,
 deferred: DeferredThread.LinkedList = .{},
-awaits: std.ArrayListUnmanaged(AwaitingObject) = .empty,
+awaits: std.ArrayListUnmanaged(Awaiting) = .empty,
 timer: xev.Dynamic.Timer,
 loop: xev.Dynamic.Loop,
 async: xev.Dynamic.Async,
+thread_pool: *xev.ThreadPool,
 now_clock: f64 = 0,
 
 running: bool = false,
@@ -264,14 +259,15 @@ pub fn init(allocator: std.mem.Allocator, L: *VM.lua.State) !Scheduler {
     io_pool.* = .init(max_threads);
 
     return .{
+        .global = L,
+        .allocator = allocator,
+        .thread_pool = io_pool,
         .loop = try xev.Dynamic.Loop.init(.{
             .entries = 4096,
             .thread_pool = io_pool,
         }),
         .timer = try xev.Dynamic.Timer.init(),
         .async = try xev.Dynamic.Async.init(),
-        .global = L,
-        .allocator = allocator,
         .sleeping = SleepingQueue.init(allocator, {}),
         .sync = .init(),
     };
@@ -316,7 +312,7 @@ pub fn awaitResult(
     L: *VM.lua.State,
     comptime handlerFn: *const fn (ctx: *T, L: *VM.lua.State, scheduler: *Scheduler) void,
     comptime dtorFn: ?*const fn (ctx: *T, L: *VM.lua.State, scheduler: *Scheduler) void,
-    priority: ?AwaitTaskPriority,
+    priority: ?Awaiting.Priority,
 ) void {
     std.debug.assert(L.status() == .Yield); // Thread must be yielded
 
@@ -362,21 +358,6 @@ pub fn awaitCall(
             }
         },
     }
-}
-
-pub fn completeAsync(
-    self: *Scheduler,
-    data: anytype,
-) void {
-    self.allocator.destroy(data);
-}
-
-pub fn createAsyncCtx(
-    self: *Scheduler,
-    comptime T: type,
-) std.mem.Allocator.Error!*T {
-    const ptr = try self.allocator.create(T);
-    return ptr;
 }
 
 pub fn cancelAsyncTask(
@@ -663,6 +644,8 @@ pub fn deinit(self: *Scheduler) void {
     }
     self.awaits.deinit(self.allocator);
     self.timer.deinit();
+    self.thread_pool.deinit();
+    self.allocator.destroy(self.thread_pool);
     self.loop.deinit();
     self.async.deinit();
 }
