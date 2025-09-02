@@ -1197,6 +1197,7 @@ export type FFILibrary = {
 }
 declare class FFICompiled
     getSymbol: (self: FFICompiled, symbol: string) -> FFIPointer?
+    listSymbols: (self: FFICompiled) -> {string} 
 end
 declare class FFIDataType
     size: (self: FFIDataType) -> number
@@ -1276,6 +1277,7 @@ export type FFICompileOptions = {
     options: string?,
     files: {string}?,
     libraries: {string}?,
+    library_paths: {string}?,
     includes: {string}?,
     sysincludes: {string}?,
     symbols: {
