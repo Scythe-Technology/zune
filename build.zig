@@ -115,6 +115,13 @@ pub fn build(b: *std.Build) !void {
     const optimize = b.standardOptimizeOption(.{});
 
     const no_bin = b.option(bool, "no-bin", "skip emitting binary") orelse false;
+    const release_ver = b.option(bool, "release-ver", "Set release version") orelse false;
+    const use_llvm = b.option(bool, "llvm", "Use llvm");
+
+    if (release_ver) switch (optimize) {
+        .ReleaseFast, .ReleaseSmall => {},
+        else => std.debug.panic("Using release-var on non-release build", .{}),
+    };
 
     const prebuild_step = b.step("prebuild", "Setup project for build");
 
@@ -123,10 +130,10 @@ pub fn build(b: *std.Build) !void {
     try prebuild(b, prebuild_step);
 
     var version = try getPackageVersion(b);
-    if (std.mem.indexOf(u8, version, "-dev")) |_| {
+    if (!release_ver) {
         const hash = b.run(&.{ "git", "rev-parse", "--short", "HEAD" });
         const trimmed = std.mem.trim(u8, hash, "\r\n ");
-        version = try std.mem.join(b.allocator, ".", &.{ version, trimmed });
+        version = try std.mem.concat(b.allocator, u8, &.{ version, "-dev", ".", trimmed });
     }
 
     const zune_info = b.addOptions();
@@ -143,6 +150,7 @@ pub fn build(b: *std.Build) !void {
                 .ReleaseFast, .ReleaseSmall => true,
             },
         }),
+        .use_llvm = use_llvm,
     });
 
     exe.step.dependOn(prebuild_step);
@@ -198,6 +206,7 @@ pub fn build(b: *std.Build) !void {
             .target = target,
             .optimize = optimize,
         }),
+        .use_llvm = use_llvm,
     });
 
     exe_unit_tests.step.dependOn(prebuild_step);
