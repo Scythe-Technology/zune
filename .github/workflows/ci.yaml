@@ -62,6 +62,7 @@ jobs:
           - os: macos-13
             name: macOs x86_64
             target: x86_64-macos
+            llvm: true
             artifact: zune-${{ needs.prep.outputs.version }}-macos-x86_64
           - os: macos-14
             name: macOs Arm64
@@ -96,7 +97,7 @@ jobs:
 
     - name: Run tests
       continue-on-error: ${{ matrix.qemu-platform != '' }}
-      run: zig build test -Dtarget=${{ matrix.target }}${{ matrix.qemu-platform != '' && ' -fqemu' || '' }} --verbose
+      run: zig build test -Dtarget=${{ matrix.target }}${{ matrix.llvm != '' && ' -Dllvm' || '' }}${{ matrix.qemu-platform != '' && ' -fqemu' || '' }} --verbose
    
     - name: Build debug
       run: zig build -Dtarget=${{ matrix.target }} --verbose

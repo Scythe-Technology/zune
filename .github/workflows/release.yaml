@@ -71,7 +71,7 @@ jobs:
         use-cache: false
 
     - name: Build
-      run: zig build -Doptimize=ReleaseFast -Dtarget=${{ matrix.target }}
+      run: zig build -Doptimize=ReleaseFast -Drelease-ver -Dtarget=${{ matrix.target }}
 
     - name: Pack Artifact
       run: cd ./zig-out/bin && zip ../../${{ matrix.artifact }}.zip ./zune${{ matrix.ext }}
