@@ -101,7 +101,11 @@ fn prebuild(b: *std.Build, step: *std.Build.Step) !void {
             }),
             .use_llvm = true,
         });
-        embedded_compressor.root_module.addImport("lcompress", b.modules.get("legacy-compress").?);
+        embedded_compressor.root_module.addImport("lcompress", b.createModule(.{
+            .root_source_file = b.path("legacy/compress.zig"),
+            .target = build_native_target,
+            .optimize = .Debug,
+        }));
 
         try compressRecursive(b, embedded_compressor, compress, compile, "src/types/");
     }
