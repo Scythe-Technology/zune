@@ -33,6 +33,7 @@ pub const State = struct {
     max_connections: usize = 1024,
     list: Lists.PriorityLinkedList(ClientContext.shortestTime) = .{},
     free: Lists.DoublyLinkedList = .{},
+    resumption: ?Scheduler.ThreadRef = null,
 
     pub const Stage = enum {
         idle,
@@ -80,6 +81,7 @@ const FnHandlers = struct {
 };
 
 completion: xev.Completion,
+close_completion: xev.Completion,
 timer: Timer,
 arena: std.heap.ArenaAllocator,
 socket: xev.TCP,
@@ -128,6 +130,15 @@ pub fn onAccept(
     const self = ud orelse unreachable;
     const allocator = self.arena.child_allocator;
 
+    switch (self.state.stage) {
+        .shutdown => {
+            self.continueShutdown(loop, &self.close_completion);
+            return .disarm;
+        },
+        .accepting => {},
+        else => unreachable,
+    }
+
     const client_socket = r catch |err| switch (err) {
         error.Canceled => return .disarm,
         else => {
@@ -135,8 +146,6 @@ pub fn onAccept(
             return .rearm;
         },
     };
-    if (self.state.stage != .accepting)
-        return .disarm;
 
     const write_timeout = std.mem.toBytes(std.posix.timeval{ .sec = 15, .usec = 0 });
     std.posix.setsockopt(switch (comptime builtin.os.tag) {
@@ -185,6 +194,29 @@ pub fn reloadNode(self: *Self, comptime direction: enum { front, back }, node: *
     self.reloadTimer(loop);
 }
 
+pub fn onClose(
+    ud: ?*Self,
+    _: *xev.Loop,
+    _: *xev.Completion,
+    _: xev.TCP,
+    _: xev.CloseError!void,
+) xev.CallbackAction {
+    const self = ud orelse unreachable;
+    var ref = self.state.resumption orelse return .disarm;
+
+    const L = ref.value;
+    defer self.state.resumption = null;
+    defer ref.deref();
+
+    const cleanup = self.state.stage == .shutdown and self.state.list.len == 0;
+    defer if (cleanup) self.ref.deref(self.scheduler.global);
+    if (cleanup) self.state.stage = .dead;
+
+    _ = Scheduler.resumeState(L, null, 0) catch {};
+
+    return .disarm;
+}
+
 pub fn onTimerTick(
     ud: ?*Self,
     loop: *xev.Loop,
@@ -193,8 +225,22 @@ pub fn onTimerTick(
 ) xev.CallbackAction {
     const self = ud orelse unreachable;
 
+    if (self.state.stage == .shutdown) {
+        self.timer.active = false;
+        self.socket.close(
+            loop,
+            &self.close_completion,
+            Self,
+            self,
+            onClose,
+        );
+        return .disarm;
+    }
+
     run catch |err| switch (err) {
-        error.Canceled => return .disarm,
+        error.Canceled => {
+            return .disarm;
+        },
         else => {},
     };
 
@@ -400,6 +446,7 @@ pub fn lua_serve(L: *VM.lua.State) !i32 {
     self.* = .{
         .arena = .init(allocator),
         .completion = .init(),
+        .close_completion = .init(),
         .ref = .init(L, -1, undefined),
         .scheduler = scheduler,
         .socket = .initFd(socket),
@@ -426,106 +473,70 @@ pub fn lua_serve(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-const AsyncStopContext = struct {
-    completion: xev.Completion,
-    server: *Self,
-    ref: Scheduler.ThreadRef,
+pub fn continueShutdown(self: *Self, loop: *xev.Loop, completion: *xev.Completion) void {
+    if (self.timer.active) {
+        var timer: xev.Timer = xev.Timer.init() catch unreachable;
+        self.timer.next_ms = 0;
+        timer.reset(
+            loop,
+            &self.timer.completion,
+            &self.timer.reset_completion,
+            0,
+            Self,
+            self,
+            onTimerTick,
+        );
+    } else self.socket.close(
+        loop,
+        completion,
+        Self,
+        self,
+        onClose,
+    );
+    var node = self.state.list.first;
+    while (node) |n| {
+        const client: *ClientContext = @fieldParentPtr("node", n);
 
-    pub fn cancelComplete(
-        ud: ?*AsyncStopContext,
-        loop: *xev.Loop,
-        c: *xev.Completion,
-        _: xev.CancelError!void,
-    ) xev.CallbackAction {
-        const self = ud orelse unreachable;
-        if (self.server.timer.active) {
-            var timer: xev.Timer = xev.Timer.init() catch unreachable;
-            timer.cancel(loop, &self.server.timer.completion, c, AsyncStopContext, self, timerCancelComplete);
-        } else self.server.socket.close(loop, c, AsyncStopContext, self, complete);
-        var node = self.server.state.list.first;
-        while (node) |n| {
-            const client: *ClientContext = @fieldParentPtr("node", n);
-
-            switch (client.state.stage) {
-                .receiving => jmp: {
-                    if (client.websocket.ref.hasRef()) blk: {
-                        client.websocket.ref.value.sendCloseFrame(loop, 1001) catch {
-                            // failed to send close frame
-                            break :blk;
-                        };
-                        break :jmp;
-                    }
-                    client.state.stage = .closing;
-                    loop.cancel(
-                        &client.completion,
-                        &client.cancel_completion,
-                        void,
-                        null,
-                        Scheduler.XevNoopCallback(xev.CancelError!void, .disarm),
-                    );
-                },
-                .writing => client.state.stage = .closing,
-                else => {},
-            }
-
-            node = n.next;
-        }
-        return .disarm;
-    }
-
-    pub fn timerCancelComplete(
-        ud: ?*AsyncStopContext,
-        loop: *xev.Loop,
-        c: *xev.Completion,
-        _: xev.CancelError!void,
-    ) xev.CallbackAction {
-        const self = ud orelse unreachable;
-        self.server.socket.close(loop, c, AsyncStopContext, self, complete);
-        return .disarm;
-    }
-
-    pub fn complete(
-        ud: ?*AsyncStopContext,
-        _: *xev.Loop,
-        _: *xev.Completion,
-        _: xev.TCP,
-        _: xev.CloseError!void,
-    ) xev.CallbackAction {
-        const self = ud orelse unreachable;
-        const server = self.server;
-        const L = self.ref.value;
-
-        defer server.scheduler.completeAsync(self);
-        defer self.ref.deref();
-
-        if (server.state.stage == .shutdown and server.state.list.len == 0) {
-            server.ref.deref(server.scheduler.global);
-            server.state.stage = .dead;
+        switch (client.state.stage) {
+            .receiving => jmp: {
+                if (client.websocket.ref.hasRef()) blk: {
+                    client.websocket.ref.value.sendCloseFrame(loop, 1001) catch {
+                        // failed to send close frame
+                        break :blk;
+                    };
+                    break :jmp;
+                }
+                client.state.stage = .closing;
+                loop.cancel(
+                    &client.completion,
+                    &client.cancel_completion,
+                    void,
+                    null,
+                    Scheduler.XevNoopCallback(xev.CancelError!void, .disarm),
+                );
+            },
+            .writing => client.state.stage = .closing,
+            else => {},
         }
 
-        _ = Scheduler.resumeState(L, null, 0) catch {};
-
-        return .disarm;
+        node = n.next;
     }
-};
+}
 
 fn lua_stop(self: *Self, L: *VM.lua.State) !i32 {
     if (!self.state.stage.isShutdown()) {
         if (!L.isyieldable())
             return L.Zyielderror();
-        const ptr = try self.scheduler.createAsyncCtx(AsyncStopContext);
-        ptr.* = .{
-            .completion = .init(),
-            .server = self,
-            .ref = .init(L),
-        };
-        self.scheduler.loop.cancel(
-            &self.completion,
-            &ptr.completion,
-            AsyncStopContext,
-            ptr,
-            AsyncStopContext.cancelComplete,
-        );
+        self.state.resumption = .init(L);
+        if (self.state.stage == .accepting) {
+            self.scheduler.loop.cancel(
+                &self.completion,
+                &self.close_completion,
+                void,
+                null,
+                Scheduler.XevNoopCallback(xev.CancelError!void, .disarm),
+            );
+        } else continueShutdown(self, &self.scheduler.loop, &self.close_completion);
         self.state.stage = .shutdown;
 
         return L.yield(0);

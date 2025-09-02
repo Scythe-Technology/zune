@@ -185,8 +185,11 @@ pub fn onClose(
     }
 
     if (server.state.stage == .shutdown and server.state.list.len == 0) {
-        server.ref.deref(GL);
-        server.state.stage = .dead;
+        if (!server.timer.active) {
+            server.ref.deref(GL);
+            server.state.stage = .dead;
+            return .disarm;
+        }
     }
 
     switch (server.state.stage) {
