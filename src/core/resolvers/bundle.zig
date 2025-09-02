@@ -1,6 +1,7 @@
 const std = @import("std");
 const lz4 = @import("lz4");
 const zstd = @import("zstd");
+const lcompress = @import("lcompress");
 
 const Zune = @import("zune");
 
@@ -82,12 +83,12 @@ pub const Section = union(enum) {
         } else {
             if (data.len > std.math.maxInt(u40)) // ~1.1TB
                 return error.DataTooLarge;
-            var array: std.ArrayListUnmanaged(u8) = .empty;
+            var array: std.ArrayList(u8) = .empty;
             defer array.deinit(allocator);
             switch (compression) {
                 .zlib => {
-                    var reader = std.io.fixedBufferStream(data);
-                    try std.compress.zlib.compress(reader.reader(), array.writer(allocator), .{
+                    var reader: std.Io.Reader = .fixed(data);
+                    try lcompress.zlib.compress(reader.adaptToOldInterface(), array.writer(allocator), .{
                         .level = .default,
                     });
                 },
@@ -185,6 +186,15 @@ pub const PackedState = packed struct(u40) {
     }
 };
 
+pub fn adaptToOldInterface(r: *std.Io.Writer) std.Io.AnyWriter {
+    return .{ .context = r, .writeFn = derpWrite };
+}
+
+fn derpWrite(context: *const anyopaque, buffer: []const u8) anyerror!usize {
+    const w: *std.Io.Writer = @ptrCast(@alignCast(@constCast(context)));
+    return w.write(buffer);
+}
+
 pub const Map = struct {
     allocator: std.mem.Allocator,
     mode: PackedState.Mode,
@@ -210,10 +220,10 @@ pub const Map = struct {
             .zlib => {
                 const decompressed_bytes = try self.allocator.alloc(u8, file.size);
 
-                var writer = std.io.fixedBufferStream(decompressed_bytes);
-                var reader = std.io.fixedBufferStream(file.data);
+                var writer: std.Io.Writer = .fixed(decompressed_bytes);
+                var reader: std.Io.Reader = .fixed(file.data);
 
-                try std.compress.zlib.decompress(reader.reader(), writer.writer());
+                try lcompress.zlib.decompress(reader.adaptToOldInterface(), adaptToOldInterface(&writer));
                 file.data = decompressed_bytes;
                 return decompressed_bytes;
             },

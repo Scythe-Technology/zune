@@ -9,7 +9,7 @@ pub fn load(L: *VM.lua.State) !void {
     try @import("websocket/lib.zig").lua_load(L);
     try L.Zpushvalue(.{
         .serve = @import("server/lib.zig").lua_serve,
-        .request = @import("client.zig").lua_request,
+        .request = @import("client/lib.zig").lua_request,
         .websocket = @import("websocket/lib.zig").lua_websocket,
     });
     L.setreadonly(-1, true);

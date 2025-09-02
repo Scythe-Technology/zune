@@ -403,8 +403,12 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     switch (OUTPUT) {
         .stdout => |_| {
-            const stdout = std.io.getStdOut().writer();
-            try stdout.writeAll(bundled_bytes.items);
+            const stdout = std.fs.File.stdout();
+            var buffer: [4096]u8 = undefined;
+            var stdout_writer = stdout.writer(&buffer);
+            const wr = &stdout_writer.interface;
+            try wr.writeAll(bundled_bytes.items);
+            try wr.flush();
         },
         inline .path, .default => |path| {
             const dir_path = std.fs.path.dirname(path);
@@ -458,7 +462,7 @@ fn OSPath(comptime path: []const u8) []const u8 {
 
 test "cmdBundle" {
     const allocator = std.testing.allocator;
-    var temporaryDir = std.testing.tmpDir(std.fs.Dir.OpenDirOptions{
+    var temporaryDir = std.testing.tmpDir(.{
         .access_sub_paths = true,
     });
     defer temporaryDir.cleanup();

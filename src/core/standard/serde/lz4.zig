@@ -11,7 +11,10 @@ pub fn lua_frame_compress(L: *VM.lua.State) !i32 {
 
     const is_buffer = L.typeOf(1) == .Buffer;
 
-    const string = if (is_buffer) L.Lcheckbuffer(1) else L.Lcheckstring(1);
+    const string = if (is_buffer)
+        L.Lcheckbuffer(1)
+    else
+        L.Lcheckstring(1);
     const options = L.typeOf(2);
 
     var level: u32 = 4;
@@ -36,19 +39,24 @@ pub fn lua_frame_compress(L: *VM.lua.State) !i32 {
         .setBlockMode(lz4.Frame.BlockMode.Independent);
     defer encoder.deinit();
 
-    var buf = std.ArrayList(u8).init(allocator);
-    defer buf.deinit();
+    var allocating: std.Io.Writer.Allocating = .init(allocator);
+    defer allocating.deinit();
 
-    try encoder.compressStream(buf.writer().any(), string);
+    try encoder.compressStream(&allocating.writer, string);
 
-    const out = try allocator.alloc(u8, buf.items.len + 4);
+    const written = allocating.written();
+
+    const out = try allocator.alloc(u8, written.len + 4);
     defer allocator.free(out);
 
     const header: [4]u8 = @bitCast(@as(u32, @intCast(string.len)));
     @memcpy(out[0..4], header[0..4]);
-    @memcpy(out[4..][0..buf.items.len], buf.items[0..]);
+    @memcpy(out[4..][0..written.len], written[0..]);
 
-    if (is_buffer) try L.Zpushbuffer(out) else try L.pushlstring(out);
+    if (is_buffer)
+        try L.Zpushbuffer(out)
+    else
+        try L.pushlstring(out);
 
     return 1;
 }

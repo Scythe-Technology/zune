@@ -106,20 +106,20 @@ fn ColorFormat(comptime fmt: []const u8, comptime use_colors: bool) []const u8 {
 }
 
 pub fn print(comptime fmt: []const u8, args: anytype) void {
-    std.debug.lockStdErr();
-    defer std.debug.unlockStdErr();
-    const stderr = std.io.getStdErr().writer();
+    var buffer: [64]u8 = undefined;
+    const bw = std.debug.lockStderrWriter(&buffer);
+    defer std.debug.unlockStderrWriter();
 
     if (Zune.STATE.FORMAT.USE_COLOR == true and std.mem.eql(u8, Zune.STATE.ENV_MAP.get("NO_COLOR") orelse "0", "0")) {
         const color_format = comptime ColorFormat(fmt, true);
-        nosuspend stderr.print(color_format, args) catch return;
+        nosuspend bw.print(color_format, args) catch return;
     } else {
         const color_format = comptime ColorFormat(fmt, false);
-        nosuspend stderr.print(color_format, args) catch return;
+        nosuspend bw.print(color_format, args) catch return;
     }
 }
 
-pub fn writerPrint(writer: anytype, comptime fmt: []const u8, args: anytype) !void {
+pub fn writerPrint(writer: *std.Io.Writer, comptime fmt: []const u8, args: anytype) !void {
     if (Zune.STATE.FORMAT.USE_COLOR == true and std.mem.eql(u8, Zune.STATE.ENV_MAP.get("NO_COLOR") orelse "0", "0")) {
         const color_format = comptime ColorFormat(fmt, true);
         try writer.print(color_format, args);

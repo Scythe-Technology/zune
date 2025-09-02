@@ -50,6 +50,14 @@ fn getPackageVersion(b: *std.Build) ![]const u8 {
     return try b.allocator.dupe(u8, version[1 .. version.len - 1]);
 }
 
+fn buildLegacyCompress(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) !void {
+    _ = b.addModule("legacy-compress", .{
+        .root_source_file = b.path("legacy/compress.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+}
+
 fn prebuild(b: *std.Build, step: *std.Build.Step) !void {
     const compile = b.step("prebuild_compile", "Compile static luau");
     const compress = b.step("prebuild_compress", "Compress static files");
@@ -63,9 +71,12 @@ fn prebuild(b: *std.Build, step: *std.Build.Step) !void {
         const dep_luau = b.dependency("luau", .{ .target = build_native_target, .optimize = .Debug, .Analysis = false });
         const bytecode_builder = b.addExecutable(.{
             .name = "bytecode_builder",
-            .root_source_file = b.path("prebuild/bytecode.zig"),
-            .target = build_native_target,
-            .optimize = .Debug,
+            .root_module = b.createModule(.{
+                .target = build_native_target,
+                .optimize = .Debug,
+                .root_source_file = b.path("prebuild/bytecode.zig"),
+            }),
+            .use_llvm = true,
         });
 
         bytecode_builder.root_module.addImport("luau", dep_luau.module("luau"));
@@ -74,7 +85,7 @@ fn prebuild(b: *std.Build, step: *std.Build.Step) !void {
             b,
             bytecode_builder,
             "src/core/lua/testing_lib.luau",
-            "src/core/lua/testing_lib.luac",
+            "src/core/lua/testing_lib.luauc",
         );
 
         compile.dependOn(&testing_framework_run.step);
@@ -83,21 +94,16 @@ fn prebuild(b: *std.Build, step: *std.Build.Step) !void {
     { // Compress files
         const embedded_compressor = b.addExecutable(.{
             .name = "embedded_compressor",
-            .root_source_file = b.path("prebuild/compressor.zig"),
-            .target = build_native_target,
-            .optimize = .Debug,
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("prebuild/compressor.zig"),
+                .target = build_native_target,
+                .optimize = .Debug,
+            }),
+            .use_llvm = true,
         });
+        embedded_compressor.root_module.addImport("lcompress", b.modules.get("legacy-compress").?);
 
         try compressRecursive(b, embedded_compressor, compress, compile, "src/types/");
-
-        const run = compressFile(
-            b,
-            embedded_compressor,
-            "src/core/lua/testing_lib.luac",
-            "src/core/lua/testing_lib.luac.gz",
-        );
-        run.step.dependOn(compile);
-        compress.dependOn(&run.step);
     }
 
     step.dependOn(compile);
@@ -109,16 +115,25 @@ pub fn build(b: *std.Build) !void {
     const optimize = b.standardOptimizeOption(.{});
 
     const no_bin = b.option(bool, "no-bin", "skip emitting binary") orelse false;
+    const release_ver = b.option(bool, "release-ver", "Set release version") orelse false;
+    const use_llvm = b.option(bool, "llvm", "Use llvm");
+
+    if (release_ver) switch (optimize) {
+        .ReleaseFast, .ReleaseSmall => {},
+        else => std.debug.panic("Using release-var on non-release build", .{}),
+    };
 
     const prebuild_step = b.step("prebuild", "Setup project for build");
+
+    try buildLegacyCompress(b, target, optimize);
 
     try prebuild(b, prebuild_step);
 
     var version = try getPackageVersion(b);
-    if (std.mem.indexOf(u8, version, "-dev")) |_| {
+    if (!release_ver) {
         const hash = b.run(&.{ "git", "rev-parse", "--short", "HEAD" });
         const trimmed = std.mem.trim(u8, hash, "\r\n ");
-        version = try std.mem.join(b.allocator, ".", &.{ version, trimmed });
+        version = try std.mem.concat(b.allocator, u8, &.{ version, "-dev", ".", trimmed });
     }
 
     const zune_info = b.addOptions();
@@ -126,13 +141,16 @@ pub fn build(b: *std.Build) !void {
 
     const exe = b.addExecutable(.{
         .name = "zune",
-        .root_source_file = b.path("src/main.zig"),
-        .target = target,
-        .optimize = optimize,
-        .strip = switch (optimize) {
-            .Debug, .ReleaseSafe => null,
-            .ReleaseFast, .ReleaseSmall => true,
-        },
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/main.zig"),
+            .target = target,
+            .optimize = optimize,
+            .strip = switch (optimize) {
+                .Debug, .ReleaseSafe => null,
+                .ReleaseFast, .ReleaseSmall => true,
+            },
+        }),
+        .use_llvm = use_llvm,
     });
 
     exe.step.dependOn(prebuild_step);
@@ -160,12 +178,15 @@ pub fn build(b: *std.Build) !void {
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
 
-    const sample_dylib = b.addSharedLibrary(.{
+    const sample_dylib = b.addLibrary(.{
         .name = "sample",
-        .root_source_file = b.path("test/standard/ffi/sample.zig"),
-        .link_libc = false,
-        .target = target,
-        .optimize = .ReleaseSafe,
+        .linkage = .dynamic,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/standard/ffi/sample.zig"),
+            .link_libc = false,
+            .target = target,
+            .optimize = .ReleaseSafe,
+        }),
     });
 
     sample_dylib.step.dependOn(prebuild_step);
@@ -175,14 +196,17 @@ pub fn build(b: *std.Build) !void {
     });
 
     const exe_unit_tests = b.addTest(.{
-        .root_source_file = b.path("src/main.zig"),
-        .target = target,
-        .optimize = optimize,
         .filters = b.args orelse &.{},
         .test_runner = .{
             .mode = .simple,
             .path = b.path("test/runner.zig"),
         },
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/main.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+        .use_llvm = use_llvm,
     });
 
     exe_unit_tests.step.dependOn(prebuild_step);
@@ -272,4 +296,6 @@ fn buildZune(
     module.addImport("sqlite", mod_sqlite);
     if (target.result.os.tag != .windows or target.result.cpu.arch != .aarch64)
         module.addImport("tinycc", mod_tinycc);
+
+    module.addImport("lcompress", b.modules.get("legacy-compress").?);
 }

@@ -62,8 +62,8 @@ pub fn findLuauFile(dir: std.fs.Dir, fileName: []const u8) !?LuauFile {
         };
         errdefer file.close();
 
-        const md = try file.metadata();
-        if (md.kind() != .file) {
+        const md = try file.stat();
+        if (md.kind != .file) {
             file.close();
             continue;
         }
@@ -122,8 +122,8 @@ pub fn searchLuauFile(buf: []u8, dir: std.fs.Dir, fileName: []const u8) !SearchR
         };
         errdefer file.close();
 
-        const md = try file.metadata();
-        if (md.kind() != .file) {
+        const md = try file.stat();
+        if (md.kind != .file) {
             file.close();
             continue;
         }

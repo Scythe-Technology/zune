@@ -50,7 +50,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
     try Zune.initState(L);
     defer Zune.deinitState(L);
 
-    try Scheduler.SCHEDULERS.append(&scheduler);
+    try Scheduler.SCHEDULERS.append(Zune.DEFAULT_ALLOCATOR, &scheduler);
 
     try Engine.prepAsync(L, &scheduler);
     try Zune.openZune(L, args, .{});
@@ -62,8 +62,12 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     L.setsafeenv(VM.lua.GLOBALSINDEX, true);
 
-    var stdin = std.io.getStdIn();
-    var in_reader = stdin.reader();
+    var stdin = std.fs.File.stdin();
+
+    var in_buffer: [128]u8 = undefined;
+    var in_reader = stdin.reader(&in_buffer);
+
+    const reader = &in_reader.interface;
 
     const terminal = &(Zune.corelib.io.TERMINAL orelse std.debug.panic("Terminal not initialized", .{}));
     errdefer terminal.restoreSettings() catch {};
@@ -75,10 +79,15 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     TERMINAL = terminal;
 
-    const out = terminal.stdout_writer;
+    const stdout = terminal.stdout_file;
+    var out_buffer: [256]u8 = undefined;
 
-    var buffer = std.ArrayList(u8).init(allocator);
-    defer buffer.deinit();
+    var out_writer = stdout.writer(&out_buffer);
+
+    const out = &out_writer.interface;
+
+    var buffer: std.ArrayList(u8) = .empty;
+    defer buffer.deinit(allocator);
 
     var position: usize = 0;
 
@@ -92,24 +101,25 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
     L.pop(1);
 
     try out.writeAll("> ");
+    try out.flush();
     while (true) {
-        const input_byte = try in_reader.readByte();
+        const input_byte = try reader.takeByte();
         if (input_byte != 3 and input_byte != 4 and REPL_STATE == 2) {
-            buffer.clearAndFree();
+            buffer.clearAndFree(allocator);
             position = 0;
             REPL_STATE = 1;
         }
         switch (input_byte) {
             0x1B => {
-                if (try in_reader.readByte() != '[')
+                if (try reader.takeByte() != '[')
                     continue;
-                var currentByte = try in_reader.readByte();
+                var currentByte = try reader.takeByte();
                 var modifier: Terminal.MODIFIER = .{};
                 switch (currentByte) {
                     '1' => {
-                        if (try in_reader.readByte() != ';')
+                        if (try reader.takeByte() != ';')
                             continue;
-                        switch (try in_reader.readByte()) {
+                        switch (try reader.takeByte()) {
                             '2' => modifier = .init(false, true, false),
                             '3' => modifier = .init(false, false, true),
                             '4' => modifier = .init(false, true, true),
@@ -117,7 +127,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
                             '6' => modifier = .init(true, false, true),
                             else => continue,
                         }
-                        currentByte = try in_reader.readByte();
+                        currentByte = try reader.takeByte();
                     },
                     else => {},
                 }
@@ -129,21 +139,23 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
                             history.saveTemp(buffer.items);
                         if (history.previous()) |line| {
                             buffer.clearRetainingCapacity();
-                            try buffer.appendSlice(line);
+                            try buffer.appendSlice(allocator, line);
                             position = line.len;
 
                             try terminal.clearLine();
                             try out.print("> {s}", .{line});
+                            try out.flush();
                         }
                     },
                     'B' => { // Down Arrow
                         if (history.next()) |line| {
                             buffer.clearRetainingCapacity();
-                            try buffer.appendSlice(line);
+                            try buffer.appendSlice(allocator, line);
                             position = line.len;
 
                             try terminal.clearLine();
                             try out.print("> {s}", .{buffer.items});
+                            try out.flush();
                         }
                         if (history.isLatest())
                             history.clearTemp();
@@ -220,17 +232,19 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
                 history.reset();
 
-                buffer.clearAndFree();
+                buffer.clearAndFree(allocator);
                 position = 0;
 
                 try terminal.clearStyles();
                 try out.writeAll("> ");
+                try out.flush();
             },
             127 => { // Backspace
                 if (position == 0)
                     continue;
                 const append = position < buffer.items.len;
                 try out.writeByte(8);
+                try out.flush();
                 position -= 1;
                 _ = buffer.orderedRemove(position);
                 try terminal.clearEndToCursor();
@@ -248,6 +262,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
                 };
                 for (0..index) |_| {
                     try out.writeByte(8);
+                    try out.flush();
                     position -= 1;
                     _ = buffer.orderedRemove(position);
                     try terminal.clearEndToCursor();
@@ -268,8 +283,9 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
                     else => {},
                 }
                 const append = position < buffer.items.len;
-                try buffer.insert(position, byte);
+                try buffer.insert(allocator, position, byte);
                 try out.writeByte(byte);
+                try out.flush();
                 position += 1;
                 if (append)
                     try terminal.writeAllRetainCursor(buffer.items[position..]);

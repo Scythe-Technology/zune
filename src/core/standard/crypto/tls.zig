@@ -17,9 +17,9 @@ const VM = luau.VM;
 pub fn lua_bundleFromSystem(L: *VM.lua.State) !i32 {
     const allocator = luau.getallocator(L);
 
-    const self = try L.newuserdatatagged(tls.config.CertBundle, TAG_CRYPTO_TLS_CERTBUNDLE);
+    const self = try L.newuserdatatagged(tls.config.cert.Bundle, TAG_CRYPTO_TLS_CERTBUNDLE);
 
-    self.* = try tls.config.CertBundle.fromSystem(allocator);
+    self.* = try tls.config.cert.fromSystem(allocator);
 
     return 1;
 }
@@ -30,9 +30,9 @@ pub fn lua_bundleFromFile(L: *VM.lua.State) !i32 {
     const path = try L.Zcheckvalue([]const u8, 1, null);
     const dir = std.fs.cwd();
 
-    const self = try L.newuserdatatagged(tls.config.CertBundle, TAG_CRYPTO_TLS_CERTBUNDLE);
+    const self = try L.newuserdatatagged(tls.config.cert.Bundle, TAG_CRYPTO_TLS_CERTBUNDLE);
 
-    self.* = try tls.config.CertBundle.fromFile(allocator, dir, path);
+    self.* = try tls.config.cert.fromFilePath(allocator, dir, path);
 
     return 1;
 }
@@ -47,7 +47,7 @@ pub fn lua_keyPairFromFile(L: *VM.lua.State) !i32 {
 
     const self = try L.newuserdatatagged(tls.config.CertKeyPair, TAG_CRYPTO_TLS_CERTKEYPAIR);
 
-    self.* = try tls.config.CertKeyPair.load(allocator, dir, cert_path, key_path);
+    self.* = try tls.config.CertKeyPair.fromFilePath(allocator, dir, cert_path, key_path);
 
     return 1;
 }
@@ -71,7 +71,7 @@ pub fn lua_setupClient(L: *VM.lua.State) !i32 {
     if (L.rawgetfield(2, "ca") != .Userdata or L.userdatatag(-1) != TAG_CRYPTO_TLS_CERTBUNDLE)
         return L.Zerror("argument #2 field 'ca' must be a CertBundle");
 
-    const ca_bundle = L.touserdatatagged(tls.config.CertBundle, -1, TAG_CRYPTO_TLS_CERTBUNDLE) orelse @panic("unreachable");
+    const ca_bundle = L.touserdatatagged(tls.config.cert.Bundle, -1, TAG_CRYPTO_TLS_CERTBUNDLE) orelse @panic("unreachable");
 
     const ca_ref: LuaHelper.Ref(void) = .init(L, -1, undefined);
 
@@ -86,6 +86,30 @@ pub fn lua_setupClient(L: *VM.lua.State) !i32 {
     errdefer allocator.free(host);
 
     client_context.* = .{
+        .record = .{
+            .buffer = &client_context.record_buffer,
+            .end = 0,
+            .seek = 0,
+            .vtable = &.{
+                .stream = Socket.TlsContext.endingStream,
+            },
+        },
+        .cleartext = .{
+            .buffer = &client_context.cleartext_buffer,
+            .end = 0,
+            .seek = 0,
+            .vtable = &.{
+                .stream = Socket.TlsContext.endingStream,
+            },
+        },
+        .ciphertext = .{
+            .buffer = &client_context.ciphertext_buffer,
+            .end = 0,
+            .seek = 0,
+            .vtable = &.{
+                .stream = Socket.TlsContext.endingStream,
+            },
+        },
         .allocator = allocator,
         .connection = .{
             .handshake = .{
@@ -151,7 +175,7 @@ pub fn lua_setupServer(L: *VM.lua.State) !i32 {
     return 0;
 }
 
-pub fn certbundle_dtor(L: *VM.lua.State, self: *tls.config.CertBundle) void {
+pub fn certbundle_dtor(L: *VM.lua.State, self: *tls.config.cert.Bundle) void {
     self.deinit(luau.getallocator(L));
 }
 
@@ -160,6 +184,6 @@ pub fn certkeypair_dtor(L: *VM.lua.State, self: *tls.config.CertKeyPair) void {
 }
 
 pub fn load(L: *VM.lua.State) void {
-    L.setuserdatadtor(tls.config.CertBundle, TAG_CRYPTO_TLS_CERTBUNDLE, certbundle_dtor);
+    L.setuserdatadtor(tls.config.cert.Bundle, TAG_CRYPTO_TLS_CERTBUNDLE, certbundle_dtor);
     L.setuserdatadtor(tls.config.CertKeyPair, TAG_CRYPTO_TLS_CERTKEYPAIR, certkeypair_dtor);
 }

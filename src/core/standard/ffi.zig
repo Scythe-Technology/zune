@@ -156,7 +156,7 @@ pub const DataTypes = struct {
         &Types.type_float, &Types.type_double, &Types.type_pointer,
     };
 
-    pub fn generateCTypeName(kind: DataType.Types, writer: anytype, id: usize, comptime pointer: bool) !void {
+    pub fn generateCTypeName(kind: DataType.Types, writer: *std.Io.Writer, id: usize, comptime pointer: bool) !void {
         const suffix = if (pointer) "*" else "";
         switch (kind) {
             .void => try writer.writeAll("void" ++ suffix),
@@ -818,23 +818,25 @@ fn compileCallableFunction(returns: DataType, args: []const DataType) !CallableF
     state.set_output_type(tinycc.TCC_OUTPUT_MEMORY);
     state.set_options("-std=c11 -nostdlib -Wl,--export-all-symbols");
 
-    var source = std.ArrayList(u8).init(allocator);
+    var source: std.Io.Writer.Allocating = .init(allocator);
     defer source.deinit();
 
-    const pointer_count = try dynamicLoadImport(&source, state, returns, args);
+    const writer = &source.writer;
+
+    const pointer_count = try dynamicLoadImport(writer, state, returns, args);
 
     const pointers: ?[]*allowzero anyopaque = if (pointer_count > 0) try allocator.alloc(*allowzero anyopaque, pointer_count) else null;
     errdefer if (pointers) |arr| allocator.free(arr);
 
     if (pointer_count > 0) {
-        try generateExported(&source, "arg_pointers[]", "void*", &.{});
+        try generateExported(writer, "arg_pointers[]", "void*", &.{});
         _ = state.add_symbol("arg_pointers", @ptrCast(@alignCast(pointers.?.ptr)));
     }
 
-    try source.append('\n');
-    try generateSourceFromSymbol(&source, returns, args);
+    try writer.writeByte('\n');
+    try generateSourceFromSymbol(writer, returns, args);
 
-    state.compileStringOnce(allocator, source.items) catch |err| {
+    state.compileStringOnce(allocator, source.written()) catch |err| {
         std.debug.print("Internal FFI Error: {}\n", .{err});
         return error.CompilationError;
     };
@@ -1119,13 +1121,13 @@ pub fn FFITypeConversion(
 }
 
 const ffi_c_interface = struct {
-    fn FFIArgumentLoad(comptime T: type) fn (L: *VM.lua.State, index: i32) callconv(.C) T {
+    fn FFIArgumentLoad(comptime T: type) fn (L: *VM.lua.State, index: i32) callconv(.c) T {
         const ti = @typeInfo(T);
         if (ti != .int and ti != .float)
             @compileError("Unsupported type");
         const size = @sizeOf(T);
         return struct {
-            fn inner(L: *VM.lua.State, index: i32) callconv(.C) T {
+            fn inner(L: *VM.lua.State, index: i32) callconv(.c) T {
                 switch (L.typeOf(index)) {
                     .Number => switch (@typeInfo(T)) {
                         .int => |i| {
@@ -1159,14 +1161,14 @@ const ffi_c_interface = struct {
         }.inner;
     }
 
-    fn FFIArgumentPush(comptime T: type) fn (L: *VM.lua.State, value: T) callconv(.C) void {
+    fn FFIArgumentPush(comptime T: type) fn (L: *VM.lua.State, value: T) callconv(.c) void {
         const ti = @typeInfo(T);
         if (ti != .int and ti != .float)
             @compileError("Unsupported type");
         const isFloat = ti == .float;
         const size = @sizeOf(T);
         return struct {
-            fn inner(L: *VM.lua.State, value: T) callconv(.C) void {
+            fn inner(L: *VM.lua.State, value: T) callconv(.c) void {
                 switch (size) {
                     1...4 => {
                         if (isFloat)
@@ -1313,28 +1315,24 @@ fn lua_struct(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn generateExported(source: *std.ArrayList(u8), name: []const u8, ret_type: []const u8, symbol_args: []const []const u8) !void {
-    const writer = source.writer();
-
+fn generateExported(writer: *std.Io.Writer, name: []const u8, ret_type: []const u8, symbol_args: []const []const u8) !void {
     try writer.print((if (builtin.os.tag == .windows) "__declspec(dllimport) " else "extern "), .{});
     try writer.print("{s} {s}", .{ ret_type, name });
 
     if (symbol_args.len > 0) {
-        try source.appendSlice("(");
+        try writer.writeByte('(');
         for (symbol_args, 0..) |arg, i| {
             if (i != 0)
-                try source.appendSlice(", ");
+                try writer.writeAll(", ");
             try writer.print("{s}", .{arg});
         }
-        try source.appendSlice(")");
+        try writer.writeByte(')');
     }
 
-    try source.appendSlice(";\n");
+    try writer.writeAll(";\n");
 }
 
-fn generateTypeFromSymbol(source: *std.ArrayList(u8), symbol: DataType, order: usize, comptime pointer: bool) !void {
-    const writer = source.writer();
-
+fn generateTypeFromSymbol(writer: *std.Io.Writer, symbol: DataType, order: usize, comptime pointer: bool) !void {
     if (order == 0) {
         if (symbol.kind == .@"struct")
             try writer.print("struct anon_ret" ++ if (pointer) "*" else "", .{})
@@ -1345,7 +1343,7 @@ fn generateTypeFromSymbol(source: *std.ArrayList(u8), symbol: DataType, order: u
     }
 }
 
-fn generateStructTypeFromSymbol(writer: anytype, symbol: DataType, order: usize) !void {
+fn generateStructTypeFromSymbol(writer: *std.Io.Writer, symbol: DataType, order: usize) !void {
     std.debug.assert(symbol.kind == .@"struct");
     const struct_info = symbol.kind.@"struct";
     try writer.print("struct __attribute__((aligned({d}))) ", .{symbol.alignment});
@@ -1373,8 +1371,7 @@ fn generateStructTypeFromSymbol(writer: anytype, symbol: DataType, order: usize)
     try writer.print("}};\n", .{});
 }
 
-fn generateTypesFromSymbol(source: *std.ArrayList(u8), symbol_returns: DataType, symbol_args: []const DataType) !void {
-    const writer = source.writer();
+fn generateTypesFromSymbol(writer: *std.Io.Writer, symbol_returns: DataType, symbol_args: []const DataType) !void {
     if (symbol_returns.kind == .@"struct")
         try generateStructTypeFromSymbol(writer, symbol_returns, 0);
 
@@ -1385,54 +1382,52 @@ fn generateTypesFromSymbol(source: *std.ArrayList(u8), symbol_returns: DataType,
         try generateStructTypeFromSymbol(writer, arg, i + 1);
     }
 
-    try source.appendSlice("typedef ");
-    try generateTypeFromSymbol(source, symbol_returns, 0, false);
-    try source.appendSlice(" (Fn)(");
+    try writer.writeAll("typedef ");
+    try generateTypeFromSymbol(writer, symbol_returns, 0, false);
+    try writer.writeAll(" (Fn)(");
     for (symbol_args, 0..) |arg, i| {
         if (i != 0)
-            try source.appendSlice(", ");
-        try generateTypeFromSymbol(source, arg, i + 1, false);
+            try writer.writeAll(", ");
+        try generateTypeFromSymbol(writer, arg, i + 1, false);
     }
-    try source.appendSlice(");");
-    try source.append('\n');
+    try writer.writeAll(");");
+    try writer.writeByte('\n');
 }
 
-fn generateSourceFromSymbol(source: *std.ArrayList(u8), symbol_returns: DataType, symbol_args: []const DataType) !void {
-    const writer = source.writer();
+fn generateSourceFromSymbol(writer: *std.Io.Writer, symbol_returns: DataType, symbol_args: []const DataType) !void {
+    try generateTypesFromSymbol(writer, symbol_returns, symbol_args);
 
-    try generateTypesFromSymbol(source, symbol_returns, symbol_args);
-
-    try source.appendSlice("void symbol_call(void* L, Fn* fn) {\n  ");
+    try writer.writeAll("void symbol_call(void* L, Fn* fn) {\n  ");
     if (symbol_returns.size > 0) {
-        try generateTypeFromSymbol(source, symbol_returns, 0, false);
-        try source.appendSlice(" ret = ");
+        try generateTypeFromSymbol(writer, symbol_returns, 0, false);
+        try writer.writeAll(" ret = ");
     }
-    try source.appendSlice("fn(");
+    try writer.writeAll("fn(");
     if (symbol_args.len > 0) {
         var order: usize = 0;
         for (symbol_args, 0..) |arg, i| {
             if (i != 0)
-                try source.append(',');
+                try writer.writeByte(',');
             switch (arg.kind) {
                 .void => return error.VoidParameter,
                 .pointer => {
                     defer order += 1;
                     try writer.print("\n    (", .{});
-                    try generateTypeFromSymbol(source, arg, i + 1, false);
+                    try generateTypeFromSymbol(writer, arg, i + 1, false);
                     try writer.print(")arg_pointers[{d}]", .{order});
                 },
                 .@"struct" => {
                     defer order += 1;
                     try writer.print("\n    *((", .{});
-                    try generateTypeFromSymbol(source, arg, i + 1, true);
+                    try generateTypeFromSymbol(writer, arg, i + 1, true);
                     try writer.print(")arg_pointers[{d}])", .{order});
                 },
                 inline else => |_, T| try writer.print("\n    lua_ffi_check{s}(L, {d})", .{ @tagName(T), i + 1 }),
             }
         }
-        try source.appendSlice("\n  ");
+        try writer.writeAll("\n  ");
     }
-    try source.appendSlice(");\n");
+    try writer.writeAll(");\n");
 
     switch (symbol_returns.kind) {
         .void => {},
@@ -1440,10 +1435,10 @@ fn generateSourceFromSymbol(source: *std.ArrayList(u8), symbol_returns: DataType
         inline else => |_, T| try writer.print("  lua_ffi_push{s}(L, ret);\n", .{@tagName(T)}),
     }
 
-    try source.appendSlice("}\n");
+    try writer.writeAll("}\n");
 }
 
-fn dynamicLoadImport(source: *std.ArrayList(u8), state: *tinycc.TCCState, returns: DataType, args: []const DataType) !usize {
+fn dynamicLoadImport(writer: *std.Io.Writer, state: *tinycc.TCCState, returns: DataType, args: []const DataType) !usize {
     const types_len = @typeInfo(ffi_c_interface).@"struct".decls.len;
     var loaded_fn: [types_len]bool = ([_]bool{false} ** types_len);
     var pointers: usize = 0;
@@ -1461,7 +1456,7 @@ fn dynamicLoadImport(source: *std.ArrayList(u8), state: *tinycc.TCCState, return
                         if (loaded_fn[i])
                             break;
                         loaded_fn[i] = true;
-                        try generateExported(source, "lua_ffi_" ++ declname, T.typeName(), &.{ "void*", "unsigned int" });
+                        try generateExported(writer, "lua_ffi_" ++ declname, T.typeName(), &.{ "void*", "unsigned int" });
                         _ = state.add_symbol("lua_ffi_" ++ declname, @ptrCast(@alignCast(&checkfn)));
                         break;
                     }
@@ -1473,13 +1468,13 @@ fn dynamicLoadImport(source: *std.ArrayList(u8), state: *tinycc.TCCState, return
     switch (returns.kind) {
         .void => {},
         .@"struct" => {
-            try generateExported(source, "lua_ffi_pushmem", "void", &.{ "void*", "unsigned char*", "unsigned long long" });
+            try generateExported(writer, "lua_ffi_pushmem", "void", &.{ "void*", "unsigned char*", "unsigned long long" });
             _ = state.add_symbol("lua_ffi_pushmem", @ptrCast(@alignCast(&ffi_c_interface.pushmem)));
         },
         inline else => |_, T| {
             const declname = "push" ++ @tagName(T);
             const pushfn = @field(ffi_c_interface, declname);
-            try generateExported(source, "lua_ffi_" ++ declname, "void", &.{ "void*", T.typeName() });
+            try generateExported(writer, "lua_ffi_" ++ declname, "void", &.{ "void*", T.typeName() });
             _ = state.add_symbol("lua_ffi_" ++ declname, @ptrCast(@alignCast(&pushfn)));
         },
     }
@@ -1740,32 +1735,33 @@ fn lua_closure(L: *VM.lua.State) !i32 {
     state.set_output_type(tinycc.TCC_OUTPUT_MEMORY);
     state.set_options("-std=c11 -nostdlib -Wl,--export-all-symbols");
 
-    var source = std.ArrayList(u8).init(allocator);
+    var source: std.Io.Writer.Allocating = .init(allocator);
     defer source.deinit();
-    const writer = source.writer();
 
-    try generateExported(&source, "external_call", "void", &.{ "void*", "void**", "void*" });
-    try generateExported(&source, "external_ptr", "void**", &.{});
+    const writer = &source.writer;
+
+    try generateExported(writer, "external_call", "void", &.{ "void*", "void**", "void*" });
+    try generateExported(writer, "external_ptr", "void**", &.{});
 
     try writer.print("\n", .{});
 
-    try generateTypesFromSymbol(&source, symbol.returns, symbol.args);
+    try generateTypesFromSymbol(writer, symbol.returns, symbol.args);
 
-    try generateTypeFromSymbol(&source, symbol.returns, 0, false);
-    try source.appendSlice(" call_closure_ffi(");
+    try generateTypeFromSymbol(writer, symbol.returns, 0, false);
+    try writer.writeAll(" call_closure_ffi(");
     for (symbol.args, 0..) |arg, i| {
         if (i != 0)
-            try source.appendSlice(", ");
-        try generateTypeFromSymbol(&source, arg, i + 1, false);
+            try writer.writeAll(", ");
+        try generateTypeFromSymbol(writer, arg, i + 1, false);
         try writer.print(" arg_{d}", .{i});
     }
-    try source.appendSlice(") {\n  ");
+    try writer.writeAll(") {\n  ");
     if (symbol.args.len > 0) {
         try writer.print("void* args[{d}];\n  ", .{symbol.args.len});
     }
     if (symbol.returns.size > 0) {
-        try generateTypeFromSymbol(&source, symbol.returns, 0, false);
-        try source.appendSlice(" ret;\n  ");
+        try generateTypeFromSymbol(writer, symbol.returns, 0, false);
+        try writer.writeAll(" ret;\n  ");
     }
 
     for (symbol.args, 0..) |_, i| {
@@ -1795,7 +1791,7 @@ fn lua_closure(L: *VM.lua.State) !i32 {
     _ = state.add_symbol("external_ptr", @ptrCast(@alignCast(call_ptr)));
     _ = state.add_symbol("external_call", @ptrCast(@alignCast(&ffi_closure_inner)));
 
-    state.compileStringOnce(allocator, source.items) catch |err| {
+    state.compileStringOnce(allocator, source.written()) catch |err| {
         std.debug.print("Internal FFI Error: {}\n", .{err});
         return error.CompilationError;
     };
@@ -2122,13 +2118,13 @@ fn lua_compile(L: *VM.lua.State) !i32 {
     state.set_output_type(tinycc.TCC_OUTPUT_MEMORY);
     state.set_options("-std=c11 -nostdlib -Wl,--export-all-symbols");
 
-    var error_output: std.ArrayList(u8) = .init(allocator);
+    var error_output: std.Io.Writer.Allocating = .init(allocator);
     defer error_output.deinit();
 
-    state.set_error_func(@ptrCast(@alignCast(&error_output)), struct {
+    state.set_error_func(@ptrCast(@alignCast(&error_output.writer)), struct {
         fn inner(ud: ?*anyopaque, msg: [*:0]const u8) callconv(.c) void {
-            const o = @as(*std.ArrayList(u8), @ptrCast(@alignCast(ud.?)));
-            o.appendSlice(std.mem.span(msg)) catch |err| @panic(@errorName(err));
+            const o = @as(*std.Io.Writer, @ptrCast(@alignCast(ud.?)));
+            o.writeAll(std.mem.span(msg)) catch |err| @panic(@errorName(err));
         }
     }.inner);
 
@@ -2198,10 +2194,10 @@ fn lua_compile(L: *VM.lua.State) !i32 {
     }
 
     state.compile_string(source_code) catch {
-        return L.Zerror(if (error_output.items.len > 0) error_output.items else "CompilationError");
+        return L.Zerror(if (error_output.written().len > 0) error_output.written() else "CompilationError");
     };
-    if (error_output.items.len > 0)
-        return L.Zerror(error_output.items);
+    if (error_output.written().len > 0)
+        return L.Zerror(error_output.written());
 
     state.set_error_func(null, struct {
         fn inner(_: ?*anyopaque, _: [*:0]const u8) callconv(.c) void {}

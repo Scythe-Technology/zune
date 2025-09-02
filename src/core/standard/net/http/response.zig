@@ -338,15 +338,14 @@ pub const Parser = struct {
         return false;
     }
 
-    pub fn push(self: *Parser, L: *VM.lua.State) !void {
+    pub fn push(self: *Parser, L: *VM.lua.State, buffer: bool) !void {
         try L.createtable(0, 3);
 
-        try L.Zsetfield(-1, "statusCode", self.status_code);
-        if (self.status_message) |msg| {
-            try L.Zsetfield(-1, "statusReason", msg);
-        } else {
-            try L.Zsetfield(-1, "statusReason", "");
-        }
+        try L.Zpushvalue(.{
+            .ok = self.status_code >= 200 and self.status_code < 300,
+            .status_code = self.status_code,
+            .status_reason = if (self.status_message) |msg| msg else "",
+        });
 
         try L.createtable(0, @intCast(self.headers.size));
         var iter = self.headers.iterator();
@@ -359,7 +358,14 @@ pub const Parser = struct {
 
         if (self.body) |body|
             switch (body) {
-                inline else => |bytes| try L.Zsetfield(-1, "body", bytes),
+                inline else => |bytes| {
+                    if (buffer) {
+                        try L.Zpushbuffer(bytes);
+                    } else {
+                        try L.pushlstring(bytes);
+                    }
+                    try L.rawsetfield(-2, "body");
+                },
             };
     }
 };
@@ -413,8 +419,8 @@ const testing = std.testing;
 test "atoi" {
     var buf: [5]u8 = undefined;
     for (0..99999) |i| {
-        const n = std.fmt.formatIntBuf(&buf, i, 10, .lower, .{});
-        try testing.expectEqual(i, atoi(buf[0..n]).?);
+        const b = std.fmt.bufPrint(&buf, "{d}", .{i}) catch unreachable;
+        try testing.expectEqual(i, atoi(b).?);
     }
 
     try testing.expectEqual(null, atoi(""));

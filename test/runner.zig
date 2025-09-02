@@ -19,19 +19,13 @@ fn getenvOwned(alloc: std.mem.Allocator, key: []const u8) ?[]u8 {
 }
 
 const Printer = struct {
-    out: std.fs.File.Writer,
+    out: *std.Io.Writer,
 
-    fn init() Printer {
-        return .{
-            .out = std.io.getStdErr().writer(),
-        };
+    inline fn fmt(self: *Printer, comptime format: []const u8, args: anytype) void {
+        self.out.print(format, args) catch @panic("OOM");
     }
 
-    inline fn fmt(self: Printer, comptime format: []const u8, args: anytype) void {
-        std.fmt.format(self.out, format, args) catch @panic("OOM");
-    }
-
-    fn status(self: Printer, s: Status, comptime format: []const u8, args: anytype) void {
+    fn status(self: *Printer, s: Status, comptime format: []const u8, args: anytype) void {
         self.out.writeAll(switch (s) {
             .Failed => "\x1b[31m",
             .Passed => "\x1b[32m",
@@ -39,6 +33,7 @@ const Printer = struct {
         }) catch @panic("OOM");
         self.fmt(format, args);
         self.fmt("\x1b[0m", .{});
+        self.out.flush() catch @panic("OOM");
     }
 };
 
@@ -53,7 +48,13 @@ pub fn main() !void {
         break :blk false;
     };
 
-    const printer = Printer.init();
+    const stderr = std.fs.File.stderr();
+    var buffer: [1024]u8 = undefined;
+    var err_writer = stderr.writer(&buffer);
+    const writer = &err_writer.interface;
+    var printer: Printer = .{
+        .out = writer,
+    };
 
     var passed: usize = 0;
     var failed: usize = 0;

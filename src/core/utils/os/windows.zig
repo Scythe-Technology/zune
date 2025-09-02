@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 
 const fs = std.fs;
 const mem = std.mem;
@@ -624,7 +625,9 @@ fn windowsCreateProcess(
         null,
         null,
         windows.TRUE,
-        windows.CREATE_UNICODE_ENVIRONMENT,
+        .{
+            .create_unicode_environment = true,
+        },
         @as(?*anyopaque, @ptrCast(envp_ptr)),
         cwd_ptr,
         lpStartupInfo,
@@ -874,8 +877,8 @@ fn argvToCommandLineWindows(
     allocator: mem.Allocator,
     argv: []const []const u8,
 ) ArgvToCommandLineError![:0]u16 {
-    var buf = std.ArrayList(u8).init(allocator);
-    defer buf.deinit();
+    var buf: std.ArrayList(u8) = .empty;
+    defer buf.deinit(allocator);
 
     if (argv.len != 0) {
         const arg0 = argv[0];
@@ -901,15 +904,15 @@ fn argvToCommandLineWindows(
             }
         }
         if (needs_quotes) {
-            try buf.append('"');
-            try buf.appendSlice(arg0);
-            try buf.append('"');
+            try buf.append(allocator, '"');
+            try buf.appendSlice(allocator, arg0);
+            try buf.append(allocator, '"');
         } else {
-            try buf.appendSlice(arg0);
+            try buf.appendSlice(allocator, arg0);
         }
 
         for (argv[1..]) |arg| {
-            try buf.append(' ');
+            try buf.append(allocator, ' ');
 
             // Subsequent arguments must be quoted if they contain spaces, tabs or double quotes,
             // or if they are empty. For simplicity and for maximum compatibility with different
@@ -921,11 +924,11 @@ fn argvToCommandLineWindows(
                 }
             } else arg.len == 0;
             if (!needs_quotes) {
-                try buf.appendSlice(arg);
+                try buf.appendSlice(allocator, arg);
                 continue;
             }
 
-            try buf.append('"');
+            try buf.append(allocator, '"');
             var backslash_count: usize = 0;
             for (arg) |byte| {
                 switch (byte) {
@@ -933,19 +936,19 @@ fn argvToCommandLineWindows(
                         backslash_count += 1;
                     },
                     '"' => {
-                        try buf.appendNTimes('\\', backslash_count * 2 + 1);
-                        try buf.append('"');
+                        try buf.appendNTimes(allocator, '\\', backslash_count * 2 + 1);
+                        try buf.append(allocator, '"');
                         backslash_count = 0;
                     },
                     else => {
-                        try buf.appendNTimes('\\', backslash_count);
-                        try buf.append(byte);
+                        try buf.appendNTimes(allocator, '\\', backslash_count);
+                        try buf.append(allocator, byte);
                         backslash_count = 0;
                     },
                 }
             }
-            try buf.appendNTimes('\\', backslash_count * 2);
-            try buf.append('"');
+            try buf.appendNTimes(allocator, '\\', backslash_count * 2);
+            try buf.append(allocator, '"');
         }
     }
 
@@ -985,7 +988,7 @@ fn argvToScriptCommandLineWindows(
     /// Arguments, not including the script name itself. Expected to be encoded as WTF-8.
     script_args: []const []const u8,
 ) ArgvToScriptCommandLineError![:0]u16 {
-    var buf = try std.ArrayList(u8).initCapacity(allocator, 64);
+    var buf = try std.array_list.Managed(u8).initCapacity(allocator, 64);
     defer buf.deinit();
 
     // `/d` disables execution of AutoRun commands.

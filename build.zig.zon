@@ -1,55 +1,55 @@
 .{
     .name = .Zune,
-    .version = "0.5.0-dev",
+    .version = "0.5.0",
     .minimum_zig_version = "0.14.0",
     .dependencies = .{
-        .json = .{
-            .url = "https://codeload.github.com/Scythe-Technology/zig-json/tar.gz/a0f8f487893aafa7ea3393a3d9d2b28f31772918",
-            .hash = "json-0.1.3-yTw8k06KAQBADDSNAOzYxLQbsqods4dKH2sIFeAB7JFf",
-        },
-        .yaml = .{
-            .url = "https://codeload.github.com/kubkon/zig-yaml/tar.gz/9b19ff52d2ee41ecbb55cb844771b3c52fb19dbb",
-            .hash = "zig_yaml-0.1.0-C1161m2cAgCRKV1mYzwK1YmjVn75x5bIgwHojVW111fV",
-        },
-        .lz4 = .{
-            .url = "https://codeload.github.com/Scythe-Technology/zig-lz4/tar.gz/374e4c899efc3a517b1f1d3ceaa64b258773abed",
-            .hash = "lz4-0.2.0-OvBcTytgAAC95acrxK1s8UwtlTWR-7J4UvEkgstnvN1p",
-        },
         .luau = .{
-            .url = "https://codeload.github.com/Scythe-Technology/zig-luau/tar.gz/52b4f9505796876a371b9f21bbbdf5cb7c6af855",
-            .hash = "luau-0.0.0+687-uDAGp864CQBH3Kg4OOuFQ3Cp8BG5d5jZRXImGLTNRQCQ",
-        },
-        .pcre2 = .{
-            .url = "https://codeload.github.com/Scythe-Technology/zpcre2/tar.gz/9e6a4e39b585e6ab6b759a949469755625e81418",
-            .hash = "zpcre2-0.0.2-p7xIaMcAMgA8ZNfD3TzLzat-HZ0zV61yCkTJSMKKgrD1",
-        },
-        .datetime = .{
-            .url = "https://codeload.github.com/FObersteiner/zdt/tar.gz/ee629ba16ec398142e7029e41fa422784a6dd771",
-            .hash = "zdt-0.5.0-xr0_vEl2EABKeovQvZmTULn4nDtsgTK1_hnwPa30DFrZ",
-        },
-        .toml = .{
-            .url = "https://codeload.github.com/mattyhall/tomlz/tar.gz/9a16dd53927ef2012478b6494bafb4475e44f4c9",
-            .hash = "N-V-__8AALF2AwBPkiyrhJgONrXAWNNU7A7hab2kAcjg6ApG",
-        },
-        .sqlite = .{
-            .url = "https://codeload.github.com/Scythe-Technology/z-sqlite/tar.gz/883a63b197ddc9d0be6fa606ce332eaf9f87cded",
-            .hash = "z_sqlite-0.0.2-t6ggsKfwlADEJn4qSlY2IMRDFSmqg1ByczSmYE-jjGDc",
-        },
-        .zstd = .{
-            .url = "https://codeload.github.com/Scythe-Technology/zig-zstd/tar.gz/ac5493cfa6bbf6813d11452ec25b5bfd2d29f8e6",
-            .hash = "zstd-1.5.6-2-Z4uSumxDAAD3I2iBy6Re33wxHF5cyb_85JP5SJ71Dc0G",
-        },
-        .tinycc = .{
-            .url = "https://codeload.github.com/Scythe-Technology/zig-tinycc/tar.gz/4799c125fd101a3b2d98fafd2324af5955f88e62",
-            .hash = "tinycc-0.0.2-T6dU8_3FAAAVHDvXDJaSfS1srHGOuUmdXCt2MWKEjlBh",
+            .url = "https://codeload.github.com/Scythe-Technology/zig-luau/tar.gz/df25e2284cbe7012ac85b57cf51765a686188860",
+            .hash = "luau-0.0.0+688-uDAGp9W_CQAG2-TrXdkjFaaK4YBi3XL7nTu7twUwJQkV",
         },
         .libxev = .{
-            .url = "https://codeload.github.com/Scythe-Technology/libxev/tar.gz/dfc90643e5076cf727d9401aff9c886ab6dec78d",
-            .hash = "libxev-0.0.0-GdacviIFDAAFRWY3D6x4C8KvhFWf-_tHaulbAkz_MTmg",
+            .url = "https://codeload.github.com/Scythe-Technology/libxev/tar.gz/a8f52c8cfe5eb5a8dbeeb834a5731070682302e0",
+            .hash = "libxev-0.0.0-GdacvrQeDAC2cD1vfsAc2PbwmJ8FVsnrZlQxTEzFOXA0",
+        },
+        .json = .{
+            .url = "https://codeload.github.com/Scythe-Technology/zig-json/tar.gz/bfa3d87788301b0df3b05b29f6e323f91bf3abbe",
+            .hash = "json-0.2.0-yTw8k2mOAQDGhdeNxl2WX1FI194JP0ukvByo1RGXOlEf",
+        },
+        .yaml = .{
+            .url = "https://codeload.github.com/Scythe-Technology/zig-yaml/tar.gz/4b48a2df68f623c6c6036c74707ab12665df6ad7",
+            .hash = "zig_yaml-0.1.0-C1161oWrAgCzhAwHIWW-cvg4so5TdCEt38TeYG-b2JYi",
+        },
+        .lz4 = .{
+            .url = "https://codeload.github.com/Scythe-Technology/zig-lz4/tar.gz/041fc3bc7348b2583562a28605506b6e1f5f8d4a",
+            .hash = "lz4-0.3.0-OvBcT35cAABHjkHxaWRdRg3RfjTAlr_KU0bbMsnqe0Nk",
+        },
+        .pcre2 = .{
+            .url = "https://codeload.github.com/Scythe-Technology/zpcre2/tar.gz/3ceb1c0e8afee5ba5c9893081d74cbec7d936f52",
+            .hash = "zpcre2-0.0.3-p7xIaFsBMgCTbBTG_CekjUxWFA2a4oLnuLtSDIeMvLkz",
+        },
+        .datetime = .{
+            .url = "https://codeload.github.com/FObersteiner/zdt/tar.gz/8b551a0a3e5ae64a32b5bad0e6a93119787b43af",
+            .hash = "zdt-0.8.1-xr0_vAxUDwCJRDh9pcAS_mdZBIsvcGTtN-K8JJSWY4I6",
+        },
+        .toml = .{
+            .url = "https://codeload.github.com/Scythe-Technology/tomlz/tar.gz/702c826500ff075302426de918f0e022911c1cc6",
+            .hash = "N-V-__8AADiCAwBidXOdXeoSJ6s1iGcJ0m3N_Pt2P7MEkWb3",
+        },
+        .sqlite = .{
+            .url = "https://codeload.github.com/Scythe-Technology/z-sqlite/tar.gz/de0e6576f542322da9c9cec63cfb7cf283025077",
+            .hash = "z_sqlite-0.0.3-t6ggsH_ylAArzj2luMYmxf2I8X1uoS9480nClMEGmyD1",
+        },
+        .zstd = .{
+            .url = "https://codeload.github.com/Scythe-Technology/zig-zstd/tar.gz/87c845ae49fef7efb425bd56891fa5fe42f8247b",
+            .hash = "zstd-1.6.0-Z4uSultEAABdjaCdI9B_dzRVGFkWjdl0_wDWjAf3ACc-",
+        },
+        .tinycc = .{
+            .url = "https://codeload.github.com/Scythe-Technology/zig-tinycc/tar.gz/a57cf4e8baf7ebc1dd5f3de31a50edb49239ec99",
+            .hash = "tinycc-0.0.3-T6dU8yTKAAAQ0w4V898cCL8RwoCyFdW1Z_THkasfSbsU",
         },
         .tls = .{
-            .url = "https://codeload.github.com/ianic/tls.zig/tar.gz/7428921d2d5c397324d3e0343d7d8c90c2d35d31",
-            .hash = "tls-0.1.0-ER2e0p41BQBIbFFuNNQa3oOxWRJXcCB0lJIWi8Z10dZJ",
+            .url = "https://codeload.github.com/ianic/tls.zig/tar.gz/602f05bd84d819d487a6e22dd1463e907f7992ab",
+            .hash = "tls-0.1.0-ER2e0sR3BQAaKutV0MShEsWhgG5NkNc04OTCEwHUson3",
         },
     },
     .paths = .{""},

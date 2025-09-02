@@ -48,7 +48,7 @@ pub const LuaDatetime = struct {
         else
             datetime;
 
-        try L.pushfstring("{}Z", .{utc});
+        try L.pushfstring("{f}Z", .{utc});
 
         return 1;
     }
@@ -111,12 +111,12 @@ pub const LuaDatetime = struct {
             datetime;
         const local = try date.tzConvert(.{ .tz = &tz });
 
-        var buf = std.ArrayList(u8).init(allocator);
-        defer buf.deinit();
+        var allocating: std.Io.Writer.Allocating = .init(allocator);
+        defer allocating.deinit();
 
-        try local.toString(format_str, buf.writer());
+        try local.toString(format_str, &allocating.writer);
 
-        try L.pushlstring(buf.items);
+        try L.pushlstring(allocating.written());
 
         return 1;
     }
@@ -131,12 +131,12 @@ pub const LuaDatetime = struct {
         else
             try datetime.tzLocalize(.{ .tz = &time.Timezone.UTC });
 
-        var buf = std.ArrayList(u8).init(allocator);
-        defer buf.deinit();
+        var allocating: std.Io.Writer.Allocating = .init(allocator);
+        defer allocating.deinit();
 
-        try utc.toString(format_str, buf.writer());
+        try utc.toString(format_str, &allocating.writer);
 
-        try L.pushlstring(buf.items);
+        try L.pushlstring(allocating.written());
 
         return 1;
     }

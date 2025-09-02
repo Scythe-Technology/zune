@@ -576,8 +576,8 @@ const testing = std.testing;
 test "atoi" {
     var buf: [5]u8 = undefined;
     for (0..99999) |i| {
-        const n = std.fmt.formatIntBuf(&buf, i, 10, .lower, .{});
-        try testing.expectEqual(i, atoi(buf[0..n]).?);
+        const b = std.fmt.bufPrint(&buf, "{d}", .{i}) catch unreachable;
+        try testing.expectEqual(i, atoi(b).?);
     }
 
     try testing.expectEqual(null, atoi(""));

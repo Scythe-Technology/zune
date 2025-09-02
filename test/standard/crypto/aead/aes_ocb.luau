@@ -83,10 +83,10 @@ describe("aes_ocb", function()
         end)
         test("With Associated Data", function()
             examine(aes_ocb.Aes128Ocb, "abcdefghijklmnop", "123456789012", {
-                { data = "zune+luau", ad = "Some Associated Data", cipher = "\x8E,1\x95\xDF\xE8\xE6\x8A^", tag = "\x1A\a\x05\x97\xA107C\xC6X\xB9\xC0\xC3{\xD4\x93" },
+                { data = "zune+luau", ad = "Some Associated Data", cipher = "\x8E,1\x95\xDF\xE8\xE6\x8A^", tag = "1\xA4\xD5\xFD\xB1Vh\xA4\xFB\x8A\xBC\xF1\xDF\xCDC\x1B" },
             });
             examine(aes_ocb.Aes128Ocb, "0000000000000000", "000000000000", {
-                { data = "runtime", ad = "Some Associated Data", cipher = "\x02o\xA8pI+\xCA", tag = "\xC7\xA1\xB79\x99H\x88qD\x10Q\xAB-\x88@\x25" },
+                { data = "runtime", ad = "Some Associated Data", cipher = "\x02o\xA8pI+\xCA", tag = "\xB3G\x01\x97\x99\xC9\x18\x82K\xF9\xE4W\x19@\x99\x1A" },
             });
         end)
         test("Buffers", function()
@@ -109,10 +109,10 @@ describe("aes_ocb", function()
         end)
         test("With Associated Data", function()
             examine(aes_ocb.Aes256Ocb, "abcdefghijklmnopqrstuvwxyz_abcde", "123456789012", {
-                { data = "zune+luau", ad = "Some Associated Data", cipher = "\xA5\xF9\xF4\x056\x1A\xCD\xD2\xA5", tag = "\xC7j\x82\xFE\x181\xA3\x13i\x96\xFD\xBD\x9F\xAA\x1F\xCD" },
+                { data = "zune+luau", ad = "Some Associated Data", cipher = "\xA5\xF9\xF4\x056\x1A\xCD\xD2\xA5", tag = "\xEB$\xCB0\\\xE9\x9B\x9C\n\xCBu\x18\xBF\x9B\xA9\xCF" },
             });
             examine(aes_ocb.Aes256Ocb, "00000000000000000000000000000000", "000000000000", {
-                { data = "runtime", ad = "Some Associated Data", cipher = "\b\a\xA0\x05$\xC2\\", tag = "y\x88qz\x04\xCD\xA29\xA1\x1E}3zl\xAA\xBE" },
+                { data = "runtime", ad = "Some Associated Data", cipher = "\b\a\xA0\x05$\xC2\\", tag = "3(a\xEC\xF2\r\x19\xA9\xCBo\xFFx\xB4@\xFB\xB8" },
             });
         end)
         test("Buffers", function()

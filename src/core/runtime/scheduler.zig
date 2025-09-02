@@ -11,7 +11,7 @@ const Lists = Zune.Utils.Lists;
 
 const VM = luau.VM;
 
-pub threadlocal var SCHEDULERS = std.ArrayList(*Scheduler).init(Zune.DEFAULT_ALLOCATOR);
+pub threadlocal var SCHEDULERS: std.ArrayList(*Scheduler) = .empty;
 
 pub fn KillScheduler(scheduler: *Scheduler, cleanUp: bool) void {
     {
@@ -34,7 +34,7 @@ pub fn KillScheduler(scheduler: *Scheduler, cleanUp: bool) void {
 pub fn KillSchedulers() void {
     for (SCHEDULERS.items) |scheduler|
         KillScheduler(scheduler, false);
-    SCHEDULERS.clearAndFree();
+    SCHEDULERS.clearAndFree(Zune.DEFAULT_ALLOCATOR);
 }
 
 pub const ThreadRef = struct {
@@ -143,7 +143,7 @@ const Synchronization = struct {
         if (self.notified.load(.acquire))
             return;
         self.notified.store(true, .release);
-        scheduler.@"async".notify() catch |err| std.debug.print("[Async Notify Error: {}]\n", .{err});
+        scheduler.async.notify() catch |err| std.debug.print("[Async Notify Error: {}]\n", .{err});
     }
 
     fn async_completion(
@@ -163,7 +163,7 @@ const Synchronization = struct {
         if (self.waiting)
             return;
         self.waiting = true;
-        scheduler.@"async".wait(
+        scheduler.async.wait(
             &scheduler.loop,
             &self.completion,
             void,
@@ -259,7 +259,7 @@ deferred: DeferredThread.LinkedList = .{},
 awaits: std.ArrayListUnmanaged(AwaitingObject) = .empty,
 timer: xev.Dynamic.Timer,
 loop: xev.Dynamic.Loop,
-@"async": xev.Dynamic.Async,
+async: xev.Dynamic.Async,
 pools: Pool,
 now_clock: f64 = 0,
 
@@ -286,7 +286,7 @@ pub fn init(allocator: std.mem.Allocator, L: *VM.lua.State) !Scheduler {
             .thread_pool = io_pool,
         }),
         .timer = try xev.Dynamic.Timer.init(),
-        .@"async" = try xev.Dynamic.Async.init(),
+        .async = try xev.Dynamic.Async.init(),
         .pools = .{
             .io = io_pool,
             .general = general_pool,
@@ -343,14 +343,14 @@ pub fn awaitResult(
 
     const resumeFn = struct {
         fn inner(ctx: *anyopaque, l: *VM.lua.State, scheduler: *Scheduler) void {
-            @call(.always_inline, handlerFn, .{ @as(*T, @alignCast(@ptrCast(ctx))), l, scheduler });
+            @call(.always_inline, handlerFn, .{ @as(*T, @ptrCast(@alignCast(ctx))), l, scheduler });
         }
     }.inner;
 
     const virtualDtor = struct {
         fn inner(ctx: *anyopaque, l: *VM.lua.State, scheduler: *Scheduler) void {
             if (dtorFn) |dtor| {
-                @call(.always_inline, dtor, .{ @as(*T, @alignCast(@ptrCast(ctx))), l, scheduler });
+                @call(.always_inline, dtor, .{ @as(*T, @ptrCast(@alignCast(ctx))), l, scheduler });
             }
         }
     }.inner;
@@ -458,13 +458,13 @@ pub fn createSync(self: *Scheduler, comptime T: type, callback: fn (*T, *Schedul
         .node = .{},
         .callback = struct {
             fn inner(ud: *anyopaque, sched: *Scheduler) void {
-                const node: *Node = @alignCast(@ptrCast(ud));
+                const node: *Node = @ptrCast(@alignCast(ud));
                 @call(.always_inline, callback, .{ &node.data, sched });
             }
         }.inner,
         .free = struct {
             fn inner(ud: *anyopaque, allocator: std.mem.Allocator) void {
-                const node: *Node = @alignCast(@ptrCast(ud));
+                const node: *Node = @ptrCast(@alignCast(ud));
                 allocator.destroy(node);
             }
         }.inner,
@@ -541,44 +541,6 @@ inline fn hasPendingWork(self: *Scheduler) bool {
         self.awaits.items.len > 0 or
         self.loop.countPending(.{ .timers = true }) > 0 or
         self.sync.hasPending();
-}
-
-pub fn XevNoopCallback(err: type, action: xev.CallbackAction) fn (
-    _: ?*void,
-    _: *xev.Dynamic.Loop,
-    _: *xev.Dynamic.Completion,
-    _: err,
-) xev.CallbackAction {
-    return struct {
-        fn inner(
-            _: ?*void,
-            _: *xev.Dynamic.Loop,
-            _: *xev.Dynamic.Completion,
-            _: err,
-        ) xev.CallbackAction {
-            return action;
-        }
-    }.inner;
-}
-
-pub fn XevNoopWatcherCallback(watcher: type, err: type, action: xev.CallbackAction) fn (
-    _: ?*void,
-    _: *xev.Dynamic.Loop,
-    _: *xev.Dynamic.Completion,
-    _: watcher,
-    _: err,
-) xev.CallbackAction {
-    return struct {
-        fn inner(
-            _: ?*void,
-            _: *xev.Dynamic.Loop,
-            _: *xev.Dynamic.Completion,
-            _: watcher,
-            _: err,
-        ) xev.CallbackAction {
-            return action;
-        }
-    }.inner;
 }
 
 inline fn processFrame(self: *Scheduler, comptime frame: FrameKind) void {
@@ -683,7 +645,16 @@ pub fn run(self: *Scheduler, comptime mode: Zune.RunMode) void {
                 @intFromFloat(@max(lowest.wake - now, 0) * std.time.ms_per_s),
                 void,
                 null,
-                XevNoopCallback(xev.Dynamic.Timer.RunError!void, .disarm),
+                struct {
+                    fn inner(
+                        _: ?*void,
+                        _: *xev.Dynamic.Loop,
+                        _: *xev.Dynamic.Completion,
+                        _: xev.Dynamic.Timer.RunError!void,
+                    ) xev.CallbackAction {
+                        return .disarm;
+                    }
+                }.inner,
             );
         self.processFrame(.EventLoop);
         if (self.sync.completed.len > 0)
@@ -714,7 +685,7 @@ pub fn deinit(self: *Scheduler) void {
     self.awaits.deinit(self.allocator);
     self.timer.deinit();
     self.loop.deinit();
-    self.@"async".deinit();
+    self.async.deinit();
     self.pools.free(self.allocator);
 }
 

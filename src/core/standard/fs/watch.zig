@@ -19,12 +19,11 @@ const WatchEvent = struct {
 };
 
 pub const WatchInfo = struct {
-    allocator: std.mem.Allocator,
     list: std.ArrayList(WatchEvent),
 
-    pub fn deinit(self: WatchInfo) void {
-        for (self.list.items) |e| self.allocator.free(e.name);
-        self.list.deinit();
+    pub fn deinit(self: WatchInfo, allocator: std.mem.Allocator) void {
+        for (self.list.items) |e| allocator.free(e.name);
+        allocator.free(self.list.allocatedSlice());
     }
 };
 
@@ -80,8 +79,8 @@ const DarwinAttributes = struct {
     pub fn scanDirectory(self: *DarwinAttributes, allocator: std.mem.Allocator) ![]FileDifference {
         const dir = &(self.dir orelse return error.WatcherNotStarted);
 
-        var diff = std.ArrayList(FileDifference).init(allocator);
-        errdefer diff.deinit();
+        var diff: std.ArrayList(FileDifference) = .empty;
+        errdefer diff.deinit(allocator);
         errdefer for (diff.items) |item| allocator.free(item.name);
 
         {
@@ -181,7 +180,7 @@ const DarwinAttributes = struct {
                     continue;
                 const name = try allocator.dupe(u8, entry.key_ptr.*);
                 errdefer allocator.free(name);
-                try diff.append(.{
+                try diff.append(allocator, .{
                     .name = name,
                     .state = .deleted,
                 });
@@ -193,14 +192,14 @@ const DarwinAttributes = struct {
                     continue;
                 const name = try allocator.dupe(u8, entry.key_ptr.*);
                 errdefer allocator.free(name);
-                try diff.append(.{
+                try diff.append(allocator, .{
                     .name = name,
                     .state = .created,
                 });
             }
         }
 
-        return diff.toOwnedSlice();
+        return diff.toOwnedSlice(allocator);
     }
 
     pub fn deinit(self: *DarwinAttributes, allocator: std.mem.Allocator) void {
@@ -295,6 +294,7 @@ pub const FileSystemWatcher = struct {
                 .ios, .macos, .tvos, .visionos, .watchos => .{ .darwin = .{} },
                 .windows => .{ .windows = .{} },
                 .linux => .{ .linux = .{} },
+                .freebsd, .openbsd, .netbsd, .dragonfly => .{ .darwin = .{} },
                 else => @compileError("Unsupported platform"),
             },
         };
@@ -334,18 +334,17 @@ pub const FileSystemWatcher = struct {
         if (bytes_read == 0)
             return null;
 
-        var watchInfo: WatchInfo = .{
-            .allocator = self.allocator,
-            .list = std.ArrayList(WatchEvent).init(self.allocator),
+        var watch_info: WatchInfo = .{
+            .list = .empty,
         };
-        errdefer watchInfo.deinit();
+        errdefer watch_info.deinit(self.allocator);
 
         var i: u32 = 0;
         while (i < bytes_read) : (i += LinuxAttributes.INotifyEventSize) {
             const event: *LinuxAttributes.INotifyEvent = @ptrCast(@alignCast(buffer[i..][0..LinuxAttributes.INotifyEventSize]));
             i += event.name_len;
 
-            try watchInfo.list.append(.{
+            try watch_info.list.append(self.allocator, .{
                 .event = WatchEvent.Event{
                     .created = (event.mask & std.os.linux.IN.CREATE) > 0,
                     .delete = (event.mask & std.os.linux.IN.DELETE_SELF) > 0 or (event.mask & std.os.linux.IN.DELETE) > 0,
@@ -356,11 +355,11 @@ pub const FileSystemWatcher = struct {
                 },
                 .name = try self.allocator.dupe(u8, std.mem.span(event.name())),
             });
-            if (watchInfo.list.items.len >= MAX_EVENTS)
+            if (watch_info.list.items.len >= MAX_EVENTS)
                 break;
         }
 
-        return watchInfo;
+        return watch_info;
     }
 
     fn nextDarwin(self: *FileSystemWatcher) !?WatchInfo {
@@ -378,18 +377,17 @@ pub const FileSystemWatcher = struct {
         if (count < 0)
             std.debug.panic("Bad kevent", .{});
 
-        var watchInfo: WatchInfo = .{
-            .allocator = self.allocator,
-            .list = std.ArrayList(WatchEvent).init(self.allocator),
+        var watch_info: WatchInfo = .{
+            .list = .empty,
         };
-        errdefer watchInfo.deinit();
+        errdefer watch_info.deinit(self.allocator);
 
         var root = false;
         var changes = list_arr[0..@as(usize, @intCast(count))];
         if (changes.len > 0) {
-            try watchInfo.list.ensureTotalCapacity(@intCast(count));
+            try watch_info.list.ensureTotalCapacity(self.allocator, @intCast(count));
             for (changes[0..]) |event| {
-                if (watchInfo.list.items.len >= MAX_EVENTS)
+                if (watch_info.list.items.len >= MAX_EVENTS)
                     break;
                 if (event.udata == 0) {
                     if (root)
@@ -401,14 +399,14 @@ pub const FileSystemWatcher = struct {
                     for (scandiff) |change| {
                         if (change.state != .created and change.state != .deleted)
                             continue;
-                        try watchInfo.list.append(.{
+                        watch_info.list.appendAssumeCapacity(.{
                             .event = WatchEvent.Event{
                                 .created = change.state == .created,
                                 .delete = change.state == .deleted,
                             },
                             .name = try self.allocator.dupe(u8, change.name),
                         });
-                        if (watchInfo.list.items.len >= MAX_EVENTS)
+                        if (watch_info.list.items.len >= MAX_EVENTS)
                             break;
                     }
                     continue;
@@ -416,7 +414,7 @@ pub const FileSystemWatcher = struct {
                 const name = self.backend.darwin.named_fds.get(event.udata) orelse continue;
                 if ((event.fflags & std.c.NOTE.DELETE) != 0)
                     continue;
-                try watchInfo.list.append(.{
+                watch_info.list.appendAssumeCapacity(.{
                     .event = .{
                         .modify = (event.fflags & std.c.NOTE.WRITE) != 0,
                         .rename = (event.fflags & (std.c.NOTE.RENAME | std.c.NOTE.LINK)) != 0,
@@ -427,7 +425,7 @@ pub const FileSystemWatcher = struct {
             }
         }
 
-        return watchInfo;
+        return watch_info;
     }
 
     fn nextWindows(self: *FileSystemWatcher) !?WatchInfo {
@@ -463,17 +461,16 @@ pub const FileSystemWatcher = struct {
                     self.backend.windows.active = false;
                     return error.Shutdown;
                 }
-                var watchInfo: WatchInfo = .{
-                    .allocator = self.allocator,
-                    .list = std.ArrayList(WatchEvent).init(self.allocator),
+                var watch_info: WatchInfo = .{
+                    .list = .empty,
                 };
-                errdefer watchInfo.deinit();
+                errdefer watch_info.deinit(self.allocator);
 
                 var n = true;
                 var offset: usize = 0;
                 while (n) {
-                    const info: *std.os.windows.FILE_NOTIFY_INFORMATION = @alignCast(@ptrCast(self.backend.windows.buf[offset..].ptr));
-                    const name_ptr: [*]u16 = @alignCast(@ptrCast(self.backend.windows.buf[offset + @sizeOf(std.os.windows.FILE_NOTIFY_INFORMATION) ..].ptr));
+                    const info: *std.os.windows.FILE_NOTIFY_INFORMATION = @ptrCast(@alignCast(self.backend.windows.buf[offset..].ptr));
+                    const name_ptr: [*]u16 = @ptrCast(@alignCast(self.backend.windows.buf[offset + @sizeOf(std.os.windows.FILE_NOTIFY_INFORMATION) ..].ptr));
                     const filename: []u16 = name_ptr[0 .. info.FileNameLength / @sizeOf(u16)];
 
                     const name = try std.unicode.utf16LeToUtf8Alloc(self.allocator, filename);
@@ -486,7 +483,7 @@ pub const FileSystemWatcher = struct {
                     else
                         offset += @as(usize, info.NextEntryOffset);
 
-                    try watchInfo.list.append(.{
+                    try watch_info.list.append(self.allocator, .{
                         .event = WatchEvent.Event{
                             .created = action == .Added,
                             .delete = action == .Removed,
@@ -495,11 +492,11 @@ pub const FileSystemWatcher = struct {
                         },
                         .name = name,
                     });
-                    if (watchInfo.list.items.len >= MAX_EVENTS)
+                    if (watch_info.list.items.len >= MAX_EVENTS)
                         break;
                 }
 
-                return watchInfo;
+                return watch_info;
             } else {
                 return error.INVAL;
             }
@@ -637,7 +634,7 @@ pub const FileSystemWatcher = struct {
 test "Platform Watch" {
     const allocator = std.testing.allocator;
 
-    var temporaryDir = std.testing.tmpDir(std.fs.Dir.OpenDirOptions{
+    var temporaryDir = std.testing.tmpDir(.{
         .access_sub_paths = true,
     });
     defer temporaryDir.cleanup();
@@ -652,9 +649,8 @@ test "Platform Watch" {
     try watcher.start();
 
     {
-        const info = try watcher.next();
-        if (info) |i| {
-            i.deinit();
+        if (try watcher.next()) |i| {
+            i.deinit(watcher.allocator);
             return error.UnexpectedEvent;
         }
     }
@@ -664,8 +660,8 @@ test "Platform Watch" {
         defer file.close();
 
         {
-            const info = try watcher.next() orelse return error.ExpectedEvent;
-            defer info.deinit();
+            var info = try watcher.next() orelse return error.ExpectedEvent;
+            defer info.deinit(watcher.allocator);
             try std.testing.expectEqual(1, info.list.items.len);
             try std.testing.expectEqualStrings("test.txt", info.list.items[0].name);
             try std.testing.expect(info.list.items[0].event.created);
@@ -680,8 +676,8 @@ test "Platform Watch" {
         try file.sync();
 
         {
-            const info = try watcher.next() orelse return error.ExpectedEvent;
-            defer info.deinit();
+            var info = try watcher.next() orelse return error.ExpectedEvent;
+            defer info.deinit(watcher.allocator);
             try std.testing.expectEqual(1, info.list.items.len);
             try std.testing.expectEqualStrings("test.txt", info.list.items[0].name);
             try std.testing.expect(!info.list.items[0].event.created);
@@ -696,8 +692,8 @@ test "Platform Watch" {
     try tempDir.deleteFile("fs-watch-test/test.txt");
 
     {
-        const info = try watcher.next() orelse return error.ExpectedEvent;
-        defer info.deinit();
+        var info = try watcher.next() orelse return error.ExpectedEvent;
+        defer info.deinit(watcher.allocator);
         try std.testing.expectEqual(1, info.list.items.len);
         try std.testing.expectEqualStrings("test.txt", info.list.items[0].name);
         try std.testing.expect(!info.list.items[0].event.created);

@@ -19,7 +19,7 @@ jobs:
       - name: Setup Zig
         uses: mlugg/setup-zig@v2
         with:
-          version: 0.14.1
+          version: 0.15.1
           use-cache: false
 
       - name: Get Zune Version
@@ -67,11 +67,11 @@ jobs:
     - name: Setup Zig
       uses: mlugg/setup-zig@v2
       with:
-        version: 0.14.1
+        version: 0.15.1
         use-cache: false
 
     - name: Build
-      run: zig build -Doptimize=ReleaseFast -Dtarget=${{ matrix.target }}
+      run: zig build -Doptimize=ReleaseFast -Drelease-ver -Dtarget=${{ matrix.target }}
 
     - name: Pack Artifact
       run: cd ./zig-out/bin && zip ../../${{ matrix.artifact }}.zip ./zune${{ matrix.ext }}

@@ -185,8 +185,11 @@ pub fn onClose(
     }
 
     if (server.state.stage == .shutdown and server.state.list.len == 0) {
-        server.ref.deref(GL);
-        server.state.stage = .dead;
+        if (!server.timer.active) {
+            server.ref.deref(GL);
+            server.state.stage = .dead;
+            return .disarm;
+        }
     }
 
     switch (server.state.stage) {
@@ -224,7 +227,7 @@ pub fn ws_close(self: *Self, loop: *xev.Loop) void {
             &self.completion,
             void,
             null,
-            Scheduler.XevNoopCallback(xev.CancelError!void, .disarm),
+            null,
         );
     } else self.close();
 }
@@ -360,10 +363,10 @@ pub fn processResponse(
                 return error.Runtime;
             };
 
-            var response: std.ArrayListUnmanaged(u8) = try .initCapacity(allocator, 1024 * 2);
-            defer response.deinit(allocator);
+            var response: std.Io.Writer.Allocating = try .initCapacity(allocator, 1024 * 2);
+            defer response.deinit();
 
-            const writer = response.writer(allocator);
+            const writer = &response.writer;
 
             try writer.print("HTTP/1.1 {d} {s}\r\n", .{
                 statusCode,
@@ -424,15 +427,15 @@ pub fn processResponse(
             }
 
             if (!written_headers.content_type) {
-                try response.appendSlice(allocator, "Content-Type: text/plain\r\n");
+                try writer.writeAll("Content-Type: text/plain\r\n");
             }
             if (!written_headers.date) {
-                try response.appendSlice(allocator, "Date: ");
+                try writer.writeAll("Date: ");
                 try time.Datetime.nowUTC().toString("%:a, %d %:b %Y %H:%M:%S GMT", writer);
-                try response.appendSlice(allocator, "\r\n");
+                try writer.writeAll("\r\n");
             }
             if (!written_headers.server) {
-                try response.appendSlice(allocator, "Server: zune\r\n");
+                try writer.writeAll("Server: zune\r\n");
             }
 
             const body: ?[]const u8 = switch (L.rawgetfield(-3, "body")) {
@@ -452,23 +455,23 @@ pub fn processResponse(
                 else
                     try writer.print("\r\n{s}", .{b});
             } else {
-                try response.appendSlice(allocator, "\r\n");
+                try writer.writeAll("\r\n");
             }
 
-            self.writeAll(response.items);
+            self.writeAll(response.written());
         },
         .String, .Buffer => |t| {
             const content = if (t == .Buffer) L.Lcheckbuffer(-1) else L.Lcheckstring(-1);
             var buf: [48]u8 = undefined;
 
-            var stream = std.io.fixedBufferStream(&buf);
-            const writer = stream.writer();
+            var writer: std.Io.Writer = .fixed(&buf);
 
             try writer.writeAll("Date: ");
-            try time.Datetime.nowUTC().toString("%:a, %d %:b %Y %H:%M:%S GMT", writer);
+            try time.Datetime.nowUTC().toString("%:a, %d %:b %Y %H:%M:%S GMT", &writer);
 
-            const response = try std.fmt.allocPrint(allocator, "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n{s}\r\nServer: zune\r\nContent-Length: {d}\r\n\r\n{s}", .{ stream.getWritten(), content.len, content });
+            const response = try std.fmt.allocPrint(allocator, "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n{s}\r\nServer: zune\r\nContent-Length: {d}\r\n\r\n{s}", .{ writer.buffered(), content.len, content });
             defer allocator.free(response);
+
             self.writeAll(response);
         },
         else => {

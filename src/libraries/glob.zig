@@ -82,7 +82,7 @@ const Brace = struct {
     open_brace_idx: u32,
     branch_idx: u32,
 };
-const BraceStack = std.BoundedArray(Brace, 10);
+const BraceStack = std.ArrayList(Brace);
 
 pub const MatchResult = enum {
     no_match,
@@ -175,7 +175,8 @@ pub fn match(glob: []const u8, path: []const u8) MatchResult {
         negated = !negated;
     }
 
-    var brace_stack = BraceStack.init(0) catch unreachable;
+    var brace: [10]Brace = undefined;
+    var brace_stack = BraceStack.initBuffer(&brace);
     const matched = globMatchImpl(&state, glob, 0, path, &brace_stack);
 
     // TODO: consider just returning a bool
@@ -307,7 +308,7 @@ inline fn globMatchImpl(state: *State, glob: []const u8, glob_start: u32, path: 
                         break :fallthrough;
                     } else break :to_else,
                     '{' => {
-                        for (brace_stack.slice()) |brace| {
+                        for (brace_stack.items) |brace| {
                             if (brace.open_brace_idx == state.glob_index) {
                                 state.glob_index = brace.branch_idx;
                                 state.brace_depth += 1;
@@ -410,13 +411,13 @@ fn matchBrace(state: *State, glob: []const u8, path: []const u8, brace_stack: *B
 }
 
 fn matchBraceBranch(state: *State, glob: []const u8, path: []const u8, open_brace_index: u32, branch_index: u32, brace_stack: *BraceStack) bool {
-    brace_stack.append(Brace{ .open_brace_idx = open_brace_index, .branch_idx = branch_index }) catch
+    brace_stack.appendBounded(Brace{ .open_brace_idx = open_brace_index, .branch_idx = branch_index }) catch
         return false; // exceeded brace depth
 
     // Clone state
     var branch_state = state.*;
     branch_state.glob_index = branch_index;
-    branch_state.brace_depth = @intCast(brace_stack.len);
+    branch_state.brace_depth = @intCast(brace_stack.items.len);
 
     const matched = globMatchImpl(&branch_state, glob, branch_index, path, brace_stack);
 

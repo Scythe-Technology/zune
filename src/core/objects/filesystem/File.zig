@@ -12,6 +12,7 @@ const MethodMap = Zune.Utils.MethodMap;
 
 const tagged = Zune.tagged;
 const sysfd = @import("../../utils/sysfd.zig");
+const ext_fs = @import("../../utils/ext_fs.zig");
 
 const VM = luau.VM;
 
@@ -89,7 +90,7 @@ pub const AsyncReadContext = struct {
     },
     ref: Scheduler.ThreadRef,
     limit: usize = LuaHelper.MAX_LUAU_SIZE,
-    array: std.ArrayList(u8) = undefined,
+    array: std.ArrayList(u8) = .empty,
     lua_type: VM.lua.Type = .String,
     buffer_len: usize = 0,
     err: ?anyerror = null,
@@ -106,6 +107,7 @@ pub const AsyncReadContext = struct {
         completion: *xev.Completion,
         file: xev.File,
     ) xev.CallbackAction {
+        const allocator = luau.getallocator(L);
         if (self.auto_close) {
             self.auto_close = false;
             file.close(&scheduler.loop, completion, This, self, close_complete);
@@ -113,7 +115,7 @@ pub const AsyncReadContext = struct {
         }
         defer scheduler.completeAsync(self);
         defer self.ref.deref();
-        defer self.array.deinit();
+        defer self.array.deinit(allocator);
 
         if (self.list) |l|
             l.remove(&self.completion);
@@ -122,7 +124,7 @@ pub const AsyncReadContext = struct {
             L.pushstring(@errorName(e)) catch |err| std.debug.panic("{}", .{err});
             _ = Scheduler.resumeStateError(L, null) catch {};
         } else {
-            self.array.shrinkAndFree(@min(self.buffer_len, self.limit));
+            self.array.shrinkAndFree(allocator, @min(self.buffer_len, self.limit));
             switch (self.lua_type) {
                 .Buffer => L.Zpushbuffer(self.array.items) catch |e| std.debug.panic("{}", .{e}),
                 .String => L.pushlstring(self.array.items) catch |e| std.debug.panic("{}", .{e}),
@@ -162,6 +164,7 @@ pub const AsyncReadContext = struct {
     ) xev.CallbackAction {
         const self = ud orelse unreachable;
         const L = self.ref.value;
+        const allocator = luau.getallocator(L);
 
         const scheduler = Scheduler.getScheduler(L);
         if (L.status() != .Yield)
@@ -182,12 +185,12 @@ pub const AsyncReadContext = struct {
 
         switch (self.file_kind) {
             .File => {
-                self.array.ensureTotalCapacity(self.buffer_len + 1) catch |err| {
+                self.array.ensureTotalCapacity(allocator, self.buffer_len + 1) catch |err| {
                     self.err = err;
                     return self.cleanup(L, scheduler, completion, file);
                 };
                 if (self.array.capacity > self.limit)
-                    self.array.shrinkAndFree(self.limit);
+                    self.array.shrinkAndFree(allocator, self.limit);
                 self.array.expandToCapacity();
 
                 file.pread(
@@ -223,8 +226,8 @@ pub const AsyncReadContext = struct {
 
         const file = xev.File.init(f) catch unreachable;
 
-        const array = try std.ArrayList(u8).initCapacity(allocator, @min(pre_alloc_size, max_size));
-        errdefer array.deinit();
+        var array: std.ArrayList(u8) = try .initCapacity(allocator, @min(pre_alloc_size, max_size));
+        errdefer array.deinit(allocator);
 
         const ctx = try scheduler.createAsyncCtx(This);
 
@@ -605,6 +608,7 @@ fn lua_lock(self: *File, L: *VM.lua.State) !i32 {
     }
     switch (comptime builtin.os.tag) {
         .windows, .linux, .macos => {},
+        .freebsd, .openbsd, .netbsd, .dragonfly => {},
         else => return error.UnsupportedPlatform,
     }
     var lockOpt: std.fs.File.Lock = .exclusive;
@@ -656,6 +660,7 @@ fn lua_unlock(self: *File, L: *VM.lua.State) !i32 {
     }
     switch (comptime builtin.os.tag) {
         .windows, .linux, .macos => {},
+        .freebsd, .openbsd, .netbsd, .dragonfly => {},
         else => return error.UnsupportedPlatform,
     }
     _ = L;
@@ -676,9 +681,10 @@ fn lua_sync(self: *File, _: *VM.lua.State) !i32 {
 fn lua_readonly(self: *File, L: *VM.lua.State) !i32 {
     switch (comptime builtin.os.tag) {
         .windows, .linux, .macos => {},
+        .freebsd, .openbsd, .netbsd, .dragonfly => {},
         else => return error.UnsupportedPlatform,
     }
-    const meta = try self.file.metadata();
+    const meta = try ext_fs.metadata(self.file);
     var permissions = meta.permissions();
     const enabled = if (L.typeOf(2) != .Boolean) {
         L.pushboolean(permissions.readOnly());

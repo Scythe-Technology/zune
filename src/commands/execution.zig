@@ -24,7 +24,7 @@ fn getFile(allocator: std.mem.Allocator, comptime from: enum { Run, Test, Other 
     errdefer if (maybe_content) |c| allocator.free(c);
 
     if (input.len == 1 and input[0] == '-') {
-        maybe_content = try std.io.getStdIn().readToEndAlloc(allocator, std.math.maxInt(usize));
+        maybe_content = try std.fs.File.stdin().deprecatedReader().readAllAlloc(allocator, std.math.maxInt(usize));
         maybe_src = try allocator.dupeZ(u8, "@STDIN");
     } else {
         const path = try File.resolve(allocator, Zune.STATE.ENV_MAP, switch (comptime from) {
@@ -41,7 +41,7 @@ fn getFile(allocator: std.mem.Allocator, comptime from: enum { Run, Test, Other 
                 error.RedundantFileExtension => return error.FileNotFound,
                 else => return err,
             } orelse return error.FileNotFound;
-            maybe_content = try result.val.handle.readToEndAlloc(allocator, std.math.maxInt(usize));
+            maybe_content = try result.val.handle.deprecatedReader().readAllAlloc(allocator, std.math.maxInt(usize));
             maybe_src = try std.mem.concatWithSentinel(allocator, u8, &.{ "@", path, result.ext }, 0);
         }
     }
@@ -180,7 +180,7 @@ fn cmdRun(allocator: std.mem.Allocator, args: []const []const u8) !void {
     try Zune.initState(L);
     defer Zune.deinitState(L);
 
-    try Scheduler.SCHEDULERS.append(&scheduler);
+    try Scheduler.SCHEDULERS.append(Zune.DEFAULT_ALLOCATOR, &scheduler);
 
     try Engine.prepAsync(L, &scheduler);
     try Zune.openZune(L, run_args, LOAD_FLAGS);
@@ -335,7 +335,7 @@ fn cmdTest(allocator: std.mem.Allocator, args: []const []const u8) !void {
     try Zune.initState(L);
     defer Zune.deinitState(L);
 
-    try Scheduler.SCHEDULERS.append(&scheduler);
+    try Scheduler.SCHEDULERS.append(Zune.DEFAULT_ALLOCATOR, &scheduler);
 
     try Engine.prepAsync(L, &scheduler);
     try Zune.openZune(L, args, LOAD_FLAGS);
@@ -390,7 +390,7 @@ fn cmdEval(allocator: std.mem.Allocator, args: []const []const u8) !void {
     try Zune.initState(L);
     defer Zune.deinitState(L);
 
-    try Scheduler.SCHEDULERS.append(&scheduler);
+    try Scheduler.SCHEDULERS.append(Zune.DEFAULT_ALLOCATOR, &scheduler);
 
     try Engine.prepAsync(L, &scheduler);
     try Zune.openZune(L, args, .{});
@@ -520,7 +520,7 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
         try Zune.initState(L);
         defer Zune.deinitState(L);
 
-        try Scheduler.SCHEDULERS.append(&scheduler);
+        try Scheduler.SCHEDULERS.append(Zune.DEFAULT_ALLOCATOR, &scheduler);
 
         const callbacks = L.callbacks();
 

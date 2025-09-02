@@ -31,7 +31,7 @@ test("Basic", function()
     expect(res.status_code).toBe(200);
     expect(res.body).toBe("Hello");
     expect(res.headers).toBe(expect.type("table"));
-    expect(res.headers["Content-Length"]).toBe("5");
+    expect(res.headers["content-length"]).toBe("5");
     expect(res.status_reason).toBe("OK");
 
     expect(requests).toHaveLength(1);
@@ -41,7 +41,7 @@ test("Basic", function()
     expect(request.method).toBe("GET");
     expect(request.path).toBe("/");
     expect(request.headers).toBe(expect.type("table"));
-    expect(request.headers["host"]).toBe("localhost:8080");
+    expect(request.headers["host"]).toBe("localhost");
     expect(request.headers["user-agent"]).toBe("zune/" .. version);
     
     expect(function()
@@ -94,7 +94,7 @@ test("Other method", function()
     expect(res.status_code).toBe(200);
     expect(res.body).toBe("Hello");
     expect(res.headers).toBe(expect.type("table"));
-    expect(res.headers["Content-Length"]).toBe("5");
+    expect(res.headers["content-length"]).toBe("5");
     expect(res.status_reason).toBe("OK");
 
     expect(requests).toHaveLength(1);
@@ -104,7 +104,7 @@ test("Other method", function()
     expect(request.method).toBe("PUT");
     expect(request.path).toBe("/");
     expect(request.headers).toBe(expect.type("table"));
-    expect(request.headers["host"]).toBe("localhost:8080");
+    expect(request.headers["host"]).toBe("localhost");
     expect(request.headers["user-agent"]).toBe("zune/" .. version);
     expect(request.headers["content-type"]).toBe("text/plain");
     expect(request.headers["content-length"]).toBe("4");
@@ -132,7 +132,7 @@ test("Basic Table Buffer", function()
     expect(res.status_code).toBe(200);
     expect(res.body).toBe("Hello Table Buffer");
     expect(res.headers).toBe(expect.type("table"));
-    expect(res.headers["Content-Length"]).toBe("18");
+    expect(res.headers["content-length"]).toBe("18");
     expect(res.status_reason).toBe("OK");
 
     expect(requests).toHaveLength(1);
@@ -142,7 +142,7 @@ test("Basic Table Buffer", function()
     expect(request.method).toBe("GET");
     expect(request.path).toBe("/");
     expect(request.headers).toBe(expect.type("table"));
-    expect(request.headers["host"]).toBe("localhost:8080");
+    expect(request.headers["host"]).toBe("localhost");
     expect(request.headers["user-agent"]).toBe("zune/" .. version);
 
     expect(not server:isRunning()).toBe(false);
@@ -168,7 +168,7 @@ test("Basic Buffer", function()
     expect(res.status_code).toBe(200);
     expect(res.body).toBe("Hello Buffer");
     expect(res.headers).toBe(expect.type("table"));
-    expect(res.headers["Content-Length"]).toBe("12");
+    expect(res.headers["content-length"]).toBe("12");
     expect(res.status_reason).toBe("OK");
 
     expect(requests).toHaveLength(1);
@@ -178,7 +178,7 @@ test("Basic Buffer", function()
     expect(request.method).toBe("GET");
     expect(request.path).toBe("/");
     expect(request.headers).toBe(expect.type("table"));
-    expect(request.headers["host"]).toBe("localhost:8080");
+    expect(request.headers["host"]).toBe("localhost");
     expect(request.headers["user-agent"]).toBe("zune/" .. version);
 
     expect(not server:isRunning()).toBe(false);
@@ -209,7 +209,7 @@ test("Long Term", function()
         expect(res.status_code).toBe(200);
         expect(res.body).toBe("Hello: " .. requestsMade);
         expect(res.headers).toBe(expect.type("table"));
-        expect(res.headers["Content-Length"]).toBe(tostring(7 + #tostring(requestsMade)));
+        expect(res.headers["content-length"]).toBe(tostring(7 + #tostring(requestsMade)));
         expect(res.status_reason).toBe("OK");
 
         expect(requests).toHaveLength(requestsMade);
@@ -219,7 +219,7 @@ test("Long Term", function()
         expect(request.method).toBe("GET");
         expect(request.path).toBe("/");
         expect(request.headers).toBe(expect.type("table"));
-        expect(request.headers["host"]).toBe("localhost:8080");
+        expect(request.headers["host"]).toBe("localhost");
         expect(request.headers["user-agent"]).toBe("zune/" .. version);
 
     end
@@ -268,7 +268,7 @@ test("Short Capacity", function()
             expect(res.status_code).toBe(200);
             expect(res.body).toBe("Hello: " .. requestsMade);
             expect(res.headers).toBe(expect.type("table"));
-            expect(res.headers["Content-Length"]).toBe(tostring(7 + #tostring(requestsMade)));
+            expect(res.headers["content-length"]).toBe(tostring(7 + #tostring(requestsMade)));
             expect(res.status_reason).toBe("OK");
     
             expect(requests).toHaveLength(requestsMade);
@@ -278,7 +278,7 @@ test("Short Capacity", function()
             expect(request.method).toBe("GET");
             expect(request.path).toBe("/");
             expect(request.headers).toBe(expect.type("table"));
-            expect(request.headers["host"]).toBe("localhost:8080");
+            expect(request.headers["host"]).toBe("localhost");
             expect(request.headers["user-agent"]).toBe("zune/" .. version);
         end)
     end
@@ -388,8 +388,8 @@ describe("Server Error", function()
         expect(res.status_code).toBe(500);
         expect(res.body).toBe("An error occurred on the server");
         expect(res.headers).toBe(expect.type("table"));
-        expect(res.headers["Content-Length"]).toBe("31");
-        expect(res.headers["Content-Type"]).toBe("text/plain");
+        expect(res.headers["content-length"]).toBe("31");
+        expect(res.headers["content-type"]).toBe("text/plain");
         expect(res.status_reason).toBe("Internal Server Error");
     end)
     test("Yielded", function()
@@ -413,8 +413,8 @@ describe("Server Error", function()
         expect(res.status_code).toBe(500);
         expect(res.body).toBe("An error occurred on the server");
         expect(res.headers).toBe(expect.type("table"));
-        expect(res.headers["Content-Length"]).toBe("31");
-        expect(res.headers["Content-Type"]).toBe("text/plain");
+        expect(res.headers["content-length"]).toBe("31");
+        expect(res.headers["content-type"]).toBe("text/plain");
         expect(res.status_reason).toBe("Internal Server Error");
     end)
 end)

@@ -64,7 +64,7 @@ pub fn parseModified(self: *LuaDatetime, allocator: std.mem.Allocator, timestrin
     self.datetime = try time.Datetime.fromFields(.{
         .day = day,
         .month = month,
-        .year = year,
+        .year = @intCast(year),
         .hour = hour,
         .minute = minute,
         .second = second,
@@ -102,7 +102,7 @@ pub fn parseModifiedShort(self: *LuaDatetime, allocator: std.mem.Allocator, time
     self.datetime = try time.Datetime.fromFields(.{
         .day = day,
         .month = month,
-        .year = year,
+        .year = @intCast(year),
         .hour = hour,
         .minute = minute,
         .second = second,

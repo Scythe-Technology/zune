@@ -12,6 +12,8 @@ const MethodMap = Zune.Utils.MethodMap;
 
 const File = @import("../../objects/filesystem/File.zig");
 
+const ext_fs = @import("../../utils/ext_fs.zig");
+
 const Watch = @import("./watch.zig");
 
 const tagged = @import("../../../tagged.zig");
@@ -73,7 +75,7 @@ fn lua_readFileSync(L: *VM.lua.State) !i32 {
 
 fn lua_readDir(L: *VM.lua.State) !i32 {
     const path = L.Lcheckstring(1);
-    var dir = try fs.cwd().openDir(path, fs.Dir.OpenDirOptions{
+    var dir = try fs.cwd().openDir(path, .{
         .iterate = true,
     });
     defer dir.close();
@@ -148,7 +150,7 @@ fn lua_removeDir(L: *VM.lua.State) !i32 {
 
 fn internal_isDir(srcDir: fs.Dir, path: []const u8) bool {
     if (comptime builtin.os.tag == .windows) {
-        var dir = srcDir.openDir(path, fs.Dir.OpenDirOptions{
+        var dir = srcDir.openDir(path, .{
             .iterate = true,
         }) catch return false;
         defer dir.close();
@@ -183,6 +185,7 @@ fn internal_stat(dir: fs.Dir, path: []const u8) !fs.Dir.Stat {
 fn lua_stat(L: *VM.lua.State) !i32 {
     switch (comptime builtin.os.tag) {
         .windows, .linux, .macos => {},
+        .freebsd, .openbsd, .netbsd, .dragonfly => {},
         else => return error.UnsupportedPlatform,
     }
     const path = L.Lcheckstring(1);
@@ -204,7 +207,7 @@ fn lua_stat(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn internal_metadata_table(L: *VM.lua.State, metadata: fs.File.Metadata, isSymlink: bool) !void {
+fn internal_metadata_table(L: *VM.lua.State, metadata: ext_fs.Metadata, isSymlink: bool) !void {
     try L.Zpushvalue(.{
         .created_at = internal_lossyfloat_time(metadata.created() orelse 0),
         .modified_at = internal_lossyfloat_time(metadata.modified()),
@@ -221,6 +224,7 @@ fn internal_metadata_table(L: *VM.lua.State, metadata: fs.File.Metadata, isSymli
 fn lua_metadata(L: *VM.lua.State) !i32 {
     switch (comptime builtin.os.tag) {
         .windows, .linux, .macos => {},
+        .freebsd, .openbsd, .netbsd, .dragonfly => {},
         else => return error.UnsupportedPlatform,
     }
     const path = L.Lcheckstring(1);
@@ -229,9 +233,9 @@ fn lua_metadata(L: *VM.lua.State) !i32 {
     defer allocator.free(buf);
     const cwd = std.fs.cwd();
     if (internal_isDir(cwd, path)) {
-        var dir = try cwd.openDir(path, fs.Dir.OpenDirOptions{});
+        var dir = try cwd.openDir(path, .{});
         defer dir.close();
-        const metadata = try dir.metadata();
+        const metadata = try ext_fs.metadata(.{ .handle = dir.fd });
         var isLink = builtin.os.tag != .windows;
         if (builtin.os.tag != .windows)
             _ = cwd.readLink(path, buf) catch |err| switch (err) {
@@ -241,11 +245,11 @@ fn lua_metadata(L: *VM.lua.State) !i32 {
             };
         try internal_metadata_table(L, metadata, isLink);
     } else {
-        var file = try cwd.openFile(path, fs.File.OpenFlags{
+        var file = try cwd.openFile(path, .{
             .mode = .read_only,
         });
         defer file.close();
-        const metadata = try file.metadata();
+        const metadata = try ext_fs.metadata(file);
         var isLink = builtin.os.tag != .windows;
         if (builtin.os.tag != .windows)
             _ = cwd.readLink(path, buf) catch |err| switch (err) {
@@ -300,7 +304,7 @@ fn lua_copy(L: *VM.lua.State) !i32 {
     const override = L.Loptboolean(3, false);
     const cwd = std.fs.cwd();
     if (internal_isDir(cwd, fromPath)) {
-        var fromDir = try cwd.openDir(fromPath, fs.Dir.OpenDirOptions{
+        var fromDir = try cwd.openDir(fromPath, .{
             .iterate = true,
             .access_sub_paths = true,
             .no_follow = true,
@@ -314,7 +318,7 @@ fn lua_copy(L: *VM.lua.State) !i32 {
                 else => return UnhandledError.UnknownError,
             };
         }
-        var toDir = try cwd.openDir(toPath, fs.Dir.OpenDirOptions{
+        var toDir = try cwd.openDir(toPath, .{
             .iterate = true,
             .access_sub_paths = true,
             .no_follow = true,
@@ -514,6 +518,7 @@ fn lua_realPath(L: *VM.lua.State) !i32 {
     switch (comptime builtin.os.tag) {
         .macos, .ios, .tvos, .visionos, .watchos => {},
         .windows, .linux => {},
+        .freebsd, .openbsd, .netbsd, .dragonfly => {},
         else => return error.UnsupportedPlatform,
     }
     const path = L.Lcheckstring(1);
@@ -538,7 +543,7 @@ const WatchState = struct {
         const state = self.state.load(.acquire);
         if (state == .Dead) {
             defer scheduler.freeSync(self);
-            defer if (self.info) |info| info.deinit();
+            defer if (self.info) |info| info.deinit(self.watcher.allocator);
             defer self.mutex.unlock();
             self.watcher.deinit();
             self.callback.deref(scheduler.global);
@@ -551,14 +556,14 @@ const WatchState = struct {
 
         if (state == .Terminating) {
             if (self.info) |info| {
-                defer info.deinit();
+                defer info.deinit(self.watcher.allocator);
                 self.info = null;
             }
             return;
         }
 
         if (self.info) |info| {
-            defer info.deinit();
+            defer info.deinit(self.watcher.allocator);
             for (info.list.items) |item| {
                 if (self.callback.hasRef()) {
                     const ML = scheduler.global.newthread() catch @panic("OutOfMemory");
@@ -627,6 +632,7 @@ const WatchState = struct {
 fn lua_watch(L: *VM.lua.State) !i32 {
     switch (comptime builtin.os.tag) {
         .windows, .linux, .macos => {},
+        .freebsd, .openbsd, .netbsd, .dragonfly => {},
         else => return error.UnsupportedPlatform,
     }
     const scheduler = Scheduler.getScheduler(L);

@@ -145,7 +145,7 @@ describe("DateTime", function()
 
             expect(date:formatUniversalTime("%Y-%m-%d %H:%M:%S")).toBe("1995-12-04 00:12:00");
             expect(date:formatUniversalTime("%Y-%m-%d %H:%M:%S %:z")).toBe("1995-12-04 00:12:00 +00:00");
-            expect(date:formatUniversalTime("%T")).toBe("1995-12-04T00:12:00+00:00");
+            expect(date:formatUniversalTime("%T")).toBe("1995-12-04T00:12:00Z");
         end)
     end)
 

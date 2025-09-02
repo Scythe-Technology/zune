@@ -9,7 +9,10 @@ pub fn lua_compress(L: *VM.lua.State) !i32 {
 
     const is_buffer = L.typeOf(1) == .Buffer;
 
-    const string = if (is_buffer) L.Lcheckbuffer(1) else L.Lcheckstring(1);
+    const string = if (is_buffer)
+        L.Lcheckbuffer(1)
+    else
+        L.Lcheckstring(1);
     const options = L.typeOf(2);
 
     var level: i32 = zstd.DEFAULT_COMPRESSION_LEVEL;
@@ -31,7 +34,10 @@ pub fn lua_compress(L: *VM.lua.State) !i32 {
     const compressed = try zstd.compressAlloc(allocator, string, level);
     defer allocator.free(compressed);
 
-    if (is_buffer) try L.Zpushbuffer(compressed) else try L.pushlstring(compressed);
+    if (is_buffer)
+        try L.Zpushbuffer(compressed)
+    else
+        try L.pushlstring(compressed);
 
     return 1;
 }
@@ -41,12 +47,18 @@ pub fn lua_decompress(L: *VM.lua.State) !i32 {
 
     const is_buffer = L.typeOf(1) == .Buffer;
 
-    const string = if (is_buffer) L.Lcheckbuffer(1) else L.Lcheckstring(1);
+    const string = if (is_buffer)
+        L.Lcheckbuffer(1)
+    else
+        L.Lcheckstring(1);
 
     const decompressed = try zstd.decompressAlloc(allocator, string);
     defer allocator.free(decompressed);
 
-    if (is_buffer) try L.Zpushbuffer(decompressed) else try L.pushlstring(decompressed);
+    if (is_buffer)
+        try L.Zpushbuffer(decompressed)
+    else
+        try L.pushlstring(decompressed);
 
     return 1;
 }

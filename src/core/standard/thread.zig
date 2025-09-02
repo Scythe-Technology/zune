@@ -222,7 +222,11 @@ pub const Runtime = struct {
     fn entry(self: *Runtime) void {
         const ML = self.L.tothread(1).?;
 
+        Scheduler.SCHEDULERS = .empty;
+
         jmp: {
+            Scheduler.SCHEDULERS.append(Zune.DEFAULT_ALLOCATOR, &self.scheduler) catch break :jmp;
+
             Zune.initState(self.L) catch break :jmp;
             defer Zune.deinitState(self.L);
 
@@ -478,7 +482,7 @@ fn createThread(allocator: std.mem.Allocator, L: *VM.lua.State) !*VM.lua.State {
         .L = undefined,
         .scheduler = .{
             .allocator = allocator,
-            .@"async" = undefined,
+            .async = undefined,
             .global = undefined,
             .loop = undefined,
             .pools = undefined,
