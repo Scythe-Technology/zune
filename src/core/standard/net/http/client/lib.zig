@@ -345,6 +345,7 @@ fn stream_read(
                     inner_ctx.cleartext.end += res.cleartext.len;
                     if (res.cleartext.len > 0) {
                         const amount = inner_ctx.cleartext.readSliceShort(&inner_self.read_buffer) catch unreachable; // shouldn't fail;
+                        inner_ctx.cleartext.rebase(inner_ctx.cleartext.buffer.len) catch unreachable; // shouldn't fail
                         switch (@call(.always_inline, callback, .{
                             ud,
                             l,
