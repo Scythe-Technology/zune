@@ -608,6 +608,7 @@ fn lua_lock(self: *File, L: *VM.lua.State) !i32 {
     }
     switch (comptime builtin.os.tag) {
         .windows, .linux, .macos => {},
+        .freebsd, .openbsd, .netbsd, .dragonfly => {},
         else => return error.UnsupportedPlatform,
     }
     var lockOpt: std.fs.File.Lock = .exclusive;
@@ -659,6 +660,7 @@ fn lua_unlock(self: *File, L: *VM.lua.State) !i32 {
     }
     switch (comptime builtin.os.tag) {
         .windows, .linux, .macos => {},
+        .freebsd, .openbsd, .netbsd, .dragonfly => {},
         else => return error.UnsupportedPlatform,
     }
     _ = L;
@@ -679,6 +681,7 @@ fn lua_sync(self: *File, _: *VM.lua.State) !i32 {
 fn lua_readonly(self: *File, L: *VM.lua.State) !i32 {
     switch (comptime builtin.os.tag) {
         .windows, .linux, .macos => {},
+        .freebsd, .openbsd, .netbsd, .dragonfly => {},
         else => return error.UnsupportedPlatform,
     }
     const meta = try ext_fs.metadata(self.file);

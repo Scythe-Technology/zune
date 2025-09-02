@@ -294,6 +294,7 @@ pub const FileSystemWatcher = struct {
                 .ios, .macos, .tvos, .visionos, .watchos => .{ .darwin = .{} },
                 .windows => .{ .windows = .{} },
                 .linux => .{ .linux = .{} },
+                .freebsd, .openbsd, .netbsd, .dragonfly => .{ .darwin = .{} },
                 else => @compileError("Unsupported platform"),
             },
         };

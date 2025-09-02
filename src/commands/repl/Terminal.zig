@@ -59,6 +59,7 @@ pub const MoveCursorAction = enum {
 fn AssertPlatform() !void {
     switch (comptime builtin.os.tag) {
         .linux, .windows, .macos => {},
+        .freebsd, .openbsd, .netbsd, .dragonfly => {},
         else => return error.UnsupportedPlatform,
     }
 }
@@ -103,6 +104,7 @@ pub fn saveSettings(self: *Terminal) !void {
     comptime try AssertPlatform();
     switch (comptime builtin.os.tag) {
         .linux, .windows, .macos => {},
+        .freebsd, .openbsd, .netbsd, .dragonfly => {},
         else => return error.UnsupportedPlatform,
     }
     if (!self.stdin_istty or !self.stdout_istty)

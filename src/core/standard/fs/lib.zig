@@ -185,6 +185,7 @@ fn internal_stat(dir: fs.Dir, path: []const u8) !fs.Dir.Stat {
 fn lua_stat(L: *VM.lua.State) !i32 {
     switch (comptime builtin.os.tag) {
         .windows, .linux, .macos => {},
+        .freebsd, .openbsd, .netbsd, .dragonfly => {},
         else => return error.UnsupportedPlatform,
     }
     const path = L.Lcheckstring(1);
@@ -223,6 +224,7 @@ fn internal_metadata_table(L: *VM.lua.State, metadata: ext_fs.Metadata, isSymlin
 fn lua_metadata(L: *VM.lua.State) !i32 {
     switch (comptime builtin.os.tag) {
         .windows, .linux, .macos => {},
+        .freebsd, .openbsd, .netbsd, .dragonfly => {},
         else => return error.UnsupportedPlatform,
     }
     const path = L.Lcheckstring(1);
@@ -516,6 +518,7 @@ fn lua_realPath(L: *VM.lua.State) !i32 {
     switch (comptime builtin.os.tag) {
         .macos, .ios, .tvos, .visionos, .watchos => {},
         .windows, .linux => {},
+        .freebsd, .openbsd, .netbsd, .dragonfly => {},
         else => return error.UnsupportedPlatform,
     }
     const path = L.Lcheckstring(1);
@@ -629,6 +632,7 @@ const WatchState = struct {
 fn lua_watch(L: *VM.lua.State) !i32 {
     switch (comptime builtin.os.tag) {
         .windows, .linux, .macos => {},
+        .freebsd, .openbsd, .netbsd, .dragonfly => {},
         else => return error.UnsupportedPlatform,
     }
     const scheduler = Scheduler.getScheduler(L);
