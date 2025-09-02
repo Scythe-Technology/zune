@@ -25,6 +25,7 @@ const ClientContext = @import("./client.zig");
 const ClientWebSocket = @import("./websocket.zig");
 
 pub const State = struct {
+    listening: bool = false,
     stage: Stage = .idle,
     port: u16,
     client_timeout: usize = 60,
@@ -132,6 +133,7 @@ pub fn onAccept(
 
     switch (self.state.stage) {
         .shutdown => {
+            self.state.listening = false;
             self.continueShutdown(loop, &self.close_completion);
             return .disarm;
         },
@@ -140,7 +142,10 @@ pub fn onAccept(
     }
 
     const client_socket = r catch |err| switch (err) {
-        error.Canceled => return .disarm,
+        error.Canceled => {
+            self.state.listening = false;
+            return .disarm;
+        },
         else => {
             self.emitError(.accept, err);
             return .rearm;
@@ -180,6 +185,7 @@ pub fn onAccept(
 
     if (self.state.max_connections > 0 and self.state.list.len >= self.state.max_connections) {
         self.state.stage = .max_capacity;
+        self.state.listening = false;
         return .disarm;
     }
     return .rearm;
@@ -227,6 +233,8 @@ pub fn onTimerTick(
 
     if (self.state.stage == .shutdown) {
         self.timer.active = false;
+        if (self.state.listening)
+            return .disarm; // the accept callback will handle shutdown
         self.socket.close(
             loop,
             &self.close_completion,
@@ -325,6 +333,7 @@ pub fn startListen(self: *Self, loop: *xev.Loop) void {
     std.debug.assert(self.state.stage == .idle);
 
     self.state.stage = .accepting;
+    self.state.listening = true;
     self.socket.accept(
         loop,
         &self.completion,
