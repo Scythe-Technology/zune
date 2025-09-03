@@ -30,6 +30,12 @@ const UnhandledError = error{UnknownError};
 const OpenError = error{ InvalidMode, BadExclusive };
 
 pub const LIB_NAME = "fs";
+pub fn PlatformSupported() bool {
+    return switch (comptime builtin.os.tag) {
+        .linux, .macos, .windows => true,
+        else => false,
+    };
+}
 
 fn lua_readFileAsync(L: *VM.lua.State) !i32 {
     const path = L.Lcheckstring(1);

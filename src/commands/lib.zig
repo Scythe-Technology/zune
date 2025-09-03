@@ -46,7 +46,7 @@ pub const CommandMap = initCommands(&.{
     @import("luau.zig").Command,
     @import("help.zig").Command,
 
-    @import("version.zig").Command,
+    @import("info.zig").Command,
 });
 
 test {
@@ -57,5 +57,5 @@ test {
     _ = @import("bundle.zig");
     _ = @import("luau.zig");
     _ = @import("help.zig");
-    _ = @import("version.zig");
+    _ = @import("info.zig");
 }
