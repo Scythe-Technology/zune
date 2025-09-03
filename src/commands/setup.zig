@@ -2,6 +2,8 @@ const std = @import("std");
 const json = @import("json");
 const lcompress = @import("lcompress");
 
+const Zune = @import("zune");
+
 const command = @import("lib.zig");
 
 const file = @import("../core/resolvers/file.zig");
@@ -102,8 +104,8 @@ fn setup(editor: EditorKind, allocator: std.mem.Allocator, setupInfo: SetupInfo)
             // Get Values of luau-lsp.require.mode and luau-lsp.require.directoryAliases
             const definition_files = settings_object.get(LUAU_LSP_DEFINITION_FILES) orelse try settings_root.value.setWith(LUAU_LSP_DEFINITION_FILES, try settings_root.newArray());
             const documentation_files = settings_object.get(LUAU_LSP_DOCUMENTATION_FILES) orelse try settings_root.value.setWith(LUAU_LSP_DOCUMENTATION_FILES, try settings_root.newArray());
-            var definition_files_array = definition_files.arrayOrNull() orelse std.debug.panic("{s} is not a valid Array", .{LUAU_LSP_DEFINITION_FILES});
-            var documentation_files_array = documentation_files.arrayOrNull() orelse std.debug.panic("{s} is not a valid Array", .{LUAU_LSP_DOCUMENTATION_FILES});
+            var definition_files_array = definition_files.arrayOrNull() orelse Zune.quitMsg("{s} is not a valid Array", .{LUAU_LSP_DEFINITION_FILES});
+            var documentation_files_array = documentation_files.arrayOrNull() orelse Zune.quitMsg("{s} is not a valid Array", .{LUAU_LSP_DOCUMENTATION_FILES});
 
             for (luaudefs) |type_file| {
                 {
@@ -360,7 +362,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     const cwd = std.fs.cwd();
 
-    const HOME = file.getHomeDir(envMap) orelse std.debug.panic("Failed to setup, $HOME/$USERPROFILE variable not found", .{});
+    const HOME = file.getHomeDir(envMap) orelse Zune.quitMsg("Failed to setup, $HOME/$USERPROFILE variable not found", .{});
 
     const path = try std.fs.path.resolve(allocator, &.{ HOME, ".zune/typedefs" });
     defer allocator.free(path);
