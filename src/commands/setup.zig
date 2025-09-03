@@ -186,7 +186,7 @@ fn setup(editor: EditorKind, allocator: std.mem.Allocator, setupInfo: SetupInfo)
                     \\          "definitions": [
                     \\            "{s}/.zune/typedefs/global/zune.d.luau"
                     \\          ],
-                    \\          "documentations": [
+                    \\          "documentation": [
                     \\            "{s}/.zune/typedefs/global/zune.d.json"
                     \\          ]
                     \\        }}
@@ -221,7 +221,7 @@ fn setup(editor: EditorKind, allocator: std.mem.Allocator, setupInfo: SetupInfo)
             var definition_files = luau_ext.asObject().get("definitions") orelse try luau_ext.setWith("definitions", try settings_root.newArray());
             const definition_files_array = definition_files.asArray();
 
-            var documentation_files = luau_ext.asObject().get("documentations") orelse try luau_ext.setWith("documentations", try settings_root.newArray());
+            var documentation_files = luau_ext.asObject().get("documentation") orelse try luau_ext.setWith("documentation", try settings_root.newArray());
             const documentation_files_array = documentation_files.asArray();
 
             for (luaudefs) |type_file| {
@@ -286,7 +286,7 @@ fn setup(editor: EditorKind, allocator: std.mem.Allocator, setupInfo: SetupInfo)
                 \\          "definitions": [
                 \\            "{s}/.zune/typedefs/global/zune.d.luau"
                 \\          ],
-                \\          "documentations": [
+                \\          "documentation": [
                 \\            "{s}/.zune/typedefs/global/zune.d.json"
                 \\          ]
                 \\        }}
