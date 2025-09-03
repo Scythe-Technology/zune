@@ -198,21 +198,21 @@ pub fn loadConfiguration(dir: std.fs.Dir) void {
         if (toml.checkString(config, "cwd")) |path| {
             if (comptime builtin.target.os.tag != .wasi) {
                 const cwd = dir.openDir(path, .{}) catch |err| {
-                    std.debug.panic("[zune.toml] Failed to open cwd (\"{s}\"): {}\n", .{ path, err });
+                    quitMsg("[zune.toml] Failed to open cwd (\"{s}\"): {}\n", .{ path, err });
                 };
                 cwd.setAsCwd() catch |err| {
-                    std.debug.panic("[zune.toml] Failed to set cwd to (\"{s}\"): {}\n", .{ path, err });
+                    quitMsg("[zune.toml] Failed to set cwd to (\"{s}\"): {}\n", .{ path, err });
                 };
             }
         }
         if (toml.checkString(config, "run_path")) |path| {
             STATE.WORKSPACE.run_path = DEFAULT_ALLOCATOR.dupe(u8, path) catch |err| {
-                std.debug.panic("[zune.toml] {}\n", .{err});
+                quitMsg("[zune.toml] {}\n", .{err});
             };
         }
         if (toml.checkString(config, "test_path")) |path| {
             STATE.WORKSPACE.test_path = DEFAULT_ALLOCATOR.dupe(u8, path) catch |err| {
-                std.debug.panic("[zune.toml] {}\n", .{err});
+                quitMsg("[zune.toml] {}\n", .{err});
             };
         }
         if (toml.checkTable(config, "scripts")) |scripts| {
@@ -221,24 +221,24 @@ pub fn loadConfiguration(dir: std.fs.Dir) void {
                 const key = entry.key_ptr.*;
                 const value = entry.value_ptr.*;
                 if (value != .string)
-                    std.debug.panic("[zune.toml] 'scripts.{s}' must be a string\n", .{key});
+                    quitMsg("[zune.toml] 'scripts.{s}' must be a string\n", .{key});
                 const script_path = value.string;
                 if (script_path.len == 0)
-                    std.debug.panic("[zune.toml] 'scripts.{s}' cannot be empty\n", .{key});
+                    quitMsg("[zune.toml] 'scripts.{s}' cannot be empty\n", .{key});
                 if (std.mem.indexOfNone(u8, key, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-+#&$!@")) |_| {
-                    std.debug.panic("[zune.toml] 'scripts.{s}' contains invalid characters\n", .{key});
+                    quitMsg("[zune.toml] 'scripts.{s}' contains invalid characters\n", .{key});
                 }
                 if (STATE.WORKSPACE.scripts.contains(key)) {
-                    std.debug.panic("[zune.toml] Duplicate script key '{s}' found\n", .{key});
+                    quitMsg("[zune.toml] Duplicate script key '{s}' found\n", .{key});
                 }
                 const key_copy = DEFAULT_ALLOCATOR.dupe(u8, key) catch |err| {
-                    std.debug.panic("[zune.toml] Failed to copy script key '{s}': {}\n", .{ key, err });
+                    quitMsg("[zune.toml] Failed to copy script key '{s}': {}\n", .{ key, err });
                 };
                 const value_copy = DEFAULT_ALLOCATOR.dupe(u8, script_path) catch |err| {
-                    std.debug.panic("[zune.toml] Failed to copy script path '{s}': {}\n", .{ script_path, err });
+                    quitMsg("[zune.toml] Failed to copy script path '{s}': {}\n", .{ script_path, err });
                 };
                 STATE.WORKSPACE.scripts.put(allocator, key_copy, value_copy) catch |err| {
-                    std.debug.panic("[zune.toml] Failed to add script '{s}': {}\n", .{ key, err });
+                    quitMsg("[zune.toml] Failed to add script '{s}': {}\n", .{ key, err });
                 };
             }
         }
@@ -269,6 +269,11 @@ pub fn loadConfiguration(dir: std.fs.Dir) void {
     }
 }
 
+pub fn quitMsg(comptime format: []const u8, args: anytype) noreturn {
+    debug.print(format, args);
+    std.process.exit(1);
+}
+
 pub fn initState(L: *VM.lua.State) !void {
     try Resolvers.Require.init(L);
     if (FEATURES.ffi and comptime corelib.ffi.PlatformSupported())
@@ -286,61 +291,30 @@ pub fn openZune(L: *VM.lua.State, args: []const []const u8, flags: Flags) !void 
 
     try objects.load(L);
 
-    try L.createtable(0, 0);
-    try L.Zpushvalue(.{
-        .__index = struct {
-            fn inner(l: *VM.lua.State) !i32 {
-                _ = try l.Lfindtable(VM.lua.REGISTRYINDEX, "_LIBS", 1);
-                l.pushvalue(2);
-                _ = l.rawget(-2);
-                return 1;
-            }
-        }.inner,
-        .__metatable = "This metatable is locked",
-    });
-    L.setreadonly(-1, true);
-    _ = try L.setmetatable(-2);
-    L.setreadonly(-1, true);
-    try L.setglobal("zune");
+    try L.createtable(0, @typeInfo(corelib).@"struct".decls.len + 1);
+    L.pushvalue(-1);
+    try L.rawsetfield(VM.lua.REGISTRYINDEX, "_LIBS");
+    try L.rawsetglobal("zune");
 
-    try L.Zpushfunction(Resolvers.Fmt.print, "zune_fmt_print");
-    try L.setglobal("print");
+    try L.Zpushfunction(Resolvers.Fmt.print, "fmt_print");
+    try L.rawsetglobal("print");
 
     try L.Zsetglobal("_VERSION", VERSION);
 
     if (!flags.limbo) {
-        if (FEATURES.fs and comptime corelib.fs.PlatformSupported())
-            try corelib.fs.loadLib(L);
-        if (FEATURES.task)
-            try corelib.task.loadLib(L);
-        if (FEATURES.luau)
-            try corelib.luau.loadLib(L);
-        if (FEATURES.serde)
-            try corelib.serde.loadLib(L);
-        if (FEATURES.io)
-            try corelib.io.loadLib(L);
-        if (FEATURES.crypto)
-            try corelib.crypto.loadLib(L);
-        if (FEATURES.regex)
-            try corelib.regex.loadLib(L);
-        if (FEATURES.net and comptime corelib.net.PlatformSupported())
-            try corelib.net.loadLib(L);
-        if (FEATURES.datetime and comptime corelib.datetime.PlatformSupported())
-            try corelib.datetime.loadLib(L);
+        inline for (@typeInfo(corelib).@"struct".decls) |decl| {
+            comptime if (std.mem.eql(u8, decl.name, "process") or std.mem.eql(u8, decl.name, "testing"))
+                continue;
+            const lib = @field(corelib, decl.name);
+            const enabled = if (comptime @hasField(@TypeOf(FEATURES), decl.name)) @field(FEATURES, decl.name) else true;
+            if (@hasDecl(lib, "PlatformSupported")) {
+                if (enabled and comptime lib.PlatformSupported())
+                    try lib.loadLib(L);
+            } else if (enabled)
+                try lib.loadLib(L);
+        }
         if (FEATURES.process and comptime corelib.process.PlatformSupported())
             try corelib.process.loadLib(L, args);
-        if (FEATURES.ffi and comptime corelib.ffi.PlatformSupported())
-            try corelib.ffi.loadLib(L);
-        if (FEATURES.sqlite)
-            try corelib.sqlite.loadLib(L);
-        if (FEATURES.require)
-            try corelib.require.loadLib(L);
-        if (FEATURES.random)
-            try corelib.random.loadLib(L);
-        if (FEATURES.thread and comptime corelib.thread.PlatformSupported())
-            try corelib.thread.loadLib(L);
-
-        try corelib.mem.loadLib(L);
 
         try corelib.testing.loadLib(L, STATE.RUN_MODE == .Test);
 
@@ -353,6 +327,10 @@ pub fn openZune(L: *VM.lua.State, args: []const []const u8, flags: Flags) !void 
             try Utils.LuaHelper.registerModule(L, "compiled");
         }
     }
+
+    std.debug.assert(L.rawgetfield(VM.lua.REGISTRYINDEX, "_LIBS") == .Table);
+    L.setreadonly(-1, true);
+    L.pop(1); // drop: _LIBS
 }
 
 pub fn main() !void {

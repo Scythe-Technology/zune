@@ -41,4 +41,5 @@ pub fn main() !void {
     const old_writer = adaptToOldInterface(writer);
 
     try lcompress.gzip.compress(old_reader, old_writer, .{});
+    try writer.flush();
 }

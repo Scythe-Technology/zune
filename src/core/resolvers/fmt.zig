@@ -96,7 +96,7 @@ pub fn printValue(
                     } else try Zune.debug.writerPrint(writer, "<bmagenta><<table>><clear>", .{});
                     return;
                 }
-                const ptr = @intFromPtr(L.topointer(idx) orelse std.debug.panic("Failed Table to Ptr Conversion", .{}));
+                const ptr = @intFromPtr(L.topointer(idx).?);
                 if (map) |tracked| {
                     if (tracked.get(ptr)) |_| {
                         if (Zune.STATE.FORMAT.TABLE_ADDRESS)
