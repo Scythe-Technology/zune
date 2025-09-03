@@ -309,7 +309,7 @@ pub fn openZune(L: *VM.lua.State, args: []const []const u8, flags: Flags) !void 
     try L.Zsetglobal("_VERSION", VERSION);
 
     if (!flags.limbo) {
-        if (FEATURES.fs)
+        if (FEATURES.fs and comptime corelib.fs.PlatformSupported())
             try corelib.fs.loadLib(L);
         if (FEATURES.task)
             try corelib.task.loadLib(L);
