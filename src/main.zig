@@ -123,6 +123,7 @@ pub const ZuneState = struct {
     };
 
     pub const FormatOptions = struct {
+        ENABLED: bool = true,
         MAX_DEPTH: u8 = 4,
         USE_COLOR: bool = true,
         TABLE_ADDRESS: bool = true,
@@ -246,6 +247,8 @@ pub fn loadConfiguration(dir: std.fs.Dir) void {
 
     if (toml.checkTable(zune_config, "resolvers")) |resolvers_config| {
         if (toml.checkTable(resolvers_config, "formatter")) |fmt_config| {
+            if (toml.checkBool(fmt_config, "enabled")) |enabled|
+                STATE.FORMAT.ENABLED = enabled;
             if (toml.checkInteger(fmt_config, "max_depth")) |depth|
                 STATE.FORMAT.MAX_DEPTH = @truncate(@as(u64, @bitCast(depth)));
             if (toml.checkBool(fmt_config, "use_color")) |enabled|
@@ -296,8 +299,10 @@ pub fn openZune(L: *VM.lua.State, args: []const []const u8, flags: Flags) !void 
     try L.rawsetfield(VM.lua.REGISTRYINDEX, "_LIBS");
     try L.rawsetglobal("zune");
 
-    try L.Zpushfunction(Resolvers.Fmt.print, "fmt_print");
-    try L.rawsetglobal("print");
+    if (STATE.FORMAT.ENABLED) {
+        try L.Zpushfunction(Resolvers.Fmt.print, "fmt_print");
+        try L.rawsetglobal("print");
+    }
 
     try L.Zsetglobal("_VERSION", VERSION);
 

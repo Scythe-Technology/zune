@@ -288,6 +288,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
             .limbo = LOAD_FLAGS.limbo,
         },
         .format = .{
+            .enabled = Zune.STATE.FORMAT.ENABLED,
             .use_color = Zune.STATE.FORMAT.USE_COLOR,
             .max_depth = Zune.STATE.FORMAT.MAX_DEPTH,
             .table_address = Zune.STATE.FORMAT.TABLE_ADDRESS,
