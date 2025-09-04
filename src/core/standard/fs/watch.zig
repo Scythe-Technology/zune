@@ -27,11 +27,11 @@ pub const WatchInfo = struct {
     }
 };
 
-const LinuxAttributes = struct {
+const InotifyAttributes = struct {
     fd: ?i32 = null,
     fds: [1]std.posix.pollfd = undefined,
 
-    const INotifyEventSize = @sizeOf(INotifyEvent);
+    const InotifyEventSize = @sizeOf(INotifyEvent);
     pub const INotifyEvent = extern struct {
         wd: c_int,
         mask: u32,
@@ -43,13 +43,13 @@ const LinuxAttributes = struct {
         }
     };
 
-    pub fn deinit(self: *LinuxAttributes) void {
+    pub fn deinit(self: *InotifyAttributes) void {
         if (self.fd) |fd|
             std.posix.close(fd);
     }
 };
 
-const DarwinAttributes = struct {
+const KqueueAttributes = struct {
     const kevent = std.c.Kevent;
 
     fd: ?i32 = null,
@@ -76,7 +76,7 @@ const DarwinAttributes = struct {
         }
     };
 
-    pub fn scanDirectory(self: *DarwinAttributes, allocator: std.mem.Allocator) ![]FileDifference {
+    pub fn scanDirectory(self: *KqueueAttributes, allocator: std.mem.Allocator) ![]FileDifference {
         const dir = &(self.dir orelse return error.WatcherNotStarted);
 
         var diff: std.ArrayList(FileDifference) = .empty;
@@ -100,7 +100,7 @@ const DarwinAttributes = struct {
                 }
 
                 var changes: u8 = 0;
-                var changelist: [64]DarwinAttributes.kevent = std.mem.zeroes([64]DarwinAttributes.kevent);
+                var changelist: [64]KqueueAttributes.kevent = std.mem.zeroes([64]KqueueAttributes.kevent);
 
                 var iter = dir.iterate();
                 while (try iter.next()) |entry| {
@@ -202,7 +202,7 @@ const DarwinAttributes = struct {
         return diff.toOwnedSlice(allocator);
     }
 
-    pub fn deinit(self: *DarwinAttributes, allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *KqueueAttributes, allocator: std.mem.Allocator) void {
         if (self.fd) |fd|
             std.posix.close(fd);
         if (self.dir) |*dir|
@@ -218,7 +218,7 @@ const DarwinAttributes = struct {
     }
 };
 
-const WindowsAttributes = struct {
+const IOCPAttributes = struct {
     handle: ?std.os.windows.HANDLE = null,
     iocp: ?std.os.windows.HANDLE = null,
     overlapped: std.os.windows.OVERLAPPED = std.mem.zeroes(std.os.windows.OVERLAPPED),
@@ -234,7 +234,7 @@ const WindowsAttributes = struct {
         RenamedNew = std.os.windows.FILE_ACTION_RENAMED_NEW_NAME,
     };
 
-    pub fn monitor(self: *WindowsAttributes) !void {
+    pub fn monitor(self: *IOCPAttributes) !void {
         const handle = self.handle orelse return error.WatcherNotStarted;
         if (self.monitoring)
             return;
@@ -266,7 +266,7 @@ const WindowsAttributes = struct {
         self.monitoring = true;
     }
 
-    pub fn deinit(self: *WindowsAttributes) void {
+    pub fn deinit(self: *IOCPAttributes) void {
         if (self.handle) |handle|
             _ = std.os.windows.kernel32.CloseHandle(handle);
         if (self.iocp) |iocp|
@@ -280,9 +280,9 @@ pub const FileSystemWatcher = struct {
     path: []const u8,
 
     backend: union(enum) {
-        linux: LinuxAttributes,
-        darwin: DarwinAttributes,
-        windows: WindowsAttributes,
+        inotify: InotifyAttributes,
+        kqueue: KqueueAttributes,
+        iocp: IOCPAttributes,
     },
 
     pub fn init(allocator: std.mem.Allocator, dir: std.fs.Dir, pathname: []const u8) FileSystemWatcher {
@@ -291,10 +291,10 @@ pub const FileSystemWatcher = struct {
             .dir = dir,
             .path = pathname,
             .backend = switch (comptime builtin.os.tag) {
-                .ios, .macos, .tvos, .visionos, .watchos => .{ .darwin = .{} },
-                .windows => .{ .windows = .{} },
-                .linux => .{ .linux = .{} },
-                .freebsd, .openbsd, .netbsd, .dragonfly => .{ .darwin = .{} },
+                .ios, .macos, .tvos, .visionos, .watchos => .{ .kqueue = .{} },
+                .windows => .{ .iocp = .{} },
+                .linux => .{ .inotify = .{} },
+                .freebsd, .openbsd, .netbsd, .dragonfly => .{ .kqueue = .{} },
                 else => @compileError("Unsupported platform"),
             },
         };
@@ -302,28 +302,30 @@ pub const FileSystemWatcher = struct {
 
     pub fn start(self: *FileSystemWatcher) !void {
         switch (comptime builtin.os.tag) {
-            .linux => try self.startLinux(),
-            .ios, .macos, .tvos, .visionos, .watchos => try self.startDarwin(),
-            .windows => try self.startWindows(),
+            .linux => try self.startInotify(),
+            .ios, .macos, .tvos, .visionos, .watchos => try self.startKqueue(),
+            .freebsd, .openbsd, .netbsd, .dragonfly => try self.startKqueue(),
+            .windows => try self.startIOCP(),
             else => return error.UnsupportedPlatform,
         }
     }
 
     pub fn next(self: *FileSystemWatcher) !?WatchInfo {
         switch (comptime builtin.os.tag) {
-            .linux => return self.nextLinux(),
-            .ios, .macos, .tvos, .visionos, .watchos => return self.nextDarwin(),
-            .windows => return self.nextWindows(),
+            .linux => return self.nextInotify(),
+            .ios, .macos, .tvos, .visionos, .watchos => return self.nextKqueue(),
+            .freebsd, .openbsd, .netbsd, .dragonfly => return self.nextKqueue(),
+            .windows => return self.nextIOCP(),
             else => return error.UnsupportedPlatform,
         }
     }
 
-    fn nextLinux(self: *FileSystemWatcher) !?WatchInfo {
+    fn nextInotify(self: *FileSystemWatcher) !?WatchInfo {
         if (comptime builtin.os.tag != .linux)
             @compileError("Cannot call nextLinux on non-Linux platforms");
 
-        const fd = self.backend.linux.fd orelse return error.WatcherNotStarted;
-        const nums = try std.posix.poll(&self.backend.linux.fds, 1000);
+        const fd = self.backend.inotify.fd orelse return error.WatcherNotStarted;
+        const nums = try std.posix.poll(&self.backend.inotify.fds, 1000);
         if (nums == 0)
             return null;
         if (nums < 0)
@@ -340,8 +342,8 @@ pub const FileSystemWatcher = struct {
         errdefer watch_info.deinit(self.allocator);
 
         var i: u32 = 0;
-        while (i < bytes_read) : (i += LinuxAttributes.INotifyEventSize) {
-            const event: *LinuxAttributes.INotifyEvent = @ptrCast(@alignCast(buffer[i..][0..LinuxAttributes.INotifyEventSize]));
+        while (i < bytes_read) : (i += InotifyAttributes.InotifyEventSize) {
+            const event: *InotifyAttributes.INotifyEvent = @ptrCast(@alignCast(buffer[i..][0..InotifyAttributes.InotifyEventSize]));
             i += event.name_len;
 
             try watch_info.list.append(self.allocator, .{
@@ -362,13 +364,13 @@ pub const FileSystemWatcher = struct {
         return watch_info;
     }
 
-    fn nextDarwin(self: *FileSystemWatcher) !?WatchInfo {
-        if (comptime !builtin.os.tag.isDarwin())
-            @compileError("Cannot call nextDarwin on non-Darwin platforms");
+    fn nextKqueue(self: *FileSystemWatcher) !?WatchInfo {
+        if (comptime !builtin.os.tag.isBSD())
+            @compileError("Cannot call nextKqueue on non-BSD platforms");
 
-        const fd = self.backend.darwin.fd orelse return error.WatcherNotStarted;
+        const fd = self.backend.kqueue.fd orelse return error.WatcherNotStarted;
 
-        var list_arr: [128]DarwinAttributes.kevent = std.mem.zeroes([128]DarwinAttributes.kevent);
+        var list_arr: [128]KqueueAttributes.kevent = std.mem.zeroes([128]KqueueAttributes.kevent);
 
         var timespec = std.posix.timespec{ .sec = 1, .nsec = 0 };
         const count = std.posix.system.kevent(fd, &list_arr, 0, &list_arr, 128, &timespec);
@@ -393,7 +395,7 @@ pub const FileSystemWatcher = struct {
                     if (root)
                         continue;
                     root = true;
-                    const scandiff = try self.backend.darwin.scanDirectory(self.allocator);
+                    const scandiff = try self.backend.kqueue.scanDirectory(self.allocator);
                     defer self.allocator.free(scandiff);
                     defer for (scandiff) |change| self.allocator.free(change.name);
                     for (scandiff) |change| {
@@ -411,7 +413,7 @@ pub const FileSystemWatcher = struct {
                     }
                     continue;
                 }
-                const name = self.backend.darwin.named_fds.get(event.udata) orelse continue;
+                const name = self.backend.kqueue.named_fds.get(event.udata) orelse continue;
                 if ((event.fflags & std.c.NOTE.DELETE) != 0)
                     continue;
                 watch_info.list.appendAssumeCapacity(.{
@@ -428,16 +430,16 @@ pub const FileSystemWatcher = struct {
         return watch_info;
     }
 
-    fn nextWindows(self: *FileSystemWatcher) !?WatchInfo {
+    fn nextIOCP(self: *FileSystemWatcher) !?WatchInfo {
         if (comptime builtin.os.tag != .windows)
-            @compileError("Cannot call nextWindows on non-Windows platforms");
+            @compileError("Cannot call nextIOCP on non-Windows platforms");
 
-        const iocp = self.backend.windows.iocp orelse return error.WatcherNotStarted;
-        if (!self.backend.windows.active)
+        const iocp = self.backend.iocp.iocp orelse return error.WatcherNotStarted;
+        if (!self.backend.iocp.active)
             return error.WatcherNotActive;
 
-        if (!self.backend.windows.monitoring)
-            try self.backend.windows.monitor();
+        if (!self.backend.iocp.monitoring)
+            try self.backend.iocp.monitor();
 
         var nbytes: std.os.windows.DWORD = 0;
         var key: std.os.windows.ULONG_PTR = 0;
@@ -452,13 +454,13 @@ pub const FileSystemWatcher = struct {
                 }
             }
 
-            self.backend.windows.monitoring = false;
+            self.backend.iocp.monitoring = false;
 
             if (overlapped) |ptr| {
-                if (ptr != &self.backend.windows.overlapped)
+                if (ptr != &self.backend.iocp.overlapped)
                     continue;
                 if (nbytes == 0) {
-                    self.backend.windows.active = false;
+                    self.backend.iocp.active = false;
                     return error.Shutdown;
                 }
                 var watch_info: WatchInfo = .{
@@ -469,14 +471,14 @@ pub const FileSystemWatcher = struct {
                 var n = true;
                 var offset: usize = 0;
                 while (n) {
-                    const info: *std.os.windows.FILE_NOTIFY_INFORMATION = @ptrCast(@alignCast(self.backend.windows.buf[offset..].ptr));
-                    const name_ptr: [*]u16 = @ptrCast(@alignCast(self.backend.windows.buf[offset + @sizeOf(std.os.windows.FILE_NOTIFY_INFORMATION) ..].ptr));
+                    const info: *std.os.windows.FILE_NOTIFY_INFORMATION = @ptrCast(@alignCast(self.backend.iocp.buf[offset..].ptr));
+                    const name_ptr: [*]u16 = @ptrCast(@alignCast(self.backend.iocp.buf[offset + @sizeOf(std.os.windows.FILE_NOTIFY_INFORMATION) ..].ptr));
                     const filename: []u16 = name_ptr[0 .. info.FileNameLength / @sizeOf(u16)];
 
                     const name = try std.unicode.utf16LeToUtf8Alloc(self.allocator, filename);
                     errdefer self.allocator.free(name);
 
-                    const action: WindowsAttributes.Action = @enumFromInt(info.Action);
+                    const action: IOCPAttributes.Action = @enumFromInt(info.Action);
 
                     if (info.NextEntryOffset == 0)
                         n = false
@@ -503,7 +505,7 @@ pub const FileSystemWatcher = struct {
         }
     }
 
-    fn startLinux(self: *FileSystemWatcher) !void {
+    fn startInotify(self: *FileSystemWatcher) !void {
         const fd = try std.posix.inotify_init1(std.os.linux.IN.CLOEXEC);
         errdefer std.posix.close(fd);
 
@@ -519,15 +521,15 @@ pub const FileSystemWatcher = struct {
         if (wd < 0)
             return error.InotifyAddWatchFailed;
 
-        self.backend.linux.fd = fd;
-        self.backend.linux.fds[0] = std.posix.pollfd{
+        self.backend.inotify.fd = fd;
+        self.backend.inotify.fds[0] = std.posix.pollfd{
             .fd = fd,
             .events = std.posix.POLL.IN | std.posix.POLL.ERR,
             .revents = 0,
         };
     }
 
-    fn startDarwin(self: *FileSystemWatcher) !void {
+    fn startKqueue(self: *FileSystemWatcher) !void {
         const fd = try std.posix.kqueue();
         if (fd == 0)
             return error.KQueueError;
@@ -542,15 +544,15 @@ pub const FileSystemWatcher = struct {
         const copy_path = try self.allocator.dupe(u8, self.path);
         errdefer self.allocator.free(copy_path);
 
-        try self.backend.darwin.fds.put(self.allocator, copy_path, .{
+        try self.backend.kqueue.fds.put(self.allocator, copy_path, .{
             .handle = @intCast(dir.fd),
             .kind = .directory,
         });
-        errdefer std.debug.assert(self.backend.darwin.fds.orderedRemove(copy_path));
-        try self.backend.darwin.named_fds.put(self.allocator, @intCast(dir.fd), copy_path);
-        errdefer std.debug.assert(self.backend.darwin.named_fds.orderedRemove(@intCast(dir.fd)));
+        errdefer std.debug.assert(self.backend.kqueue.fds.orderedRemove(copy_path));
+        try self.backend.kqueue.named_fds.put(self.allocator, @intCast(dir.fd), copy_path);
+        errdefer std.debug.assert(self.backend.kqueue.named_fds.orderedRemove(@intCast(dir.fd)));
 
-        var kevent: [1]DarwinAttributes.kevent = .{
+        var kevent: [1]KqueueAttributes.kevent = .{
             .{
                 .data = 0,
                 .udata = 0,
@@ -563,15 +565,15 @@ pub const FileSystemWatcher = struct {
 
         _ = std.posix.system.kevent(fd, &kevent, 1, &kevent, 0, null);
 
-        self.backend.darwin.fd = fd;
-        self.backend.darwin.dir = dir;
-        errdefer self.backend.darwin.dir = null;
-        errdefer self.backend.darwin.fd = null;
+        self.backend.kqueue.fd = fd;
+        self.backend.kqueue.dir = dir;
+        errdefer self.backend.kqueue.dir = null;
+        errdefer self.backend.kqueue.fd = null;
 
-        self.allocator.free(try self.backend.darwin.scanDirectory(self.allocator));
+        self.allocator.free(try self.backend.kqueue.scanDirectory(self.allocator));
     }
 
-    fn startWindows(self: *FileSystemWatcher) !void {
+    fn startIOCP(self: *FileSystemWatcher) !void {
         const wpath = try std.os.windows.sliceToPrefixedFileW(self.dir.fd, self.path);
 
         const ptr = wpath.span().ptr;
@@ -616,16 +618,16 @@ pub const FileSystemWatcher = struct {
         const iocp = try std.os.windows.CreateIoCompletionPort(handle, null, 0, 1);
         errdefer _ = std.os.windows.CloseHandle(iocp);
 
-        self.backend.windows.handle = handle;
-        self.backend.windows.iocp = iocp;
+        self.backend.iocp.handle = handle;
+        self.backend.iocp.iocp = iocp;
 
-        try self.backend.windows.monitor();
+        try self.backend.iocp.monitor();
     }
 
     pub fn deinit(self: *FileSystemWatcher) void {
         switch (comptime builtin.os.tag) {
-            .linux => self.backend.linux.deinit(),
-            .ios, .macos, .tvos, .visionos, .watchos => self.backend.darwin.deinit(self.allocator),
+            .linux => self.backend.inotify.deinit(),
+            .ios, .macos, .tvos, .visionos, .watchos => self.backend.kqueue.deinit(self.allocator),
             else => {},
         }
     }

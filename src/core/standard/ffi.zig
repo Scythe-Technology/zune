@@ -24,6 +24,7 @@ pub fn PlatformSupported() bool {
         .macos => true,
         .linux => !builtin.cpu.arch.isAARCH64(),
         .windows => !builtin.cpu.arch.isAARCH64(),
+        .freebsd => true,
         else => false,
     };
 }
@@ -2347,7 +2348,7 @@ pub fn loadLib(L: *VM.lua.State) !void {
     try L.rawsetfield(-2, "types");
 
     switch (comptime builtin.os.tag) {
-        .linux => try L.pushstring("so"),
+        .linux, .freebsd => try L.pushstring("so"),
         .macos => try L.pushstring("dylib"),
         .windows => try L.pushstring("dll"),
         else => try L.pushstring(""),

@@ -21,6 +21,7 @@ const TAG_NET_SOCKET = tagged.Tags.get("NET_SOCKET").?;
 pub fn PlatformSupported() bool {
     return switch (comptime builtin.os.tag) {
         .linux, .macos, .windows => true,
+        .freebsd => true,
         else => false,
     };
 }
@@ -592,7 +593,7 @@ const AsyncAcceptContext = struct {
                 L,
                 switch (comptime builtin.os.tag) {
                     .windows => @ptrCast(@alignCast(socket.fd)),
-                    .ios, .macos, .wasi => socket.fd,
+                    .ios, .macos, .wasi, .freebsd => socket.fd,
                     .linux => socket.fd(),
                     else => @compileError("Unsupported OS"),
                 },

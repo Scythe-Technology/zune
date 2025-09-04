@@ -16,6 +16,7 @@ pub const LIB_NAME = "net";
 pub fn PlatformSupported() bool {
     return switch (comptime builtin.os.tag) {
         .linux, .macos, .windows => true,
+        .freebsd => true,
         else => false,
     };
 }

@@ -22,6 +22,7 @@ const TAG_FS_FILE = tagged.Tags.get("FS_FILE").?;
 pub fn PlatformSupported() bool {
     return switch (comptime builtin.os.tag) {
         .linux, .macos, .windows, .wasi => true,
+        .freebsd => true,
         else => false,
     };
 }
