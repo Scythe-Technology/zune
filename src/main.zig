@@ -309,6 +309,11 @@ pub fn deinitState(L: *VM.lua.State) void {
 }
 
 pub fn openZune(L: *VM.lua.State, args: []const []const u8, flags: Flags) !void {
+    if (STATE.MAIN_THREAD_ID == null) {
+        @branchHint(.cold);
+        STATE.MAIN_THREAD_ID = std.Thread.getCurrentId();
+    }
+
     try Resolvers.Require.load(L);
 
     try objects.load(L);
