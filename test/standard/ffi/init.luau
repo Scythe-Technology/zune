@@ -62,6 +62,9 @@ elseif (process.os == "linux") then
 elseif (process.os == "macos") then
     expect(ffi.prefix).toBe("lib");
     expect(ffi.suffix).toBe("dylib");
+elseif (process.os == "freebsd") then
+    expect(ffi.prefix).toBe("lib");
+    expect(ffi.suffix).toBe("so");
 else
     error("Unsupported OS: " .. process.os);
 end
