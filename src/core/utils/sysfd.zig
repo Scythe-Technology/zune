@@ -45,7 +45,7 @@ pub const context = switch (builtin.os.tag) {
             return error.UnexpectedWaitResult;
         }
     },
-    .macos, .linux => struct {
+    .macos, .linux, .freebsd => struct {
         pub const POLLIN: i16 = 0x0001;
         pub const POLLERR: i16 = 0x0008;
         pub const POLLHUP: i16 = 0x0010;
