@@ -602,24 +602,38 @@ fn lua_read(self: *File, L: *VM.lua.State) !i32 {
     if (!self.mode.canRead())
         return error.NotOpenForReading;
 
+    if (size == 0) {
+        if (L.Loptboolean(3, false))
+            try L.Zpushbuffer("")
+        else
+            try L.pushlstring("");
+        return 1;
+    }
+
     switch (comptime builtin.os.tag) {
         .windows => if (self.kind == .Tty) {
             const scheduler = Scheduler.getScheduler(L);
             const sync = try scheduler.createSync(AsyncReadContext.Thread, AsyncReadContext.Thread.complete);
             errdefer scheduler.freeSync(sync);
 
+            var array: std.ArrayList(u8) = try .initCapacity(luau.getallocator(L), @min(size, LuaHelper.MAX_LUAU_SIZE));
+
+            array.expandToCapacity();
+
             sync.* = .{
                 .task = .{ .callback = AsyncReadContext.Thread.perform },
                 .file = self.file,
                 .async = .{
                     .ref = .init(L),
-                    .array = try .initCapacity(luau.getallocator(L), @min(size, LuaHelper.MAX_LUAU_SIZE)),
+                    .array = array,
                     .limit = size,
                     .file_kind = .Tty,
                     .auto_close = false,
-                    .lua_type = if (L.Loptboolean(3, false)) .Buffer else .String,
+                    .lua_type = if (L.toboolean(3)) .Buffer else .String,
                 },
             };
+
+            scheduler.asyncWaitForSync(sync);
 
             scheduler.thread_pool.schedule(&sync.task);
 
@@ -646,6 +660,15 @@ fn lua_readSync(self: *File, L: *VM.lua.State) !i32 {
     const allocator = luau.getallocator(L);
     const size = L.Loptunsigned(2, LuaHelper.MAX_LUAU_SIZE);
     const useBuffer = L.Loptboolean(3, false);
+
+    if (size == 0) {
+        if (useBuffer)
+            try L.Zpushbuffer("")
+        else
+            try L.pushlstring("");
+        return 1;
+    }
+
     switch (self.kind) {
         .File => {
             const data = try self.file.readToEndAlloc(allocator, @intCast(size));
