@@ -641,7 +641,26 @@ pub fn deinit(self: *Scheduler) void {
     }
     self.awaits.deinit(self.allocator);
     self.timer.deinit();
-    self.thread_pool.deinit();
+    switch (comptime builtin.os.tag) {
+        .freebsd => {
+            // TODO: Fix FreeBSD thread pool indefinitely blocking on deinit.
+            if (Zune.STATE.MAIN_THREAD_ID != self.threadId) {
+                // Attempt to clean up thread pool on sub thread scheduler.
+                self.thread_pool.deinit();
+            } else {
+                // Send shutdown signal, but do not wait for threads to join, issue stated on todo comment above.
+                const pool = self.thread_pool;
+                const sync = pool.sync.fetchAdd(.{ .shutdown = true }, .acq_rel);
+                if (sync.idle > 0) {
+                    _ = pool.idle.fetchOr(2, .release);
+                    std.Thread.Futex.wake(&pool.idle, std.math.maxInt(u32));
+                }
+                if (sync.spawnable == sync.max)
+                    pool.join.store(2, .monotonic);
+            }
+        },
+        else => self.thread_pool.deinit(),
+    }
     self.allocator.destroy(self.thread_pool);
     self.loop.deinit();
     self.async.deinit();
