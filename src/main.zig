@@ -146,7 +146,26 @@ pub fn init() !void {
     STATE.ENV_MAP = try std.process.getEnvMap(allocator);
 
     switch (comptime builtin.os.tag) {
-        .linux => try xev.Dynamic.detect(), // multiple backends
+        .linux => {
+            const backend = STATE.ENV_MAP.get("ZUNE_ASYNC_BACKEND");
+            if (backend) |perferred| {
+                @branchHint(.cold);
+                var success = false;
+                if (std.mem.eql(u8, perferred, "epoll")) {
+                    success = xev.Dynamic.prefer(.epoll);
+                } else if (std.mem.eql(u8, perferred, "io_uring")) {
+                    success = xev.Dynamic.prefer(.io_uring);
+                } else {
+                    try xev.Dynamic.detect();
+                    std.debug.print("unknown async backend '{s}', falling back to default '{t}'.\n", .{ perferred, xev.Dynamic.backend });
+                    success = true;
+                }
+                if (!success) {
+                    try xev.Dynamic.detect();
+                    std.debug.print("failed to initialize preferred async backend '{s}', falling back to default '{t}'.\n", .{ perferred, xev.Dynamic.backend });
+                }
+            } else try xev.Dynamic.detect();
+        }, // multiple backends
         else => {},
     }
 }
