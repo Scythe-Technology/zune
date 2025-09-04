@@ -268,6 +268,54 @@ pub const AsyncReadContext = struct {
 
         return L.yield(0);
     }
+
+    // for windows
+    pub const Thread = struct {
+        task: xev.ThreadPool.Task,
+        file: std.fs.File,
+        async: AsyncReadContext,
+
+        pub fn perform(task: *xev.ThreadPool.Task) void {
+            const self: *Thread = @fieldParentPtr("task", task);
+
+            const f = self.file;
+            const L = self.async.ref.value;
+            const scheduler = Scheduler.getScheduler(L);
+
+            defer scheduler.synchronize(self);
+
+            const amount = f.read(self.async.array.items) catch |err| {
+                self.async.err = err;
+                return;
+            };
+            self.async.buffer_len += amount;
+        }
+
+        pub fn complete(self: *Thread, scheduler: *Scheduler) void {
+            const L = self.async.ref.value;
+            const allocator = luau.getallocator(L);
+
+            defer scheduler.freeSync(self);
+            defer self.async.ref.deref();
+            defer self.async.array.deinit(allocator);
+
+            if (L.status() != .Yield)
+                return;
+
+            if (self.async.err) |e| {
+                L.pushstring(@errorName(e)) catch |err| std.debug.panic("{}", .{err});
+                _ = Scheduler.resumeStateError(L, null) catch {};
+            } else {
+                self.async.array.shrinkAndFree(allocator, @min(self.async.buffer_len, self.async.limit));
+                switch (self.async.lua_type) {
+                    .Buffer => L.Zpushbuffer(self.async.array.items) catch |e| std.debug.panic("{}", .{e}),
+                    .String => L.pushlstring(self.async.array.items) catch |e| std.debug.panic("{}", .{e}),
+                    else => unreachable,
+                }
+                _ = Scheduler.resumeState(L, null, 1) catch {};
+            }
+        }
+    };
 };
 
 pub const AsyncWriteContext = struct {
@@ -442,6 +490,15 @@ fn lua_write(self: *File, L: *VM.lua.State) !i32 {
         return error.NotOpenForWriting;
     const data = try L.Zcheckvalue([]const u8, 2, null);
 
+    switch (comptime builtin.os.tag) {
+        .windows => if (self.kind == .Tty) {
+            // use sync since most times files are not open with overlapped
+            try self.file.writeAll(data);
+            return 0;
+        },
+        else => {},
+    }
+
     const pos = switch (self.kind) {
         .File => if (self.mode.canSeek()) try self.file.getPos() else 0,
         .Tty => 0,
@@ -544,6 +601,33 @@ fn lua_read(self: *File, L: *VM.lua.State) !i32 {
     const size = L.Loptunsigned(2, LuaHelper.MAX_LUAU_SIZE);
     if (!self.mode.canRead())
         return error.NotOpenForReading;
+
+    switch (comptime builtin.os.tag) {
+        .windows => if (self.kind == .Tty) {
+            const scheduler = Scheduler.getScheduler(L);
+            const sync = try scheduler.createSync(AsyncReadContext.Thread, AsyncReadContext.Thread.complete);
+            errdefer scheduler.freeSync(sync);
+
+            sync.* = .{
+                .task = .{ .callback = AsyncReadContext.Thread.perform },
+                .file = self.file,
+                .async = .{
+                    .ref = .init(L),
+                    .array = try .initCapacity(luau.getallocator(L), @min(size, LuaHelper.MAX_LUAU_SIZE)),
+                    .limit = size,
+                    .file_kind = .Tty,
+                    .auto_close = false,
+                    .lua_type = if (L.Loptboolean(3, false)) .Buffer else .String,
+                },
+            };
+
+            scheduler.thread_pool.schedule(&sync.task);
+
+            return L.yield(0);
+        },
+        else => {},
+    }
+
     return AsyncReadContext.queue(
         L,
         self.file,
