@@ -26,7 +26,7 @@ test("Basic TCP", function()
         server_sockname.family,
         bit32.bor(
             net.SOCKF.STREAM,
-            if (zune.process.os == "windows") then 0 else net.SOCKF.CLOEXEC
+            if (zune.platform.os == "windows") then 0 else net.SOCKF.CLOEXEC
         ),
         net.IPPROTO.TCP
     );
@@ -57,10 +57,10 @@ test("Basic TCP", function()
 end)
 
 test("Basic TCP TLS", function()
-    if (zune.process.args[1] ~= "allow") then
-        print("Skipping TLS test");
-        return;
-    end
+    -- if (zune.process.args[1] ~= "allow") then
+    --     print("Skipping TLS test");
+    --     return;
+    -- end
     
     local server_socket = net.createSocket(
         net.ADDRF.INET,
@@ -85,7 +85,7 @@ test("Basic TCP TLS", function()
         server_sockname.family,
         bit32.bor(
             net.SOCKF.STREAM,
-            if (zune.process.os == "windows") then 0 else net.SOCKF.CLOEXEC
+            if (zune.platform.os == "windows") then 0 else net.SOCKF.CLOEXEC
         ),
         net.IPPROTO.TCP
     );
