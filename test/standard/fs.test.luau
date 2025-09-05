@@ -84,7 +84,7 @@ describe("Binary", function()
         end)
     end)
 
-    test("RemoveFile", function()
+    test("DeleteFile", function()
         fs.deleteFile(path("sample"));
         fs.deleteFile(path("sample2"));
 
@@ -169,7 +169,7 @@ describe("Text", function()
         expect(isFile(path("unknown/sample2.txt"))).toBeFalsy();
     end)
 
-    test("RemoveFile", function()
+    test("DeleteFile", function()
         fs.deleteFile(path("sample.txt"));
         fs.deleteFile(path("sample2.txt"));
 
@@ -183,7 +183,7 @@ describe("Text", function()
 end)
 
 describe("Dir", function()
-    test("WriteDir", function()
+    test("MakeDir", function()
         fs.makeDir(path("foo"));
 
         -- Recursive
@@ -194,7 +194,7 @@ describe("Dir", function()
         end).toThrow("FileNotFound");
     end)
 
-    test("ReadDir", function()
+    test("Entries", function()
         local result = fs.entries(path(""));
         expect(result).toBe(expect.any("table"));
         expect(result).toBe(expect.similar({{name = "foo", kind = "directory"}}));
@@ -219,7 +219,7 @@ describe("Dir", function()
         expect(isDir(path("unknown/foo"))).toBeFalsy();
     end)
 
-    test("RemoveDir", function()
+    test("DeleteDir", function()
         fs.deleteDir(path("foo/bar/luau"));
         expect(isDir(path("foo/bar/luau"))).toBeFalsy();
 
