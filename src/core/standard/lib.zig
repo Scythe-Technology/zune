@@ -5,6 +5,7 @@ pub const mem = @import("mem.zig");
 pub const net = @import("net/lib.zig");
 pub const task = @import("task.zig");
 pub const luau = @import("luau.zig");
+pub const time = @import("time/lib.zig");
 pub const regex = @import("regex.zig");
 pub const serde = @import("serde/lib.zig");
 pub const sqlite = @import("sqlite.zig");
@@ -14,7 +15,7 @@ pub const random = @import("random.zig");
 pub const process = @import("process.zig");
 pub const require = @import("require.zig");
 pub const testing = @import("testing.zig");
-pub const datetime = @import("datetime/lib.zig");
+pub const platform = @import("platform/lib.zig");
 
 test {
     _ = fs;
@@ -27,11 +28,12 @@ test {
     _ = io;
     _ = crypto;
     _ = regex;
-    _ = datetime;
+    _ = time;
     _ = ffi;
     _ = sqlite;
     _ = require;
     _ = random;
     _ = thread;
     _ = mem;
+    _ = platform;
 }
