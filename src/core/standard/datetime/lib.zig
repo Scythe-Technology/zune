@@ -10,11 +10,9 @@ const MethodMap = Zune.Utils.MethodMap;
 
 const parse = @import("parse.zig");
 
-const tagged = @import("../../../tagged.zig");
-
 const VM = luau.VM;
 
-const TAG_DATETIME = tagged.Tags.get("DATETIME").?;
+const TAG_DATETIME = Zune.Tags.get("DATETIME").?;
 
 pub const LIB_NAME = "datetime";
 pub fn PlatformSupported() bool {

@@ -11,12 +11,10 @@ const Scheduler = Zune.Runtime.Scheduler;
 const LuaHelper = Zune.Utils.LuaHelper;
 const MethodMap = Zune.Utils.MethodMap;
 
-const tagged = @import("../../tagged.zig");
-
 const VM = luau.VM;
 
-const TAG_FFI_POINTER = tagged.Tags.get("FFI_POINTER").?;
-const TAG_FFI_DATATYPE = tagged.Tags.get("FFI_DATATYPE").?;
+const TAG_FFI_POINTER = Zune.Tags.get("FFI_POINTER").?;
+const TAG_FFI_DATATYPE = Zune.Tags.get("FFI_DATATYPE").?;
 
 pub const LIB_NAME = "ffi";
 pub fn PlatformSupported() bool {

@@ -15,8 +15,8 @@ const Lists = Zune.Utils.Lists;
 
 const VM = luau.VM;
 
-const TAG_NET_HTTP_SERVER = Zune.tagged.Tags.get("NET_HTTP_SERVER").?;
-const TAG_NET_HTTP_WEBSOCKET = Zune.tagged.Tags.get("NET_HTTP_WEBSOCKET").?;
+const TAG_NET_HTTP_SERVER = Zune.Tags.get("NET_HTTP_SERVER").?;
+const TAG_NET_HTTP_WEBSOCKET = Zune.Tags.get("NET_HTTP_WEBSOCKET").?;
 
 /// The Zune HTTP server backend.
 const Self = @This();

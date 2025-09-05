@@ -11,13 +11,11 @@ const Scheduler = Zune.Runtime.Scheduler;
 const LuaHelper = Zune.Utils.LuaHelper;
 const MethodMap = Zune.Utils.MethodMap;
 
-const tagged = Zune.tagged;
-
 const VM = luau.VM;
 
 const Socket = @This();
 
-const TAG_NET_SOCKET = tagged.Tags.get("NET_SOCKET").?;
+const TAG_NET_SOCKET = Zune.Tags.get("NET_SOCKET").?;
 pub fn PlatformSupported() bool {
     return switch (comptime builtin.os.tag) {
         .linux, .macos, .windows => true,

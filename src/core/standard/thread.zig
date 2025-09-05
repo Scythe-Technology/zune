@@ -12,7 +12,7 @@ const Lists = Zune.Utils.Lists;
 
 const VM = luau.VM;
 
-const TAG_THREAD = Zune.tagged.Tags.get("THREAD").?;
+const TAG_THREAD = Zune.Tags.get("THREAD").?;
 
 pub const LIB_NAME = "thread";
 pub fn PlatformSupported() bool {

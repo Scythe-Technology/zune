@@ -10,12 +10,10 @@ const Scheduler = Zune.Runtime.Scheduler;
 const LuaHelper = Zune.Utils.LuaHelper;
 const MethodMap = Zune.Utils.MethodMap;
 
-const tagged = @import("../../tagged.zig");
-
 const VM = luau.VM;
 
-const TAG_SQLITE_DATABASE = tagged.Tags.get("SQLITE_DATABASE").?;
-const TAG_SQLITE_STATEMENT = tagged.Tags.get("SQLITE_STATEMENT").?;
+const TAG_SQLITE_DATABASE = Zune.Tags.get("SQLITE_DATABASE").?;
+const TAG_SQLITE_STATEMENT = Zune.Tags.get("SQLITE_STATEMENT").?;
 
 pub const LIB_NAME = "sqlite";
 

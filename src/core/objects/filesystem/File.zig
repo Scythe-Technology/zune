@@ -10,7 +10,6 @@ const Scheduler = Zune.Runtime.Scheduler;
 const LuaHelper = Zune.Utils.LuaHelper;
 const MethodMap = Zune.Utils.MethodMap;
 
-const tagged = Zune.tagged;
 const sysfd = @import("../../utils/sysfd.zig");
 const ext_fs = @import("../../utils/ext_fs.zig");
 
@@ -18,7 +17,7 @@ const VM = luau.VM;
 
 const File = @This();
 
-const TAG_FS_FILE = tagged.Tags.get("FS_FILE").?;
+const TAG_FS_FILE = Zune.Tags.get("FS_FILE").?;
 pub fn PlatformSupported() bool {
     return switch (comptime builtin.os.tag) {
         .linux, .macos, .windows, .wasi => true,

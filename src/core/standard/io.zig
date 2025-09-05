@@ -11,7 +11,6 @@ const LuaHelper = Zune.Utils.LuaHelper;
 const MethodMap = Zune.Utils.MethodMap;
 
 const sysfd = @import("../utils/sysfd.zig");
-const tagged = @import("../../tagged.zig");
 
 const File = @import("../objects/filesystem/File.zig");
 
@@ -21,9 +20,9 @@ const mem = @import("./mem.zig");
 
 const VM = luau.VM;
 
-const TAG_IO_STREAM = tagged.Tags.get("IO_STREAM").?;
-const TAG_IO_BUFFERSINK = tagged.Tags.get("IO_BUFFERSINK").?;
-const TAG_IO_BUFFERSTREAM = tagged.Tags.get("IO_BUFFERSTREAM").?;
+const TAG_IO_STREAM = Zune.Tags.get("IO_STREAM").?;
+const TAG_IO_BUFFERSINK = Zune.Tags.get("IO_BUFFERSINK").?;
+const TAG_IO_BUFFERSTREAM = Zune.Tags.get("IO_BUFFERSTREAM").?;
 
 pub const LIB_NAME = "io";
 

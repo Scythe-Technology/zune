@@ -15,7 +15,7 @@ const Lists = Zune.Utils.Lists;
 const Response = @import("../response.zig");
 const WebSocket = @import("../websocket.zig");
 
-const TAG_NET_HTTP_WEBSOCKET = Zune.tagged.Tags.get("NET_HTTP_CLIENTWEBSOCKET").?;
+const TAG_NET_HTTP_WEBSOCKET = Zune.Tags.get("NET_HTTP_CLIENTWEBSOCKET").?;
 
 const VM = luau.VM;
 

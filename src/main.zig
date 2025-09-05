@@ -68,7 +68,7 @@ pub const debug = struct {
     pub const writerPrint = @import("core/utils/print.zig").writerPrint;
 };
 
-pub const tagged = @import("tagged.zig");
+pub const Tags = @import("tagged.zig").Tags;
 pub const info = @import("zune-info");
 
 const VM = luau.VM;

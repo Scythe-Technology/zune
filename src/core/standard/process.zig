@@ -5,8 +5,6 @@ const builtin = @import("builtin");
 
 const Zune = @import("zune");
 
-const tagged = @import("../../tagged.zig");
-
 const Engine = Zune.Runtime.Engine;
 const Scheduler = Zune.Runtime.Scheduler;
 
@@ -27,7 +25,7 @@ const process = std.process;
 
 const native_os = builtin.os.tag;
 
-const TAG_PROCESS_CHILD = tagged.Tags.get("PROCESS_CHILD").?;
+const TAG_PROCESS_CHILD = Zune.Tags.get("PROCESS_CHILD").?;
 
 pub const LIB_NAME = "process";
 pub fn PlatformSupported() bool {

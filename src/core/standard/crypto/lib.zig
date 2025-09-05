@@ -15,7 +15,7 @@ const common = @import("common.zig");
 
 const VM = luau.VM;
 
-const TAG_CRYPTO_HASHER = Zune.tagged.Tags.get("CRYPTO_HASHER").?;
+const TAG_CRYPTO_HASHER = Zune.Tags.get("CRYPTO_HASHER").?;
 
 const hash = std.crypto.hash;
 const aead = std.crypto.aead;
