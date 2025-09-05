@@ -678,7 +678,7 @@ pub fn lua_request(L: *VM.lua.State) !i32 {
     const allocator = luau.getallocator(L);
     const scheduler = Scheduler.getScheduler(L);
 
-    const uri_string = try L.Zcheckvalue([]const u8, 1, null);
+    const uri_string = try L.Zcheckvalue([:0]const u8, 1, null);
 
     var method: std.http.Method = .GET;
     var body_type: VM.lua.Type = .String;
