@@ -544,6 +544,14 @@ fn lua_cwd(L: *VM.lua.State) !i32 {
     return 1;
 }
 
+fn lua_pid(L: *VM.lua.State) !i32 {
+    switch (comptime builtin.os.tag) {
+        .windows => L.pushunsigned(std.os.windows.GetCurrentProcessId()),
+        else => L.pushinteger(std.c.getpid()),
+    }
+    return 1;
+}
+
 pub fn loadLib(L: *VM.lua.State, args: []const []const u8) !void {
     try L.createtable(0, 10);
 
@@ -560,6 +568,7 @@ pub fn loadLib(L: *VM.lua.State, args: []const []const u8) !void {
     try L.Zsetfieldfn(-1, "loadEnv", lua_loadEnv);
 
     try L.Zsetfieldfn(-1, "cwd", lua_cwd);
+    try L.Zsetfieldfn(-1, "pid", lua_pid);
 
     try L.Zsetfieldfn(-1, "exit", lua_exit);
     try L.Zsetfieldfn(-1, "run", lua_run);
