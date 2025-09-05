@@ -394,7 +394,7 @@ pub const LuaPointer = struct {
 
     pub fn lua_read(ptr: *LuaPointer, L: *VM.lua.State) !i32 {
         if (ptr.owner == .none or ptr.ptr == null)
-            return error.NoAddressAvailable;
+            return L.Zerror("unavailable address");
 
         const src_offset: usize = @intFromFloat(L.Lchecknumber(2));
         const dest_offset: usize = @intFromFloat(L.Lchecknumber(4));
@@ -409,7 +409,7 @@ pub const LuaPointer = struct {
                 .Userdata => {
                     const other = LuaPointer.value(L, 3) orelse return error.Fail;
                     if (other.owner == .none or other.ptr == null)
-                        return error.NoAddressAvailable;
+                        return L.Zerror("unavailable address");
                     dest_bounds = other.size;
                     break :blk @ptrCast(@alignCast(ptr.ptr));
                 },
@@ -434,7 +434,7 @@ pub const LuaPointer = struct {
 
     pub fn lua_write(ptr: *LuaPointer, L: *VM.lua.State) !i32 {
         if (ptr.owner == .none or ptr.ptr == null)
-            return error.NoAddressAvailable;
+            return L.Zerror("unavailable address");
 
         const dest_offset: usize = @intCast(try L.Zcheckvalue(i32, 2, null));
         const src_offset: usize = @intFromFloat(try L.Zcheckvalue(f64, 4, null));
@@ -449,7 +449,7 @@ pub const LuaPointer = struct {
                 .Userdata => {
                     const other = LuaPointer.value(L, 3) orelse return error.Fail;
                     if (other.owner == .none or other.ptr == null)
-                        return error.NoAddressAvailable;
+                        return L.Zerror("unavailable address");
                     src_bounds = other.size;
                     break :blk @ptrCast(@alignCast(ptr.ptr));
                 },
@@ -477,7 +477,7 @@ pub const LuaPointer = struct {
         return struct {
             fn inner(ptr: *LuaPointer, L: *VM.lua.State) !i32 {
                 if (ptr.owner == .none or ptr.ptr == null)
-                    return error.NoAddressAvailable;
+                    return L.Zerror("unavailable address");
                 const pos: usize = @intCast(L.Loptinteger(2, 0));
 
                 if (ptr.size) |size| if (size < len + pos)
@@ -513,7 +513,7 @@ pub const LuaPointer = struct {
         return struct {
             fn inner(ptr: *LuaPointer, L: *VM.lua.State) !i32 {
                 if (ptr.owner == .none or ptr.ptr == null)
-                    return error.NoAddressAvailable;
+                    return L.Zerror("unavailable address");
                 const pos: usize = @intCast(L.Loptinteger(2, 0));
 
                 if (ptr.size) |size| if (size < len + pos)
@@ -527,7 +527,7 @@ pub const LuaPointer = struct {
                         .Userdata => {
                             const lptr = LuaPointer.value(L, 3) orelse return error.Fail;
                             if (lptr.owner == .none)
-                                return error.NoAddressAvailable;
+                                return L.Zerror("unavailable address");
                             var bytes: [@sizeOf(usize)]u8 = @bitCast(@as(usize, @intFromPtr(lptr.ptr)));
                             @memcpy(mem[0..@sizeOf(usize)], &bytes);
                         },
@@ -554,7 +554,7 @@ pub const LuaPointer = struct {
             return 1;
         };
         if (ptr.owner == .none or ptr.ptr == null)
-            return L.Zerror("NoAddressAvailable");
+            return L.Zerror("unavailable address");
         if (size < 0)
             return L.Zerror("size cannot be negative");
 
@@ -583,17 +583,17 @@ pub const LuaPointer = struct {
             return 1;
         };
         if (ptr.owner == .none or ptr.ptr == null)
-            return error.NoAddressAvailable;
+            return L.Zerror("unavailable address");
         if (alignment < 0)
             return L.Zerror("alignment cannot be negative");
 
         const len: usize = @intFromFloat(alignment);
 
         switch (ptr.type) {
-            .allocated => return L.Zerror("alignment is already known"),
+            .allocated => return L.Zerror("alignment already known"),
             .static => {
                 if (ptr.alignment) |_|
-                    return L.Zerror("alignment is already set");
+                    return L.Zerror("alignment already set");
             },
         }
 
@@ -917,7 +917,7 @@ const LuaDataType = struct {
         if (self.type.kind != .pointer)
             return L.Zerror("'tag' is only available for pointers");
         if (self.type.kind.pointer.tag != 0)
-            return L.Zerror("Cannot create tagged pointer from tagged pointer");
+            return L.Zerror("cannot create tagged pointer from tagged pointer");
 
         const unique = try L.Zcheckvalue([]const u8, 2, null);
 
@@ -944,7 +944,7 @@ const LuaDataType = struct {
         if (self.type.kind != .@"struct")
             return L.Zerror("'offset' is only available for structs");
         const field = try L.Zcheckvalue([]const u8, 2, null);
-        const order = self.fields_map.?.getIndex(field) orelse return L.Zerrorf("Unknown field: {s}", .{field});
+        const order = self.fields_map.?.getIndex(field) orelse return L.Zerrorf("unknown field: {s}", .{field});
         L.pushinteger(@intCast(self.offsets.?[order]));
         return 1;
     }
@@ -976,9 +976,9 @@ const LuaDataType = struct {
                     .Userdata => {
                         const lptr = LuaPointer.value(L, -1) orelse return error.Failed;
                         if (lptr.owner == .none)
-                            return error.NoAddressAvailable;
+                            return L.Zerror("unavailable address");
                         if (lptr.data.tag != field_type.kind.pointer.tag)
-                            return error.PointerTagMismatch;
+                            return L.Zerrorf("tag mismatch for field: {s}", .{field});
                         var bytes: [@sizeOf(usize)]u8 = @bitCast(@as(usize, @intFromPtr(lptr.ptr)));
                         @memcpy(mem[pos .. pos + @sizeOf(usize)], &bytes);
                     },
@@ -1210,7 +1210,7 @@ const ffi_c_interface = struct {
     pub const pushf64 = FFIArgumentPush(f64);
 
     pub fn pushpointer(L: *VM.lua.State, ptr: ?*anyopaque) callconv(.c) void {
-        _ = LuaPointer.newStaticPtr(L, ptr) catch (L.LerrorL("Failed to create pointer", .{}) catch |e| std.debug.panic("{}", .{e}));
+        _ = LuaPointer.newStaticPtr(L, ptr) catch (L.LerrorL("failed to create pointer", .{}) catch |e| std.debug.panic("{}", .{e}));
     }
 
     pub fn pushmem(L: *VM.lua.State, ptr: [*c]u8, size: usize) callconv(.c) void {
@@ -1878,9 +1878,9 @@ const FFIFunction = struct {
                             .Userdata => {
                                 const ptr = LuaPointer.value(L, idx) orelse return L.Zerrorf("userdata is not a Pointer", .{});
                                 if (ptr.owner == .none)
-                                    return L.Zerrorf("Pointer no address available", .{});
+                                    return L.Zerrorf("unavailable address", .{});
                                 if (ptr.data.tag != arg.kind.pointer.tag)
-                                    return L.Zerrorf("Pointer tag mismatch", .{});
+                                    return L.Zerrorf("tag mismatch", .{});
                                 ptrs[order] = @ptrCast(@alignCast(ptr.ptr));
                             },
                             .String => {
@@ -1946,7 +1946,7 @@ fn lua_fn(L: *VM.lua.State) !i32 {
         .allocated => return error.PointerNotCallable,
         else => {},
     }
-    const ptr: *anyopaque = src.ptr orelse return error.NoAddressAvailable;
+    const ptr: *anyopaque = src.ptr orelse return L.Zerror("unavailable address");
 
     const allocator = luau.getallocator(L);
 
@@ -2072,7 +2072,7 @@ fn lua_dupe(L: *VM.lua.State) !i32 {
         .Userdata => {
             const ptr = LuaPointer.value(L, 1) orelse return error.Fail;
             if (ptr.owner == .none or ptr.ptr == null)
-                return error.NoAddressAvailable;
+                return L.Zerror("unavailable address");
             const len = ptr.size orelse return L.Zerror("unknown sized pointer");
             const dup_ptr = try LuaPointer.allocBlockPtr(L, len, ptr.alignment orelse .@"1");
             dup_ptr.data = ptr.data;

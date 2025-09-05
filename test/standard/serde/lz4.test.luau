@@ -74,7 +74,7 @@ describe("Lz4", function()
                 expect(serde.lz4.compressFrame(sample, {level = 1000})).toBe(compressed_sample_default);
             end)
             test("Fail", function()
-                expect(function() serde.lz4.compressFrame(sample, {level = -1}) end).toThrow("Options 'level' must not be less than 0");
+                expect(function() serde.lz4.compressFrame(sample, {level = -1}) end).toThrow("options 'level' must not be less than 0");
                 expect(function() serde.lz4.compressFrame(true) end).toThrow("invalid argument #1 to 'compressFrame' (string expected, got boolean)");
             end)
         end)
@@ -92,7 +92,7 @@ describe("Lz4", function()
                 expect(serde.lz4.decompressFrame(compressed_sample_level0)).toBe(sample);
             end)
             test("Fail", function()
-                expect(function() serde.lz4.decompressFrame("\x01\x00\x00") end).toThrow("InvalidHeader");
+                expect(function() serde.lz4.decompressFrame("\x01\x00\x00") end).toThrow("invalid header");
             end)
         end)
     end)

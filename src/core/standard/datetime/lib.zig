@@ -149,7 +149,7 @@ pub const LuaDatetime = struct {
 
     pub fn __index(L: *VM.lua.State) !i32 {
         try L.Zchecktype(1, .Userdata);
-        const ptr = L.touserdatatagged(LuaDatetime, 1, TAG_DATETIME) orelse return L.Zerror("Expected 'datetime'");
+        const ptr = L.touserdatatagged(LuaDatetime, 1, TAG_DATETIME) orelse return L.Zerror("expected 'datetime'");
 
         const index = L.Lcheckstring(2);
 

@@ -970,11 +970,11 @@ fn lua_send(self: *Socket, L: *VM.lua.State) !i32 {
     switch (self.tls_context) {
         .none => {},
         .server_ref => return L.Zerror("socket unable to send"),
-        inline else => |i| if (i.connection == .handshake) return L.Zerror("Incomplete Handshake"),
+        inline else => |i| if (i.connection == .handshake) return L.Zerror("incomplete handshake"),
     }
 
     if (offset >= buf.len)
-        return L.Zerror("Offset is out of bounds");
+        return L.Zerror("offset out of bounds");
 
     const input = try allocator.dupe(u8, buf[offset..]);
     errdefer allocator.free(input);
@@ -1004,19 +1004,19 @@ fn lua_send(self: *Socket, L: *VM.lua.State) !i32 {
 
 fn lua_sendMsg(self: *Socket, L: *VM.lua.State) !i32 {
     if (self.tls_context != .none)
-        return L.Zerror("Not supported with TLS");
+        return L.Zerror("unsupported with tls");
     if (!L.isyieldable())
         return L.Zyielderror();
     const allocator = luau.getallocator(L);
     const scheduler = Scheduler.getScheduler(L);
     const port = L.Lcheckunsigned(2);
     if (port > std.math.maxInt(u16))
-        return L.Zerror("PortOutOfRange");
+        return L.Zerror("port out of range");
     const address_str = try L.Zcheckvalue([:0]const u8, 3, null);
     const data = try L.Zcheckvalue([]const u8, 4, null);
     const offset = L.Loptunsigned(5, 0);
     if (offset >= data.len)
-        return L.Zerror("Offset is out of bounds");
+        return L.Zerror("offset out of bounds");
 
     const buf = try allocator.dupe(u8, data[offset..]);
     errdefer allocator.free(buf);
@@ -1059,12 +1059,12 @@ fn lua_recv(self: *Socket, L: *VM.lua.State) !i32 {
     const scheduler = Scheduler.getScheduler(L);
     const size = L.Loptinteger(2, 8192);
     if (size > LuaHelper.MAX_LUAU_SIZE)
-        return L.Zerror("SizeTooLarge");
+        return L.Zerror("too large");
 
     switch (self.tls_context) {
         .none => {},
         .server_ref => return L.Zerror("socket unable to receive"),
-        inline else => |i| if (i.connection == .handshake) return L.Zerror("Incomplete Handshake"),
+        inline else => |i| if (i.connection == .handshake) return L.Zerror("incomplete handshake"),
     }
 
     const buf = try allocator.alloc(u8, @intCast(size));
@@ -1094,14 +1094,14 @@ fn lua_recv(self: *Socket, L: *VM.lua.State) !i32 {
 
 fn lua_recvMsg(self: *Socket, L: *VM.lua.State) !i32 {
     if (self.tls_context != .none)
-        return L.Zerror("Not supported with TLS");
+        return L.Zerror("unsupported with tls");
     if (!L.isyieldable())
         return L.Zyielderror();
     const allocator = luau.getallocator(L);
     const scheduler = Scheduler.getScheduler(L);
     const size = L.Loptinteger(2, 8192);
     if (size > LuaHelper.MAX_LUAU_SIZE)
-        return L.Zerror("SizeTooLarge");
+        return L.Zerror("too large");
 
     const buf = try allocator.alloc(u8, @intCast(size));
     errdefer allocator.free(buf);
@@ -1179,7 +1179,7 @@ fn lua_connect(self: *Socket, L: *VM.lua.State) !i32 {
     const address_str = try L.Zcheckvalue([:0]const u8, 2, null);
     const port = L.Lcheckunsigned(3);
     if (port > std.math.maxInt(u16))
-        return L.Zerror("PortOutOfRange");
+        return L.Zerror("port out of range");
 
     const address = if (address_str.len <= 15)
         try std.net.Address.parseIp4(address_str, @intCast(port))
@@ -1212,7 +1212,7 @@ fn lua_connect(self: *Socket, L: *VM.lua.State) !i32 {
 fn lua_listen(self: *Socket, L: *VM.lua.State) !i32 {
     const backlog = L.Loptunsigned(2, 128);
     if (backlog > std.math.maxInt(u31))
-        return L.Zerror("BacklogTooLarge");
+        return L.Zerror("too large");
     try std.posix.listen(self.socket, @intCast(backlog));
     return 0;
 }
@@ -1221,7 +1221,7 @@ fn lua_bindIp(self: *Socket, L: *VM.lua.State) !i32 {
     const address_ip = try L.Zcheckvalue([:0]const u8, 2, null);
     const port = L.Lcheckunsigned(3);
     if (port > std.math.maxInt(u16))
-        return L.Zerror("PortOutOfRange");
+        return L.Zerror("port out of range");
     const address = if (address_ip.len <= 15)
         try std.net.Address.parseIp4(address_ip, @intCast(port))
     else
@@ -1249,7 +1249,7 @@ fn lua_setOption(self: *Socket, L: *VM.lua.State) !i32 {
     const value = switch (L.typeOf(4)) {
         .Boolean => &std.mem.toBytes(@as(c_int, 1)),
         .Buffer, .String => try L.Zcheckvalue([]const u8, 4, null),
-        else => return L.Zerror("Invalid value type"),
+        else => return L.Zerror("invalid value type"),
     };
     try std.posix.setsockopt(
         self.socket,
@@ -1346,7 +1346,7 @@ fn lua_kind(self: *Socket, L: *VM.lua.State) !i32 {
 
 fn before_method(self: *Socket, L: *VM.lua.State) !void {
     if (self.open == .closed)
-        return L.Zerror("SocketClosed");
+        return L.Zerror("socket closed");
 }
 
 const __index = MethodMap.CreateStaticIndexMap(Socket, TAG_NET_SOCKET, .{

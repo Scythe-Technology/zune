@@ -15,7 +15,7 @@ describe("Random", function()
         end).toThrow("missing argument #2 to 'nextInteger' (number expected)");
         expect(function()
             crypto.random.nextInteger(100, -100);
-        end).toThrow("InvalidRange (min > max)");
+        end).toThrow("invalid range (min > max)");
         expect(crypto.random.nextInteger(0, 0)).toBe(0);
     end)
 
@@ -27,7 +27,7 @@ describe("Random", function()
         end).toThrow("missing argument #2 to 'nextNumber' (number expected)");
         expect(function()
             crypto.random.nextNumber(100, -100);
-        end).toThrow("InvalidRange (min > max)");
+        end).toThrow("invalid range (min > max)");
         expect(crypto.random.nextNumber(0, 0)).toBe(0);
     end)
 
@@ -45,16 +45,16 @@ describe("Random", function()
 
         expect(function()
             crypto.random.fill(buf, 0, 17);
-        end).toThrow("InvalidLength (offset + length > buffer size)");
+        end).toThrow("invalid length (offset + length > buffer size)");
         expect(function()
             crypto.random.fill(buf, 8, 9);
-        end).toThrow("InvalidLength (offset + length > buffer size)");
+        end).toThrow("invalid length (offset + length > buffer size)");
         expect(function()
             crypto.random.fill(buf, -1, 1);
-        end).toThrow("InvalidOffset (offset < 0)");
+        end).toThrow("invalid offset (offset < 0)");
         expect(function()
             crypto.random.fill(buf, 0, -1);
-        end).toThrow("InvalidLength (length < 0)");
+        end).toThrow("invalid length (length < 0)");
     end)
 end)
 

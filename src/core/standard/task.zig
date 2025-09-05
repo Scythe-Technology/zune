@@ -24,11 +24,11 @@ fn lua_wait(L: *VM.lua.State) !i32 {
 fn lua_cancel(L: *VM.lua.State) !i32 {
     const scheduler = Scheduler.getScheduler(L);
     try L.Zchecktype(1, .Thread);
-    const thread = L.tothread(1) orelse return L.Zerror("Expected thread");
+    const thread = L.tothread(1) orelse return L.Zerror("expected thread");
     scheduler.cancelThread(thread);
     const status = L.costatus(thread);
     if (status != .Finished and status != .FinishedErr and status != .Suspended)
-        return L.Zerrorf("Cannot close {s} coroutine", .{@tagName(status)});
+        return L.Zerrorf("cannot close {s} coroutine", .{@tagName(status)});
     try thread.resetthread();
     return 0;
 }
@@ -36,7 +36,7 @@ fn lua_cancel(L: *VM.lua.State) !i32 {
 fn lua_spawn(L: *VM.lua.State) !i32 {
     const fnType = L.typeOf(1);
     if (fnType != .Function and fnType != .Thread)
-        return L.Zerror("Expected function or thread");
+        return L.Zerror("expected function or thread");
 
     const top = L.gettop();
     const args = top - 1;
@@ -66,7 +66,7 @@ fn lua_defer(L: *VM.lua.State) !i32 {
     const scheduler = Scheduler.getScheduler(L);
     const fnType = L.typeOf(1);
     if (fnType != .Function and fnType != .Thread)
-        return L.Zerror("Expected function or thread");
+        return L.Zerror("expected function or thread");
 
     const top = L.gettop();
     const args = top - 1;
@@ -97,7 +97,7 @@ fn lua_delay(L: *VM.lua.State) !i32 {
     const time = L.Lchecknumber(1);
     const fnType = L.typeOf(2);
     if (fnType != .Function and fnType != .Thread)
-        return L.Zerror("Expected function or thread");
+        return L.Zerror("expected function or thread");
 
     const top = L.gettop();
     const args = top - 2;
@@ -142,7 +142,7 @@ fn lua_count(L: *VM.lua.State) !i32 {
 
     for (kind) |c| {
         if (out > 4)
-            return L.Zerror("Too many kinds");
+            return L.Zerror("too many kinds");
         switch (c) {
             's' => {
                 out += 1;
@@ -165,7 +165,7 @@ fn lua_count(L: *VM.lua.State) !i32 {
                 out += 1;
                 L.pushnumber(@floatFromInt(scheduler.loop.countPending(.{ .timers = false })));
             },
-            else => return L.Zerror("Invalid kind"),
+            else => return L.Zerror("invalid kind"),
         }
     }
 

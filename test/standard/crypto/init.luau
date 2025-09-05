@@ -35,11 +35,11 @@ describe("HashObject", function()
         expect(hasher:digest("base64")).toBe("dLxpVOlznkVJH7UJfDJ0Ms6wO+8=");
         expect(function()
             hasher:update("test");
-        end).toThrow("Hasher already used");
+        end).toThrow("hasher already used");
         expect(copy:digest("base64")).toBe("dLxpVOlznkVJH7UJfDJ0Ms6wO+8=");
         expect(function()
             copy:copy();
-        end).toThrow("Hasher already used");
+        end).toThrow("hasher already used");
     end)
 end)
 

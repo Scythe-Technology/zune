@@ -476,7 +476,7 @@ fn decodeEnvironment(L: *VM.lua.State, string: []const u8) !void {
 fn loadEnvironment(L: *VM.lua.State, allocator: std.mem.Allocator, file: []const u8) !void {
     const bytes: []const u8 = std.fs.cwd().readFileAlloc(allocator, file, std.math.maxInt(usize)) catch |err| switch (err) {
         error.FileNotFound => return,
-        else => return L.Zerrorf("InternalError ({s})", .{@errorName(err)}),
+        else => return L.Zerrorf("internal error ({s})", .{@errorName(err)}),
     };
     defer allocator.free(bytes);
 
@@ -520,7 +520,7 @@ fn lua_onsignal(L: *VM.lua.State) !i32 {
         if (GL != L)
             L.xpush(GL, 2);
 
-        const ref = (GL.ref(if (GL != L) -1 else 2) catch @panic("OutOfMemory")) orelse return L.Zerror("Failed to create reference");
+        const ref = (GL.ref(if (GL != L) -1 else 2) catch @panic("OutOfMemory")) orelse return L.Zerror("failed to create reference");
         if (GL != L)
             GL.pop(1);
 
@@ -531,7 +531,7 @@ fn lua_onsignal(L: *VM.lua.State) !i32 {
             .state = GL,
             .ref = ref,
         };
-    } else return L.Zerrorf("Unknown signal: {s}", .{sig});
+    } else return L.Zerrorf("unknown signal: {s}", .{sig});
 
     return 0;
 }

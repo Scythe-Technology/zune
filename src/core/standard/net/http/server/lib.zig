@@ -377,39 +377,39 @@ pub fn lua_serve(L: *VM.lua.State) !i32 {
     const error_type = L.rawgetfield(1, "error");
     if (!error_type.isnoneornil()) {
         if (error_type != .Function)
-            return L.Zerror("Expected field 'error' to be a function");
+            return L.Zerror("expected field 'error' to be a function");
         callbacks.@"error" = .init(L, -1, undefined);
     }
 
     const websocket_type = L.rawgetfield(1, "websocket");
     if (!websocket_type.isnoneornil()) {
         if (websocket_type != .Table)
-            return L.Zerror("Expected field 'websocket' to be a table");
+            return L.Zerror("expected field 'websocket' to be a table");
         const upgrade_type = L.rawgetfield(-1, "upgrade");
         if (!upgrade_type.isnoneornil()) {
             if (upgrade_type != .Function)
-                return L.Zerror("Expected field 'upgrade' to be a function");
+                return L.Zerror("expected field 'upgrade' to be a function");
             callbacks.ws_upgrade = .init(L, -1, undefined);
         }
         L.pop(1);
         const open_type = L.rawgetfield(-1, "open");
         if (!open_type.isnoneornil()) {
             if (open_type != .Function)
-                return L.Zerror("Expected field 'open' to be a function");
+                return L.Zerror("expected field 'open' to be a function");
             callbacks.ws_open = .init(L, -1, undefined);
         }
         L.pop(1);
         const message_type = L.rawgetfield(-1, "message");
         if (!message_type.isnoneornil()) {
             if (message_type != .Function)
-                return L.Zerror("Expected field 'message' to be a function");
+                return L.Zerror("expected field 'message' to be a function");
             callbacks.ws_message = .init(L, -1, undefined);
         }
         L.pop(1);
         const close_type = L.rawgetfield(-1, "close");
         if (!close_type.isnoneornil()) {
             if (close_type != .Function)
-                return L.Zerror("Expected field 'close' to be a function");
+                return L.Zerror("expected field 'close' to be a function");
             callbacks.ws_close = .init(L, -1, undefined);
         }
         L.pop(1);

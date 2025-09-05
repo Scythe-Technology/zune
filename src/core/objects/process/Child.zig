@@ -194,7 +194,7 @@ pub fn __index(L: *VM.lua.State) !i32 {
     const self = L.touserdatatagged(Child, 1, TAG_PROCESS_CHILD) orelse return L.Zerror("invalid userdata");
     const index = L.Lcheckstring(2);
 
-    switch (IndexMap.get(index) orelse return L.Zerrorf("Unknown index: {s}", .{index})) {
+    switch (IndexMap.get(index) orelse return L.Zerrorf("unknown index: {s}", .{index})) {
         .Stdin => {
             if (self.stdin_file.push(L))
                 return 1;

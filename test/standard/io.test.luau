@@ -110,7 +110,7 @@ describe("IO", function()
 
             expect(function()
                 sink:write(large .. "a");
-            end).toThrow("BufferSink limit exceeded");
+            end).toThrow("limit exceeded");
     
             expect(function()
                 sink:close()

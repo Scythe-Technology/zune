@@ -47,11 +47,11 @@ fn lua_getAddressList(L: *VM.lua.State) !i32 {
     const name = L.Lcheckstring(1);
     const port = L.Lcheckunsigned(2);
     if (port > std.math.maxInt(u16))
-        return L.Zerror("PortOutOfRange");
+        return L.Zerror("port out of range");
     const list = try std.net.getAddressList(allocator, name, @intCast(port));
     defer list.deinit();
     if (list.addrs.len > std.math.maxInt(i32))
-        return L.Zerror("AddressListTooLarge");
+        return L.Zerror("address list too large");
     try L.createtable(@intCast(list.addrs.len), 0);
     for (list.addrs, 1..) |address, i| {
         var buf: [Socket.LONGEST_ADDRESS]u8 = undefined;

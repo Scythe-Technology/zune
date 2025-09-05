@@ -872,7 +872,7 @@ fn lua_close(self: *File, L: *VM.lua.State) !i32 {
 
 fn before_method(self: *File, L: *VM.lua.State) !void {
     if (!self.mode.isOpen())
-        return L.Zerror("File is closed");
+        return L.Zerror("file closed");
 }
 
 const __index = MethodMap.CreateStaticIndexMap(File, TAG_FS_FILE, .{

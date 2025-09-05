@@ -1292,22 +1292,22 @@ describe("FFI", function()
             test("Conflict", function()
                 expect(function()
                     any_check(ffi.dupe(buffer.create(0)):release():tag(1));
-                end).toThrow("Pointer tag mismatch");
+                end).toThrow("tag mismatch");
                 expect(function()
                     any_check(ffi.dupe(buffer.create(0)):release():tag(2));
-                end).toThrow("Pointer tag mismatch");
+                end).toThrow("tag mismatch");
                 expect(function()
                     ctxA_check(ffi.dupe(buffer.create(0)):release():tag(2));
-                end).toThrow("Pointer tag mismatch");
+                end).toThrow("tag mismatch");
                 expect(function()
                     ctxB_check(ffi.dupe(buffer.create(0)):release():tag(1));
-                end).toThrow("Pointer tag mismatch");
+                end).toThrow("tag mismatch");
                 expect(function()
                     ctxA_check(ffi.dupe(buffer.create(0)):release());
-                end).toThrow("Pointer tag mismatch");
+                end).toThrow("tag mismatch");
                 expect(function()
                     ctxB_check(ffi.dupe(buffer.create(0)):release());
-                end).toThrow("Pointer tag mismatch");
+                end).toThrow("tag mismatch");
             end)
         end)
     end)

@@ -30,12 +30,12 @@ pub fn CreateNamecallMap(
     return struct {
         fn inner(L: *VM.lua.State) !i32 {
             const ptr = if (comptime tag) |t|
-                L.touserdatatagged(T, 1, t) orelse return L.Zerrorf("Bad userdata", .{})
+                L.touserdatatagged(T, 1, t) orelse return L.Zerrorf("invalid userdata", .{})
             else
-                L.touserdata(T, 1) orelse return L.Zerrorf("Bad userdata", .{});
+                L.touserdata(T, 1) orelse return L.Zerrorf("invalid userdata", .{});
 
             const namecall = L.namecallstr() orelse return 0;
-            const method = map.get(namecall) orelse return L.Zerrorf("Unknown method: {s}", .{namecall});
+            const method = map.get(namecall) orelse return L.Zerrorf("unknown method: {s}", .{namecall});
             return @call(.auto, method, .{ ptr, L });
         }
     }.inner;
@@ -53,7 +53,7 @@ pub fn CreateStaticIndexMap(
             inline for (index_map) |kv| {
                 try state.Zpushfunction(struct {
                     fn inner(L: *VM.lua.State) !i32 {
-                        const ptr = L.touserdatatagged(T, 1, tag) orelse return L.Zerror("Expected ':' calling member function " ++ kv[0]);
+                        const ptr = L.touserdatatagged(T, 1, tag) orelse return L.Zerror("expected ':' calling member function " ++ kv[0]);
                         return @call(.always_inline, kv[1], .{ ptr, L });
                     }
                 }.inner, kv[0]);
