@@ -723,7 +723,7 @@ describe("Parse", function()
 
     test("Source Any", function()
         local function tryDir(dir: string)
-            for _, entry in zune.fs.readDir(dir) do
+            for _, entry in zune.fs.entries(dir) do
                 if (entry.kind == "file") then
                     if (string.find(entry.name, ".luau$")) then
                         local input = zune.fs.readFile(zune.fs.path.join(dir, entry.name));

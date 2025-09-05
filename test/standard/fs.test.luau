@@ -3,7 +3,7 @@ local TEMP_DIR = _G.__test_tempdir::string;
 
 local fs = zune.fs;
 local task = zune.task;
-local process = zune.process;
+local platform = zune.platform;
 local testing = zune.testing;
 
 local describe = testing.describe;
@@ -85,14 +85,14 @@ describe("Binary", function()
     end)
 
     test("RemoveFile", function()
-        fs.removeFile(path("sample"));
-        fs.removeFile(path("sample2"));
+        fs.deleteFile(path("sample"));
+        fs.deleteFile(path("sample2"));
 
         expect(function()
-            fs.removeFile(path("unknown/sample"))
+            fs.deleteFile(path("unknown/sample"))
         end).toThrow("FileNotFound");
         expect(function()
-            fs.removeFile(path("unknown/sample2"))
+            fs.deleteFile(path("unknown/sample2"))
         end).toThrow("FileNotFound");
     end)
 end)
@@ -170,46 +170,46 @@ describe("Text", function()
     end)
 
     test("RemoveFile", function()
-        fs.removeFile(path("sample.txt"));
-        fs.removeFile(path("sample2.txt"));
+        fs.deleteFile(path("sample.txt"));
+        fs.deleteFile(path("sample2.txt"));
 
         expect(function()
-            fs.removeFile(path("unknown/sample.txt"))
+            fs.deleteFile(path("unknown/sample.txt"))
         end).toThrow("FileNotFound");
         expect(function()
-            fs.removeFile(path("unknown/sample2.txt"))
+            fs.deleteFile(path("unknown/sample2.txt"))
         end).toThrow("FileNotFound");
     end)
 end)
 
 describe("Dir", function()
     test("WriteDir", function()
-        fs.writeDir(path("foo"));
+        fs.makeDir(path("foo"));
 
         -- Recursive
-        fs.writeDir(path("foo/bar/luau"), true);
+        fs.makeDir(path("foo/bar/luau"), true);
 
         expect(function()
-            fs.writeDir(path("unknown/foo"));
+            fs.makeDir(path("unknown/foo"));
         end).toThrow("FileNotFound");
     end)
 
     test("ReadDir", function()
-        local result = fs.readDir(path(""));
+        local result = fs.entries(path(""));
         expect(result).toBe(expect.any("table"));
         expect(result).toBe(expect.similar({{name = "foo", kind = "directory"}}));
         
-        local result2 = fs.readDir(TEMP_DIR);
+        local result2 = fs.entries(TEMP_DIR);
         expect(result2).toBe(expect.any("table"));
         expect(result2).toHaveLength(1);
         expect(result2).toBe(expect.similar({{name = "foo", kind = "directory"}}));
 
-        local result3 = fs.readDir(path("foo/bar/luau"));
+        local result3 = fs.entries(path("foo/bar/luau"));
         expect(result3).toBe(expect.any("table"));
         expect(result3).toBe(expect.similar({}));
 
         expect(function()
-            fs.readDir(path("unknown"));
+            fs.entries(path("unknown"));
         end).toThrow("FileNotFound");
     end)
 
@@ -220,21 +220,21 @@ describe("Dir", function()
     end)
 
     test("RemoveDir", function()
-        fs.removeDir(path("foo/bar/luau"));
+        fs.deleteDir(path("foo/bar/luau"));
         expect(isDir(path("foo/bar/luau"))).toBeFalsy();
 
         expect(function()
-            fs.removeDir(path("foo"));
+            fs.deleteDir(path("foo"));
         end).toThrow("DirNotEmpty");
 
         -- Recursive
-        fs.removeDir(path("foo"), true);
+        fs.deleteDir(path("foo"), true);
         expect(isDir(path("foo"))).toBeFalsy();
     end)
 end)
 
 test("Metadata", function()
-    fs.writeDir(path("metadata"));
+    fs.makeDir(path("metadata"));
 
     local metadata = fs.metadata(path("metadata"));
     expect(metadata).toBe(expect.any("table"));
@@ -249,11 +249,11 @@ test("Metadata", function()
             read_only = false,
         },
     }));
-    fs.removeDir(path("metadata"));
+    fs.deleteDir(path("metadata"));
 end)
 
 test("Stat", function()
-    fs.writeDir(path("stat"));
+    fs.makeDir(path("stat"));
     fs.writeFile(path("stat/sample.txt"), "Some text sample\n");
 
     do
@@ -290,12 +290,12 @@ test("Stat", function()
         }));
     end
 
-    fs.removeFile(path("stat/sample.txt")); 
-    fs.removeDir(path("stat"));
+    fs.deleteFile(path("stat/sample.txt")); 
+    fs.deleteDir(path("stat"));
 end)
 
 test("Move", function()
-    fs.writeDir(path("metadata"));
+    fs.makeDir(path("metadata"));
     fs.writeFile(path("metadata/sample.txt"), "Some text sample\n");
     fs.writeFile(path("metadata/sample2.txt"), "Some text sample number 2\n");
 
@@ -318,15 +318,15 @@ test("Move", function()
     local resultRead2 = fs.readFile(path("sample.txt"));
     expect(resultRead2).toBe("Some text sample number 2\n");
 
-    fs.removeFile(path("sample.txt"));
-    fs.removeDir(path("metadata"));
+    fs.deleteFile(path("sample.txt"));
+    fs.deleteDir(path("metadata"));
 
     expect(isFile(path("sample.txt"))).toBeFalsy();
     expect(isDir(path("metadata"))).toBeFalsy();
 end)
 
 test("Copy", function()
-    fs.writeDir(path("metadata"));
+    fs.makeDir(path("metadata"));
     fs.writeFile(path("metadata/sample.txt"), "Some text sample\n");
     fs.writeFile(path("metadata/sample2.txt"), "Some text sample number 2\n");
 
@@ -356,9 +356,9 @@ test("Copy", function()
     expect(isFile(path("metadata2/sample.txt"))).toBeTruthy();
     expect(isFile(path("metadata2/sample2.txt"))).toBeTruthy();
 
-    fs.removeFile(path("sample.txt"));
-    fs.removeDir(path("metadata"), true);
-    fs.removeDir(path("metadata2"), true);
+    fs.deleteFile(path("sample.txt"));
+    fs.deleteDir(path("metadata"), true);
+    fs.deleteDir(path("metadata2"), true);
 
     expect(isFile(path("sample.txt"))).toBeFalsy();
     expect(isDir(path("metadata"))).toBeFalsy();
@@ -366,8 +366,8 @@ test("Copy", function()
 end)
 
 test("Symlink", function()
-    if (process.os ~= "windows") then
-        fs.writeDir(path("metadata"));
+    if (platform.os ~= "windows") then
+        fs.makeDir(path("metadata"));
         fs.writeFile(path("metadata/sample.txt"), "Some text sample\n");
         fs.writeFile(path("metadata/sample2.txt"), "Some text sample number 2\n");
 
@@ -418,9 +418,9 @@ test("Symlink", function()
         expect(isFile(path("metadata2/sample.txt"))).toBeTruthy();
         expect(isFile(path("metadata2/sample2.txt"))).toBeTruthy();
 
-        fs.removeFile(path("sample.txt"));
-        fs.removeDir(path("metadata"), true);
-        fs.removeDir(path("metadata2"), true);
+        fs.deleteFile(path("sample.txt"));
+        fs.deleteDir(path("metadata"), true);
+        fs.deleteDir(path("metadata2"), true);
 
         expect(isFile(path("sample.txt"))).toBeFalsy();
         expect(isDir(path("metadata"))).toBeFalsy();
@@ -518,11 +518,11 @@ describe("File Object/Handle", function()
         result:close();
     end)
 
-    fs.removeFile(path("sample.txt"));
+    fs.deleteFile(path("sample.txt"));
 end)
 
 describe("Path", function()
-    local SEP = if (zune.process.os == "windows") then "\\" else "/";
+    local SEP = if (zune.platform.os == "windows") then "\\" else "/";
     test("getExePath", function()
         local result = fs.getExePath();
         expect(result).toBe(expect.any("string"));
@@ -662,15 +662,15 @@ test("Watch", function()
     h:sync();
     h:close();
     task.wait(0.5);
-    fs.removeFile(path("sample2.txt"));
+    fs.deleteFile(path("sample2.txt"));
     task.wait(0.5);
-    fs.writeDir(path("foo"));
+    fs.makeDir(path("foo"));
     task.wait(0.5);
-    fs.removeDir(path("foo"));
+    fs.deleteDir(path("foo"));
     task.wait(0.5);
 
     -- TODO: Check tests for windows, tests for windows are inconsistent
-    expect(changes).toBe(expect.similar(if (process.os ~= "windows") then {
+    expect(changes).toBe(expect.similar(if (platform.os ~= "windows") then {
         {path = "sample2.txt", events = {"created"}},
         {path = "sample2.txt", events = {"modified"}},
         {path = "sample2.txt", events = {"deleted"}},

@@ -42,7 +42,7 @@ describe("Require", function()
             expect(res).toBe(`redundant file extension, remove '.lua'`);
         end)
 
-        local SEP = if zune.process.os == "windows" then "\\" else "/"
+        local SEP = if zune.platform.os == "windows" then "\\" else "/"
         test("Name Conflict", function()
             local ok, res = pcall(require, "./generated/duplicate");
             expect(ok).toBeFalsy();
