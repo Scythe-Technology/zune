@@ -1,8 +1,8 @@
 --!strict
 local ffi = zune.ffi;
 local mem = zune.mem;
-local process = zune.process;
 local testing = zune.testing;
+local platform = zune.platform;
 
 local test = testing.test;
 local expect = testing.expect;
@@ -53,20 +53,20 @@ expect(ffi).toBe(
     })
 )
 
-if (process.os == "windows") then
+if (platform.os == "windows") then
     expect(ffi.prefix).toBe("");
     expect(ffi.suffix).toBe("dll");
-elseif (process.os == "linux") then
+elseif (platform.os == "linux") then
     expect(ffi.prefix).toBe("lib");
     expect(ffi.suffix).toBe("so");
-elseif (process.os == "macos") then
+elseif (platform.os == "macos") then
     expect(ffi.prefix).toBe("lib");
     expect(ffi.suffix).toBe("dylib");
-elseif (process.os == "freebsd") then
+elseif (platform.os == "freebsd") then
     expect(ffi.prefix).toBe("lib");
     expect(ffi.suffix).toBe("so");
 else
-    error("Unsupported OS: " .. process.os);
+    error("Unsupported OS: " .. platform.os);
 end
 
 local static_suffix = ffi.suffix;
@@ -1349,7 +1349,7 @@ describe("FFI", function()
                 expect(add_doublefn(62.5)).toBe(65);
             end)
             test("Complex", function()
-                local compiled = ffi.c.compile((if (process.os == "windows") then "__declspec(dllimport) " else "extern") .. " void blank();\n\nvoid blank2() { blank(); }", {
+                local compiled = ffi.c.compile((if (platform.os == "windows") then "__declspec(dllimport) " else "extern") .. " void blank();\n\nvoid blank2() { blank(); }", {
                     files = {`./zig-out/lib/{ffi.prefix}sample.{static_suffix}`},
                 });
 
