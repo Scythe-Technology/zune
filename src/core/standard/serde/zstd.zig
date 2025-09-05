@@ -22,10 +22,10 @@ pub fn lua_compress(L: *VM.lua.State) !i32 {
         const levelType = L.rawgetfield(2, "level");
         if (!levelType.isnoneornil()) {
             if (levelType != .Number)
-                return L.Zerror("Options 'level' field must be a number");
+                return L.Zerror("options 'level' field must be a number");
             const num = L.tointeger(-1) orelse unreachable;
             if (num < zstd.MIN_COMPRESSION_LEVEL or num > zstd.MAX_COMPRESSION_LEVEL)
-                return L.Zerrorf("Options 'level' must not be over {} or less than {}", .{ zstd.MAX_COMPRESSION_LEVEL, zstd.MIN_COMPRESSION_LEVEL });
+                return L.Zerrorf("options 'level' must not be over {} or less than {}", .{ zstd.MAX_COMPRESSION_LEVEL, zstd.MIN_COMPRESSION_LEVEL });
             level = num;
         }
         L.pop(1);

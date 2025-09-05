@@ -62,6 +62,9 @@ elseif (process.os == "linux") then
 elseif (process.os == "macos") then
     expect(ffi.prefix).toBe("lib");
     expect(ffi.suffix).toBe("dylib");
+elseif (process.os == "freebsd") then
+    expect(ffi.prefix).toBe("lib");
+    expect(ffi.suffix).toBe("so");
 else
     error("Unsupported OS: " .. process.os);
 end
@@ -1289,22 +1292,22 @@ describe("FFI", function()
             test("Conflict", function()
                 expect(function()
                     any_check(ffi.dupe(buffer.create(0)):release():tag(1));
-                end).toThrow("Pointer tag mismatch");
+                end).toThrow("tag mismatch");
                 expect(function()
                     any_check(ffi.dupe(buffer.create(0)):release():tag(2));
-                end).toThrow("Pointer tag mismatch");
+                end).toThrow("tag mismatch");
                 expect(function()
                     ctxA_check(ffi.dupe(buffer.create(0)):release():tag(2));
-                end).toThrow("Pointer tag mismatch");
+                end).toThrow("tag mismatch");
                 expect(function()
                     ctxB_check(ffi.dupe(buffer.create(0)):release():tag(1));
-                end).toThrow("Pointer tag mismatch");
+                end).toThrow("tag mismatch");
                 expect(function()
                     ctxA_check(ffi.dupe(buffer.create(0)):release());
-                end).toThrow("Pointer tag mismatch");
+                end).toThrow("tag mismatch");
                 expect(function()
                     ctxB_check(ffi.dupe(buffer.create(0)):release());
-                end).toThrow("Pointer tag mismatch");
+                end).toThrow("tag mismatch");
             end)
         end)
     end)

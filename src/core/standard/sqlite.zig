@@ -10,12 +10,10 @@ const Scheduler = Zune.Runtime.Scheduler;
 const LuaHelper = Zune.Utils.LuaHelper;
 const MethodMap = Zune.Utils.MethodMap;
 
-const tagged = @import("../../tagged.zig");
-
 const VM = luau.VM;
 
-const TAG_SQLITE_DATABASE = tagged.Tags.get("SQLITE_DATABASE").?;
-const TAG_SQLITE_STATEMENT = tagged.Tags.get("SQLITE_STATEMENT").?;
+const TAG_SQLITE_DATABASE = Zune.Tags.get("SQLITE_DATABASE").?;
+const TAG_SQLITE_STATEMENT = Zune.Tags.get("SQLITE_STATEMENT").?;
 
 pub const LIB_NAME = "sqlite";
 
@@ -33,7 +31,7 @@ const LuaStatement = struct {
 
     pub fn loadParams(allocator: std.mem.Allocator, L: *VM.lua.State, statement: sqlite.Statement, idx: i32) ![]?sqlite.Value {
         if (L.typeOf(idx) != .Table)
-            return L.Zerrorf("Expected table in argument #{d}", .{idx - 1});
+            return L.Zerrorf("expected table in argument #{d}", .{idx - 1});
         const values = try allocator.alloc(?sqlite.Value, statement.param_list.items.len);
         errdefer allocator.free(values);
         for (statement.param_list.items, 0..) |info, i| {
@@ -43,7 +41,7 @@ const LuaStatement = struct {
                 .String => values[i] = .{ .text = L.tostring(-1) orelse unreachable },
                 .Buffer => values[i] = .{ .blob = L.tobuffer(-1) orelse unreachable },
                 .Nil => values[i] = null,
-                else => return L.Zerrorf("Unsupported type for parameter {s}", .{info.name}),
+                else => return L.Zerrorf("unsupported type for parameter {s}", .{info.name}),
             }
         }
         return values;
@@ -75,7 +73,7 @@ const LuaStatement = struct {
         // TODO: prob should switch to static string map
         if (std.mem.eql(u8, namecall, "all")) {
             if (ptr.closed)
-                return L.Zerror("Statement is closed");
+                return L.Zerror("statement closed");
 
             ptr.statement.reset();
             defer ptr.statement.reset();
@@ -102,7 +100,7 @@ const LuaStatement = struct {
             return 1;
         } else if (std.mem.eql(u8, namecall, "get")) {
             if (ptr.closed)
-                return L.Zerror("Statement is closed");
+                return L.Zerror("statement closed");
             var params: ?[]?sqlite.Value = null;
             defer if (params) |p| allocator.free(p);
             if (ptr.statement.paramSize() > 0)
@@ -123,7 +121,7 @@ const LuaStatement = struct {
             return 1;
         } else if (std.mem.eql(u8, namecall, "run")) {
             if (ptr.closed)
-                return L.Zerror("Statement is closed");
+                return L.Zerror("statement closed");
 
             ptr.statement.reset();
             defer ptr.statement.reset();
@@ -150,7 +148,7 @@ const LuaStatement = struct {
         } else if (std.mem.eql(u8, namecall, "finalize")) {
             ptr.close(L);
         }
-        return L.Zerrorf("Unknown method: {s}", .{namecall});
+        return L.Zerrorf("unknown method: {s}", .{namecall});
     }
 
     pub fn close(ptr: *LuaStatement, L: *VM.lua.State) void {
@@ -292,7 +290,7 @@ const LuaDatabase = struct {
 
     pub fn lua_query(self: *LuaDatabase, L: *VM.lua.State) !i32 {
         if (self.closed)
-            return L.Zerror("Database is closed");
+            return L.Zerror("database closed");
         const allocator = luau.getallocator(L);
         const query = try L.Zcheckvalue([]const u8, 2, null);
         try self.statements.ensureTotalCapacity(allocator, self.statements.items.len + 1);
@@ -315,7 +313,7 @@ const LuaDatabase = struct {
 
     pub fn lua_exec(self: *LuaDatabase, L: *VM.lua.State) !i32 {
         if (self.closed)
-            return L.Zerror("Database is closed");
+            return L.Zerror("database closed");
         const allocator = luau.getallocator(L);
 
         const query = try L.Zcheckvalue([]const u8, 2, null);
@@ -349,7 +347,7 @@ const LuaDatabase = struct {
         try L.Zchecktype(2, .Function);
         const kind_str = L.tostring(3);
         const kind: TransactionKind = if (kind_str) |str|
-            TransactionMap.get(str) orelse return L.Zerrorf("Unknown transaction kind: {s}.", .{str})
+            TransactionMap.get(str) orelse return L.Zerrorf("unknown transaction kind: {s}.", .{str})
         else
             .None;
         L.pushvalue(1);

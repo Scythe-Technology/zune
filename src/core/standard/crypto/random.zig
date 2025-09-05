@@ -17,7 +17,7 @@ pub fn lua_nextinteger(L: *VM.lua.State) !i32 {
     };
     const max = try L.Zcheckvalue(i32, 2, null);
     if (min > max)
-        return L.Zerror("InvalidRange (min > max)");
+        return L.Zerror("invalid range (min > max)");
     L.pushinteger(std.crypto.random.intRangeAtMost(i32, min, max));
     return 1;
 }
@@ -29,7 +29,7 @@ pub fn lua_nextnumber(L: *VM.lua.State) !i32 {
     };
     const max = try L.Zcheckvalue(f64, 2, null);
     if (min > max)
-        return L.Zerror("InvalidRange (min > max)");
+        return L.Zerror("invalid range (min > max)");
     const v = std.crypto.random.float(f64);
     L.pushnumber(min + (v * (max - min)));
     return 1;
@@ -41,11 +41,11 @@ pub fn lua_fill(L: *VM.lua.State) !i32 {
     const length = try L.Zcheckvalue(i32, 3, null);
 
     if (offset < 0)
-        return L.Zerror("InvalidOffset (offset < 0)");
+        return L.Zerror("invalid offset (offset < 0)");
     if (length < 0)
-        return L.Zerror("InvalidLength (length < 0)");
+        return L.Zerror("invalid length (length < 0)");
     if (offset + length > buffer.len)
-        return L.Zerror("InvalidLength (offset + length > buffer size)");
+        return L.Zerror("invalid length (offset + length > buffer size)");
 
     std.crypto.random.bytes(buffer[@intCast(offset)..][0..@intCast(length)]);
 

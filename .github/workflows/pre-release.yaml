@@ -56,6 +56,12 @@ jobs:
           - name: macOs Arm64
             target: aarch64-macos
             artifact: zune-${{ needs.prep.outputs.version }}-macos-aarch64
+          - name: FreeBSD x86_64
+            target: x86_64-freebsd
+            artifact: zune-${{ needs.prep.outputs.version }}-freebsd-x86_64
+          - name: FreeBSD Arm64
+            target: aarch64-freebsd
+            artifact: zune-${{ needs.prep.outputs.version }}-freebsd-aarch64
 
     name: ${{ matrix.name }}
     timeout-minutes: 20

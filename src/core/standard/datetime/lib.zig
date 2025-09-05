@@ -10,11 +10,9 @@ const MethodMap = Zune.Utils.MethodMap;
 
 const parse = @import("parse.zig");
 
-const tagged = @import("../../../tagged.zig");
-
 const VM = luau.VM;
 
-const TAG_DATETIME = tagged.Tags.get("DATETIME").?;
+const TAG_DATETIME = Zune.Tags.get("DATETIME").?;
 
 pub const LIB_NAME = "datetime";
 pub fn PlatformSupported() bool {
@@ -151,7 +149,7 @@ pub const LuaDatetime = struct {
 
     pub fn __index(L: *VM.lua.State) !i32 {
         try L.Zchecktype(1, .Userdata);
-        const ptr = L.touserdatatagged(LuaDatetime, 1, TAG_DATETIME) orelse return L.Zerror("Expected 'datetime'");
+        const ptr = L.touserdatatagged(LuaDatetime, 1, TAG_DATETIME) orelse return L.Zerror("expected 'datetime'");
 
         const index = L.Lcheckstring(2);
 

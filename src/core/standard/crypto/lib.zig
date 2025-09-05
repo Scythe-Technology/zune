@@ -15,7 +15,7 @@ const common = @import("common.zig");
 
 const VM = luau.VM;
 
-const TAG_CRYPTO_HASHER = Zune.tagged.Tags.get("CRYPTO_HASHER").?;
+const TAG_CRYPTO_HASHER = Zune.Tags.get("CRYPTO_HASHER").?;
 
 const hash = std.crypto.hash;
 const aead = std.crypto.aead;
@@ -156,7 +156,7 @@ const LuaCryptoHasher = struct {
 
     fn lua_update(self: *LuaCryptoHasher, L: *VM.lua.State) !i32 {
         if (self.extra != null and self.used)
-            return L.Zerror("Hasher already used");
+            return L.Zerror("hasher already used");
         const value = try L.Zcheckvalue([]const u8, 2, null);
 
         switch (self.algorithm) {
@@ -176,10 +176,10 @@ const LuaCryptoHasher = struct {
     const DigestEncodingMap = EnumMap.Gen(DigestEncoding);
     fn lua_digest(self: *LuaCryptoHasher, L: *VM.lua.State) !i32 {
         if (self.extra != null and self.used)
-            return L.Zerror("Hasher already used");
+            return L.Zerror("hasher already used");
         const encoding_name = try L.Zcheckvalue(?[:0]const u8, 2, null);
         const encoding = if (encoding_name) |name|
-            DigestEncodingMap.get(name) orelse return L.Zerrorf("Invalid encoding: {s}", .{name})
+            DigestEncodingMap.get(name) orelse return L.Zerrorf("invalid encoding: {s}", .{name})
         else
             null;
         switch (self.algorithm) {
@@ -225,7 +225,7 @@ const LuaCryptoHasher = struct {
 
     fn lua_copy(self: *LuaCryptoHasher, L: *VM.lua.State) !i32 {
         if (self.extra != null and self.used)
-            return L.Zerror("Hasher already used");
+            return L.Zerror("hasher already used");
         const allocator = luau.getallocator(L);
 
         const hasher = try L.newuserdatataggedwithmetatable(LuaCryptoHasher, TAG_CRYPTO_HASHER);
@@ -267,7 +267,7 @@ fn lua_createHash(L: *VM.lua.State) !i32 {
 
     const name = try L.Zcheckvalue([:0]const u8, 1, null);
     const secret = try L.Zcheckvalue(?[:0]const u8, 2, null);
-    const algo = LuaCryptoHasher.AlgorithmMap.get(name) orelse return L.Zerrorf("Invalid algorithm: {s}", .{name});
+    const algo = LuaCryptoHasher.AlgorithmMap.get(name) orelse return L.Zerrorf("invalid algorithm: {s}", .{name});
 
     const block_length = algo.block_length();
     const digest_length = algo.digest_length();

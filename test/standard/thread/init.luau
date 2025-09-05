@@ -267,10 +267,10 @@ describe("thread", function()
         end).toThrow("CyclicReference");
         expect(function()
             t:send(function() end);
-        end).toThrow("Unsupported lua type for sending (got function)");
+        end).toThrow("unsupported lua type for sending (got function)");
         expect(function()
             t:send(newproxy());
-        end).toThrow("Unsupported lua type for sending (got userdata)");
+        end).toThrow("unsupported lua type for sending (got userdata)");
         t:send();
         t:join();
     end)

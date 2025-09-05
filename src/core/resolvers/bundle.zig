@@ -159,14 +159,15 @@ pub const PackedState = packed struct(u40) {
     mode: Mode,
     luau: Luau,
     format: Format,
-    _: u6 = 0, // reserved bits
+    _: u5 = 0, // reserved bits
 
     pub const Mode = packed struct(u2) {
         compiled: enum(u1) { debug, release },
         limbo: bool = false,
     };
 
-    const Format = packed struct(u26) {
+    const Format = packed struct(u27) {
+        enabled: bool = true,
         use_color: bool = true,
         table_address: bool = true,
         recursive_table: bool = false,
@@ -344,6 +345,7 @@ pub fn loadBundle(allocator: std.mem.Allocator, exe_header: ExeHeader, bundle: [
     Zune.STATE.LUAU_OPTIONS.DEBUG_LEVEL = state.luau.debug_level;
     Zune.STATE.LUAU_OPTIONS.OPTIMIZATION_LEVEL = state.luau.optimization_level;
 
+    Zune.STATE.FORMAT.ENABLED = state.format.enabled;
     Zune.STATE.FORMAT.USE_COLOR = state.format.use_color;
     Zune.STATE.FORMAT.TABLE_ADDRESS = state.format.table_address;
     Zune.STATE.FORMAT.RECURSIVE_TABLE = state.format.recursive_table;

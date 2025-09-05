@@ -38,8 +38,8 @@ describe("Zlib", function()
             expect(serde.zstd.compress(sample, {level = 22})).toBe(compressed_sample_22);
         end)
         test("Fail", function()
-            expect(function() serde.zstd.compress(sample, {level = 23}) end).toThrow("Options 'level' must not be over 22 or less than -131072");
-            expect(function() serde.zstd.compress(sample, {level = -131073}) end).toThrow("Options 'level' must not be over 22 or less than -131072");
+            expect(function() serde.zstd.compress(sample, {level = 23}) end).toThrow("options 'level' must not be over 22 or less than -131072");
+            expect(function() serde.zstd.compress(sample, {level = -131073}) end).toThrow("options 'level' must not be over 22 or less than -131072");
             expect(function() serde.zstd.compress(true) end).toThrow("invalid argument #1 to 'compress' (string expected, got boolean)");
         end)
     end)

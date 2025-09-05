@@ -26,7 +26,7 @@ fn getWritableSlice(L: *VM.lua.State, idx: i32) ![]u8 {
         .Userdata => {
             const ptr = ffi.LuaPointer.value(L, idx) orelse return L.Zerror("expected a buffer or userdata");
             if (ptr.owner == .none or ptr.ptr == null)
-                return L.Zerror("NoAddressAvailable");
+                return L.Zerror("unavailable address");
             return @as([*]u8, @ptrCast(@alignCast(ptr.ptr.?)))[0 .. ptr.size orelse return L.Zerror("unknown size")];
         },
         else => return L.Zerror("expected a buffer or userdata"),
@@ -40,7 +40,7 @@ fn getReadableSlice(L: *VM.lua.State, idx: i32) ![]const u8 {
         .Userdata => {
             const ptr = ffi.LuaPointer.value(L, idx) orelse return L.Zerror("expected a buffer or userdata");
             if (ptr.owner == .none or ptr.ptr == null)
-                return L.Zerror("NoAddressAvailable");
+                return L.Zerror("unavailable address");
             return @as([*]u8, @ptrCast(@alignCast(ptr.ptr.?)))[0 .. ptr.size orelse return L.Zerror("unknown size")];
         },
         else => return L.Zerror("expected a buffer, string, or userdata"),

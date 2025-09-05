@@ -16,9 +16,7 @@ const ext_fs = @import("../../utils/ext_fs.zig");
 
 const Watch = @import("./watch.zig");
 
-const tagged = @import("../../../tagged.zig");
-
-const TAG_FS_WATCHER = tagged.Tags.get("FS_WATCHER").?;
+const TAG_FS_WATCHER = Zune.Tags.get("FS_WATCHER").?;
 
 const VM = luau.VM;
 
@@ -33,6 +31,7 @@ pub const LIB_NAME = "fs";
 pub fn PlatformSupported() bool {
     return switch (comptime builtin.os.tag) {
         .linux, .macos, .windows => true,
+        .freebsd => true,
         else => false,
     };
 }

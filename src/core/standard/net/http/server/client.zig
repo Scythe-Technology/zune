@@ -13,9 +13,7 @@ const LuaHelper = Zune.Utils.LuaHelper;
 const MethodMap = Zune.Utils.MethodMap;
 const Lists = Zune.Utils.Lists;
 
-const tagged = Zune.tagged;
-
-const TAG_NET_HTTP_WEBSOCKET = tagged.Tags.get("NET_HTTP_WEBSOCKET").?;
+const TAG_NET_HTTP_WEBSOCKET = Zune.Tags.get("NET_HTTP_WEBSOCKET").?;
 
 const Request = @import("../request.zig");
 const WebSocket = @import("../websocket.zig");

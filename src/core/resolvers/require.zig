@@ -256,7 +256,7 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
             break :jmp;
         };
         switch (res.value_ptr.*) {
-            .loading => return L.Zerror("Cyclic dependency detected"),
+            .loading => return L.Zerror("cyclic dependency detected"),
             .@"error" => return L.Zerror("requested module failed to load"),
             .loaded => {
                 defer allocator.free(script_path);

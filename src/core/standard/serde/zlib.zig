@@ -24,12 +24,12 @@ pub fn lua_compress(L: *VM.lua.State) !i32 {
         const levelType = L.rawgetfield(2, "level");
         if (!levelType.isnoneornil()) {
             if (levelType != .Number)
-                return L.Zerror("Options 'level' field must be a number");
+                return L.Zerror("options 'level' field must be a number");
             const num = L.tointeger(-1) orelse unreachable;
             if (num < 4 or num > 13)
-                return L.Zerror("Options 'level' must not be over 13 or less than 4 or equal to 10");
+                return L.Zerror("options 'level' must not be over 13 or less than 4 or equal to 10");
             if (num == 10)
-                return L.Zerrorf("Options 'level' cannot be {d}, level does not exist", .{num});
+                return L.Zerrorf("options 'level' cannot be {d}, level does not exist", .{num});
             level = @intCast(num);
         }
         L.pop(1);

@@ -20,10 +20,11 @@ fn Execute(_: std.mem.Allocator, _: []const []const u8) !void {
         "\n" ++
         "  <bold><blue>luau     <clear><dim>[args...]        <clear>Display info from luau.\n" ++
         "  <bold><blue>help                      <clear>Display help message.\n" ++
+        "  <bold><blue>info     <clear><dim>[all]        <clear><clear>Display runtime information.\n" ++
         "\n" ++
         "<bold>Flags:<clear>\n" ++
         "  -e, --eval     <clear><dim>[luau]     <clear>Evaluate luau code.\n" ++
-        "  -V, --version             <clear>Display version.\n" ++
+        "  -V, --version             <clear>Display runtime information.\n" ++
         "  -h, --help                <clear>Display help message.\n" ++
         "", .{});
 }

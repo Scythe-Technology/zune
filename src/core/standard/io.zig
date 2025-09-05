@@ -11,7 +11,6 @@ const LuaHelper = Zune.Utils.LuaHelper;
 const MethodMap = Zune.Utils.MethodMap;
 
 const sysfd = @import("../utils/sysfd.zig");
-const tagged = @import("../../tagged.zig");
 
 const File = @import("../objects/filesystem/File.zig");
 
@@ -21,9 +20,9 @@ const mem = @import("./mem.zig");
 
 const VM = luau.VM;
 
-const TAG_IO_STREAM = tagged.Tags.get("IO_STREAM").?;
-const TAG_IO_BUFFERSINK = tagged.Tags.get("IO_BUFFERSINK").?;
-const TAG_IO_BUFFERSTREAM = tagged.Tags.get("IO_BUFFERSTREAM").?;
+const TAG_IO_STREAM = Zune.Tags.get("IO_STREAM").?;
+const TAG_IO_BUFFERSINK = Zune.Tags.get("IO_BUFFERSINK").?;
+const TAG_IO_BUFFERSTREAM = Zune.Tags.get("IO_BUFFERSTREAM").?;
 
 pub const LIB_NAME = "io";
 
@@ -100,7 +99,7 @@ const Stream = struct {
         return struct {
             fn inner(self: *Stream, L: *VM.lua.State) !i32 {
                 if (!self.mode.write)
-                    return L.Zerror("Stream is not writable");
+                    return L.Zerror("not writable");
                 std.debug.assert(self.vtable.write != null);
                 switch (comptime @typeInfo(T)) {
                     .int => |i| {
@@ -128,7 +127,7 @@ const Stream = struct {
         return struct {
             fn inner(self: *Stream, L: *VM.lua.State) anyerror!i32 {
                 if (!self.mode.read)
-                    return L.Zerror("Stream is not readable");
+                    return L.Zerror("not readable");
                 std.debug.assert(self.vtable.read != null);
                 const data = try self.vtable.read.?(self.ref.value, @sizeOf(T), true) orelse return error.EOF;
                 const value = std.mem.bytesToValue(T, data[0..len]);
@@ -149,7 +148,7 @@ const Stream = struct {
 
     pub fn lua_write(self: *Stream, L: *VM.lua.State) !i32 {
         if (!self.mode.write)
-            return L.Zerror("Stream is not writable");
+            return L.Zerror("not writable");
         std.debug.assert(self.vtable.write != null);
         const data = try L.Zcheckvalue([]const u8, 2, null);
         try self.vtable.write.?(self.ref.value, data);
@@ -158,7 +157,7 @@ const Stream = struct {
 
     pub fn lua_read(self: *Stream, L: *VM.lua.State) !i32 {
         if (!self.mode.read)
-            return L.Zerror("Stream is not readable");
+            return L.Zerror("not readable");
         std.debug.assert(self.vtable.read != null);
         const amount = L.Loptunsigned(2, mem.MAX_LUAU_SIZE);
         const use_buffer = L.Loptboolean(3, true);
@@ -172,7 +171,7 @@ const Stream = struct {
 
     pub fn lua_seekTo(self: *Stream, L: *VM.lua.State) !i32 {
         if (!self.mode.seek)
-            return L.Zerror("Stream is not seekable");
+            return L.Zerror("not seekable");
         std.debug.assert(self.vtable.seekTo != null);
         const pos = L.Lcheckunsigned(2);
         try self.vtable.seekTo.?(self.ref.value, pos);
@@ -181,7 +180,7 @@ const Stream = struct {
 
     pub fn lua_seekBy(self: *Stream, L: *VM.lua.State) !i32 {
         if (!self.mode.seek)
-            return L.Zerror("Stream is not seekable");
+            return L.Zerror("not seekable");
         std.debug.assert(self.vtable.seekBy != null);
         const offset = L.Lcheckinteger(2);
         try self.vtable.seekBy.?(self.ref.value, offset);
@@ -292,7 +291,7 @@ const BufferSink = struct {
             L.pushboolean(self.closed);
             return 1;
         }
-        return L.Zerrorf("Unknown index: {s}", .{index});
+        return L.Zerrorf("unknown index: {s}", .{index});
     }
 
     pub fn write(self: *BufferSink, value: []const u8) !void {
@@ -304,7 +303,7 @@ const BufferSink = struct {
             return error.Closed;
         const str = try L.Zcheckvalue([]const u8, 2, null);
         if (self.buf.items.len + str.len > self.limit)
-            return L.Zerror("BufferSink limit exceeded");
+            return L.Zerror("limit exceeded");
         try self.write(str);
         return 0;
     }

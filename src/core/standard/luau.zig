@@ -31,19 +31,19 @@ fn lua_compile(L: *VM.lua.State) !i32 {
     }, 2, null)) |opts| {
         compileOpts.debugLevel = opts.debug_level orelse compileOpts.debugLevel;
         if (compileOpts.debugLevel < 0 or compileOpts.debugLevel > 2)
-            return L.Zerror("Invalid debug level");
+            return L.Zerror("invalid debug level");
 
         compileOpts.optimizationLevel = opts.optimization_level orelse compileOpts.optimizationLevel;
         if (compileOpts.optimizationLevel < 0 or compileOpts.optimizationLevel > 3)
-            return L.Zerror("Invalid optimization level");
+            return L.Zerror("invalid optimization level");
 
         compileOpts.coverageLevel = opts.coverage_level orelse compileOpts.coverageLevel;
         if (compileOpts.coverageLevel < 0 or compileOpts.coverageLevel > 2)
-            return L.Zerror("Invalid coverage level");
+            return L.Zerror("invalid coverage level");
 
         compileOpts.typeInfoLevel = opts.type_info_Level orelse compileOpts.typeInfoLevel;
         if (compileOpts.typeInfoLevel < 0 or compileOpts.typeInfoLevel > 1)
-            return L.Zerror("Invalid type info level");
+            return L.Zerror("invalid type info level");
 
         // TODO: Enable after tests are added
         // compileOpts.vector_ctor = opts.vector_ctor orelse compileOpts.vector_ctor;
@@ -84,7 +84,7 @@ fn lua_load(L: *VM.lua.State) !i32 {
     try L.load(opts.chunk_name, bytecode, 0);
 
     if (L.typeOf(-1) != .Function)
-        return L.Zerror("Luau Error (Bad Load)");
+        return L.Zerror("luau error (bad load)");
 
     if (L.typeOf(2) == .Table) {
         if (L.rawgetfield(2, "env") == .Table) {
@@ -96,7 +96,7 @@ fn lua_load(L: *VM.lua.State) !i32 {
             if (use_code_gen)
                 L.setsafeenv(-1, true);
             if (!L.setfenv(-2))
-                return L.Zerror("Luau Error (Bad Env)");
+                return L.Zerror("luau error (bad environment)");
         } else L.pop(1);
     }
 

@@ -11,7 +11,6 @@ const LuaHelper = Zune.Utils.LuaHelper;
 const MethodMap = Zune.Utils.MethodMap;
 const Lists = Zune.Utils.Lists;
 
-const tagged = @import("../../../tagged.zig");
 const sysfd = @import("../../utils/sysfd.zig");
 
 const File = @import("../filesystem/File.zig");
@@ -20,7 +19,7 @@ const VM = luau.VM;
 
 const Child = @This();
 
-const TAG_PROCESS_CHILD = tagged.Tags.get("PROCESS_CHILD").?;
+const TAG_PROCESS_CHILD = Zune.Tags.get("PROCESS_CHILD").?;
 pub fn PlatformSupported() bool {
     return std.process.can_spawn;
 }
@@ -195,7 +194,7 @@ pub fn __index(L: *VM.lua.State) !i32 {
     const self = L.touserdatatagged(Child, 1, TAG_PROCESS_CHILD) orelse return L.Zerror("invalid userdata");
     const index = L.Lcheckstring(2);
 
-    switch (IndexMap.get(index) orelse return L.Zerrorf("Unknown index: {s}", .{index})) {
+    switch (IndexMap.get(index) orelse return L.Zerrorf("unknown index: {s}", .{index})) {
         .Stdin => {
             if (self.stdin_file.push(L))
                 return 1;

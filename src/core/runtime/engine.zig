@@ -512,18 +512,22 @@ const RunOptions = struct {
 
 pub fn runAsync(L: *VM.lua.State, sched: *Scheduler, comptime options: RunOptions) !void {
     defer if (options.cleanUp) stateCleanUp();
+    if (comptime Zune.corelib.thread.PlatformSupported())
+        Zune.corelib.thread.THREADS = .{};
     sched.deferThread(L, null, 0);
     sched.run(options.mode);
     const threadlib = Zune.corelib.thread;
-    var node = threadlib.THREADS.first;
-    while (node) |n| {
-        node = n.next;
-        const runtime = threadlib.Runtime.from(n);
-        if (runtime.thread) |t|
-            t.join();
-        runtime.thread = null;
-        if (runtime.owner == .thread)
-            runtime.deinit();
+    if (comptime Zune.corelib.thread.PlatformSupported()) {
+        var node = threadlib.THREADS.first;
+        while (node) |n| {
+            node = n.next;
+            const runtime = threadlib.Runtime.from(n);
+            if (runtime.thread) |t|
+                t.join();
+            runtime.thread = null;
+            if (runtime.owner == .thread)
+                runtime.deinit();
+        }
     }
     _ = try checkStatus(L);
 }

@@ -12,7 +12,7 @@ const Lists = Zune.Utils.Lists;
 
 const VM = luau.VM;
 
-const TAG_THREAD = Zune.tagged.Tags.get("THREAD").?;
+const TAG_THREAD = Zune.Tags.get("THREAD").?;
 
 pub const LIB_NAME = "thread";
 pub fn PlatformSupported() bool {
@@ -260,7 +260,7 @@ const LuaThread = struct {
     pub fn lua_start(self: *LuaThread, L: *VM.lua.State) !i32 {
         const runtime = self.runtime;
         if (runtime.status.load(ACQUIRE_ORDER) != .ready) {
-            return L.Zerror("thread is already running or dead");
+            return L.Zerror("thread running or dead");
         }
 
         runtime.status.store(.running, RELEASE_ORDER);
@@ -290,7 +290,7 @@ const LuaThread = struct {
                 var map = std.AutoArrayHashMap(usize, bool).init(allocator);
                 defer map.deinit();
                 const value = storevalue(L, allocator, @intCast(i), &err_type, &map) catch |err| switch (err) {
-                    error.UnsupportedType => return L.Zerrorf("Unsupported lua type for sending (got {s})", .{VM.lapi.typename(err_type)}),
+                    error.UnsupportedType => return L.Zerrorf("unsupported lua type for sending (got {s})", .{VM.lapi.typename(err_type)}),
                     else => return err,
                 };
                 errdefer value.deinit(allocator);
@@ -668,7 +668,7 @@ fn lua_selfSend(L: *VM.lua.State) !i32 {
             var map = std.AutoArrayHashMap(usize, bool).init(allocator);
             defer map.deinit();
             const value = storevalue(L, allocator, @intCast(i), &err_type, &map) catch |err| switch (err) {
-                error.UnsupportedType => return L.Zerrorf("Unsupported lua type for sending (got {s})", .{VM.lapi.typename(err_type)}),
+                error.UnsupportedType => return L.Zerrorf("unsupported lua type for sending (got {s})", .{VM.lapi.typename(err_type)}),
                 else => return err,
             };
             errdefer value.deinit(allocator);

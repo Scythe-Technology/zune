@@ -7,11 +7,9 @@ const Zune = @import("zune");
 const LuaHelper = Zune.Utils.LuaHelper;
 const MethodMap = Zune.Utils.MethodMap;
 
-const tagged = @import("../../tagged.zig");
-
 const VM = luau.VM;
 
-const TAG_REGEX_COMPILED = tagged.Tags.get("REGEX_COMPILED").?;
+const TAG_REGEX_COMPILED = Zune.Tags.get("REGEX_COMPILED").?;
 
 pub const LIB_NAME = "regex";
 
@@ -162,14 +160,14 @@ fn regex_create(L: *VM.lua.State) !i32 {
     const flags = L.tolstring(2) orelse "";
 
     if (flags.len > 2)
-        return L.Zerror("Too many flags provided");
+        return L.Zerror("too many flags provided");
 
     var flag: u32 = 0;
     for (flags) |f| switch (f) {
         'i' => flag |= pcre2.Options.CASELESS,
         'm' => flag |= pcre2.Options.MULTILINE,
         'u' => flag |= pcre2.Options.UTF,
-        else => return L.Zerrorf("Unknown flag: {c}", .{f}),
+        else => return L.Zerrorf("unknown flag: {c}", .{f}),
     };
 
     var pos: usize = 0;

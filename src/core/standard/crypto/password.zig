@@ -83,7 +83,7 @@ pub fn lua_verify(L: *VM.lua.State) !i32 {
     const hash = try L.Zcheckvalue([]const u8, 2, null);
 
     if (hash.len < 8)
-        return L.Zerror("InvalidHash (Must be PHC encoded)");
+        return L.Zerror("invalid hash (must be PHC encoded)");
 
     if (@as(u32, @bitCast(hash[0..4].*)) == TAG_BCRYPT)
         L.pushboolean(if (bcrypt.strVerify(

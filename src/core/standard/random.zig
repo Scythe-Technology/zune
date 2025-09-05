@@ -9,9 +9,7 @@ const MethodMap = Zune.Utils.MethodMap;
 
 const VM = luau.VM;
 
-const tagged = @import("../../tagged.zig");
-
-const TAG_RANDOM = tagged.Tags.get("RANDOM").?;
+const TAG_RANDOM = Zune.Tags.get("RANDOM").?;
 
 pub const LIB_NAME = "random";
 
