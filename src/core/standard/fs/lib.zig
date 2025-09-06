@@ -502,7 +502,7 @@ fn lua_createFile(L: *VM.lua.State) !i32 {
             else if (opts.truncate)
                 std.os.windows.CREATE_ALWAYS
             else
-                std.os.windows.FILE_OPEN_IF,
+                std.os.windows.OPEN_ALWAYS,
         }),
         else => try fs.cwd().createFile(path, .{
             .read = true,
