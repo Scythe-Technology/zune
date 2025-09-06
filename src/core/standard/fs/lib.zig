@@ -488,6 +488,7 @@ fn lua_createFile(L: *VM.lua.State) !i32 {
     };
 
     const Options = struct {
+        read: bool = true,
         exclusive: bool = false,
         truncate: bool = true,
         mode: Mode = fs.File.default_mode,
@@ -496,7 +497,7 @@ fn lua_createFile(L: *VM.lua.State) !i32 {
 
     const file: fs.File = switch (comptime builtin.os.tag) {
         .windows => try @import("../../utils/os/windows.zig").OpenFile(fs.cwd(), path, .{
-            .accessMode = std.os.windows.GENERIC_READ | std.os.windows.GENERIC_WRITE,
+            .accessMode = std.os.windows.GENERIC_WRITE | (if (opts.read) std.os.windows.GENERIC_READ else 0),
             .creationDisposition = if (opts.exclusive)
                 std.os.windows.CREATE_NEW
             else if (opts.truncate)
@@ -505,14 +506,14 @@ fn lua_createFile(L: *VM.lua.State) !i32 {
                 std.os.windows.OPEN_ALWAYS,
         }),
         else => try fs.cwd().createFile(path, .{
-            .read = true,
+            .read = opts.read,
             .exclusive = opts.exclusive,
             .truncate = opts.truncate,
             .mode = @intCast(opts.mode),
         }),
     };
 
-    try File.push(L, file, .File, .readwrite(.seek_close));
+    try File.push(L, file, .File, if (opts.read) .readwrite(.seek_close) else .writable(.seek_close));
 
     return 1;
 }
