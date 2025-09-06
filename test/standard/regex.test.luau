@@ -233,6 +233,22 @@ describe("Regex", function()
         end)
     end)
 
+    test("split", function()
+        local re = regex.create("b+");
+
+        expect(re:split("abbc")).toBe(expect.similar({
+            "a", "c"
+        }));
+
+        expect(re:split("abbccabcacbc")).toBe(expect.similar({
+            "a", "ccabcacbc"
+        }));
+
+        expect(re:split("abbccabcacbc", true)).toBe(expect.similar({
+            "a", "cca", "cac", "c"
+        }));
+    end)
+
     test("isMatch", function()
         local re = regex.create("a(b+)c");
 

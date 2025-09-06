@@ -324,7 +324,7 @@ test("Fast Timeout", function()
         net.ADDRF.INET,
         bit32.bor(
             net.SOCKF.STREAM,
-            if (zune.process.os == "windows") then 0 else net.SOCKF.CLOEXEC
+            if (zune.platform.os == "windows") then 0 else net.SOCKF.CLOEXEC
         ),
         net.IPPROTO.TCP
     );
@@ -453,7 +453,7 @@ test("Macro Random", function()
             net.ADDRF.INET,
             bit32.bor(
                 net.SOCKF.STREAM,
-                if (zune.process.os == "windows") then 0 else net.SOCKF.CLOEXEC
+                if (zune.platform.os == "windows") then 0 else net.SOCKF.CLOEXEC
             ),
             net.IPPROTO.TCP
         );

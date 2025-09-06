@@ -718,12 +718,26 @@ describe("Parse", function()
                     },
                 }
             },
+            root = {},
+            lines = 0,
+            lineOffsets = {},
+            eof = {
+                tag = "eof",
+                text = "",
+                position = {
+                    line = 0,
+                    column = 0,
+                },
+                trailingTrivia = {},
+                leadingTrivia = {},
+            },
+            hotcomments = {},
         }));
     end)
 
     test("Source Any", function()
         local function tryDir(dir: string)
-            for _, entry in zune.fs.readDir(dir) do
+            for _, entry in zune.fs.entries(dir) do
                 if (entry.kind == "file") then
                     if (string.find(entry.name, ".luau$")) then
                         local input = zune.fs.readFile(zune.fs.path.join(dir, entry.name));
@@ -892,6 +906,20 @@ describe("ParseExpr", function()
                     },
                 }
             },
+            root = {},
+            lines = 0,
+            lineOffsets = {},
+            eof = {
+                tag = "eof",
+                text = "",
+                position = {
+                    line = 0,
+                    column = 0,
+                },
+                trailingTrivia = {},
+                leadingTrivia = {},
+            },
+            hotcomments = {},
         }));
     end)
 end)

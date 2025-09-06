@@ -14,7 +14,7 @@ const VM = luau.VM;
 
 const TAG_DATETIME = Zune.Tags.get("DATETIME").?;
 
-pub const LIB_NAME = "datetime";
+pub const LIB_NAME = "time";
 pub fn PlatformSupported() bool {
     switch (comptime builtin.cpu.arch) {
         .x86_64,
@@ -278,6 +278,53 @@ fn lua_parse(L: *VM.lua.State) !i32 {
     return 1;
 }
 
+fn lua_instant_now(L: *VM.lua.State) !i32 {
+    const now = try std.time.Instant.now();
+    const bytes = try L.newbuffer(12);
+    switch (comptime builtin.os.tag) {
+        .windows => {
+            const qpc = now.timestamp;
+            const qpf = std.os.windows.QueryPerformanceFrequency();
+
+            // 10Mhz (1 qpc tick every 100ns) is a common enough QPF value that we can optimize on it.
+            // https://github.com/microsoft/STL/blob/785143a0c73f030238ef618890fd4d6ae2b3a3a0/stl/inc/chrono#L694-L701
+            const common_qpf = 10_000_000;
+            if (qpf == common_qpf) {
+                const ns = qpc * (std.time.ns_per_s / common_qpf);
+                const float_bytes: [8]u8 = @bitCast(@as(f64, @floatFromInt(ns / std.time.ns_per_s)));
+                @memcpy(bytes[0..8], &float_bytes);
+                const int_bytes: [4]u8 = @bitCast(@as(u32, @intCast(ns % std.time.ns_per_s)));
+                @memcpy(bytes[8..12], &int_bytes);
+            } else {
+                const scale = @as(u64, std.time.ns_per_s << 32) / @as(u32, @intCast(qpf));
+                const since = @as(u96, qpc) * scale;
+                const result = since >> 32;
+                const float_bytes: [8]u8 = @bitCast(@as(f64, @floatFromInt(result / std.time.ns_per_s)));
+                @memcpy(bytes[0..8], &float_bytes);
+                const int_bytes: [4]u8 = @bitCast(@as(u32, @intCast(result % std.time.ns_per_s)));
+                @memcpy(bytes[8..12], &int_bytes);
+            }
+        },
+        else => {
+            const float_bytes: [8]u8 = @bitCast(@as(f64, @floatFromInt(now.timestamp.sec)));
+            @memcpy(bytes[0..8], &float_bytes);
+            const int_bytes: [4]u8 = @bitCast(@as(u32, @intCast(now.timestamp.nsec)));
+            @memcpy(bytes[8..12], &int_bytes);
+        },
+    }
+    return 1;
+}
+
+fn lua_timestamp(L: *VM.lua.State) !i32 {
+    L.pushnumber(@floatFromInt(std.time.timestamp()));
+    return 1;
+}
+
+fn lua_timestampMillis(L: *VM.lua.State) !i32 {
+    L.pushnumber(@floatFromInt(std.time.milliTimestamp()));
+    return 1;
+}
+
 pub fn loadLib(L: *VM.lua.State) !void {
     {
         _ = try L.Znewmetatable(@typeName(LuaDatetime), .{
@@ -292,13 +339,20 @@ pub fn loadLib(L: *VM.lua.State) !void {
     }
 
     try L.Zpushvalue(.{
-        .now = lua_now,
-        .parse = lua_parse,
-        .fromIsoDate = lua_fromIsoDate,
-        .fromUniversalTime = lua_fromUniversalTime,
-        .fromLocalTime = lua_fromLocalTime,
-        .fromUnixTimestamp = lua_fromUnixTimestamp,
-        .fromUnixTimestampMillis = lua_fromUnixTimestampMillis,
+        .date = .{
+            .now = lua_now,
+            .parse = lua_parse,
+            .fromIsoDate = lua_fromIsoDate,
+            .fromUniversalTime = lua_fromUniversalTime,
+            .fromLocalTime = lua_fromLocalTime,
+            .fromUnixTimestamp = lua_fromUnixTimestamp,
+            .fromUnixTimestampMillis = lua_fromUnixTimestampMillis,
+        },
+        .instant = .{
+            .now = lua_instant_now,
+        },
+        .timestamp = lua_timestamp,
+        .timestampMillis = lua_timestampMillis,
     });
     L.setreadonly(-1, true);
 
@@ -309,11 +363,11 @@ test {
     _ = parse;
 }
 
-test "datetime" {
+test "time" {
     const TestRunner = @import("../../utils/testrunner.zig");
 
     const testResult = try TestRunner.runTest(
-        TestRunner.newTestFile("standard/datetime.test.luau"),
+        TestRunner.newTestFile("standard/time.test.luau"),
         &.{},
         .{},
     );

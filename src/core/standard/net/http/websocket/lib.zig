@@ -1155,7 +1155,7 @@ pub fn lua_websocket(L: *VM.lua.State) !i32 {
     const allocator = luau.getallocator(L);
     const scheduler = Scheduler.getScheduler(L);
 
-    const uriString = try L.Zcheckvalue([:0]const u8, 1, null);
+    const uri_string = try L.Zcheckvalue([:0]const u8, 1, null);
 
     var timeout: ?u32 = 30;
 
@@ -1274,7 +1274,7 @@ pub fn lua_websocket(L: *VM.lua.State) !i32 {
     var uri_buffer: [1024 * 2]u8 = undefined;
     var fixedBuffer = std.heap.FixedBufferAllocator.init(&uri_buffer);
 
-    const protocol, const valid_uri = try validateUri(try std.Uri.parse(uriString), fixedBuffer.allocator());
+    const protocol, const valid_uri = try validateUri(try std.Uri.parse(uri_string), fixedBuffer.allocator());
 
     const host = valid_uri.host.?.raw;
 

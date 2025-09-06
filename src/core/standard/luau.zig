@@ -1952,7 +1952,7 @@ fn lua_parse(L: *VM.lua.State) !i32 {
     defer parseResult.deinit();
 
     if (!parseResult.errors.empty()) {
-        try L.createtable(0, 1);
+        try L.createtable(0, 6);
         {
             try L.createtable(@truncate(parseResult.errors.size()), 0);
             var iter = parseResult.errors.iterator();
@@ -1966,6 +1966,28 @@ fn lua_parse(L: *VM.lua.State) !i32 {
             }
         }
         try L.rawsetfield(-2, "errors");
+
+        try L.createtable(0, 0);
+        try L.rawsetfield(-2, "root");
+
+        L.pushnumber(0);
+        try L.rawsetfield(-2, "lines");
+
+        try L.createtable(0, 0);
+        try L.rawsetfield(-2, "lineOffsets");
+
+        try L.createtable(0, 0);
+        try L.rawsetfield(-2, "hotcomments");
+
+        try L.Zpushvalue(.{
+            .text = "",
+            .tag = "eof",
+            .position = .{ .line = 0, .column = 0 },
+            .trailingTrivia = .{},
+            .leadingTrivia = .{},
+        });
+        try L.rawsetfield(-2, "eof");
+
         return 1;
     }
 
@@ -2036,7 +2058,7 @@ fn lua_parseExpr(L: *VM.lua.State) !i32 {
     defer parseResult.deinit();
 
     if (!parseResult.errors.empty()) {
-        try L.createtable(0, 1);
+        try L.createtable(0, 6);
         {
             try L.createtable(@truncate(parseResult.errors.size()), 0);
             var iter = parseResult.errors.iterator();
@@ -2050,6 +2072,28 @@ fn lua_parseExpr(L: *VM.lua.State) !i32 {
             }
         }
         try L.rawsetfield(-2, "errors");
+
+        try L.createtable(0, 0);
+        try L.rawsetfield(-2, "root");
+
+        L.pushnumber(0);
+        try L.rawsetfield(-2, "lines");
+
+        try L.createtable(0, 0);
+        try L.rawsetfield(-2, "lineOffsets");
+
+        try L.createtable(0, 0);
+        try L.rawsetfield(-2, "hotcomments");
+
+        try L.Zpushvalue(.{
+            .text = "",
+            .tag = "eof",
+            .position = .{ .line = 0, .column = 0 },
+            .trailingTrivia = .{},
+            .leadingTrivia = .{},
+        });
+        try L.rawsetfield(-2, "eof");
+
         return 1;
     }
 

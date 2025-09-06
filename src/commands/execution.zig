@@ -86,7 +86,7 @@ fn cmdRun(allocator: std.mem.Allocator, args: []const []const u8) !void {
         if (flag.len < 2)
             continue;
         switch (flag[0]) {
-            '-' => switch (flag[1]) {
+            '-' => sw: switch (flag[1]) {
                 'O' => if (flag.len == 3 and flag[2] >= '0' and flag[2] <= '2') {
                     const level: u2 = switch (flag[2]) {
                         '0' => 0,
@@ -141,7 +141,9 @@ fn cmdRun(allocator: std.mem.Allocator, args: []const []const u8) !void {
                     Zune.STATE.LUAU_OPTIONS.JIT_ENABLED = false;
                 } else if (std.mem.eql(u8, flag, "--limbo")) {
                     LOAD_FLAGS.limbo = true;
-                },
+                } else if (std.mem.eql(u8, flag, "--no-fmt")) {
+                    Zune.STATE.FORMAT.ENABLED = false;
+                } else continue :sw 0,
                 else => {
                     Zune.debug.print("<red>error<clear>: unknown flag '{s}'\n", .{flag});
                     std.process.exit(1);
@@ -232,7 +234,7 @@ fn cmdTest(allocator: std.mem.Allocator, args: []const []const u8) !void {
         if (flag.len < 2)
             continue;
         switch (flag[0]) {
-            '-' => switch (flag[1]) {
+            '-' => sw: switch (flag[1]) {
                 'O' => if (flag.len == 3 and flag[2] >= '0' and flag[2] <= '2') {
                     const level: u2 = switch (flag[2]) {
                         '0' => 0,
@@ -281,7 +283,9 @@ fn cmdTest(allocator: std.mem.Allocator, args: []const []const u8) !void {
                     Zune.STATE.LUAU_OPTIONS.JIT_ENABLED = false;
                 } else if (std.mem.eql(u8, flag, "--limbo")) {
                     LOAD_FLAGS.limbo = true;
-                },
+                } else if (std.mem.eql(u8, flag, "--no-fmt")) {
+                    Zune.STATE.FORMAT.ENABLED = false;
+                } else continue :sw 0,
                 else => {
                     Zune.debug.print("<red>error<clear>: unknown flag '{s}'\n", .{flag});
                     std.process.exit(1);
@@ -448,7 +452,7 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
         if (flag.len < 2)
             continue;
         switch (flag[0]) {
-            '-' => switch (flag[1]) {
+            '-' => sw: switch (flag[1]) {
                 'O' => if (flag.len == 3 and flag[2] >= '0' and flag[2] <= '2') {
                     const level: u2 = switch (flag[2]) {
                         '0' => 0,
@@ -479,7 +483,9 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
                     ALWAYS_DEBUG = false;
                 } else if (std.mem.eql(u8, flag, "--limbo")) {
                     LOAD_FLAGS.limbo = true;
-                },
+                } else if (std.mem.eql(u8, flag, "--no-fmt")) {
+                    Zune.STATE.FORMAT.ENABLED = false;
+                } else continue :sw 0,
                 else => {
                     Zune.debug.print("<red>error<clear>: unknown flag '{s}'\n", .{flag});
                     std.process.exit(1);

@@ -78,7 +78,7 @@ fn lua_readFileSync(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn lua_readDir(L: *VM.lua.State) !i32 {
+fn lua_entries(L: *VM.lua.State) !i32 {
     const path = L.Lcheckstring(1);
     var dir = try fs.cwd().openDir(path, .{
         .iterate = true,
@@ -125,7 +125,7 @@ fn lua_writeFileSync(L: *VM.lua.State) !i32 {
     return 0;
 }
 
-fn lua_writeDir(L: *VM.lua.State) !i32 {
+fn lua_makeDir(L: *VM.lua.State) !i32 {
     const path = L.Lcheckstring(1);
     const recursive = L.Loptboolean(2, false);
     const cwd = std.fs.cwd();
@@ -136,13 +136,13 @@ fn lua_writeDir(L: *VM.lua.State) !i32 {
     return 0;
 }
 
-fn lua_removeFile(L: *VM.lua.State) !i32 {
+fn lua_deleteFile(L: *VM.lua.State) !i32 {
     const path = L.Lcheckstring(1);
     try fs.cwd().deleteFile(path);
     return 0;
 }
 
-fn lua_removeDir(L: *VM.lua.State) !i32 {
+fn lua_deleteDir(L: *VM.lua.State) !i32 {
     const path = L.Lcheckstring(1);
     const recursive = L.Loptboolean(2, false);
     const cwd = std.fs.cwd();
@@ -482,23 +482,41 @@ fn lua_openFile(L: *VM.lua.State) !i32 {
 fn lua_createFile(L: *VM.lua.State) !i32 {
     const path = L.Lcheckstring(1);
 
+    const Mode = switch (comptime builtin.os.tag) {
+        .freebsd, .macos, .ios, .tvos, .watchos, .visionos, .dragonfly, .serenity => u16,
+        else => u32,
+    };
+
     const Options = struct {
+        read: bool = true,
         exclusive: bool = false,
+        truncate: bool = true,
+        mode: Mode = fs.File.default_mode,
     };
     const opts: Options = try L.Zcheckvalue(?Options, 2, null) orelse .{};
 
     const file: fs.File = switch (comptime builtin.os.tag) {
         .windows => try @import("../../utils/os/windows.zig").OpenFile(fs.cwd(), path, .{
-            .accessMode = std.os.windows.GENERIC_READ | std.os.windows.GENERIC_WRITE,
-            .creationDisposition = if (opts.exclusive) std.os.windows.CREATE_NEW else std.os.windows.CREATE_ALWAYS,
+            .accessMode = if (opts.read)
+                std.os.windows.GENERIC_WRITE | std.os.windows.GENERIC_READ
+            else
+                std.os.windows.GENERIC_WRITE,
+            .creationDisposition = if (opts.exclusive)
+                std.os.windows.CREATE_NEW
+            else if (opts.truncate)
+                std.os.windows.CREATE_ALWAYS
+            else
+                std.os.windows.OPEN_ALWAYS,
         }),
         else => try fs.cwd().createFile(path, .{
-            .read = true,
+            .read = opts.read,
             .exclusive = opts.exclusive,
+            .truncate = opts.truncate,
+            .mode = @intCast(opts.mode),
         }),
     };
 
-    try File.push(L, file, .File, .readwrite(.seek_close));
+    try File.push(L, file, .File, if (opts.read) .readwrite(.seek_close) else .writable(.seek_close));
 
     return 1;
 }
@@ -792,12 +810,12 @@ pub fn loadLib(L: *VM.lua.State) !void {
         .openFile = lua_openFile,
         .readFile = lua_readFileAsync,
         .readFileSync = lua_readFileSync,
-        .readDir = lua_readDir,
+        .entries = lua_entries,
         .writeFile = lua_writeFileAsync,
         .writeFileSync = lua_writeFileSync,
-        .writeDir = lua_writeDir,
-        .removeFile = lua_removeFile,
-        .removeDir = lua_removeDir,
+        .makeDir = lua_makeDir,
+        .deleteFile = lua_deleteFile,
+        .deleteDir = lua_deleteDir,
         .stat = lua_stat,
         .metadata = lua_metadata,
         .move = lua_move,

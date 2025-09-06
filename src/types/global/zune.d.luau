@@ -37,10 +37,11 @@ type YamlEncoder = {
 type Base64Encoder = {
     encode: 
         & ((value: string) -> string)
-        & ((value: buffer) -> buffer),
+        & ((value: buffer) -> buffer)
+        & ((value: string | buffer) -> string | buffer),
     decode: 
         & ((base64: string) -> string)
-        & ((base64: buffer) -> buffer), 
+        & ((base64: string | buffer) -> string | buffer), 
 }
 export type SerdeGenericCompressionOptions = {
     level: number?, 
@@ -48,12 +49,15 @@ export type SerdeGenericCompressionOptions = {
 type CompressionFn = 
     & ((raw: string) -> string)
     & ((raw: buffer) -> buffer)
+    & ((raw: string | buffer) -> string | buffer)
 type AdvancedCompressionFn = 
     & ((raw: string, opts: SerdeGenericCompressionOptions?) -> string)
     & ((raw: buffer, opts: SerdeGenericCompressionOptions?) -> buffer)
+    & ((raw: string | buffer, opts: SerdeGenericCompressionOptions?) -> string | buffer)
 type DecompressionFn = 
     & ((compressed: string) -> string)
     & ((compressed: buffer) -> buffer)
+    & ((compressed: string | buffer) -> string | buffer)
 export type _zune_serde_json = {
     encode: (value: any, config: SerdeJsonEncodeConfig?) -> string,
     decode: (json: string, config: SerdeJsonDecodeConfig?) -> any,
@@ -91,48 +95,59 @@ export type _zune_serde_yaml = {
 export type _zune_serde_base64 = {
     encode: 
         & ((value: string) -> string)
-        & ((value: buffer) -> buffer),
+        & ((value: buffer) -> buffer)
+        & ((value: string | buffer) -> string | buffer),
     decode: 
         & ((base64: string) -> string)
-        & ((base64: buffer) -> buffer), 
+        & ((base64: string | buffer) -> string | buffer), 
 }
 export type _zune_serde_gzip = {
     compress: 
         & ((raw: string, opts: SerdeGenericCompressionOptions?) -> string)
-        & ((raw: buffer, opts: SerdeGenericCompressionOptions?) -> buffer),
+        & ((raw: buffer, opts: SerdeGenericCompressionOptions?) -> buffer)
+        & ((raw: string | buffer, opts: SerdeGenericCompressionOptions?) -> string | buffer),
     decompress: 
         & ((compressed: string) -> string)
-        & ((compressed: buffer) -> buffer), 
+        & ((compressed: buffer) -> buffer)
+        & ((compressed: string | buffer) -> string | buffer), 
 }
 export type _zune_serde_zlib = {
     compress: 
         & ((raw: string, opts: SerdeGenericCompressionOptions?) -> string)
-        & ((raw: buffer, opts: SerdeGenericCompressionOptions?) -> buffer),
+        & ((raw: buffer, opts: SerdeGenericCompressionOptions?) -> buffer)
+        & ((raw: string | buffer, opts: SerdeGenericCompressionOptions?) -> string | buffer),
     decompress: 
         & ((compressed: string) -> string)
-        & ((compressed: buffer) -> buffer), 
+        & ((compressed: buffer) -> buffer)
+        & ((compressed: string | buffer) -> string | buffer), 
 }
 export type _zune_serde_lz4 = {
     compress: 
         & ((raw: string) -> string)
-        & ((raw: buffer) -> buffer),
+        & ((raw: buffer) -> buffer)
+        & ((raw: string | buffer) -> string | buffer),
     compressFrame: 
         & ((raw: string, opts: SerdeGenericCompressionOptions?) -> string)
-        & ((raw: buffer, opts: SerdeGenericCompressionOptions?) -> buffer),
+        & ((raw: buffer, opts: SerdeGenericCompressionOptions?) -> buffer)
+        & ((raw: string | buffer, opts: SerdeGenericCompressionOptions?) -> string | buffer),
     decompress: 
         & ((compressed: string, size: number) -> string)
-        & ((compressed: buffer, size: number) -> buffer),
+        & ((compressed: buffer, size: number) -> buffer)
+        & ((compressed: string | buffer, size: number) -> string | buffer),
     decompressFrame: 
         & ((compressed: string) -> string)
-        & ((compressed: buffer) -> buffer), 
+        & ((compressed: buffer) -> buffer)
+        & ((compressed: string | buffer) -> string | buffer), 
 }
 export type _zune_serde_zstd = {
     compress: 
         & ((raw: string, opts: SerdeGenericCompressionOptions?) -> string)
-        & ((raw: buffer, opts: SerdeGenericCompressionOptions?) -> buffer),
+        & ((raw: buffer, opts: SerdeGenericCompressionOptions?) -> buffer)
+        & ((raw: string | buffer, opts: SerdeGenericCompressionOptions?) -> string | buffer),
     decompress: 
         & ((compressed: string) -> string)
-        & ((compressed: buffer) -> buffer), 
+        & ((compressed: buffer) -> buffer)
+        & ((compressed: string | buffer) -> string | buffer), 
 }
 type GenericCompressor = {
     compress: AdvancedCompressionFn,
@@ -187,9 +202,11 @@ declare class FileHandle
     read: 
         & ((self: FileHandle, amount: number?, bytes: false?) -> string)
         & ((self: FileHandle, amount: number?, bytes: true) -> buffer)
+        & ((self: FileHandle, amount: number?, bytes: boolean) -> string | buffer)
     readSync: 
         & ((self: FileHandle, amount: number?, bytes: false?) -> string)
         & ((self: FileHandle, amount: number?, bytes: true) -> buffer)
+        & ((self: FileHandle, amount: number?, bytes: boolean) -> string | buffer)
     write: (self: FileHandle, contents: string | buffer) -> ()
     writeSync: (self: FileHandle, contents: string | buffer) -> ()
     append: (self: FileHandle, contents: string | buffer) -> ()
@@ -211,7 +228,8 @@ declare class FileWatcher
     stop: (self: FileWatcher) -> () 
 end
 export type FileCreateOptions = {
-    exclusive: boolean?, 
+    exclusive: boolean?,
+    truncate: boolean?, 
 }
 export type FileOpenOptions = {
     mode: string?, 
@@ -237,12 +255,18 @@ export type _zune_fs = {
     openFile: (path: string, opts: FileOpenOptions?) -> FileHandle,
     readFile: 
         & ((path: string) -> string)
-        & ((path: string, bytes: true) -> buffer),
-    readDir: (path: string) -> {DirectoryEntry},
+        & ((path: string, bytes: true) -> buffer)
+        & ((path: string, bytes: boolean) -> string | buffer),
+    readFileSync: 
+        & ((path: string) -> string)
+        & ((path: string, bytes: true) -> buffer)
+        & ((path: string, bytes: boolean) -> string | buffer),
+    entries: (path: string) -> {DirectoryEntry},
     writeFile: (path: string, contents: string | buffer) -> (),
-    writeDir: (path: string, recursive: boolean?) -> (),
-    removeFile: (path: string) -> (),
-    removeDir: (path: string, recursive: boolean?) -> (),
+    writeFileSync: (path: string, contents: string | buffer) -> (),
+    makeDir: (path: string, recursive: boolean?) -> (),
+    deleteFile: (path: string) -> (),
+    deleteDir: (path: string, recursive: boolean?) -> (),
     metadata: (path: string) -> Metadata,
     stat: (path: string) -> FileStat,
     move: (from: string, to: string, overwrite: boolean?) -> (),
@@ -263,6 +287,7 @@ declare class CryptoHash
         & ((self: CryptoHash) -> buffer)
         & ((self: CryptoHash, encoding: "binary") -> buffer)
         & ((self: CryptoHash, encoding: "hex" | "base64") -> string)
+        & ((self: CryptoHash, encoding: string) -> string | buffer)
     update: (self: CryptoHash, value: string | buffer) -> ()
     copy: (self: CryptoHash) -> CryptoHash 
 end
@@ -477,15 +502,44 @@ export type _zune_thread = {
     getCpuCount: () -> number,
     isThread: boolean, 
 }
+--[[ time ]]
+export type TimeDictionary = {
+    year: number,
+    month: number,
+    day: number,
+    hour: number,
+    minute: number,
+    second: number,
+    millisecond: number, 
+}
+export type _zune_time_date = {
+    now: () -> DateTime,
+    fromIsoDate: (date: string) -> DateTime,
+    fromUnixTimestamp: (timestamp: number) -> DateTime,
+    fromUnixTimestampMillis: (timestamp: number) -> DateTime,
+    fromLocalTime: (year: number, month: number, day: number, hour: number, minute: number, second: number, millisecond: number) -> DateTime,
+    fromUniversalTime: (year: number, month: number, day: number, hour: number, minute: number, second: number, millisecond: number) -> DateTime,
+    parse: (date: string) -> DateTime, 
+}
+export type _zune_time_instant = {
+    now: () -> buffer, 
+}
+declare class DateTime
+    timestamp: number
+    timestamp_millis: number
+    toLocalTime: (self: DateTime) -> TimeDictionary
+    toUniversalTime: (self: DateTime) -> TimeDictionary
+    toIsoDate: (self: DateTime) -> string
+    formatLocalTime: (self: DateTime, format: string) -> string
+    formatUniversalTime: (self: DateTime, format: string) -> string 
+end
+export type _zune_time = {
+    date: _zune_time_date,
+    instant: _zune_time_instant,
+    timestamp: () -> number,
+    timestampMillis: () -> number, 
+}
 --[[ process ]]
-export type CPUArchitecture = 
-    | "aarch64"
-    | "x86_64"
-    | "riscv64"
-export type OS = 
-    | "linux"
-    | "windows"
-    | "macos"
 export type ProcessOptions = {
     cwd: string?,
     env: {
@@ -513,18 +567,11 @@ declare class ProcessChild
     kill: (self: ProcessChild) -> ProcessResult 
 end
 export type _zune_process = {
-    os: 
-        | "linux"
-        | "windows"
-        | "macos",
-    arch: 
-        | "aarch64"
-        | "x86_64"
-        | "riscv64",
     args: {string},
     env: _zune_process_env,
     loadEnv: () -> {[string]: string},
     cwd: () -> string,
+    pid: () -> number,
     create: (exec: string, args: {string}?, opts: ProcessOptions?) -> ProcessChild,
     run: (exec: string, args: {string}?, opts: ProcessOptions?) -> ProcessRunResult,
     exit: (code: number) -> never,
@@ -539,6 +586,7 @@ declare class Regex
     match: (self: Regex, input: string | buffer) -> {RegexMatch}?
     search: (self: Regex, input: string | buffer) -> {RegexMatch}?
     captures: (self: Regex, input: string | buffer, global: boolean?) -> {{RegexMatch}}
+    split: (self: Regex, input: string | buffer, global: boolean?) -> {string}
     isMatch: (self: Regex, input: string | buffer) -> boolean
     format: (self: Regex, str: string, format: string) -> string
     replace: (self: Regex, str: string, replacement: string) -> string
@@ -661,8 +709,7 @@ export type ParseResult = {
     errors: {{
         message: string,
         location: Location, 
-    }}
-} | {
+    }}?,
     root: {any},
     eof: {
         text: "",
@@ -675,7 +722,7 @@ export type ParseResult = {
         header: boolean,
         content: string,
         location: Location, 
-    }}
+    }}, 
 }
 export type _zune_luau = {
     compile: (source: string | buffer, opts: LuauCompileOptions?) -> buffer,
@@ -684,6 +731,99 @@ export type _zune_luau = {
     parse: (src: string | buffer) -> ParseResult,
     parseExpr: (src: string | buffer) -> any,
     garbagecollect: () -> (), 
+}
+--[[ platform ]]
+export type CPUArchitecture = 
+    | "aarch64"
+    | "x86_64"
+    | "riscv64"
+export type OS = 
+    | "linux"
+    | "windows"
+    | "macos"
+    | "freebsd"
+export type _zune_platform_cpu = {
+    arch: 
+        | "aarch64"
+        | "x86_64"
+        | "riscv64",
+    endian: "big" | "little", 
+}
+export type ABI = 
+    | "none"
+    | "gnu"
+    | "gnuabin32"
+    | "gnuabi64"
+    | "gnueabi"
+    | "gnueabihf"
+    | "gnuf32"
+    | "gnusf"
+    | "gnux32"
+    | "code16"
+    | "eabi"
+    | "eabihf"
+    | "ilp32"
+    | "android"
+    | "androideabi"
+    | "musl"
+    | "muslabin32"
+    | "muslabi64"
+    | "musleabi"
+    | "musleabihf"
+    | "muslf32"
+    | "muslsf"
+    | "muslx32"
+    | "msvc"
+    | "itanium"
+    | "cygnus"
+    | "simulator"
+    | "macabi"
+    | "ohos"
+    | "ohoseabi"
+export type _zune_platform = {
+    os: 
+        | "linux"
+        | "windows"
+        | "macos"
+        | "freebsd",
+    abi: 
+        | "none"
+        | "gnu"
+        | "gnuabin32"
+        | "gnuabi64"
+        | "gnueabi"
+        | "gnueabihf"
+        | "gnuf32"
+        | "gnusf"
+        | "gnux32"
+        | "code16"
+        | "eabi"
+        | "eabihf"
+        | "ilp32"
+        | "android"
+        | "androideabi"
+        | "musl"
+        | "muslabin32"
+        | "muslabi64"
+        | "musleabi"
+        | "musleabihf"
+        | "muslf32"
+        | "muslsf"
+        | "muslx32"
+        | "msvc"
+        | "itanium"
+        | "cygnus"
+        | "simulator"
+        | "macabi"
+        | "ohos"
+        | "ohoseabi",
+    cpu: _zune_platform_cpu,
+    async: "io_uring" | "epoll" | "kqueue" | "iocp",
+    getFreeMemory: () -> number,
+    getTotalMemory: () -> number,
+    getPageSize: () -> number,
+    getKernelVersion: () -> string,
+    getHostName: () -> string, 
 }
 --[[ net ]]
 declare class NetworkSocket
@@ -1307,6 +1447,7 @@ declare class IoReadable
     read: 
         & ((self: IoReadable, amount: number?, bytes: true?) -> buffer)
         & ((self: IoReadable, amount: number?, bytes: false) -> string)
+        & ((self: IoReadable, amount: number?, bytes: boolean) -> string | buffer)
     readu8: (self: IoReadable) -> number
     readu16: (self: IoReadable) -> number
     readu32: (self: IoReadable) -> number
@@ -1331,6 +1472,7 @@ declare class BufferStream
     read: 
         & ((self: BufferStream, amount: number?, bytes: true?) -> buffer)
         & ((self: BufferStream, amount: number?, bytes: false) -> string)
+        & ((self: BufferStream, amount: number?, bytes: boolean) -> string | buffer)
     write: (self: BufferStream, data: string | buffer) -> ()
     pos: (self: BufferStream) -> number
     size: (self: BufferStream) -> number
@@ -1346,6 +1488,7 @@ declare class BufferSink
     flush: 
         & ((self: BufferSink, bytes: true?) -> buffer)
         & ((self: BufferSink, bytes: false) -> string)
+        & ((self: BufferSink, bytes: boolean) -> string | buffer)
     write: (self: BufferSink, data: string | buffer) -> ()
     writer: (self: BufferSink) -> IoWritable
     close: (self: BufferSink) -> () 
@@ -1419,15 +1562,6 @@ export type _zune_mem = {
     rotate: (src: MemWritableSlice, amount: number) -> (),
     set: (dest: MemWritableSlice, value: number, offset: number?, count: number?) -> (), 
 }
---[[ task ]]
-export type _zune_task = {
-    cancel: (thread: thread) -> (),
-    defer: <A...,  R...>(f: ((A...) ->  R...) | thread,  A...) -> thread,
-    delay: <A...,  R...>(sec: number, f: ((A...) -> (R...)) | thread,  A...) -> thread,
-    spawn: <A...,  R...>(f: ((A...) -> (R...)) | thread,  A...) -> thread,
-    wait: (sec: number?) -> number,
-    count: (() -> number) & ((kinds: string) -> ...number), 
-}
 --[[ sqlite ]]
 export type SQLite3Values = {
     [string]: number | string | buffer
@@ -1453,33 +1587,14 @@ end
 export type _zune_sqlite = {
     open: (path: string?) -> SQLite3Database, 
 }
---[[ datetime ]]
-export type TimeDictionary = {
-    year: number,
-    month: number,
-    day: number,
-    hour: number,
-    minute: number,
-    second: number,
-    millisecond: number, 
-}
-declare class DateTime
-    timestamp: number
-    timestamp_millis: number
-    toLocalTime: (self: DateTime) -> TimeDictionary
-    toUniversalTime: (self: DateTime) -> TimeDictionary
-    toIsoDate: (self: DateTime) -> string
-    formatLocalTime: (self: DateTime, format: string) -> string
-    formatUniversalTime: (self: DateTime, format: string) -> string 
-end
-export type _zune_datetime = {
-    now: () -> DateTime,
-    fromIsoDate: (date: string) -> DateTime,
-    fromUnixTimestamp: (timestamp: number) -> DateTime,
-    fromUnixTimestampMillis: (timestamp: number) -> DateTime,
-    fromLocalTime: (year: number, month: number, day: number, hour: number, minute: number, second: number, millisecond: number) -> DateTime,
-    fromUniversalTime: (year: number, month: number, day: number, hour: number, minute: number, second: number, millisecond: number) -> DateTime,
-    parse: (date: string) -> DateTime, 
+--[[ task ]]
+export type _zune_task = {
+    cancel: (thread: thread) -> (),
+    defer: <A...,  R...>(f: ((A...) ->  R...) | thread,  A...) -> thread,
+    delay: <A...,  R...>(sec: number, f: ((A...) -> (R...)) | thread,  A...) -> thread,
+    spawn: <A...,  R...>(f: ((A...) -> (R...)) | thread,  A...) -> thread,
+    wait: (sec: number?) -> number,
+    count: (() -> number) & ((kinds: string) -> ...number), 
 }
 declare _FILE: {
     source: string?,
@@ -1501,11 +1616,12 @@ declare zune: {
     io: _zune_io,
     crypto: _zune_crypto,
     regex: _zune_regex,
-    datetime: _zune_datetime,
+    time: _zune_time,
     ffi: _zune_ffi,
     sqlite: _zune_sqlite,
     require: _zune_require,
     random: _zune_random,
     thread: _zune_thread,
-    mem: _zune_mem, 
+    mem: _zune_mem,
+    platform: _zune_platform, 
 }

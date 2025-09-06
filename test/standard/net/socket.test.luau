@@ -26,7 +26,7 @@ test("Basic TCP", function()
         server_sockname.family,
         bit32.bor(
             net.SOCKF.STREAM,
-            if (zune.process.os == "windows") then 0 else net.SOCKF.CLOEXEC
+            if (zune.platform.os == "windows") then 0 else net.SOCKF.CLOEXEC
         ),
         net.IPPROTO.TCP
     );
@@ -85,7 +85,7 @@ test("Basic TCP TLS", function()
         server_sockname.family,
         bit32.bor(
             net.SOCKF.STREAM,
-            if (zune.process.os == "windows") then 0 else net.SOCKF.CLOEXEC
+            if (zune.platform.os == "windows") then 0 else net.SOCKF.CLOEXEC
         ),
         net.IPPROTO.TCP
     );

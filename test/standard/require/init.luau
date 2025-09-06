@@ -8,7 +8,7 @@ local foo = require("@self/module/foo");
 
 local this_path = debug.info(1, "s");
 
-local _7 = if zune.process.os == "windows" then "\\" else "/";
+local _7 = if zune.platform.os == "windows" then "\\" else "/";
 
 describe("require", function()
     local RelativeAlias = [[{

@@ -1,29 +1,26 @@
 --!strict
 
-local TEMP_DIR = _G.__test_tempdir::string;
-
 local fs = zune.fs;
 local process = zune.process;
 local testing = zune.testing;
+local platform = zune.platform;
 
 local describe = testing.describe;
 local expect = testing.expect;
 local test = testing.test;
 
-local IS_WINDOWS = process.os == "windows";
+local IS_WINDOWS = platform.os == "windows";
 
 test("Context", function()
 	expect(process).toBe(expect.any("table"));
 
-	expect(process.os).toBe(expect.any("string"));
-	expect(#process.os).toBeGreaterThan(0);
-
-	expect(process.arch).toBe(expect.any("string"));
-	expect(#process.arch).toBeGreaterThan(0);
-
 	local cwd = process.cwd();
 	expect(cwd).toBe(expect.any("string"));
 	expect(#cwd).toBeGreaterThan(0);
+
+	local pid = process.pid();
+	expect(pid).toBe(expect.any("number"));
+	expect(pid).toBeGreaterThan(0);
 
 	expect(function()
 		process.args = {};
@@ -159,7 +156,7 @@ STRING`
 			expect(result.MULTI_SINGLE_QUOTED).toBe("THIS\nIS\nA\nMULTILINE\nSTRING");
 			expect(result.MULTI_BACKTICKED).toBe("THIS\nIS\nA\n\"MULTILINE'S\"\nSTRING");
 
-			fs.removeFile("./.env");
+			fs.deleteFile("./.env");
 		end)
 
 		test("Priority", function()
@@ -172,8 +169,8 @@ STRING`
 			expect(result.A).toBe("2");
 			expect(result.B).toBe("3");
 
-			fs.removeFile("./.env");
-			fs.removeFile("./.env.local");
+			fs.deleteFile("./.env");
+			fs.deleteFile("./.env.local");
 		end)
 	end)
 end)

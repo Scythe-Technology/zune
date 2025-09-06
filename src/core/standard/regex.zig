@@ -101,6 +101,46 @@ const LuaRegex = struct {
         return 1;
     }
 
+    pub fn split(self: *LuaRegex, L: *VM.lua.State) !i32 {
+        const allocator = luau.getallocator(L);
+
+        const input = try L.Zcheckvalue([]const u8, 2, null);
+        const global = L.Loptboolean(3, false);
+
+        try L.newtable();
+
+        var iter = try self.code.searchIterator(input);
+        defer iter.free();
+        var current_index: usize = 0;
+        var split_count: i32 = 1;
+        while (try iter.next(allocator)) |m| {
+            defer m.free(allocator);
+            if (m.captures.len == 0)
+                continue;
+
+            const capture = m.captures[0].?;
+            const start_index = capture.index;
+
+            const slice = input[current_index..start_index];
+
+            current_index = capture.index + capture.slice.len;
+            try L.pushlstring(slice);
+            try L.rawseti(-2, split_count);
+
+            split_count += 1;
+
+            if (!global)
+                break;
+        }
+        if (current_index < input.len) {
+            const slice = input[current_index..];
+            try L.pushlstring(slice);
+            try L.rawseti(-2, split_count);
+        }
+
+        return 1;
+    }
+
     pub fn isMatch(self: *LuaRegex, L: *VM.lua.State) !i32 {
         const input = try L.Zcheckvalue([]const u8, 2, null);
         L.pushboolean(try self.code.isMatch(input));
@@ -144,6 +184,7 @@ const LuaRegex = struct {
         .{ "match", match },
         .{ "search", search },
         .{ "captures", captures },
+        .{ "split", split },
         .{ "isMatch", isMatch },
         .{ "format", format },
         .{ "replace", replace },
