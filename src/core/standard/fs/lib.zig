@@ -500,7 +500,7 @@ fn lua_createFile(L: *VM.lua.State) !i32 {
             .creationDisposition = if (opts.exclusive)
                 std.os.windows.CREATE_NEW
             else if (opts.truncate)
-                std.os.windows.FILE_OVERWRITE_IF
+                std.os.windows.CREATE_ALWAYS
             else
                 std.os.windows.FILE_OPEN_IF,
         }),
