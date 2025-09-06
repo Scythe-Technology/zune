@@ -196,7 +196,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
         if (flag.len < 2)
             continue;
         switch (flag[0]) {
-            '-' => switch (flag[1]) {
+            '-' => sw: switch (flag[1]) {
                 'O' => if (flag.len == 3 and flag[2] >= '0' and flag[2] <= '2') {
                     const level: u2 = switch (flag[2]) {
                         '0' => 0,
@@ -248,7 +248,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
                         Zune.debug.print("<red>error<clear>: unknown compression type '{s}'\n", .{flag[14..]});
                         std.process.exit(1);
                     };
-                },
+                } else continue :sw 0,
                 else => {
                     Zune.debug.print("<red>error<clear>: unknown flag '{s}'\n", .{flag});
                     std.process.exit(1);
