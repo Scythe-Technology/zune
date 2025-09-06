@@ -497,7 +497,10 @@ fn lua_createFile(L: *VM.lua.State) !i32 {
 
     const file: fs.File = switch (comptime builtin.os.tag) {
         .windows => try @import("../../utils/os/windows.zig").OpenFile(fs.cwd(), path, .{
-            .accessMode = std.os.windows.GENERIC_WRITE | (if (opts.read) std.os.windows.GENERIC_READ else 0),
+            .accessMode = if (opts.read)
+                std.os.windows.GENERIC_WRITE | std.os.windows.GENERIC_READ
+            else
+                std.os.windows.GENERIC_WRITE,
             .creationDisposition = if (opts.exclusive)
                 std.os.windows.CREATE_NEW
             else if (opts.truncate)
