@@ -57,10 +57,10 @@ test("Basic TCP", function()
 end)
 
 test("Basic TCP TLS", function()
-    -- if (zune.process.args[1] ~= "allow") then
-    --     print("Skipping TLS test");
-    --     return;
-    -- end
+    if (zune.process.args[1] ~= "allow") then
+        print("Skipping TLS test");
+        return;
+    end
     
     local server_socket = net.createSocket(
         net.ADDRF.INET,
