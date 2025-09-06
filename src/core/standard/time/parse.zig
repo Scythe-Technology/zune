@@ -41,18 +41,30 @@ pub fn parseModified(self: *LuaDatetime, allocator: std.mem.Allocator, timestrin
     if (value.len < 29)
         return error.InvalidFormat;
 
-    const day = std.fmt.parseInt(u8, value[5..7], 10) catch return error.InvalidFormat;
+    var reader: std.Io.Reader = .fixed(value);
+    reader.toss(5);
 
-    const lower_month = try std.ascii.allocLowerString(allocator, value[8..11]);
+    const day = if (value[6] == ' ')
+        std.fmt.parseInt(u8, try reader.take(1), 10) catch return error.InvalidFormat
+    else
+        std.fmt.parseInt(u8, try reader.take(2), 10) catch return error.InvalidFormat;
+    reader.toss(1);
+
+    const lower_month = try std.ascii.allocLowerString(allocator, try reader.take(3));
     defer allocator.free(lower_month);
 
-    const month = @intFromEnum(MonthMap.get(lower_month) orelse return error.InvalidFormat) + 1;
-    const year = std.fmt.parseInt(u16, value[12..16], 10) catch return error.InvalidFormat;
-    const hour = std.fmt.parseInt(u8, value[17..19], 10) catch return error.InvalidFormat;
-    const minute = std.fmt.parseInt(u8, value[20..22], 10) catch return error.InvalidFormat;
-    const second = std.fmt.parseInt(u8, value[23..25], 10) catch return error.InvalidFormat;
+    reader.toss(1);
 
-    const tz = std.mem.trim(u8, value[26..], " ");
+    const month = @intFromEnum(MonthMap.get(lower_month) orelse return error.InvalidFormat) + 1;
+    const year = std.fmt.parseInt(u16, try reader.take(4), 10) catch return error.InvalidFormat;
+    reader.toss(1);
+    const hour = std.fmt.parseInt(u8, try reader.take(2), 10) catch return error.InvalidFormat;
+    reader.toss(1);
+    const minute = std.fmt.parseInt(u8, try reader.take(2), 10) catch return error.InvalidFormat;
+    reader.toss(1);
+    const second = std.fmt.parseInt(u8, try reader.take(2), 10) catch return error.InvalidFormat;
+
+    const tz = std.mem.trim(u8, reader.buffered(), " ");
     if (tz.len < 3)
         return error.InvalidFormat;
 
@@ -96,18 +108,29 @@ pub fn parseModifiedShort(self: *LuaDatetime, allocator: std.mem.Allocator, time
     if (value.len < 24)
         return error.InvalidFormat;
 
-    const day = std.fmt.parseInt(u8, value[0..2], 10) catch return error.InvalidFormat;
+    var reader: std.Io.Reader = .fixed(value);
 
-    const lower_month = try std.ascii.allocLowerString(allocator, value[3..6]);
+    const day = if (value[1] == ' ')
+        std.fmt.parseInt(u8, try reader.take(1), 10) catch return error.InvalidFormat
+    else
+        std.fmt.parseInt(u8, try reader.take(2), 10) catch return error.InvalidFormat;
+    reader.toss(1);
+
+    const lower_month = try std.ascii.allocLowerString(allocator, try reader.take(3));
     defer allocator.free(lower_month);
 
-    const month = @intFromEnum(MonthMap.get(lower_month) orelse return error.InvalidFormat) + 1;
-    const year = std.fmt.parseInt(u16, value[7..11], 10) catch return error.InvalidFormat;
-    const hour = std.fmt.parseInt(u8, value[12..14], 10) catch return error.InvalidFormat;
-    const minute = std.fmt.parseInt(u8, value[15..17], 10) catch return error.InvalidFormat;
-    const second = std.fmt.parseInt(u8, value[18..20], 10) catch return error.InvalidFormat;
+    reader.toss(1);
 
-    const tz = std.mem.trim(u8, value[21..], " ");
+    const month = @intFromEnum(MonthMap.get(lower_month) orelse return error.InvalidFormat) + 1;
+    const year = std.fmt.parseInt(u16, try reader.take(4), 10) catch return error.InvalidFormat;
+    reader.toss(1);
+    const hour = std.fmt.parseInt(u8, try reader.take(2), 10) catch return error.InvalidFormat;
+    reader.toss(1);
+    const minute = std.fmt.parseInt(u8, try reader.take(2), 10) catch return error.InvalidFormat;
+    reader.toss(1);
+    const second = std.fmt.parseInt(u8, try reader.take(2), 10) catch return error.InvalidFormat;
+
+    const tz = std.mem.trim(u8, reader.buffered(), " ");
     if (tz.len < 3)
         return error.InvalidFormat;
 
@@ -146,7 +169,7 @@ pub fn parseModifiedShort(self: *LuaDatetime, allocator: std.mem.Allocator, time
 
 pub fn parse(self: *LuaDatetime, allocator: std.mem.Allocator, str: []const u8) !void {
     const trimmed = std.mem.trimLeft(u8, std.mem.trimRight(u8, str, " "), " ");
-    if (std.mem.indexOfScalar(u8, trimmed, '-') == null) {
+    if ((std.mem.indexOfScalar(u8, trimmed, '-') orelse 9) > 8) {
         if (str.len < 29)
             return parseModifiedShort(self, allocator, trimmed);
         return parseModified(self, allocator, trimmed);
@@ -183,6 +206,22 @@ test "Timeparse" {
         try testing.expectEqual(2015, datetime.year);
         try testing.expectEqual(10, datetime.month);
         try testing.expectEqual(21, datetime.day);
+        try testing.expectEqual(7, datetime.hour);
+        try testing.expectEqual(28, datetime.minute);
+        try testing.expectEqual(0, datetime.second);
+        try testing.expect(result.timezone == null);
+        try testing.expect(datetime.tz == null);
+        try testing.expect(datetime.utc_offset != null);
+        try testing.expectEqual(21600, datetime.utc_offset.?.seconds_east);
+    }
+    {
+        var result: LuaDatetime = undefined;
+        try parse(&result, testing.allocator, "Wed, 1 Oct 2015 07:28:00 +0600");
+        defer LuaDatetime.__dtor(undefined, &result);
+        const datetime = result.datetime;
+        try testing.expectEqual(2015, datetime.year);
+        try testing.expectEqual(10, datetime.month);
+        try testing.expectEqual(1, datetime.day);
         try testing.expectEqual(7, datetime.hour);
         try testing.expectEqual(28, datetime.minute);
         try testing.expectEqual(0, datetime.second);
@@ -237,6 +276,22 @@ test "Timeparse" {
         try testing.expectEqual(2015, datetime.year);
         try testing.expectEqual(10, datetime.month);
         try testing.expectEqual(21, datetime.day);
+        try testing.expectEqual(7, datetime.hour);
+        try testing.expectEqual(28, datetime.minute);
+        try testing.expectEqual(0, datetime.second);
+        try testing.expect(result.timezone == null);
+        try testing.expect(datetime.tz == null);
+        try testing.expect(datetime.utc_offset != null);
+        try testing.expectEqual(21600, datetime.utc_offset.?.seconds_east);
+    }
+    {
+        var result: LuaDatetime = undefined;
+        try parse(&result, testing.allocator, "1 Oct 2015 07:28:00 +0600");
+        defer LuaDatetime.__dtor(undefined, &result);
+        const datetime = result.datetime;
+        try testing.expectEqual(2015, datetime.year);
+        try testing.expectEqual(10, datetime.month);
+        try testing.expectEqual(1, datetime.day);
         try testing.expectEqual(7, datetime.hour);
         try testing.expectEqual(28, datetime.minute);
         try testing.expectEqual(0, datetime.second);
