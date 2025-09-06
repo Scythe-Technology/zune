@@ -718,6 +718,20 @@ describe("Parse", function()
                     },
                 }
             },
+            root = {},
+            lines = 0,
+            lineOffsets = {},
+            eof = {
+                tag = "eof",
+                text = "",
+                position = {
+                    line = 0,
+                    column = 0,
+                },
+                trailingTrivia = {},
+                leadingTrivia = {},
+            },
+            hotcomments = {},
         }));
     end)
 
@@ -892,6 +906,20 @@ describe("ParseExpr", function()
                     },
                 }
             },
+            root = {},
+            lines = 0,
+            lineOffsets = {},
+            eof = {
+                tag = "eof",
+                text = "",
+                position = {
+                    line = 0,
+                    column = 0,
+                },
+                trailingTrivia = {},
+                leadingTrivia = {},
+            },
+            hotcomments = {},
         }));
     end)
 end)

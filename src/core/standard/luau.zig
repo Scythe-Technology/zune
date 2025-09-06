@@ -1982,10 +1982,9 @@ fn lua_parse(L: *VM.lua.State) !i32 {
         try L.Zpushvalue(.{
             .text = "",
             .tag = "eof",
-            .location = .{
-                .begin = .{ .line = 0, .column = 0 },
-                .end = .{ .line = 0, .column = 0 },
-            },
+            .position = .{ .line = 0, .column = 0 },
+            .trailingTrivia = .{},
+            .leadingTrivia = .{},
         });
         try L.rawsetfield(-2, "eof");
 
@@ -2089,10 +2088,9 @@ fn lua_parseExpr(L: *VM.lua.State) !i32 {
         try L.Zpushvalue(.{
             .text = "",
             .tag = "eof",
-            .location = .{
-                .begin = .{ .line = 0, .column = 0 },
-                .end = .{ .line = 0, .column = 0 },
-            },
+            .position = .{ .line = 0, .column = 0 },
+            .trailingTrivia = .{},
+            .leadingTrivia = .{},
         });
         try L.rawsetfield(-2, "eof");
 
