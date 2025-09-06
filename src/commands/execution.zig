@@ -141,6 +141,8 @@ fn cmdRun(allocator: std.mem.Allocator, args: []const []const u8) !void {
                     Zune.STATE.LUAU_OPTIONS.JIT_ENABLED = false;
                 } else if (std.mem.eql(u8, flag, "--limbo")) {
                     LOAD_FLAGS.limbo = true;
+                } else if (std.mem.eql(u8, flag, "--no-fmt")) {
+                    Zune.STATE.FORMAT.ENABLED = false;
                 } else continue :sw 0,
                 else => {
                     Zune.debug.print("<red>error<clear>: unknown flag '{s}'\n", .{flag});
@@ -281,6 +283,8 @@ fn cmdTest(allocator: std.mem.Allocator, args: []const []const u8) !void {
                     Zune.STATE.LUAU_OPTIONS.JIT_ENABLED = false;
                 } else if (std.mem.eql(u8, flag, "--limbo")) {
                     LOAD_FLAGS.limbo = true;
+                } else if (std.mem.eql(u8, flag, "--no-fmt")) {
+                    Zune.STATE.FORMAT.ENABLED = false;
                 } else continue :sw 0,
                 else => {
                     Zune.debug.print("<red>error<clear>: unknown flag '{s}'\n", .{flag});
@@ -479,6 +483,8 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
                     ALWAYS_DEBUG = false;
                 } else if (std.mem.eql(u8, flag, "--limbo")) {
                     LOAD_FLAGS.limbo = true;
+                } else if (std.mem.eql(u8, flag, "--no-fmt")) {
+                    Zune.STATE.FORMAT.ENABLED = false;
                 } else continue :sw 0,
                 else => {
                     Zune.debug.print("<red>error<clear>: unknown flag '{s}'\n", .{flag});

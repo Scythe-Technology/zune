@@ -231,6 +231,8 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
                     Zune.STATE.LUAU_OPTIONS.JIT_ENABLED = false;
                 } else if (std.mem.eql(u8, flag, "--limbo")) {
                     LOAD_FLAGS.limbo = true;
+                } else if (std.mem.eql(u8, flag, "--no-fmt")) {
+                    Zune.STATE.FORMAT.ENABLED = false;
                 } else if (std.mem.eql(u8, flag, "--release")) {
                     BUILD_MODE = .release;
                 } else if (std.mem.eql(u8, flag, "--debug")) {
