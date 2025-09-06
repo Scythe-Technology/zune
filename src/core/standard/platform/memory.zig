@@ -109,7 +109,7 @@ pub fn getFreeMemory() SystemMemoryError!u64 {
                 return error.UnknownFreeSystemMemory;
             }
 
-            return @as(u64, stats.free_count) * std.heap.pageSize();
+            return @as(u64, stats.free_count + stats.inactive_count) * std.heap.pageSize();
         },
         .windows => {
             var sbi: windows.SYSTEM_BASIC_INFORMATION = undefined;
