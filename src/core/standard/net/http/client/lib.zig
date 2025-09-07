@@ -321,7 +321,7 @@ fn stream_read(
                 ) xev.CallbackAction {
                     const inner_self = ud orelse unreachable;
                     const inner_ctx = inner_self.state.tls orelse unreachable;
-                    inner_ctx.record.end += r catch |err| return @call(.always_inline, callback, .{
+                    const amt = r catch |err| return @call(.always_inline, callback, .{
                         ud,
                         l,
                         c,
@@ -329,6 +329,7 @@ fn stream_read(
                         xev.ReadBuffer{ .slice = &inner_self.read_buffer },
                         err,
                     });
+                    inner_ctx.record.end += amt;
                     const res = inner_ctx.connection.active.client.decrypt(inner_ctx.record.buffered(), inner_ctx.cleartext.buffer[inner_ctx.cleartext.end..]) catch {
                         _ = @call(.always_inline, callback, .{
                             ud,
@@ -687,6 +688,9 @@ pub fn lua_request(L: *VM.lua.State) !i32 {
 
     var timeout: ?u32 = 30;
     var payload: ?[]const u8 = null;
+    var max_body_size: ?usize = null;
+    var max_header_size: ?usize = null;
+    var max_header_count: ?u32 = null;
 
     var headers: std.ArrayListUnmanaged(u8) = .empty;
     defer headers.deinit(allocator);
@@ -736,6 +740,18 @@ pub fn lua_request(L: *VM.lua.State) !i32 {
                 return L.Zerror("invalid response_body_type (expected 'string' or 'buffer')");
             }
         }
+        L.pop(1);
+
+        if (try L.Zcheckfield(?u32, 2, "max_body_size")) |size|
+            max_body_size = @min(size, LuaHelper.MAX_LUAU_SIZE);
+        L.pop(1);
+
+        if (try L.Zcheckfield(?u32, 2, "max_header_size")) |size|
+            max_header_size = @min(size, LuaHelper.MAX_LUAU_SIZE);
+        L.pop(1);
+
+        if (try L.Zcheckfield(?u16, 2, "max_header_count")) |size|
+            max_header_count = size;
         L.pop(1);
 
         if (try L.Zcheckfield(?[]const u8, 2, "method")) |method_str| blk: {
@@ -845,9 +861,14 @@ pub fn lua_request(L: *VM.lua.State) !i32 {
     }
 
     const self = try allocator.create(Self);
+    var parser: Response.Parser = .init(allocator, max_header_count orelse 100);
+    if (max_body_size) |size|
+        parser.max_body_size = size;
+    if (max_header_size) |size|
+        parser.max_header_size = size;
     self.* = .{
         .lua_ref = .init(L),
-        .parser = .init(allocator, 100),
+        .parser = parser,
         .completion = .init(),
         .cancel_completion = .init(),
         .state = .{
