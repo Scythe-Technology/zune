@@ -737,6 +737,8 @@ pub fn onRecv(
             error.TooManyHeaders => self.writeAll(HTTP_431),
             error.UnsupportedProtocol => self.writeAll(HTTP_505),
             error.InvalidHeaderLine => self.writeAll(HTTP_400),
+            error.InvalidChunkedEncoding => self.writeAll(HTTP_400),
+            error.UnsupportedTransferEncoding => self.writeAll(HTTP_400),
             error.OutOfMemory => {
                 self.server.emitError(.raw_receive, err);
                 self.writeAll(HTTP_500);

@@ -53,16 +53,19 @@ const QueryValue = struct {
 
 pub const Parser = struct {
     arena: ArenaAllocator,
-    buf: ?[]const u8 = null,
     left: ?[]const u8 = null,
     pos: usize = 0,
 
-    stage: enum { method, url, protocol, headers, body } = .method,
+    stage: Stage = .method,
     method: Method = .GET,
     protocol: Protocol = .HTTP10,
     headers: std.StringHashMapUnmanaged([]const u8),
     body: ?union(enum) {
-        dynamic: []u8,
+        dynamic: std.Io.Writer,
+        chunked: struct {
+            size: ?usize = null,
+            buffer: std.ArrayListUnmanaged(u8) = .empty,
+        },
         static: []const u8,
     } = null,
     url: ?[]const u8 = null,
@@ -70,6 +73,8 @@ pub const Parser = struct {
     max_body_size: usize = 1_048_576,
     max_header_size: usize = 4096,
     max_header_count: usize = 100,
+
+    const Stage = enum { method, url, protocol, headers, body, done };
 
     pub fn init(allocator: Allocator, max_header_count: u32) Parser {
         var headers: std.StringHashMapUnmanaged([]const u8) = .empty;
@@ -83,7 +88,6 @@ pub const Parser = struct {
 
     pub fn reset(self: *Parser) void {
         self.body = null;
-        self.buf = null;
         self.url = null;
         self.method = .GET;
         if (self.left) |_| {
@@ -136,38 +140,16 @@ pub const Parser = struct {
         }
         defer if (allocated) allocator.free(input);
 
-        const pos = self.pos;
         self.pos = 0;
 
         sw: switch (self.stage) {
-            .method => if (try self.parseMethod(input[self.pos..]))
-                continue :sw .url,
-            .url => if (try self.parseUrl(arena_allocator, input[self.pos..]))
-                continue :sw .protocol,
-            .protocol => if (try self.parseProtocol(input[self.pos..]))
-                continue :sw .headers,
-            .headers => if (try self.parseHeaders(arena_allocator, input[self.pos..], allocated))
-                return true,
-            .body => {
-                if (self.body) |b|
-                    switch (b) {
-                        .dynamic => |body| {
-                            if (self.pos > 0) {
-                                return false;
-                            }
-                            const remaining = body.len - pos;
-                            if (buf.len >= remaining) {
-                                @memcpy(body[pos..], buf[0..remaining]);
-                                self.pos = pos + buf.len;
-                                return true;
-                            } else {
-                                @memcpy(body[pos .. pos + buf.len], buf[0..]);
-                                self.pos = pos + buf.len;
-                                return false;
-                            }
-                        },
-                        else => {},
-                    };
+            .method => continue :sw try self.parseMethod(input[self.pos..]) orelse break :sw,
+            .url => continue :sw try self.parseUrl(arena_allocator, input[self.pos..]) orelse break :sw,
+            .protocol => continue :sw try self.parseProtocol(input[self.pos..]) orelse break :sw,
+            .headers => continue :sw try self.parseHeaders(arena_allocator, input[self.pos..], allocated) orelse break :sw,
+            .body => continue :sw try self.parseBody(arena_allocator, input[self.pos..]) orelse break :sw,
+            .done => {
+                self.stage = .done;
                 return true;
             },
         }
@@ -179,7 +161,7 @@ pub const Parser = struct {
         return false;
     }
 
-    fn parseMethod(self: *Parser, buf: []const u8) !bool {
+    fn parseMethod(self: *Parser, buf: []const u8) !?Stage {
         const buf_len = buf.len;
 
         // Shortest method is only 3 characters (+1 trailing space), so
@@ -191,7 +173,7 @@ pub const Parser = struct {
         // and might as well break early.
         // If buf_len > = 8, then we can safely parse any (valid) method without
         // having to do any other bound-checking.
-        if (buf_len < 8) return false;
+        if (buf_len < 8) return null;
 
         // this approach to matching method name comes from zhp
         switch (@as(u32, @bitCast(buf[0..4].*))) {
@@ -235,18 +217,18 @@ pub const Parser = struct {
             },
             else => return error.UnknownMethod,
         }
-        return true;
+        return .url;
     }
 
-    fn parseUrl(self: *Parser, arena: Allocator, buf: []const u8) !bool {
+    fn parseUrl(self: *Parser, arena: Allocator, buf: []const u8) !?Stage {
         self.stage = .url;
         const buf_len = buf.len;
-        if (buf_len == 0) return false;
+        if (buf_len == 0) return null;
 
         var len: usize = 0;
         switch (buf[0]) {
             '/' => {
-                const end_index = std.mem.indexOfScalarPos(u8, buf[1..buf_len], 0, ' ') orelse return false;
+                const end_index = std.mem.indexOfScalarPos(u8, buf[1..buf_len], 0, ' ') orelse return null;
                 // +1 since we skipped the leading / in our indexOfScalar and +1 to consume the space
                 len = end_index + 2;
                 const url = buf[0 .. end_index + 1];
@@ -254,7 +236,7 @@ pub const Parser = struct {
                 self.url = try arena.dupe(u8, url);
             },
             '*' => {
-                if (buf_len == 1) return false;
+                if (buf_len == 1) return null;
                 // Read never returns 0, so if we're here, buf.len >= 1
                 if (buf[1] != ' ') return error.InvalidRequestTarget;
                 len = 2;
@@ -265,12 +247,12 @@ pub const Parser = struct {
         }
 
         self.pos += len;
-        return true;
+        return .protocol;
     }
 
-    fn parseProtocol(self: *Parser, buf: []const u8) !bool {
+    fn parseProtocol(self: *Parser, buf: []const u8) !?Stage {
         self.stage = .protocol;
-        if (buf.len < 10) return false;
+        if (buf.len < 10) return null;
 
         if (@as(u32, @bitCast(buf[0..4].*)) != asUint("HTTP")) {
             return error.UnknownProtocol;
@@ -287,10 +269,10 @@ pub const Parser = struct {
         }
 
         self.pos += 10;
-        return true;
+        return .headers;
     }
 
-    fn parseHeaders(self: *Parser, arena: Allocator, full: []const u8, allocated: bool) !bool {
+    fn parseHeaders(self: *Parser, arena: Allocator, full: []const u8, allocated: bool) !?Stage {
         self.stage = .headers;
         var pos: usize = 0;
         var buf = full;
@@ -320,7 +302,7 @@ pub const Parser = struct {
                             if (next == value.len) {
                                 // we don't have any more data, we can't tell
                                 self.pos += pos;
-                                return false;
+                                return null;
                             }
 
                             if (value[next] != '\n') {
@@ -338,7 +320,7 @@ pub const Parser = struct {
                             // for loop reached the end without finding a \r
                             // we need more data
                             self.pos += pos;
-                            return false;
+                            return null;
                         }
 
                         const name = buf[0..i];
@@ -377,15 +359,14 @@ pub const Parser = struct {
                         if (buf.len == 1) {
                             // we don't have any more data, we need more data
                             self.pos += pos;
-                            return false;
+                            return null;
                         }
 
                         if (buf[1] == '\n') {
                             // we have \r\n at the start of a line, we're done
                             pos += 2;
-                            self.buf = full[pos..];
                             self.pos += pos;
-                            return try self.prepareForBody(arena, allocated);
+                            return try self.prepareForBody(arena, full[pos..], allocated);
                         }
                         // we have a \r followed by something that isn't a \n, can't be right
                         return error.InvalidHeaderLine;
@@ -395,27 +376,39 @@ pub const Parser = struct {
             } else {
                 // didn't find a colon or blank line, we need more data
                 self.pos += pos;
-                return false;
+                return null;
             }
         }
         self.pos += pos;
-        return false;
+        return null;
     }
 
-    fn prepareForBody(self: *Parser, arena: Allocator, allocated: bool) !bool {
+    fn prepareForBody(self: *Parser, arena: Allocator, buf: []const u8, allocated: bool) !?Stage {
         self.stage = .body;
-        const str = self.headers.get("content-length") orelse return true;
+        const str = self.headers.get("content-length") orelse {
+            const encoding = self.headers.get("transfer-encoding") orelse return .done;
+            var iter = std.mem.splitScalar(u8, encoding, ',');
+            var chunked_found = false;
+            while (iter.next()) |enc| {
+                if (std.mem.eql(u8, enc, "chunked")) {
+                    chunked_found = true;
+                } else return error.UnsupportedTransferEncoding;
+            }
+            if (chunked_found) {
+                self.body = .{ .chunked = .{} };
+                return .body;
+            }
+            return .done;
+        };
         const cl = atoi(str) orelse return error.InvalidContentLength;
 
         if (cl == 0)
-            return true;
+            return .done;
 
         if (cl > self.max_body_size) {
             return error.BodyTooBig;
         }
 
-        self.pos = 0;
-        const buf = self.buf.?;
         const len = buf.len;
 
         // how much (if any) of the body we've already read
@@ -431,20 +424,88 @@ pub const Parser = struct {
             // we've read the entire body into buf, point to that.
             self.pos += cl;
             if (allocated) {
-                self.body = .{ .dynamic = try arena.dupe(u8, buf[0..cl]) };
+                self.body = .{ .dynamic = .fixed(try arena.dupe(u8, buf[0..cl])) };
             } else {
                 self.body = .{ .static = buf[0..cl] };
             }
-            return true;
+            return .done;
         } else {
             // We don't have the [full] body, and our static buffer is too small
             const body_buf = try arena.alloc(u8, cl);
             if (read > 0)
                 @memcpy(body_buf[0..read], buf[0..read]);
-            self.pos = read;
-            self.body = .{ .dynamic = body_buf };
+            self.pos += read;
+            self.body = .{ .dynamic = .fixed(body_buf) };
+            self.body.?.dynamic.end = read;
         }
-        return false;
+        return null;
+    }
+
+    fn parseBody(self: *Parser, arena: Allocator, buffer: []const u8) !?Stage {
+        self.stage = .body;
+        if (buffer.len == 0) return null;
+        if (self.body) |*b|
+            switch (b.*) {
+                .dynamic => |*writer| {
+                    const remaining = writer.buffer.len - writer.end;
+                    const consume = buffer[0..@min(remaining, buffer.len)];
+                    self.pos += consume.len;
+                    std.debug.assert(writer.write(consume) catch unreachable == consume.len);
+                    if (writer.buffer.len - writer.end == 0)
+                        return .done;
+                    return null;
+                },
+                .chunked => |*chunked| {
+                    if (chunked.size) |sz| {
+                        if (sz <= 2) {
+                            const consume = buffer[0..@min(sz, buffer.len)];
+                            chunked.size = sz - consume.len;
+                            switch (sz) {
+                                2 => switch (consume.len) {
+                                    2 => if (!std.mem.eql(u8, consume, "\r\n"))
+                                        return error.InvalidChunkedEncoding,
+                                    1 => if (consume[0] != '\r')
+                                        return error.InvalidChunkedEncoding,
+                                    else => unreachable,
+                                },
+                                1 => if (consume[0] != '\n') return error.InvalidChunkedEncoding,
+                                else => unreachable,
+                            }
+                            if (chunked.size == 0)
+                                chunked.size = null;
+                            self.pos += consume.len;
+                            return .body;
+                        }
+                        const consume = buffer[0..@min(sz - 2, buffer.len)];
+                        chunked.size = sz - consume.len;
+                        chunked.buffer.appendSliceAssumeCapacity(consume);
+                        self.pos += consume.len;
+                        return .body;
+                    }
+                    const end_index = std.mem.indexOfScalar(u8, buffer, '\n') orelse return null;
+                    if (buffer.len < 2 or end_index < 1 or buffer[end_index - 1] != '\r')
+                        return error.InvalidChunkedEncoding;
+                    const number = buffer[0 .. end_index - 1];
+                    if (number.len == 0)
+                        return error.InvalidChunkedEncoding;
+                    const size = atoi(number) orelse return error.InvalidChunkedEncoding;
+                    if (size == 0) {
+                        if (buffer.len < end_index + 3)
+                            return null;
+                        if (!std.mem.eql(u8, buffer[end_index + 1 .. end_index + 3], "\r\n"))
+                            return error.InvalidChunkedEncoding;
+                        return .done;
+                    }
+                    if (chunked.buffer.items.len + size > self.max_body_size)
+                        return error.BodyTooBig;
+                    try chunked.buffer.ensureUnusedCapacity(arena, size);
+                    chunked.size = size + 2;
+                    self.pos += end_index + 1;
+                    return .body;
+                },
+                else => {},
+            };
+        return .done;
     }
 
     pub fn parseQuery(self: *Parser, query: []const u8, maxQuery: usize) ![]QueryValue {
@@ -522,7 +583,9 @@ pub const Parser = struct {
 
         if (self.body) |body|
             switch (body) {
-                inline else => |bytes| try L.Zsetfield(-1, "body", bytes),
+                .static => |bytes| try L.Zsetfield(-1, "body", bytes),
+                .dynamic => |writer| try L.Zsetfield(-1, "body", writer.buffer),
+                .chunked => |chunked| try L.Zsetfield(-1, "body", chunked.buffer.items),
             };
     }
 };
@@ -616,6 +679,13 @@ fn testParseProcedural(input: []const u8, max: u32) !Parser {
     return error.Incomplete;
 }
 
+fn testParseProceduralIncomplete(input: []const u8, max: u32) !void {
+    for (0..input.len) |i| {
+        const slice = input[0..i];
+        try std.testing.expectError(error.Incomplete, testParseProcedural(slice, max));
+    }
+}
+
 fn testParseFull(comptime input: []const u8, max: u32) !Parser {
     const allocator = std.testing.allocator;
     var parser = Parser.init(allocator, max);
@@ -637,9 +707,8 @@ test "parser: basic (procedural)" {
     try testing.expectEqual(.HTTP11, parser.protocol);
     try testing.expectEqual(2, parser.pos);
     try testing.expectEqual(0, parser.headers.size);
-    try testing.expectEqual(.body, parser.stage);
+    try testing.expectEqual(.done, parser.stage);
     try testing.expect(parser.body == null);
-    try testing.expect(parser.buf != null);
     try testing.expect(parser.left == null);
 }
 
@@ -661,13 +730,13 @@ test "parser: many headers (procedural)" {
     try testing.expectEqual(.HTTP11, parser.protocol);
     try testing.expectEqual(2, parser.pos);
     try testing.expectEqual(8, parser.headers.size);
-    try testing.expectEqual(.body, parser.stage);
+    try testing.expectEqual(.done, parser.stage);
     try testing.expect(parser.body == null);
-    try testing.expect(parser.buf != null);
     try testing.expect(parser.left == null);
 }
 
 test "parser: too many headers (procedural)" {
+    try testParseProceduralIncomplete("GET / HTTP/1.1\r\nHost: foo.bar\r\nAccept: text/html\r\nUser-Agent: curl/7.64.1\r\nAccept-Language: en-US,en;q=0.5", 100);
     try testing.expectEqual(error.TooManyHeaders, testParseProcedural("GET / HTTP/1.1\r\nHost: foo.bar\r\nAccept: text/html\r\nUser-Agent: curl/7.64.1\r\nAccept-Language: en-US,en;q=0.5", 1));
 }
 
@@ -743,9 +812,8 @@ test "parser: url (procedural)" {
     try testing.expectEqual(.HTTP11, parser.protocol);
     try testing.expectEqual(2, parser.pos);
     try testing.expectEqual(0, parser.headers.size);
-    try testing.expectEqual(.body, parser.stage);
+    try testing.expectEqual(.done, parser.stage);
     try testing.expect(parser.body == null);
-    try testing.expect(parser.buf != null);
     try testing.expect(parser.left == null);
 
     const url = Url.parse(parser.url.?);
@@ -768,11 +836,47 @@ test "parser: body (procedural)" {
     try testing.expectEqual(.GET, parser.method);
     try testing.expectEqualStrings("/", parser.url.?);
     try testing.expectEqual(.HTTP11, parser.protocol);
-    try testing.expectEqual(5, parser.pos);
+    try testing.expectEqual(1, parser.pos);
     try testing.expectEqual(2, parser.headers.size);
     try testing.expect(parser.body.? == .dynamic);
-    try testing.expectEqual(.body, parser.stage);
-    try testing.expectEqualStrings("hello", parser.body.?.dynamic);
+    try testing.expectEqual(.done, parser.stage);
+    try testing.expectEqualStrings("hello", parser.body.?.dynamic.buffer);
+}
+
+test "parser: chunked transfer encoding (procedural)" {
+    var parser = try testParseProcedural("GET / HTTP/1.1\r\nHost: foo.bar\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n0\r\n\r\n", 2);
+    defer parser.deinit();
+
+    try testing.expectEqual(.GET, parser.method);
+    try testing.expectEqualStrings("/", parser.url.?);
+    try testing.expectEqual(.HTTP11, parser.protocol);
+    try testing.expectEqual(0, parser.pos);
+    try testing.expectEqual(2, parser.headers.size);
+    try testing.expect(parser.body.? == .chunked);
+    try testing.expectEqual(.done, parser.stage);
+    try testing.expectEqualStrings("hello", parser.body.?.chunked.buffer.items);
+}
+
+test "parser: chunked transfer encoding 2 (procedural)" {
+    var parser = try testParseProcedural("GET / HTTP/1.1\r\nHost: foo.bar\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n1\r\n \r\n1\r\nw\r\n1\r\no\r\n1\r\nr\r\n1\r\nl\r\n1\r\nd\r\n0\r\n\r\n", 2);
+    defer parser.deinit();
+
+    try testing.expectEqual(.GET, parser.method);
+    try testing.expectEqualStrings("/", parser.url.?);
+    try testing.expectEqual(.HTTP11, parser.protocol);
+    try testing.expectEqual(0, parser.pos);
+    try testing.expectEqual(2, parser.headers.size);
+    try testing.expect(parser.body.? == .chunked);
+    try testing.expectEqual(.done, parser.stage);
+    try testing.expectEqualStrings("hello world", parser.body.?.chunked.buffer.items);
+}
+
+test "parser: bad chunked transfer encoding (procedural)" {
+    try testParseProceduralIncomplete("GET / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n0\r\n", 1);
+    try testing.expectError(error.Incomplete, testParseProcedural("GET / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n", 1));
+    try testing.expectError(error.InvalidChunkedEncoding, testParseProcedural("GET / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n0\r\r\r\n", 1));
+    try testing.expectError(error.InvalidChunkedEncoding, testParseProcedural("GET / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n  \r\n", 1));
+    try testing.expectError(error.InvalidChunkedEncoding, testParseProcedural("GET / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n4\r\nhello\r\n", 1));
 }
 
 test "parser: basic (full)" {
@@ -784,9 +888,8 @@ test "parser: basic (full)" {
     try testing.expectEqual(.HTTP11, parser.protocol);
     try testing.expectEqual(18, parser.pos);
     try testing.expectEqual(0, parser.headers.size);
-    try testing.expectEqual(.body, parser.stage);
+    try testing.expectEqual(.done, parser.stage);
     try testing.expect(parser.body == null);
-    try testing.expect(parser.buf != null);
     try testing.expect(parser.left == null);
 }
 
@@ -808,9 +911,8 @@ test "parser: many headers (full)" {
     try testing.expectEqual(.HTTP11, parser.protocol);
     try testing.expectEqual(222, parser.pos);
     try testing.expectEqual(8, parser.headers.size);
-    try testing.expectEqual(.body, parser.stage);
+    try testing.expectEqual(.done, parser.stage);
     try testing.expect(parser.body == null);
-    try testing.expect(parser.buf != null);
     try testing.expect(parser.left == null);
 }
 
@@ -898,9 +1000,8 @@ test "parser: url (full)" {
     try testing.expectEqual(.HTTP11, parser.protocol);
     try testing.expectEqual(33, parser.pos);
     try testing.expectEqual(0, parser.headers.size);
-    try testing.expectEqual(.body, parser.stage);
+    try testing.expectEqual(.done, parser.stage);
     try testing.expect(parser.body == null);
-    try testing.expect(parser.buf != null);
     try testing.expect(parser.left == null);
 
     const url = Url.parse(parser.url.?);
@@ -924,9 +1025,44 @@ test "parser: body (full)" {
     try testing.expectEqual(.GET, parser.method);
     try testing.expectEqualStrings("/", parser.url.?);
     try testing.expectEqual(.HTTP11, parser.protocol);
-    try testing.expectEqual(5, parser.pos);
+    try testing.expectEqual(57, parser.pos);
     try testing.expectEqual(2, parser.headers.size);
     try testing.expect(parser.body.? == .static);
-    try testing.expectEqual(.body, parser.stage);
+    try testing.expectEqual(.done, parser.stage);
     try testing.expectEqualStrings("hello", parser.body.?.static);
+}
+
+test "parser: chunked transfer encoding (full)" {
+    var parser = try testParseFull("GET / HTTP/1.1\r\nHost: foo.bar\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n0\r\n\r\n", 2);
+    defer parser.deinit();
+
+    try testing.expectEqual(.GET, parser.method);
+    try testing.expectEqualStrings("/", parser.url.?);
+    try testing.expectEqual(.HTTP11, parser.protocol);
+    try testing.expectEqual(71, parser.pos);
+    try testing.expectEqual(2, parser.headers.size);
+    try testing.expect(parser.body.? == .chunked);
+    try testing.expectEqual(.done, parser.stage);
+    try testing.expectEqualStrings("hello", parser.body.?.chunked.buffer.items);
+}
+
+test "parser: chunked transfer encoding 2 (full)" {
+    var parser = try testParseFull("GET / HTTP/1.1\r\nHost: foo.bar\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n1\r\n \r\n1\r\nw\r\n1\r\no\r\n1\r\nr\r\n1\r\nl\r\n1\r\nd\r\n0\r\n\r\n", 2);
+    defer parser.deinit();
+
+    try testing.expectEqual(.GET, parser.method);
+    try testing.expectEqualStrings("/", parser.url.?);
+    try testing.expectEqual(.HTTP11, parser.protocol);
+    try testing.expectEqual(107, parser.pos);
+    try testing.expectEqual(2, parser.headers.size);
+    try testing.expect(parser.body.? == .chunked);
+    try testing.expectEqual(.done, parser.stage);
+    try testing.expectEqualStrings("hello world", parser.body.?.chunked.buffer.items);
+}
+
+test "parser: bad chunked transfer encoding (full)" {
+    try testing.expectError(error.Incomplete, testParseFull("GET / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n", 1));
+    try testing.expectError(error.InvalidChunkedEncoding, testParseFull("GET / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n0\r\r\r\n", 1));
+    try testing.expectError(error.InvalidChunkedEncoding, testParseFull("GET / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n  \r\n", 1));
+    try testing.expectError(error.InvalidChunkedEncoding, testParseFull("GET / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n4\r\nhello\r\n", 1));
 }
