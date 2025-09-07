@@ -330,7 +330,7 @@ pub fn logDetailedError(L: *VM.lua.State) !void {
         if (b.mode.compiled == .release)
             return;
 
-    var largest_line: usize = 0;
+    var largest_line: usize = 1;
     for (list.items) |info| {
         if (info.current_line) |line|
             largest_line = @max(largest_line, @as(usize, @intCast(line)));

@@ -34,7 +34,7 @@ fn lua_compile(L: *VM.lua.State) !i32 {
             return L.Zerror("invalid debug level");
 
         compileOpts.optimizationLevel = opts.optimization_level orelse compileOpts.optimizationLevel;
-        if (compileOpts.optimizationLevel < 0 or compileOpts.optimizationLevel > 3)
+        if (compileOpts.optimizationLevel < 0 or compileOpts.optimizationLevel > 2)
             return L.Zerror("invalid optimization level");
 
         compileOpts.coverageLevel = opts.coverage_level orelse compileOpts.coverageLevel;

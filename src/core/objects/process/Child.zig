@@ -179,35 +179,35 @@ pub const __namecall = MethodMap.CreateNamecallMap(Child, TAG_PROCESS_CHILD, .{
     .{ "wait", lua_wait },
 });
 
-pub const IndexMap = std.StaticStringMap(enum {
-    Stdin,
-    Stdout,
-    Stderr,
-}).initComptime(.{
-    .{ "stdin", .Stdin },
-    .{ "stdout", .Stdout },
-    .{ "stderr", .Stderr },
-});
-
 pub fn __index(L: *VM.lua.State) !i32 {
     try L.Zchecktype(1, .Userdata);
     const self = L.touserdatatagged(Child, 1, TAG_PROCESS_CHILD) orelse return L.Zerror("invalid userdata");
     const index = L.Lcheckstring(2);
 
-    switch (IndexMap.get(index) orelse return L.Zerrorf("unknown index: {s}", .{index})) {
-        .Stdin => {
+    const Map = std.StaticStringMap(enum {
+        stdin,
+        stdout,
+        stderr,
+    }).initComptime(.{
+        .{ "stdin", .stdin },
+        .{ "stdout", .stdout },
+        .{ "stderr", .stderr },
+    });
+
+    switch (Map.get(index) orelse return L.Zerrorf("unknown index: {s}", .{index})) {
+        .stdin => {
             if (self.stdin_file.push(L))
                 return 1;
             L.pushnil();
             return 1;
         },
-        .Stdout => {
+        .stdout => {
             if (self.stdout_file.push(L))
                 return 1;
             L.pushnil();
             return 1;
         },
-        .Stderr => {
+        .stderr => {
             if (self.stderr_file.push(L))
                 return 1;
             L.pushnil();

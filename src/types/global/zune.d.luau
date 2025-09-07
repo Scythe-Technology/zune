@@ -905,7 +905,11 @@ export type HttpRequestOptions = {
     }?,
     method: ("GET" | "HEAD" | "POST" | "PUT" | "DELETE" | "CONNECT" | "OPTIONS" | "TRACE" | "PATCH")?,
     body: (string | buffer)?,
-    allow_redirects: boolean?, 
+    allow_redirects: boolean?,
+    timeout: number?,
+    max_body_size: number?,
+    max_header_size: number?,
+    max_headers: number?, 
 }
 export type HttpWebSocketOptions = {
     protocols: {string}?,

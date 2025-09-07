@@ -4,12 +4,12 @@
     .minimum_zig_version = "0.14.0",
     .dependencies = .{
         .luau = .{
-            .url = "https://codeload.github.com/Scythe-Technology/zig-luau/tar.gz/f32a8c357625f97e3f1d0455fbf3ca67d96bf3cf",
-            .hash = "luau-0.0.0+689-uDAGp2DBCQDuZFXvgRLeDoOS5dJfEzLtIkSyxKVEPWQS",
+            .url = "https://codeload.github.com/Scythe-Technology/zig-luau/tar.gz/ff07eacd43f926b6744b8ffba132a14c9235ecd7",
+            .hash = "luau-0.0.0+690-uDAGp4HBCQDnf0mIhjTQ03dWM3U7ZxTnb4cHtVERwmoN",
         },
         .libxev = .{
-            .url = "https://codeload.github.com/Scythe-Technology/libxev/tar.gz/0dbc59ceab3104be0c72ece9253708047c964846",
-            .hash = "libxev-0.0.0-Gdacvg0iDABTtYmMWrNAk6zKtbcAowsibVDU_VX5lQX5",
+            .url = "https://codeload.github.com/Scythe-Technology/libxev/tar.gz/923fd685b5d23049d6a2ceea0c73eb57235212a9",
+            .hash = "libxev-0.0.0-GdacvjwjDABDtdJnwlFyNd_Ti23ysHQteZVebf1aHXGE",
         },
         .json = .{
             .url = "https://codeload.github.com/Scythe-Technology/zig-json/tar.gz/bfa3d87788301b0df3b05b29f6e323f91bf3abbe",
@@ -48,8 +48,8 @@
             .hash = "tinycc-0.0.3-T6dU8yTKAAAQ0w4V898cCL8RwoCyFdW1Z_THkasfSbsU",
         },
         .tls = .{
-            .url = "https://codeload.github.com/ianic/tls.zig/tar.gz/602f05bd84d819d487a6e22dd1463e907f7992ab",
-            .hash = "tls-0.1.0-ER2e0sR3BQAaKutV0MShEsWhgG5NkNc04OTCEwHUson3",
+            .url = "https://codeload.github.com/ianic/tls.zig/tar.gz/fd11fcfa77628bc2fb9de7fd1fecfe89339c93fc",
+            .hash = "tls-0.1.0-ER2e0mRIBQCvHQz8kf9k3xHQDwz4WH71ht44JoVycYmL",
         },
     },
     .paths = .{""},

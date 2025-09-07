@@ -125,7 +125,7 @@ pub fn emitError(
 pub fn onAccept(
     ud: ?*Self,
     loop: *xev.Loop,
-    _: *xev.Completion,
+    c: *xev.Completion,
     r: xev.AcceptError!xev.TCP,
 ) xev.CallbackAction {
     const self = ud orelse unreachable;
@@ -134,7 +134,7 @@ pub fn onAccept(
     switch (self.state.stage) {
         .shutdown => {
             self.state.listening = false;
-            self.continueShutdown(loop, &self.close_completion);
+            self.continueShutdown(loop, c);
             return .disarm;
         },
         .accepting => {},
