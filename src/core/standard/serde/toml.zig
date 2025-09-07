@@ -795,6 +795,9 @@ pub fn lua_encode(L: *VM.lua.State) !i32 {
     try L.Zchecktype(1, .Table);
     const allocator = luau.getallocator(L);
 
+    if (L.gettop() != 1)
+        L.settop(1);
+
     var allocating: std.Io.Writer.Allocating = .init(allocator);
     defer allocating.deinit();
 

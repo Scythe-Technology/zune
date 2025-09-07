@@ -97,6 +97,9 @@ fn encodeValue(L: *VM.lua.State, allocator: std.mem.Allocator, tracked: *std.Aut
 pub fn lua_encode(L: *VM.lua.State) !i32 {
     const allocator = luau.getallocator(L);
 
+    if (L.gettop() != 1)
+        L.settop(1);
+
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
 
