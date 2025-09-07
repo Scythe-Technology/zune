@@ -690,7 +690,7 @@ pub fn lua_request(L: *VM.lua.State) !i32 {
     var payload: ?[]const u8 = null;
     var max_body_size: ?usize = null;
     var max_header_size: ?usize = null;
-    var max_header_count: ?u32 = null;
+    var max_headers: ?u32 = null;
 
     var headers: std.ArrayListUnmanaged(u8) = .empty;
     defer headers.deinit(allocator);
@@ -750,8 +750,8 @@ pub fn lua_request(L: *VM.lua.State) !i32 {
             max_header_size = @min(size, LuaHelper.MAX_LUAU_SIZE);
         L.pop(1);
 
-        if (try L.Zcheckfield(?u16, 2, "max_header_count")) |size|
-            max_header_count = size;
+        if (try L.Zcheckfield(?u16, 2, "max_headers")) |size|
+            max_headers = size;
         L.pop(1);
 
         if (try L.Zcheckfield(?[]const u8, 2, "method")) |method_str| blk: {
@@ -861,7 +861,7 @@ pub fn lua_request(L: *VM.lua.State) !i32 {
     }
 
     const self = try allocator.create(Self);
-    var parser: Response.Parser = .init(allocator, max_header_count orelse 100);
+    var parser: Response.Parser = .init(allocator, max_headers orelse 100);
     if (max_body_size) |size|
         parser.max_body_size = size;
     if (max_header_size) |size|
