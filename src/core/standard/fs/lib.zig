@@ -470,7 +470,7 @@ fn lua_openFile(L: *VM.lua.State) !i32 {
         }),
     };
 
-    try File.push(L, file, .File, switch (mode) {
+    _ = try File.push(L, file, .File, switch (mode) {
         .read_only => .readable(.seek_close),
         .read_write => .readwrite(.seek_close),
         .write_only => .writable(.seek_close),
@@ -516,7 +516,7 @@ fn lua_createFile(L: *VM.lua.State) !i32 {
         }),
     };
 
-    try File.push(L, file, .File, if (opts.read) .readwrite(.seek_close) else .writable(.seek_close));
+    _ = try File.push(L, file, .File, if (opts.read) .readwrite(.seek_close) else .writable(.seek_close));
 
     return 1;
 }

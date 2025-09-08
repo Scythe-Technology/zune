@@ -244,19 +244,19 @@ pub fn push(L: *VM.lua.State, child: std.process.Child) !void {
     };
 
     if (child.stdin) |file| {
-        try File.push(L, file, .Tty, .writable(.close));
+        _ = try File.push(L, file, .Tty, .writable(.close));
         self.stdin_file = .init(L, -1, undefined);
         self.stdin = file;
         L.pop(1);
     }
     if (child.stdout) |file| {
-        try File.push(L, file, .Tty, .readable(.close));
+        _ = try File.push(L, file, .Tty, .readable(.close));
         self.stdout_file = .init(L, -1, undefined);
         self.stdout = file;
         L.pop(1);
     }
     if (child.stderr) |file| {
-        try File.push(L, file, .Tty, .readable(.close));
+        _ = try File.push(L, file, .Tty, .readable(.close));
         self.stderr_file = .init(L, -1, undefined);
         self.stderr = file;
         L.pop(1);

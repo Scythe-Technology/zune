@@ -20,6 +20,7 @@ pub fn init(allocator: std.mem.Allocator, comptime location: []const u8) !Histor
     }
     var history_data: std.ArrayList([]const u8) = .empty;
     errdefer history_data.deinit(allocator);
+    errdefer for (history_data.items) |data| allocator.free(data);
     if (file_path) |path| {
         errdefer allocator.free(path);
         const file = std.fs.openFileAbsolute(path, .{}) catch |err| {
@@ -48,10 +49,12 @@ pub fn init(allocator: std.mem.Allocator, comptime location: []const u8) !Histor
             };
             if (amt == 0)
                 break;
+            reader.interface.toss(1);
             const line = allocating.written();
             if (std.mem.trim(u8, line, " \r").len == 0)
                 continue;
-            try history_data.append(allocator, std.mem.trim(u8, line, "\r"));
+            const copy = try allocator.dupe(u8, line);
+            try history_data.append(allocator, copy);
             if (history_data.items.len > MAX_HISTORY_SIZE)
                 allocator.free(history_data.orderedRemove(1));
         }
@@ -157,5 +160,6 @@ pub fn deinit(self: *History) void {
             writer.writeAll(data) catch break;
             writer.writeByte('\n') catch break;
         }
+        writer.flush() catch {};
     }
 }

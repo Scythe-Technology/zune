@@ -602,16 +602,22 @@ pub fn loadLib(L: *VM.lua.State) !void {
     const stderr = std.fs.File.stderr();
 
     // StdIn
-    File.push(L, stdin, .Tty, .readable(.none)) catch |err| std.debug.panic("{}", .{err});
+    const stdin_ud = File.push(L, stdin, .Tty, .readable(.none)) catch |err| std.debug.panic("{}", .{err});
     try L.rawsetfield(-2, "stdin");
 
     // StdOut
-    File.push(L, stdout, .Tty, .writable(.none)) catch |err| std.debug.panic("{}", .{err});
+    const stdout_ud = File.push(L, stdout, .Tty, .writable(.none)) catch |err| std.debug.panic("{}", .{err});
     try L.rawsetfield(-2, "stdout");
 
     // StdErr
-    File.push(L, stderr, .Tty, .writable(.none)) catch |err| std.debug.panic("{}", .{err});
+    const stderr_ud = File.push(L, stderr, .Tty, .writable(.none)) catch |err| std.debug.panic("{}", .{err});
     try L.rawsetfield(-2, "stderr");
+
+    if (comptime builtin.os.tag == .windows) {
+        stdin_ud.overlapped = false;
+        stdout_ud.overlapped = false;
+        stderr_ud.overlapped = false;
+    }
 
     // Terminal
     TERMINAL = Terminal.init(stdin, stdout);

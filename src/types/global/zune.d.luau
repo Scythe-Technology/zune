@@ -111,6 +111,16 @@ export type _zune_serde_gzip = {
         & ((compressed: buffer) -> buffer)
         & ((compressed: string | buffer) -> string | buffer), 
 }
+export type _zune_serde_flate = {
+    compress: 
+        & ((raw: string, opts: SerdeGenericCompressionOptions?) -> string)
+        & ((raw: buffer, opts: SerdeGenericCompressionOptions?) -> buffer)
+        & ((raw: string | buffer, opts: SerdeGenericCompressionOptions?) -> string | buffer),
+    decompress: 
+        & ((compressed: string) -> string)
+        & ((compressed: buffer) -> buffer)
+        & ((compressed: string | buffer) -> string | buffer), 
+}
 export type _zune_serde_zlib = {
     compress: 
         & ((raw: string, opts: SerdeGenericCompressionOptions?) -> string)
@@ -160,6 +170,7 @@ export type _zune_serde = {
     yaml: _zune_serde_yaml,
     base64: _zune_serde_base64,
     gzip: _zune_serde_gzip,
+    flate: _zune_serde_flate,
     zlib: _zune_serde_zlib,
     lz4: _zune_serde_lz4,
     zstd: _zune_serde_zstd, 
@@ -200,13 +211,15 @@ export type FileStat = {
 }
 declare class FileHandle
     read: 
+        & ((self: FileHandle, amount: number?) -> string)
         & ((self: FileHandle, amount: number?, bytes: false?) -> string)
         & ((self: FileHandle, amount: number?, bytes: true) -> buffer)
-        & ((self: FileHandle, amount: number?, bytes: boolean) -> string | buffer)
+        & ((self: FileHandle, amount: number?, bytes: boolean?) -> string | buffer)
     readSync: 
+        & ((self: FileHandle, amount: number?) -> string)
         & ((self: FileHandle, amount: number?, bytes: false?) -> string)
         & ((self: FileHandle, amount: number?, bytes: true) -> buffer)
-        & ((self: FileHandle, amount: number?, bytes: boolean) -> string | buffer)
+        & ((self: FileHandle, amount: number?, bytes: boolean?) -> string | buffer)
     write: (self: FileHandle, contents: string | buffer) -> ()
     writeSync: (self: FileHandle, contents: string | buffer) -> ()
     append: (self: FileHandle, contents: string | buffer) -> ()
@@ -255,10 +268,12 @@ export type _zune_fs = {
     openFile: (path: string, opts: FileOpenOptions?) -> FileHandle,
     readFile: 
         & ((path: string) -> string)
+        & ((path: string, bytes: false?) -> string)
         & ((path: string, bytes: true) -> buffer)
         & ((path: string, bytes: boolean) -> string | buffer),
     readFileSync: 
         & ((path: string) -> string)
+        & ((path: string, bytes: false?) -> string)
         & ((path: string, bytes: true) -> buffer)
         & ((path: string, bytes: boolean) -> string | buffer),
     entries: (path: string) -> {DirectoryEntry},
@@ -664,7 +679,7 @@ type FunctionalCases = ExpectCases & {
 type ExpectHandler = {
     any: (type: string) -> any,
     type: (type: "nil" | "boolean" | "number" | "string" | "function" | "table" | "userdata" | "thread" | "buffer" | "vector") -> any,
-    similar: (expected: {[any]: any} | {any}) -> any, 
+    similar: (expected: any) -> any, 
 }
 export type _zune_testing = {
     running: boolean,
@@ -1316,6 +1331,7 @@ export type _zune_net_IPPROTO = {
 export type _zune_net_http = {
     serve: (opts: HttpServeOptions) -> HttpServer,
     request: 
+        & ((host: string) -> HttpResponse<string>)
         & ((host: string, opts: HttpRequestOptionsType<"string"?>?) -> HttpResponse<string>)
         & ((host: string, opts: HttpRequestOptionsType<"buffer">?) -> HttpResponse<buffer>)
         & ((host: string, opts: HttpRequestOptionsType<"string" | "buffer" | nil>?) -> HttpResponse<string | buffer>),
@@ -1449,9 +1465,10 @@ export type _zune_ffi = {
 --[[ io ]]
 declare class IoReadable
     read: 
+        & ((self: IoReadable, amount: number?) -> buffer)
         & ((self: IoReadable, amount: number?, bytes: true?) -> buffer)
         & ((self: IoReadable, amount: number?, bytes: false) -> string)
-        & ((self: IoReadable, amount: number?, bytes: boolean) -> string | buffer)
+        & ((self: IoReadable, amount: number?, bytes: boolean?) -> string | buffer)
     readu8: (self: IoReadable) -> number
     readu16: (self: IoReadable) -> number
     readu32: (self: IoReadable) -> number
@@ -1474,9 +1491,10 @@ declare class IoWritable
 end
 declare class BufferStream
     read: 
+        & ((self: BufferStream, amount: number?) -> buffer)
         & ((self: BufferStream, amount: number?, bytes: true?) -> buffer)
         & ((self: BufferStream, amount: number?, bytes: false) -> string)
-        & ((self: BufferStream, amount: number?, bytes: boolean) -> string | buffer)
+        & ((self: BufferStream, amount: number?, bytes: boolean?) -> string | buffer)
     write: (self: BufferStream, data: string | buffer) -> ()
     pos: (self: BufferStream) -> number
     size: (self: BufferStream) -> number
@@ -1490,9 +1508,10 @@ declare class BufferSink
     len: number
     closed: boolean
     flush: 
+        & ((self: BufferSink) -> buffer)
         & ((self: BufferSink, bytes: true?) -> buffer)
         & ((self: BufferSink, bytes: false) -> string)
-        & ((self: BufferSink, bytes: boolean) -> string | buffer)
+        & ((self: BufferSink, bytes: boolean?) -> string | buffer)
     write: (self: BufferSink, data: string | buffer) -> ()
     writer: (self: BufferSink) -> IoWritable
     close: (self: BufferSink) -> () 

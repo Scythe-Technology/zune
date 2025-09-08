@@ -28,7 +28,7 @@ pub const Section = union(enum) {
     file: File,
 
     pub const Script = []const u8;
-    pub const Compression = enum(u3) { none, zlib, lz4, zstd };
+    pub const Compression = enum(u3) { none, zlib, lz4, zstd, gzip, flate };
 
     pub const File = struct {
         data: []const u8,
@@ -89,6 +89,18 @@ pub const Section = union(enum) {
                 .zlib => {
                     var reader: std.Io.Reader = .fixed(data);
                     try lcompress.zlib.compress(reader.adaptToOldInterface(), array.writer(allocator), .{
+                        .level = .default,
+                    });
+                },
+                .gzip => {
+                    var reader: std.Io.Reader = .fixed(data);
+                    try lcompress.gzip.compress(reader.adaptToOldInterface(), array.writer(allocator), .{
+                        .level = .default,
+                    });
+                },
+                .flate => {
+                    var reader: std.Io.Reader = .fixed(data);
+                    try lcompress.flate.compress(reader.adaptToOldInterface(), array.writer(allocator), .{
                         .level = .default,
                     });
                 },
@@ -225,6 +237,26 @@ pub const Map = struct {
                 var reader: std.Io.Reader = .fixed(file.data);
 
                 try lcompress.zlib.decompress(reader.adaptToOldInterface(), adaptToOldInterface(&writer));
+                file.data = decompressed_bytes;
+                return decompressed_bytes;
+            },
+            .gzip => {
+                const decompressed_bytes = try self.allocator.alloc(u8, file.size);
+
+                var writer: std.Io.Writer = .fixed(decompressed_bytes);
+                var reader: std.Io.Reader = .fixed(file.data);
+
+                try lcompress.gzip.decompress(reader.adaptToOldInterface(), adaptToOldInterface(&writer));
+                file.data = decompressed_bytes;
+                return decompressed_bytes;
+            },
+            .flate => {
+                const decompressed_bytes = try self.allocator.alloc(u8, file.size);
+
+                var writer: std.Io.Writer = .fixed(decompressed_bytes);
+                var reader: std.Io.Reader = .fixed(file.data);
+
+                try lcompress.flate.decompress(reader.adaptToOldInterface(), adaptToOldInterface(&writer));
                 file.data = decompressed_bytes;
                 return decompressed_bytes;
             },
