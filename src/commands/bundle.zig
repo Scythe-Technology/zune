@@ -103,6 +103,8 @@ fn scanDir(
 const COMPRESSION_MAP = std.StaticStringMap(Bundle.Section.Compression).initComptime(.{
     .{ "none", .none },
     .{ "zlib", .zlib },
+    .{ "flate", .flate },
+    .{ "gzip", .gzip },
     .{ "lz4", .lz4 },
     .{ "zstd", .zstd },
 });
@@ -393,7 +395,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
     if (bundled.len > Bundle.ExeHeader.maxValue(.size)) {
         Zune.debug.print("<red>error<clear>: large bundled size ({d} MB), exceeds maximum ({d} MB)\n", .{ @divTrunc(bundled.len, 1_000_000), @divTrunc(Bundle.ExeHeader.maxValue(.size), 1_000_000) });
         Zune.debug.print("try bundling more compact data, either by bundling with bytecode instead of script source code with --release flag,\n", .{});
-        Zune.debug.print("or compressing files with --compress=<<zstd|lz4|zlib>>.\n", .{});
+        Zune.debug.print("or compressing files with --compression=<<zstd|lz4|zlib|gzip|flate>>.\n", .{});
         std.process.exit(1);
     }
     const hash = std.hash.XxHash3.hash(Bundle.SEED, bundled);
