@@ -26,9 +26,11 @@ fn lua_cancel(L: *VM.lua.State) !i32 {
     try L.Zchecktype(1, .Thread);
     const thread = L.tothread(1) orelse return L.Zerror("expected thread");
     scheduler.cancelThread(thread);
-    const status = L.costatus(thread);
-    if (status != .Finished and status != .FinishedErr and status != .Suspended)
-        return L.Zerrorf("cannot close {s} coroutine", .{@tagName(status)});
+    switch (L.costatus(thread)) {
+        .Finished, .FinishedErr, .Suspended => {},
+        .Normal => return 0,
+        .Running => return L.Zerror("cannot close running coroutine"),
+    }
     try thread.resetthread();
     return 0;
 }
