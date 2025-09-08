@@ -48,8 +48,8 @@
             .hash = "tinycc-0.0.3-T6dU8yTKAAAQ0w4V898cCL8RwoCyFdW1Z_THkasfSbsU",
         },
         .tls = .{
-            .url = "https://codeload.github.com/ianic/tls.zig/tar.gz/fd11fcfa77628bc2fb9de7fd1fecfe89339c93fc",
-            .hash = "tls-0.1.0-ER2e0mRIBQCvHQz8kf9k3xHQDwz4WH71ht44JoVycYmL",
+            .url = "https://codeload.github.com/Scythe-Technology/tls.zig/tar.gz/09d6a4b605c3289fdc7324008c79f29d228bb172",
+            .hash = "tls-0.1.0-ER2e0uBHBQCxubq8ruuWI47QZ63XrCigfiqL6e5cAZVG",
         },
     },
     .paths = .{""},
