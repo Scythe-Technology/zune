@@ -488,7 +488,7 @@ pub const Parser = struct {
                     const number = buffer[0 .. end_index - 1];
                     if (number.len == 0)
                         return error.InvalidChunkedEncoding;
-                    const size = atoi(number) orelse return error.InvalidChunkedEncoding;
+                    const size = std.fmt.parseUnsigned(u32, number, 16) catch return error.InvalidChunkedEncoding;
                     if (size == 0) {
                         if (buffer.len < end_index + 3)
                             return null;
