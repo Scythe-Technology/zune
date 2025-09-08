@@ -82,6 +82,7 @@ pub const OpenMode = packed struct {
 file: std.fs.File,
 mode: OpenMode = .{},
 kind: FileKind = .File,
+overlapped: if (builtin.os.tag == .windows) bool else void = if (builtin.os.tag == .windows) true else undefined,
 list: *Scheduler.CompletionLinkedList,
 
 pub const AsyncReadContext = struct {
@@ -490,7 +491,7 @@ fn lua_write(self: *File, L: *VM.lua.State) !i32 {
     const data = try L.Zcheckvalue([]const u8, 2, null);
 
     switch (comptime builtin.os.tag) {
-        .windows => if (self.kind == .Tty) {
+        .windows => if (self.kind == .Tty and !self.overlapped) {
             // use sync since most times files are not open with overlapped
             try self.file.writeAll(data);
             return 0;
@@ -610,7 +611,7 @@ fn lua_read(self: *File, L: *VM.lua.State) !i32 {
     }
 
     switch (comptime builtin.os.tag) {
-        .windows => if (self.kind == .Tty) {
+        .windows => if (self.kind == .Tty and !self.overlapped) {
             const scheduler = Scheduler.getScheduler(L);
             const sync = try scheduler.createSync(AsyncReadContext.Thread, AsyncReadContext.Thread.complete);
             errdefer scheduler.freeSync(sync);
@@ -912,7 +913,7 @@ pub inline fn load(L: *VM.lua.State) !void {
     L.setuserdatadtor(File, TAG_FS_FILE, __dtor);
 }
 
-pub fn push(L: *VM.lua.State, file: std.fs.File, kind: FileKind, mode: OpenMode) !void {
+pub fn push(L: *VM.lua.State, file: std.fs.File, kind: FileKind, mode: OpenMode) !*File {
     const allocator = luau.getallocator(L);
     const self = try L.newuserdatataggedwithmetatable(File, TAG_FS_FILE);
     const list = try allocator.create(Scheduler.CompletionLinkedList);
@@ -923,4 +924,5 @@ pub fn push(L: *VM.lua.State, file: std.fs.File, kind: FileKind, mode: OpenMode)
         .mode = mode,
         .list = list,
     };
+    return self;
 }
