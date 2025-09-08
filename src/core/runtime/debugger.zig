@@ -154,6 +154,27 @@ pub fn getExactBreakpoint(breakpoints: *std.ArrayListUnmanaged(LuaBreakpoint), l
     return null;
 }
 
+pub fn reloadBreakpoints() void {
+    var iter = BREAKPOINTS.iterator();
+    while (iter.next()) |entry| {
+        const breakpoints = entry.value_ptr;
+        breakpoints.changes = @intCast(breakpoints.list.items.len);
+        CHANGES_COUNT += breakpoints.changes;
+        for (breakpoints.list.items) |*bp| {
+            if (bp.remove)
+                continue;
+            bp.enabled = false;
+            bp.remove = false;
+        }
+        var i = breakpoints.list.items.len;
+        while (i > 0) : (i -= 1) {
+            const bp = &breakpoints.list.items[i - 1];
+            if (bp.remove)
+                _ = breakpoints.list.orderedRemove(i);
+        }
+    }
+}
+
 const BreakpointResult = enum {
     saved,
     exists,

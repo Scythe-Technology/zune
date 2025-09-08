@@ -515,6 +515,8 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
     while (true) {
         defer Debugger.DEBUG.dead = false;
 
+        Debugger.reloadBreakpoints();
+
         var L = try luau.init(&allocator);
         defer L.deinit();
 
