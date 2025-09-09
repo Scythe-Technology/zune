@@ -263,6 +263,41 @@ describe("ChildProcess", function()
 				}));
 			end
 		end)
+
+		describe("Std Options", function()
+			test("Both", function()
+				local result = process.run("echo", {"some long message"}, {stdout = "pipe", stderr = "pipe"});
+				expect(result).toBe(expect.similar({
+					ok = true,
+					code = 0,
+					stderr = "",
+					stdout = "some long message\n",
+				}));
+			end)
+			test("Stdout", function()
+				local result = process.run("echo", {"some long message"}, {stdout = "pipe", stderr = "ignore"});
+				expect(result).toBe(expect.similar({
+					ok = true,
+					code = 0,
+					stdout = "some long message\n",
+				}));
+			end)
+			test("Stderr", function()
+				local result = process.run("echo", {"some long message"}, {stdout = "ignore", stderr = "pipe"});
+				expect(result).toBe(expect.similar({
+					ok = true,
+					code = 0,
+					stderr = "",
+				}));
+			end)
+			test("None", function()
+				local result = process.run("echo", {"some long message"}, {stdout = "ignore", stderr = "ignore"});
+				expect(result).toBe(expect.similar({
+					ok = true,
+					code = 0,
+				}));
+			end)
+		end)
 	end)
 
 	describe("Create", function()
@@ -309,6 +344,85 @@ describe("ChildProcess", function()
 				ok = false,
 				code = if IS_WINDOWS then 1 else 15,
 			}));
+		end)
+
+		describe("Std Options", function()
+			test("All", function()
+				local result = process.create("echo", {"some", "long", "message"}, {stdout = "pipe", stderr = "pipe", stdin = "pipe"});
+				assert(result.stdin ~= nil);
+				assert(result.stdout ~= nil);
+				assert(result.stderr ~= nil);
+
+				local status = result:wait();
+
+				expect(result.stdout:read()).toBe("some long message\n");
+
+				expect(status).toBe(expect.any("table"));
+				expect(status).toBe(expect.similar({
+					ok = true,
+					code = 0,
+				}));
+			end)
+			test("Stdout/Stderr", function()
+				local result = process.create("echo", {"some", "long", "message"}, {stdout = "pipe", stderr = "pipe", stdin = "ignore"});
+				assert(result.stdin == nil);
+				assert(result.stdout ~= nil);
+				assert(result.stderr ~= nil);
+
+				local status = result:wait();
+
+				expect(result.stdout:read()).toBe("some long message\n");
+
+				expect(status).toBe(expect.any("table"));
+				expect(status).toBe(expect.similar({
+					ok = true,
+					code = 0,
+				}));
+			end)
+			test("Stdout", function()
+				local result = process.create("echo", {"some", "long", "message"}, {stdout = "pipe", stderr = "ignore", stdin = "ignore"});
+				assert(result.stdin == nil);
+				assert(result.stdout ~= nil);
+				assert(result.stderr == nil);
+
+				local status = result:wait();
+
+				expect(result.stdout:read()).toBe("some long message\n");
+
+				expect(status).toBe(expect.any("table"));
+				expect(status).toBe(expect.similar({
+					ok = true,
+					code = 0,
+				}));
+			end)
+			test("Stderr", function()
+				local result = process.create("echo", {"some", "long", "message"}, {stdout = "ignore", stderr = "pipe", stdin = "ignore"});
+				assert(result.stdin == nil);
+				assert(result.stdout == nil);
+				assert(result.stderr ~= nil);
+
+				local status = result:wait();
+
+				expect(status).toBe(expect.any("table"));
+				expect(status).toBe(expect.similar({
+					ok = true,
+					code = 0,
+				}));
+			end)
+			test("None", function()
+				local result = process.create("echo", {"some", "long", "message"}, {stdout = "ignore", stderr = "ignore", stdin = "ignore"});
+				assert(result.stdin == nil);
+				assert(result.stdout == nil);
+				assert(result.stderr == nil);
+
+				local status = result:wait();
+
+				expect(status).toBe(expect.any("table"));
+				expect(status).toBe(expect.similar({
+					ok = true,
+					code = 0,
+				}));
+			end)
 		end)
 	end)
 end)
