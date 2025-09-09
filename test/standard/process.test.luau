@@ -323,6 +323,7 @@ describe("ChildProcess", function()
 			});
 			assert(result.stdin)
 			assert(result.stdout)
+			expect(result.pid).toBe(expect.type("number"));
 			local status = result:wait();
 			expect(status).toBe(expect.any("table"));
 			expect(status).toBe(expect.similar({
@@ -334,6 +335,7 @@ describe("ChildProcess", function()
 			local result = process.create("cat");
 			assert(result.stdin)
 			assert(result.stdout)
+			expect(result.pid).toBe(expect.type("number"));
 			result.stdin:write("Hello World\n");
 			expect(result.stdout:read(5)).toBe("Hello");
 			expect(result.stdout:read()).toBe(" World\n");
