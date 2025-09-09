@@ -71,52 +71,75 @@ fn writeProcessEnvMap(L: *VM.lua.State, envMap: *std.process.EnvMap, idx: i32) !
     };
 }
 
-const ProcessChildOptions = struct {
+const ProcessOptions = struct {
     cwd: ?[]const u8 = null,
     env: ?process.EnvMap = null,
     joined: ?[]const u8 = null,
     args: std.ArrayList([]const u8),
-    stdio: enum { inherit, pipe, ignore } = .pipe,
+    stdin: Behavior = .pipe,
+    stdout: Behavior = .pipe,
+    stderr: Behavior = .pipe,
 
-    pub fn init(L: *VM.lua.State, allocator: std.mem.Allocator) !ProcessChildOptions {
+    pub const Behavior = enum { inherit, pipe, ignore };
+
+    pub fn init(L: *VM.lua.State, allocator: std.mem.Allocator) !ProcessOptions {
         const cmd = try L.Zcheckvalue([:0]const u8, 1, null);
-        const options = !L.typeOf(3).isnoneornil();
 
         var shell: ?[]const u8 = null;
         var shell_inline: ?[]const u8 = "-c";
 
-        var childOptions: ProcessChildOptions = .{
+        var options: ProcessOptions = .{
             .args = .empty,
         };
-        errdefer childOptions.args.deinit(allocator);
+        errdefer options.args.deinit(allocator);
 
-        if (options) {
+        if (!L.typeOf(3).isnoneornil()) {
             try L.Zchecktype(3, .Table);
 
-            childOptions.cwd = try L.Zcheckfield(?[]const u8, 3, "cwd");
+            options.cwd = try L.Zcheckfield(?[]const u8, 3, "cwd");
             L.pop(1);
 
             if (LuaHelper.maybeKnownType(L.rawgetfield(3, "env"))) |@"type"| {
                 if (@"type" != .Table)
                     return L.Zerrorf("invalid environment (table expected, got {s})", .{VM.lapi.typename(@"type")});
-                childOptions.env = std.process.EnvMap.init(allocator);
-                try writeProcessEnvMap(L, &childOptions.env.?, -1);
+                options.env = std.process.EnvMap.init(allocator);
+                try writeProcessEnvMap(L, &options.env.?, -1);
             }
             L.pop(1);
 
-            switch (L.rawgetfield(3, "stdio")) {
+            const Map = std.StaticStringMap(Behavior).initComptime(.{
+                .{ "inherit", .inherit },
+                .{ "pipe", .pipe },
+                .{ "ignore", .ignore },
+            });
+
+            switch (L.rawgetfield(3, "stdin")) {
                 .None, .Nil => {},
                 .String => {
-                    const stdioOption = L.tostring(-1) orelse unreachable;
-                    if (std.mem.eql(u8, stdioOption, "inherit")) {
-                        childOptions.stdio = .inherit;
-                    } else if (std.mem.eql(u8, stdioOption, "pipe")) {
-                        childOptions.stdio = .pipe;
-                    } else if (std.mem.eql(u8, stdioOption, "ignore")) {
-                        childOptions.stdio = .ignore;
-                    } else return L.Zerrorf("invalid stdio option (inherit/pipe/ignore expected, got {s})", .{stdioOption});
+                    const option = L.tostring(-1) orelse unreachable;
+                    options.stdin = Map.get(option) orelse return L.Zerrorf("invalid stdin option (inherit/pipe/ignore expected, got {s})", .{option});
                 },
-                else => return L.Zerrorf("invalid stdio option (string expected, got {s})", .{VM.lapi.typename(L.typeOf(-1))}),
+                else => return L.Zerrorf("invalid stdin option (string expected, got {s})", .{VM.lapi.typename(L.typeOf(-1))}),
+            }
+            L.pop(1);
+
+            switch (L.rawgetfield(3, "stdout")) {
+                .None, .Nil => {},
+                .String => {
+                    const option = L.tostring(-1) orelse unreachable;
+                    options.stdout = Map.get(option) orelse return L.Zerrorf("invalid stdout option (inherit/pipe/ignore expected, got {s})", .{option});
+                },
+                else => return L.Zerrorf("invalid stdout option (string expected, got {s})", .{VM.lapi.typename(L.typeOf(-1))}),
+            }
+            L.pop(1);
+
+            switch (L.rawgetfield(3, "stderr")) {
+                .None, .Nil => {},
+                .String => {
+                    const option = L.tostring(-1) orelse unreachable;
+                    options.stderr = Map.get(option) orelse return L.Zerrorf("invalid stderr option (inherit/pipe/ignore expected, got {s})", .{option});
+                },
+                else => return L.Zerrorf("invalid stderr option (string expected, got {s})", .{VM.lapi.typename(L.typeOf(-1))}),
             }
             L.pop(1);
 
@@ -163,26 +186,26 @@ const ProcessChildOptions = struct {
             L.pop(1);
         }
 
-        try childOptions.args.append(allocator, cmd);
+        try options.args.append(allocator, cmd);
 
         if (L.typeOf(2) == .Table)
-            try getProcessArgs(L, allocator, &childOptions.args, 2);
+            try getProcessArgs(L, allocator, &options.args, 2);
 
         if (shell) |s| {
-            const joined = try std.mem.join(allocator, " ", childOptions.args.items);
+            const joined = try std.mem.join(allocator, " ", options.args.items);
             errdefer allocator.free(joined);
-            childOptions.joined = joined;
-            childOptions.args.clearRetainingCapacity();
-            try childOptions.args.append(allocator, s);
+            options.joined = joined;
+            options.args.clearRetainingCapacity();
+            try options.args.append(allocator, s);
             if (shell_inline) |inline_cmd|
-                try childOptions.args.append(allocator, inline_cmd);
-            try childOptions.args.append(allocator, joined);
+                try options.args.append(allocator, inline_cmd);
+            try options.args.append(allocator, joined);
         }
 
-        return childOptions;
+        return options;
     }
 
-    fn deinit(self: *ProcessChildOptions, allocator: std.mem.Allocator) void {
+    fn deinit(self: *ProcessOptions, allocator: std.mem.Allocator) void {
         if (self.env) |*env|
             env.deinit();
         if (self.joined) |mem|
@@ -195,14 +218,31 @@ const ProcessAsyncRunContext = struct {
     completion: xev.Completion,
     ref: Scheduler.ThreadRef,
     proc: xev.Process,
-    poller: ?std.io.Poller(ProcessAsyncRunContext.PollEnum),
+    poller: ?Poller,
 
     stdout: ?std.fs.File,
     stderr: ?std.fs.File,
 
-    pub const PollEnum = enum {
-        stdout,
-        stderr,
+    pub const Poller = union(enum) {
+        pub const Out = enum { stdout };
+        pub const Err = enum { stderr };
+        pub const Both = enum { stdout, stderr };
+
+        both: std.io.Poller(Both),
+        stdout: std.io.Poller(Out),
+        stderr: std.io.Poller(Err),
+
+        pub fn poll(self: *Poller) !bool {
+            return switch (self.*) {
+                inline else => |*p| p.poll(),
+            };
+        }
+
+        pub fn deinit(self: *Poller) void {
+            switch (self.*) {
+                inline else => |*p| p.deinit(),
+            }
+        }
     };
 
     pub fn complete(
@@ -242,14 +282,30 @@ const ProcessAsyncRunContext = struct {
         };
 
         if (self.poller) |*poller| {
-            const stdout_reader = poller.reader(.stdout);
-            const stderr_reader = poller.reader(.stderr);
+            var stdout_result: ?[]const u8 = null;
+            var stderr_result: ?[]const u8 = null;
+            switch (poller.*) {
+                .both => |*p| {
+                    const stdout_reader = p.reader(.stdout);
+                    const stderr_reader = p.reader(.stderr);
+                    stdout_result = stdout_reader.buffered()[0..@min(stdout_reader.bufferedLen(), LuaHelper.MAX_LUAU_SIZE)];
+                    stderr_result = stderr_reader.buffered()[0..@min(stderr_reader.bufferedLen(), LuaHelper.MAX_LUAU_SIZE)];
+                },
+                .stdout => |*p| {
+                    const reader = p.reader(.stdout);
+                    stdout_result = reader.buffered()[0..@min(reader.bufferedLen(), LuaHelper.MAX_LUAU_SIZE)];
+                },
+                .stderr => |*p| {
+                    const reader = p.reader(.stderr);
+                    stderr_result = reader.buffered()[0..@min(reader.bufferedLen(), LuaHelper.MAX_LUAU_SIZE)];
+                },
+            }
 
             L.Zpushvalue(.{
                 .code = code,
                 .ok = code == 0,
-                .stdout = stdout_reader.buffered()[0..@min(stdout_reader.bufferedLen(), LuaHelper.MAX_LUAU_SIZE)],
-                .stderr = stderr_reader.buffered()[0..@min(stderr_reader.bufferedLen(), LuaHelper.MAX_LUAU_SIZE)],
+                .stdout = stdout_result,
+                .stderr = stderr_result,
             }) catch |e| std.debug.panic("{}", .{e});
         } else {
             L.Zpushvalue(.{
@@ -272,17 +328,17 @@ fn lua_run(L: *VM.lua.State) !i32 {
     const scheduler = Scheduler.getScheduler(L);
     const allocator = luau.getallocator(L);
 
-    var options = try ProcessChildOptions.init(L, allocator);
+    var options = try ProcessOptions.init(L, allocator);
     defer options.deinit(allocator);
 
     var child = process.Child.init(options.args.items, allocator);
-    child.stdin_behavior = if (options.stdio == .inherit) .Inherit else .Ignore;
-    child.stdout_behavior = switch (options.stdio) {
+    child.stdin_behavior = if (options.stdin == .inherit) .Inherit else .Ignore;
+    child.stdout_behavior = switch (options.stdout) {
         .inherit => .Inherit,
         .pipe => .Pipe,
         .ignore => .Ignore,
     };
-    child.stderr_behavior = switch (options.stdio) {
+    child.stderr_behavior = switch (options.stderr) {
         .inherit => .Inherit,
         .pipe => .Pipe,
         .ignore => .Ignore,
@@ -298,10 +354,20 @@ fn lua_run(L: *VM.lua.State) !i32 {
     try child.waitForSpawn();
     errdefer _ = child.kill() catch {};
 
-    const poller = if (options.stdio == .pipe) std.io.poll(allocator, ProcessAsyncRunContext.PollEnum, .{
-        .stdout = child.stdout.?,
-        .stderr = child.stderr.?,
-    }) else null;
+    const poller: ?ProcessAsyncRunContext.Poller = if (options.stdout == .pipe and options.stderr == .pipe) .{
+        .both = std.io.poll(allocator, ProcessAsyncRunContext.Poller.Both, .{
+            .stdout = child.stdout.?,
+            .stderr = child.stderr.?,
+        }),
+    } else if (options.stdout == .pipe) .{
+        .stdout = std.io.poll(allocator, ProcessAsyncRunContext.Poller.Out, .{
+            .stdout = child.stdout.?,
+        }),
+    } else if (options.stderr == .pipe) .{
+        .stderr = std.io.poll(allocator, ProcessAsyncRunContext.Poller.Err, .{
+            .stderr = child.stderr.?,
+        }),
+    } else null;
 
     var proc = try xev.Process.init(child.id);
     errdefer proc.deinit();
@@ -335,14 +401,26 @@ fn lua_create(L: *VM.lua.State) !i32 {
         return error.UnsupportedPlatform;
     const allocator = luau.getallocator(L);
 
-    var options = try ProcessChildOptions.init(L, allocator);
+    var options = try ProcessOptions.init(L, allocator);
     defer options.deinit(allocator);
 
     var child = process.Child.init(options.args.items, allocator);
     child.expand_arg0 = .no_expand;
-    child.stdin_behavior = .Pipe;
-    child.stdout_behavior = .Pipe;
-    child.stderr_behavior = .Pipe;
+    child.stdin_behavior = switch (options.stdin) {
+        .inherit => .Inherit,
+        .pipe => .Pipe,
+        .ignore => .Ignore,
+    };
+    child.stdout_behavior = switch (options.stdout) {
+        .inherit => .Inherit,
+        .pipe => .Pipe,
+        .ignore => .Ignore,
+    };
+    child.stderr_behavior = switch (options.stderr) {
+        .inherit => .Inherit,
+        .pipe => .Pipe,
+        .ignore => .Ignore,
+    };
     child.cwd = options.cwd;
     child.env_map = if (options.env) |env|
         &env

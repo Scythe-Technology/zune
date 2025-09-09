@@ -188,10 +188,12 @@ pub fn __index(L: *VM.lua.State) !i32 {
         stdin,
         stdout,
         stderr,
+        pid,
     }).initComptime(.{
         .{ "stdin", .stdin },
         .{ "stdout", .stdout },
         .{ "stderr", .stderr },
+        .{ "pid", .pid },
     });
 
     switch (Map.get(index) orelse return L.Zerrorf("unknown index: {s}", .{index})) {
@@ -211,6 +213,14 @@ pub fn __index(L: *VM.lua.State) !i32 {
             if (self.stderr_file.push(L))
                 return 1;
             L.pushnil();
+            return 1;
+        },
+        .pid => {
+            switch (comptime builtin.os.tag) {
+                .windows => L.pushunsigned(@truncate(@intFromPtr(self.child.id))),
+                .wasi => L.pushunsigned(0),
+                else => L.pushinteger(self.child.id),
+            }
             return 1;
         },
     }

@@ -14,6 +14,7 @@ const gzip = @import("gzip.zig");
 const zlib = @import("zlib.zig");
 const flate = @import("flate.zig");
 const lz4 = @import("lz4.zig");
+const brotli = @import("brotli.zig");
 const zstd = @import("zstd.zig");
 
 const VM = luau.VM;
@@ -135,6 +136,16 @@ pub fn loadLib(L: *VM.lua.State) !void {
         L.setreadonly(-1, true);
 
         try L.rawsetfield(-2, "zstd");
+    }
+
+    { // Brotli
+        try L.Zpushvalue(.{
+            .compress = brotli.lua_compress,
+            .decompress = brotli.lua_decompress,
+        });
+        L.setreadonly(-1, true);
+
+        try L.rawsetfield(-2, "brotli");
     }
 
     L.setreadonly(-1, true);

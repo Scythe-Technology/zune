@@ -23,6 +23,10 @@
             .url = "https://codeload.github.com/Scythe-Technology/zig-lz4/tar.gz/041fc3bc7348b2583562a28605506b6e1f5f8d4a",
             .hash = "lz4-0.3.0-OvBcT35cAABHjkHxaWRdRg3RfjTAlr_KU0bbMsnqe0Nk",
         },
+        .brotli = .{
+            .url = "https://codeload.github.com/Scythe-Technology/zbrotli/tar.gz/db376685b19c03745531c0d625b3222c3cdbe0ba",
+            .hash = "zbrotli-0.0.0-YmfP91IzAACrukOcZGkDpS1-EIoNadUG0nRtGXgVOc6C",
+        },
         .pcre2 = .{
             .url = "https://codeload.github.com/Scythe-Technology/zpcre2/tar.gz/3ceb1c0e8afee5ba5c9893081d74cbec7d936f52",
             .hash = "zpcre2-0.0.3-p7xIaFsBMgCTbBTG_CekjUxWFA2a4oLnuLtSDIeMvLkz",

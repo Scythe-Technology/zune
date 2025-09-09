@@ -255,6 +255,7 @@ fn buildZune(
     const dep_toml = b.dependency("toml", .{ .target = target, .optimize = optimize });
     const dep_datetime = b.dependency("datetime", .{ .target = target, .optimize = optimize });
     const dep_lz4 = b.dependency("lz4", .{ .target = target, .optimize = packed_optimize });
+    const dep_brotli = b.dependency("brotli", .{ .target = target, .optimize = packed_optimize });
     const dep_zstd = b.dependency("zstd", .{ .target = target, .optimize = packed_optimize });
     const dep_pcre2 = b.dependency("pcre2", .{ .target = target, .optimize = packed_optimize });
     const dep_tinycc = b.dependency("tinycc", .{ .target = target, .optimize = packed_optimize, .CONFIG_TCC_BACKTRACE = false });
@@ -278,6 +279,7 @@ fn buildZune(
     const mod_toml = dep_toml.module("tomlz");
     const mod_datetime = dep_datetime.module("zdt");
     const mod_lz4 = dep_lz4.module("lz4");
+    const mod_brotli = dep_brotli.module("brotli");
     const mod_zstd = dep_zstd.module("zig-zstd");
     const mod_pcre2 = dep_pcre2.module("zpcre2");
     const mod_sqlite = dep_sqlite.module("z-sqlite");
@@ -292,6 +294,7 @@ fn buildZune(
     module.addImport("tls", mod_tls);
     module.addImport("yaml", mod_yaml);
     module.addImport("lz4", mod_lz4);
+    module.addImport("brotli", mod_brotli);
     module.addImport("zstd", mod_zstd);
     module.addImport("json", mod_json);
     module.addImport("regex", mod_pcre2);

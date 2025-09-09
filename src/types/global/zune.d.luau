@@ -131,6 +131,26 @@ export type _zune_serde_zlib = {
         & ((compressed: buffer) -> buffer)
         & ((compressed: string | buffer) -> string | buffer), 
 }
+export type _zune_serde_brotli = {
+    compress: 
+        & ((raw: string, opts: SerdeGenericCompressionOptions?) -> string)
+        & ((raw: buffer, opts: SerdeGenericCompressionOptions?) -> buffer)
+        & ((raw: string | buffer, opts: SerdeGenericCompressionOptions?) -> string | buffer),
+    decompress: 
+        & ((compressed: string) -> string)
+        & ((compressed: buffer) -> buffer)
+        & ((compressed: string | buffer) -> string | buffer), 
+}
+export type _zune_serde_zstd = {
+    compress: 
+        & ((raw: string, opts: SerdeGenericCompressionOptions?) -> string)
+        & ((raw: buffer, opts: SerdeGenericCompressionOptions?) -> buffer)
+        & ((raw: string | buffer, opts: SerdeGenericCompressionOptions?) -> string | buffer),
+    decompress: 
+        & ((compressed: string) -> string)
+        & ((compressed: buffer) -> buffer)
+        & ((compressed: string | buffer) -> string | buffer), 
+}
 export type _zune_serde_lz4 = {
     compress: 
         & ((raw: string) -> string)
@@ -149,16 +169,6 @@ export type _zune_serde_lz4 = {
         & ((compressed: buffer) -> buffer)
         & ((compressed: string | buffer) -> string | buffer), 
 }
-export type _zune_serde_zstd = {
-    compress: 
-        & ((raw: string, opts: SerdeGenericCompressionOptions?) -> string)
-        & ((raw: buffer, opts: SerdeGenericCompressionOptions?) -> buffer)
-        & ((raw: string | buffer, opts: SerdeGenericCompressionOptions?) -> string | buffer),
-    decompress: 
-        & ((compressed: string) -> string)
-        & ((compressed: buffer) -> buffer)
-        & ((compressed: string | buffer) -> string | buffer), 
-}
 type GenericCompressor = {
     compress: AdvancedCompressionFn,
     decompress: DecompressionFn, 
@@ -172,8 +182,9 @@ export type _zune_serde = {
     gzip: _zune_serde_gzip,
     flate: _zune_serde_flate,
     zlib: _zune_serde_zlib,
-    lz4: _zune_serde_lz4,
-    zstd: _zune_serde_zstd, 
+    brotli: _zune_serde_brotli,
+    zstd: _zune_serde_zstd,
+    lz4: _zune_serde_lz4, 
 }
 --[[ fs ]]
 export type MetadataKind = 
@@ -561,7 +572,9 @@ export type ProcessOptions = {
         [string]: string
     }?,
     shell: (boolean | string)?,
-    stdio: ("inherit" | "pipe" | "ignore")?, 
+    stdin: ("inherit" | "pipe" | "ignore")?,
+    stdout: ("inherit" | "pipe" | "ignore")?,
+    stderr: ("inherit" | "pipe" | "ignore")?, 
 }
 export type ProcessResult = {
     ok: boolean,
@@ -575,6 +588,7 @@ export type _zune_process_env = {
     [string]: string
 }
 declare class ProcessChild
+    pid: number
     stdin: FileHandle?
     stdout: FileHandle?
     stderr: FileHandle?
