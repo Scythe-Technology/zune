@@ -2,6 +2,8 @@ const std = @import("std");
 const luau = @import("luau");
 const lcompress = @import("lcompress");
 
+const Zune = @import("zune");
+
 const VM = luau.VM;
 
 const OldWriter = @import("../../utils/old_writer.zig");
@@ -15,11 +17,10 @@ pub fn lua_compress(L: *VM.lua.State) !i32 {
         L.Lcheckbuffer(1)
     else
         L.Lcheckstring(1);
-    const options = L.typeOf(2);
 
     var level: u4 = 12;
 
-    if (!options.isnoneornil()) {
+    if (!L.typeOf(2).isnoneornil()) {
         try L.Zchecktype(2, .Table);
         const levelType = L.rawgetfield(2, "level");
         if (!levelType.isnoneornil()) {
@@ -72,10 +73,15 @@ pub fn lua_decompress(L: *VM.lua.State) !i32 {
         OldWriter.adaptToOldInterface(&allocating.writer),
     );
 
+    const written = allocating.written();
+
+    if (written.len > Zune.Utils.LuaHelper.MAX_LUAU_SIZE)
+        return L.Zerror("decompressed data exceeds maximum string/buffer size");
+
     if (is_buffer)
-        try L.Zpushbuffer(allocating.written())
+        try L.Zpushbuffer(written)
     else
-        try L.pushlstring(allocating.written());
+        try L.pushlstring(written);
 
     return 1;
 }

@@ -2,6 +2,8 @@ const std = @import("std");
 const luau = @import("luau");
 const zstd = @import("zstd");
 
+const Zune = @import("zune");
+
 const VM = luau.VM;
 
 pub fn lua_compress(L: *VM.lua.State) !i32 {
@@ -13,11 +15,10 @@ pub fn lua_compress(L: *VM.lua.State) !i32 {
         L.Lcheckbuffer(1)
     else
         L.Lcheckstring(1);
-    const options = L.typeOf(2);
 
     var level: i32 = zstd.DEFAULT_COMPRESSION_LEVEL;
 
-    if (!options.isnoneornil()) {
+    if (!L.typeOf(2).isnoneornil()) {
         try L.Zchecktype(2, .Table);
         const levelType = L.rawgetfield(2, "level");
         if (!levelType.isnoneornil()) {
@@ -54,6 +55,9 @@ pub fn lua_decompress(L: *VM.lua.State) !i32 {
 
     const decompressed = try zstd.decompressAlloc(allocator, string);
     defer allocator.free(decompressed);
+
+    if (decompressed.len > Zune.Utils.LuaHelper.MAX_LUAU_SIZE)
+        return L.Zerror("decompressed data exceeds maximum string/buffer size");
 
     if (is_buffer)
         try L.Zpushbuffer(decompressed)
