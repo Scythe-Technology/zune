@@ -82,7 +82,6 @@ pub fn runTest(comptime testFile: TestFile, args: []const []const u8, comptime o
     try ML.Lsandboxthread();
 
     try Engine.setLuaFileContext(ML, .{
-        .source = content,
         .main = true,
     });
 

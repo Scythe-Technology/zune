@@ -194,7 +194,6 @@ fn cmdRun(allocator: std.mem.Allocator, args: []const []const u8) !void {
     try ML.Lsandboxthread();
 
     try Engine.setLuaFileContext(ML, .{
-        .source = file_content,
         .main = true,
     });
 
@@ -351,7 +350,6 @@ fn cmdTest(allocator: std.mem.Allocator, args: []const []const u8) !void {
     try ML.Lsandboxthread();
 
     try Engine.setLuaFileContext(ML, .{
-        .source = file_content,
         .main = true,
     });
 
@@ -406,7 +404,6 @@ fn cmdEval(allocator: std.mem.Allocator, args: []const []const u8) !void {
     try ML.Lsandboxthread();
 
     try Engine.setLuaFileContext(ML, .{
-        .source = file_content,
         .main = true,
     });
 
@@ -555,7 +552,6 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
         try ML.Lsandboxthread();
 
         try Engine.setLuaFileContext(ML, .{
-            .source = file_content,
             .main = true,
         });
 

@@ -345,19 +345,19 @@ pub fn processResponse(
     switch (L.typeOf(-1)) {
         .Table => {
             if (L.rawgetfield(-1, "status_code") != .Number) {
-                L.pop(1);
-                try L.pushlstring("Field 'status_code' must be a number");
+                L.pop(2);
+                try L.pushlstring("field 'status_code' must be a number");
                 return error.Runtime;
             }
-            const statusCode = L.Lcheckinteger(-1);
-            if (statusCode < 100 or statusCode > 599) {
-                L.pop(1);
-                try L.pushlstring("Status code must be between 100 and 599");
+            const status_code = L.Lcheckinteger(-1);
+            L.pop(1);
+            if (status_code < 100 or status_code > 599) {
+                try L.pushlstring("status code must be between 100 and 599");
                 return error.Runtime;
             }
-            const statusReason = std.http.Status.phrase(@enumFromInt(statusCode)) orelse {
+            const status_reason = std.http.Status.phrase(@enumFromInt(status_code)) orelse {
                 L.pop(1);
-                try L.pushlstring("Unknown status code");
+                try L.pushlstring("unknown status code");
                 return error.Runtime;
             };
 
@@ -367,8 +367,8 @@ pub fn processResponse(
             const writer = &response.writer;
 
             try writer.print("HTTP/1.1 {d} {s}\r\n", .{
-                statusCode,
-                statusReason,
+                status_code,
+                status_reason,
             });
 
             var written_headers: packed struct {
@@ -378,51 +378,54 @@ pub fn processResponse(
                 server: bool = false,
             } = .{};
 
-            const headersType = L.rawgetfield(-2, "headers");
-            if (!headersType.isnoneornil()) {
-                if (headersType != .Table) {
+            switch (L.rawgetfield(-1, "headers")) {
+                .None, .Nil => {},
+                .Table => {
+                    if (!L.rawgetfield(-1, "Content-Type").isnoneornil()) {
+                        written_headers.content_type = true;
+                    }
                     L.pop(1);
+                    if (!L.rawgetfield(-1, "Content-Length").isnoneornil()) {
+                        written_headers.content_length = true;
+                    }
+                    L.pop(1);
+                    if (!L.rawgetfield(-1, "Date").isnoneornil()) {
+                        written_headers.date = true;
+                    }
+                    L.pop(1);
+                    if (!L.rawgetfield(-1, "Server").isnoneornil()) {
+                        written_headers.server = true;
+                    }
+                    L.pop(1);
+                    var i: i32 = L.rawiter(-1, 0);
+                    while (i >= 0) : (i = L.rawiter(-1, i)) {
+                        if (L.typeOf(-2) != .String) {
+                            L.pop(4);
+                            try L.pushlstring("invalid header key (expected string)");
+                            return error.Runtime;
+                        }
+                        if (L.typeOf(-1) != .String) {
+                            L.pop(4);
+                            try L.pushlstring("invalid header value (expected string)");
+                            return error.Runtime;
+                        }
+                        const header_value = L.tostring(-1).?;
+                        if (header_value.len > 0)
+                            try writer.print("{s}: {s}\r\n", .{
+                                L.tostring(-2).?,
+                                header_value,
+                            });
+
+                        L.pop(2);
+                    }
+                },
+                else => {
+                    L.pop(2);
                     try L.pushlstring("invalid field 'headers' (expected table)");
                     return error.Runtime;
-                }
-                if (!L.rawgetfield(-1, "Content-Type").isnoneornil()) {
-                    written_headers.content_type = true;
-                }
-                L.pop(1);
-                if (!L.rawgetfield(-1, "Content-Length").isnoneornil()) {
-                    written_headers.content_length = true;
-                }
-                L.pop(1);
-                if (!L.rawgetfield(-1, "Date").isnoneornil()) {
-                    written_headers.date = true;
-                }
-                L.pop(1);
-                if (!L.rawgetfield(-1, "Server").isnoneornil()) {
-                    written_headers.server = true;
-                }
-                L.pop(1);
-                var i: i32 = L.rawiter(-1, 0);
-                while (i >= 0) : (i = L.rawiter(-1, i)) {
-                    if (L.typeOf(-2) != .String) {
-                        L.pop(1);
-                        try L.pushlstring("invalid header key (expected string)");
-                        return error.Runtime;
-                    }
-                    if (L.typeOf(-1) != .String) {
-                        L.pop(1);
-                        try L.pushlstring("invalid header value (expected string)");
-                        return error.Runtime;
-                    }
-                    const header_value = L.tostring(-1).?;
-                    if (header_value.len > 0)
-                        try writer.print("{s}: {s}\r\n", .{
-                            L.tostring(-2).?,
-                            header_value,
-                        });
-
-                    L.pop(2);
-                }
+                },
             }
+            L.pop(1);
 
             if (!written_headers.content_type) {
                 try writer.writeAll("Content-Type: text/plain\r\n");
@@ -436,17 +439,16 @@ pub fn processResponse(
                 try writer.writeAll("Server: zune\r\n");
             }
 
-            const body: ?[]const u8 = switch (L.rawgetfield(-3, "body")) {
+            const body: ?[]const u8 = switch (L.rawgetfield(-1, "body")) {
                 .String => L.Lcheckstring(-1),
                 .Buffer => L.Lcheckbuffer(-1),
                 .Nil => null,
                 else => {
-                    L.pop(1);
+                    L.pop(2);
                     try L.pushlstring("invalid field 'body' must be a string or buffer");
                     return error.Runtime;
                 },
             };
-
             if (body) |b| {
                 if (!written_headers.content_length)
                     try writer.print("Content-Length: {d}\r\n\r\n{s}", .{ b.len, b })
@@ -455,6 +457,7 @@ pub fn processResponse(
             } else {
                 try writer.writeAll("\r\n");
             }
+            L.pop(1);
 
             self.writeAll(response.written());
         },
@@ -471,6 +474,7 @@ pub fn processResponse(
             defer allocator.free(response);
 
             self.writeAll(response);
+            L.pop(1);
         },
         else => {
             L.pop(1);
@@ -682,8 +686,8 @@ pub fn requestResumed(self: *Self, L: *VM.lua.State, _: *Scheduler) void {
 
     self.processResponse(allocator, L) catch |err| {
         if (err == error.Runtime) {
-            if (L.typeOf(-3) == .Function)
-                Engine.logFnDef(L, -3);
+            if (L.typeOf(-2) == .Function)
+                Engine.logFnDef(L, -2);
         }
         self.state.stage = .closing;
         self.writeAll(HTTP_500);

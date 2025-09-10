@@ -3,7 +3,6 @@
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "source": "@roblox/global/_FILE.source",
       "main": "@roblox/global/_FILE.main"
     }
   },

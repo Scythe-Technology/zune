@@ -17,7 +17,6 @@ type TestInfo = {
 
 type FileContext = {
     name: string,
-    source: string,
 };
 
 type StackTraceInfo = {
@@ -136,13 +135,13 @@ local function runTest(fn: () -> (), info: TestInfo)
                 if (l < 0) then
                     continue;
                 end
-                local context = getfenv(f) :: {[string]: any};
-                local file = context._FILE;
-                if (type(file) ~= "table") then
+                local env = getfenv(f);
+                if (env == GLOBAL) then
                     continue;
                 end
-                local copy = table.clone(file);
-                copy.name = s;
+                local copy = {
+                    name = s,
+                };
                 table.insert(
                     stacktrace,
                     writeStackTrace(copy :: any, ln::string, l, tostring(f :: any))
@@ -256,32 +255,36 @@ local function runTest(fn: () -> (), info: TestInfo)
         print(`{RED}error{RESET}: {err}{RESET}`);
 
         for stack, v in stacktrace do
-            local contents = v.file.source;
-            local lineNumber = v.line;
+            local nameHasValue = nonEmptyString(v.name);
+            if (v.file.name:find("[string \"", 1, true)) then
+                print(`{BOLD}{UNDERLINE}{v.file.name}:{v.line}:{RESET} {DIM}{v.address:sub(11)}{nameHasValue and ` called {v.name}` or ""}{RESET}`);
+                continue;
+            end
+            print(`{BOLD}{UNDERLINE}{v.file.name}:{v.line}:{RESET} {DIM}{v.address:sub(11)}{nameHasValue and ` called {v.name}` or ""}{RESET}`);
+            local contents = zune.fs.readFileSync(v.file.name);
+            local line_number = v.line;
             local lines = contents:split("\n");
             local possible_lines = {}
             for i = -1, 1 do
-                table.insert(possible_lines, #tostring(lineNumber + i))
+                table.insert(possible_lines, #tostring(line_number + i))
             end
             local bigLineLen = math.max(unpack(possible_lines))
     
             local line = lines[v.line];
+            if (not line) then
+                continue;
+            end
             local safeLine = line:gsub("\t", "    ");
             local indent : number = #(string.match(safeLine, "^(%s*)") or "");
-            local column = #(string.match(line, "^(%s*)") or "");
-            local nameHasValue = nonEmptyString(v.name);
-            if (nameHasValue and v.name) then
+            if (nameHasValue) then
                 local start = safeLine:find(v.name, 1, true);
                 if (start) then
                     local subColumn = line:find(v.name, 1, true);
                     if (subColumn) then
-                        column = subColumn;
                         indent = (start - 1) or indent;
                     end
                 end
             end
-
-            print(`{BOLD}{UNDERLINE}{v.file.name}:{v.line}:{column}:{RESET} {DIM}{v.address:sub(11)}{nameHasValue and ` called {v.name}` or ""}{RESET}`);
             printPreviewLine(lines, v.line - 1, bigLineLen, true);
             printPreviewLine(lines, v.line, bigLineLen, false);
             printPreviewLine(lines, v.line + 1, bigLineLen, true);

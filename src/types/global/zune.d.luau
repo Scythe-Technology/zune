@@ -1634,7 +1634,6 @@ export type _zune_task = {
     count: (() -> number) & ((kinds: string) -> ...number), 
 }
 declare _FILE: {
-    source: string?,
     main: boolean, 
 }
 declare zune: {

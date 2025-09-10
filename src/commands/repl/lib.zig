@@ -56,7 +56,6 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
     try Zune.openZune(L, args, .{});
 
     try Engine.setLuaFileContext(L, .{
-        .source = "",
         .main = true,
     });
 
