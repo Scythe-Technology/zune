@@ -682,7 +682,7 @@ pub fn lua_request(L: *VM.lua.State) !i32 {
     const uri_string = try L.Zcheckvalue([:0]const u8, 1, null);
 
     var method: std.http.Method = .GET;
-    var body_type: VM.lua.Type = .String;
+    const body_type: VM.lua.Type = if (L.toboolean(3)) .Buffer else .String;
 
     const uri = try std.Uri.parse(uri_string);
 
@@ -729,17 +729,6 @@ pub fn lua_request(L: *VM.lua.State) !i32 {
                 else => return L.Zerrorf("header index is not a string (got {s})", .{VM.lapi.typename(t)}),
             };
         } else if (!headers_type.isnoneornil()) return L.Zerror("invalid headers (expected table)");
-        L.pop(1);
-
-        if (try L.Zcheckfield(?[:0]const u8, 2, "response_body_type")) |bodyType| {
-            if (std.mem.eql(u8, bodyType, "string")) {
-                body_type = .String;
-            } else if (std.mem.eql(u8, bodyType, "buffer")) {
-                body_type = .Buffer;
-            } else {
-                return L.Zerror("invalid response_body_type (expected 'string' or 'buffer')");
-            }
-        }
         L.pop(1);
 
         if (try L.Zcheckfield(?u32, 2, "max_body_size")) |size|

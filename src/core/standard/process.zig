@@ -79,7 +79,6 @@ const ProcessOptions = struct {
     stdin: Behavior = .pipe,
     stdout: Behavior = .pipe,
     stderr: Behavior = .pipe,
-    result_type: VM.lua.Type = .String,
 
     pub const Behavior = enum { inherit, pipe, ignore };
 
@@ -105,18 +104,6 @@ const ProcessOptions = struct {
                     return L.Zerrorf("invalid environment (table expected, got {s})", .{VM.lapi.typename(@"type")});
                 options.env = std.process.EnvMap.init(allocator);
                 try writeProcessEnvMap(L, &options.env.?, -1);
-            }
-            L.pop(1);
-
-            switch (L.rawgetfield(3, "bytes")) {
-                .None, .Nil => {},
-                .Boolean => {
-                    if (L.toboolean(-1))
-                        options.result_type = .Buffer
-                    else
-                        options.result_type = .String;
-                },
-                else => return L.Zerrorf("invalid bytes option (boolean expected, got {s})", .{VM.lapi.typename(L.typeOf(-1))}),
             }
             L.pop(1);
 
@@ -439,7 +426,7 @@ fn lua_run(L: *VM.lua.State) !i32 {
         .proc = proc,
         .stdout = child.stdout,
         .stderr = child.stderr,
-        .result_type = options.result_type,
+        .result_type = if (L.toboolean(4)) .Buffer else .String,
         .ref = .init(L),
         .state = .{
             .executed = false,
