@@ -222,10 +222,11 @@ const ProcessAsyncRunContext = struct {
     proc: xev.Process,
     result_type: VM.lua.Type = .String,
     state: packed struct {
-        executed: bool = false,
+        executing: bool = true,
         stderr: bool = false,
         stdout: bool = false,
     } = .{},
+    code: u32 = 0,
 
     stdout_writer: std.ArrayList(u8) = .empty,
     stderr_writer: std.ArrayList(u8) = .empty,
@@ -244,6 +245,42 @@ const ProcessAsyncRunContext = struct {
         defer self.stderr_writer.deinit(allocator);
     }
 
+    pub inline fn active(self: *ProcessAsyncRunContext) bool {
+        return self.state.stdout or self.state.stderr or self.state.executing;
+    }
+
+    pub fn resumeResult(self: *ProcessAsyncRunContext) !void {
+        const L = self.ref.value;
+        defer self.cleanup(luau.getallocator(L));
+
+        if (L.status() != .Yield)
+            return;
+
+        try L.Zpushvalue(.{
+            .code = self.code,
+            .ok = self.code == 0,
+        });
+
+        if (self.stdout != null) {
+            switch (self.result_type) {
+                .String => try L.pushlstring(self.stdout_writer.items),
+                .Buffer => try L.Zpushbuffer(self.stdout_writer.items),
+                else => unreachable,
+            }
+            try L.rawsetfield(-2, "stdout");
+        }
+        if (self.stderr != null) {
+            switch (self.result_type) {
+                .String => try L.pushlstring(self.stderr_writer.items),
+                .Buffer => try L.Zpushbuffer(self.stderr_writer.items),
+                else => unreachable,
+            }
+            try L.rawsetfield(-2, "stderr");
+        }
+
+        _ = Scheduler.resumeState(L, null, 1) catch {};
+    }
+
     pub fn complete(
         ud: ?*ProcessAsyncRunContext,
         _: *xev.Loop,
@@ -253,46 +290,21 @@ const ProcessAsyncRunContext = struct {
         const self = ud orelse unreachable;
         const L = self.ref.value;
 
-        self.state.executed = true;
+        self.state.executing = false;
 
-        const allocator = luau.getallocator(L);
-
-        defer if (!self.state.stderr and !self.state.stdout) self.cleanup(allocator);
-
-        if (L.status() != .Yield)
-            return .disarm;
+        defer if (!self.active())
+            self.resumeResult() catch |e| std.debug.panic("{}", .{e});
 
         const code: u32 = r catch |err| switch (@as(anyerror, err)) {
             error.NoSuchProcess => 0, // kqueue
             else => blk: {
-                std.debug.print("[Process Wait Error: {}]\n", .{err});
+                if (L.status() == .Yield)
+                    std.debug.print("[Process Wait Error: {}]\n", .{err});
                 break :blk 1;
             },
         };
 
-        L.Zpushvalue(.{
-            .code = code,
-            .ok = code == 0,
-        }) catch |e| std.debug.panic("{}", .{e});
-
-        if (self.stdout != null) {
-            switch (self.result_type) {
-                .String => L.pushlstring(self.stdout_writer.items) catch |e| std.debug.panic("{}", .{e}),
-                .Buffer => L.Zpushbuffer(self.stdout_writer.items) catch |e| std.debug.panic("{}", .{e}),
-                else => unreachable,
-            }
-            L.rawsetfield(-2, "stdout") catch |e| std.debug.panic("{}", .{e});
-        }
-        if (self.stderr != null) {
-            switch (self.result_type) {
-                .String => L.pushlstring(self.stderr_writer.items) catch |e| std.debug.panic("{}", .{e}),
-                .Buffer => L.Zpushbuffer(self.stderr_writer.items) catch |e| std.debug.panic("{}", .{e}),
-                else => unreachable,
-            }
-            L.rawsetfield(-2, "stderr") catch |e| std.debug.panic("{}", .{e});
-        }
-
-        _ = Scheduler.resumeState(L, null, 1) catch {};
+        self.code = code;
 
         return .disarm;
     }
@@ -307,13 +319,8 @@ const ProcessAsyncRunContext = struct {
     ) xev.CallbackAction {
         const self = ud orelse unreachable;
 
-        if (self.state.executed) {
-            self.state.stdout = false;
-            self.stdout.?.close();
-            if (!self.state.stderr)
-                self.cleanup(luau.getallocator(self.ref.value));
-            return .disarm;
-        }
+        defer if (!self.active())
+            self.resumeResult() catch |e| std.debug.panic("{}", .{e});
 
         const bytes = r catch 0;
         if (bytes == 0) {
@@ -348,13 +355,8 @@ const ProcessAsyncRunContext = struct {
     ) xev.CallbackAction {
         const self = ud orelse unreachable;
 
-        if (self.state.executed) {
-            self.state.stderr = false;
-            self.stderr.?.close();
-            if (!self.state.stdout)
-                self.cleanup(luau.getallocator(self.ref.value));
-            return .disarm;
-        }
+        defer if (!self.active())
+            self.resumeResult() catch |e| std.debug.panic("{}", .{e});
 
         const bytes = r catch 0;
         if (bytes == 0) {
@@ -429,7 +431,7 @@ fn lua_run(L: *VM.lua.State) !i32 {
         .result_type = if (L.toboolean(4)) .Buffer else .String,
         .ref = .init(L),
         .state = .{
-            .executed = false,
+            .executing = true,
             .stdout = child.stdout != null,
             .stderr = child.stderr != null,
         },
