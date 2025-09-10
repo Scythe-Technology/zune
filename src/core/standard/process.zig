@@ -312,9 +312,9 @@ const ProcessAsyncRunContext = struct {
 
     pub fn stdoutComplete(
         ud: ?*ProcessAsyncRunContext,
-        _: *xev.Loop,
-        _: *xev.Completion,
-        _: xev.File,
+        l: *xev.Loop,
+        c: *xev.Completion,
+        f: xev.File,
         _: xev.ReadBuffer,
         r: xev.ReadError!usize,
     ) xev.CallbackAction {
@@ -347,14 +347,15 @@ const ProcessAsyncRunContext = struct {
             return .disarm;
         }
 
-        return .rearm;
+        f.read(l, c, .{ .slice = &self.stdout_read_buffer }, ProcessAsyncRunContext, self, stdoutComplete);
+        return .disarm;
     }
 
     pub fn stderrComplete(
         ud: ?*ProcessAsyncRunContext,
-        _: *xev.Loop,
-        _: *xev.Completion,
-        _: xev.File,
+        l: *xev.Loop,
+        c: *xev.Completion,
+        f: xev.File,
         _: xev.ReadBuffer,
         r: xev.ReadError!usize,
     ) xev.CallbackAction {
@@ -387,7 +388,8 @@ const ProcessAsyncRunContext = struct {
             return .disarm;
         }
 
-        return .rearm;
+        f.read(l, c, .{ .slice = &self.stderr_read_buffer }, ProcessAsyncRunContext, self, stderrComplete);
+        return .disarm;
     }
 };
 
