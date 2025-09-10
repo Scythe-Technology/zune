@@ -205,6 +205,18 @@ describe("ChildProcess", function()
 			}));
 		end)
 
+		test("Echo with arguments as bytes", function()
+			local result = process.run("echo", {"some long message"}, {bytes = true});
+			expect(result).toBe(expect.similar({
+				ok = true,
+				code = 0,
+				stderr = expect.type("buffer"),
+				stdout = expect.type("buffer"),
+			}));
+			expect(buffer.tostring(result.stderr)).toBe("");
+			expect(buffer.tostring(result.stdout)).toBe("some long message\n");
+		end)
+
 		test("Echo with many arguments", function()
 			local result = process.run("echo", {"some", "normal", "very", "long", "message", "test"});
 			expect(result).toBe(expect.similar({

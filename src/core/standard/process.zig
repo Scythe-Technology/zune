@@ -79,6 +79,7 @@ const ProcessOptions = struct {
     stdin: Behavior = .pipe,
     stdout: Behavior = .pipe,
     stderr: Behavior = .pipe,
+    result_type: VM.lua.Type = .String,
 
     pub const Behavior = enum { inherit, pipe, ignore };
 
@@ -104,6 +105,18 @@ const ProcessOptions = struct {
                     return L.Zerrorf("invalid environment (table expected, got {s})", .{VM.lapi.typename(@"type")});
                 options.env = std.process.EnvMap.init(allocator);
                 try writeProcessEnvMap(L, &options.env.?, -1);
+            }
+            L.pop(1);
+
+            switch (L.rawgetfield(3, "bytes")) {
+                .None, .Nil => {},
+                .Boolean => {
+                    if (L.toboolean(-1))
+                        options.result_type = .Buffer
+                    else
+                        options.result_type = .String;
+                },
+                else => return L.Zerrorf("invalid bytes option (boolean expected, got {s})", .{VM.lapi.typename(L.typeOf(-1))}),
             }
             L.pop(1);
 
@@ -220,6 +233,7 @@ const ProcessAsyncRunContext = struct {
     stderr_completion: xev.Completion,
     ref: Scheduler.ThreadRef,
     proc: xev.Process,
+    result_type: VM.lua.Type = .String,
     state: packed struct {
         executed: bool = false,
         stderr: bool = false,
@@ -275,11 +289,19 @@ const ProcessAsyncRunContext = struct {
         }) catch |e| std.debug.panic("{}", .{e});
 
         if (self.stdout != null) {
-            L.pushlstring(self.stdout_writer.items) catch |e| std.debug.panic("{}", .{e});
+            switch (self.result_type) {
+                .String => L.pushlstring(self.stdout_writer.items) catch |e| std.debug.panic("{}", .{e}),
+                .Buffer => L.Zpushbuffer(self.stdout_writer.items) catch |e| std.debug.panic("{}", .{e}),
+                else => unreachable,
+            }
             L.rawsetfield(-2, "stdout") catch |e| std.debug.panic("{}", .{e});
         }
         if (self.stderr != null) {
-            L.pushlstring(self.stderr_writer.items) catch |e| std.debug.panic("{}", .{e});
+            switch (self.result_type) {
+                .String => L.pushlstring(self.stderr_writer.items) catch |e| std.debug.panic("{}", .{e}),
+                .Buffer => L.Zpushbuffer(self.stderr_writer.items) catch |e| std.debug.panic("{}", .{e}),
+                else => unreachable,
+            }
             L.rawsetfield(-2, "stderr") catch |e| std.debug.panic("{}", .{e});
         }
 
@@ -306,18 +328,20 @@ const ProcessAsyncRunContext = struct {
             return .disarm;
         }
 
-        const bytes = r catch {
+        const bytes = r catch 0;
+        if (bytes == 0) {
             self.state.stdout = false;
             self.stdout.?.close();
             return .disarm;
-        };
+        }
 
         const allocator = luau.getallocator(self.ref.value);
 
-        const free_space = LuaHelper.MAX_LUAU_SIZE - self.stderr_writer.items.len;
+        const free_space = LuaHelper.MAX_LUAU_SIZE - self.stdout_writer.items.len;
         const buffer = self.stdout_read_buffer[0..@min(bytes, free_space)];
-        self.stdout_writer.appendSlice(allocator, buffer) catch |e| std.debug.panic("{}", .{e});
-        if (free_space - buffer.len == 0) {
+        if (buffer.len > 0)
+            self.stdout_writer.appendSlice(allocator, buffer) catch |e| std.debug.panic("{}", .{e});
+        if (free_space - buffer.len == 0 or bytes == 0) {
             self.state.stdout = false;
             self.stdout.?.close();
             return .disarm;
@@ -344,17 +368,19 @@ const ProcessAsyncRunContext = struct {
             return .disarm;
         }
 
-        const bytes = r catch {
+        const bytes = r catch 0;
+        if (bytes == 0) {
             self.state.stderr = false;
             self.stderr.?.close();
             return .disarm;
-        };
+        }
 
         const allocator = luau.getallocator(self.ref.value);
 
         const free_space = LuaHelper.MAX_LUAU_SIZE - self.stderr_writer.items.len;
         const buffer = self.stderr_read_buffer[0..@min(bytes, free_space)];
-        self.stderr_writer.appendSlice(allocator, buffer) catch |e| std.debug.panic("{}", .{e});
+        if (buffer.len > 0)
+            self.stderr_writer.appendSlice(allocator, buffer) catch |e| std.debug.panic("{}", .{e});
         if (free_space - buffer.len == 0) {
             self.state.stderr = false;
             self.stderr.?.close();
@@ -411,6 +437,7 @@ fn lua_run(L: *VM.lua.State) !i32 {
         .proc = proc,
         .stdout = child.stdout,
         .stderr = child.stderr,
+        .result_type = options.result_type,
         .ref = .init(L),
         .state = .{
             .executed = false,
