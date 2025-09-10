@@ -216,34 +216,32 @@ const ProcessOptions = struct {
 
 const ProcessAsyncRunContext = struct {
     completion: xev.Completion,
+    stdout_completion: xev.Completion,
+    stderr_completion: xev.Completion,
     ref: Scheduler.ThreadRef,
     proc: xev.Process,
-    poller: ?Poller,
+    state: packed struct {
+        executed: bool = false,
+        stderr: bool = false,
+        stdout: bool = false,
+    } = .{},
+
+    stdout_writer: std.ArrayList(u8) = .empty,
+    stderr_writer: std.ArrayList(u8) = .empty,
+
+    stdout_read_buffer: [4096]u8 = undefined,
+    stderr_read_buffer: [4096]u8 = undefined,
 
     stdout: ?std.fs.File,
     stderr: ?std.fs.File,
 
-    pub const Poller = union(enum) {
-        pub const Out = enum { stdout };
-        pub const Err = enum { stderr };
-        pub const Both = enum { stdout, stderr };
-
-        both: std.io.Poller(Both),
-        stdout: std.io.Poller(Out),
-        stderr: std.io.Poller(Err),
-
-        pub fn poll(self: *Poller) !bool {
-            return switch (self.*) {
-                inline else => |*p| p.poll(),
-            };
-        }
-
-        pub fn deinit(self: *Poller) void {
-            switch (self.*) {
-                inline else => |*p| p.deinit(),
-            }
-        }
-    };
+    pub fn cleanup(self: *ProcessAsyncRunContext, allocator: std.mem.Allocator) void {
+        defer allocator.destroy(self);
+        defer self.ref.deref();
+        defer self.proc.deinit();
+        defer self.stdout_writer.deinit(allocator);
+        defer self.stderr_writer.deinit(allocator);
+    }
 
     pub fn complete(
         ud: ?*ProcessAsyncRunContext,
@@ -254,21 +252,11 @@ const ProcessAsyncRunContext = struct {
         const self = ud orelse unreachable;
         const L = self.ref.value;
 
-        if (self.poller) |*poller|
-            _ = poller.poll() catch {};
+        self.state.executed = true;
 
         const allocator = luau.getallocator(L);
 
-        defer allocator.destroy(self);
-        defer self.ref.deref();
-        defer self.proc.deinit();
-        defer if (self.poller) |*poller| poller.deinit();
-        defer {
-            if (self.stdout) |stdout|
-                stdout.close();
-            if (self.stderr) |stderr|
-                stderr.close();
-        }
+        defer if (!self.state.stderr and !self.state.stdout) self.cleanup(allocator);
 
         if (L.status() != .Yield)
             return .disarm;
@@ -281,42 +269,99 @@ const ProcessAsyncRunContext = struct {
             },
         };
 
-        if (self.poller) |*poller| {
-            var stdout_result: ?[]const u8 = null;
-            var stderr_result: ?[]const u8 = null;
-            switch (poller.*) {
-                .both => |*p| {
-                    const stdout_reader = p.reader(.stdout);
-                    const stderr_reader = p.reader(.stderr);
-                    stdout_result = stdout_reader.buffered()[0..@min(stdout_reader.bufferedLen(), LuaHelper.MAX_LUAU_SIZE)];
-                    stderr_result = stderr_reader.buffered()[0..@min(stderr_reader.bufferedLen(), LuaHelper.MAX_LUAU_SIZE)];
-                },
-                .stdout => |*p| {
-                    const reader = p.reader(.stdout);
-                    stdout_result = reader.buffered()[0..@min(reader.bufferedLen(), LuaHelper.MAX_LUAU_SIZE)];
-                },
-                .stderr => |*p| {
-                    const reader = p.reader(.stderr);
-                    stderr_result = reader.buffered()[0..@min(reader.bufferedLen(), LuaHelper.MAX_LUAU_SIZE)];
-                },
-            }
+        L.Zpushvalue(.{
+            .code = code,
+            .ok = code == 0,
+        }) catch |e| std.debug.panic("{}", .{e});
 
-            L.Zpushvalue(.{
-                .code = code,
-                .ok = code == 0,
-                .stdout = stdout_result,
-                .stderr = stderr_result,
-            }) catch |e| std.debug.panic("{}", .{e});
-        } else {
-            L.Zpushvalue(.{
-                .code = code,
-                .ok = code == 0,
-            }) catch |e| std.debug.panic("{}", .{e});
+        if (self.stdout != null) {
+            L.pushlstring(self.stdout_writer.items) catch |e| std.debug.panic("{}", .{e});
+            L.rawsetfield(-2, "stdout") catch |e| std.debug.panic("{}", .{e});
+        }
+        if (self.stderr != null) {
+            L.pushlstring(self.stderr_writer.items) catch |e| std.debug.panic("{}", .{e});
+            L.rawsetfield(-2, "stderr") catch |e| std.debug.panic("{}", .{e});
         }
 
         _ = Scheduler.resumeState(L, null, 1) catch {};
 
         return .disarm;
+    }
+
+    pub fn stdoutComplete(
+        ud: ?*ProcessAsyncRunContext,
+        _: *xev.Loop,
+        _: *xev.Completion,
+        _: xev.File,
+        _: xev.ReadBuffer,
+        r: xev.ReadError!usize,
+    ) xev.CallbackAction {
+        const self = ud orelse unreachable;
+
+        if (self.state.executed) {
+            self.state.stdout = false;
+            self.stdout.?.close();
+            if (!self.state.stderr)
+                self.cleanup(luau.getallocator(self.ref.value));
+            return .disarm;
+        }
+
+        const bytes = r catch {
+            self.state.stdout = false;
+            self.stdout.?.close();
+            return .disarm;
+        };
+
+        const allocator = luau.getallocator(self.ref.value);
+
+        const free_space = LuaHelper.MAX_LUAU_SIZE - self.stderr_writer.items.len;
+        const buffer = self.stdout_read_buffer[0..@min(bytes, free_space)];
+        self.stdout_writer.appendSlice(allocator, buffer) catch |e| std.debug.panic("{}", .{e});
+        if (free_space - buffer.len == 0) {
+            self.state.stdout = false;
+            self.stdout.?.close();
+            return .disarm;
+        }
+
+        return .rearm;
+    }
+
+    pub fn stderrComplete(
+        ud: ?*ProcessAsyncRunContext,
+        _: *xev.Loop,
+        _: *xev.Completion,
+        _: xev.File,
+        _: xev.ReadBuffer,
+        r: xev.ReadError!usize,
+    ) xev.CallbackAction {
+        const self = ud orelse unreachable;
+
+        if (self.state.executed) {
+            self.state.stderr = false;
+            self.stderr.?.close();
+            if (!self.state.stdout)
+                self.cleanup(luau.getallocator(self.ref.value));
+            return .disarm;
+        }
+
+        const bytes = r catch {
+            self.state.stderr = false;
+            self.stderr.?.close();
+            return .disarm;
+        };
+
+        const allocator = luau.getallocator(self.ref.value);
+
+        const free_space = LuaHelper.MAX_LUAU_SIZE - self.stderr_writer.items.len;
+        const buffer = self.stderr_read_buffer[0..@min(bytes, free_space)];
+        self.stderr_writer.appendSlice(allocator, buffer) catch |e| std.debug.panic("{}", .{e});
+        if (free_space - buffer.len == 0) {
+            self.state.stderr = false;
+            self.stderr.?.close();
+            return .disarm;
+        }
+
+        return .rearm;
     }
 };
 
@@ -354,21 +399,6 @@ fn lua_run(L: *VM.lua.State) !i32 {
     try child.waitForSpawn();
     errdefer _ = child.kill() catch {};
 
-    const poller: ?ProcessAsyncRunContext.Poller = if (options.stdout == .pipe and options.stderr == .pipe) .{
-        .both = std.io.poll(allocator, ProcessAsyncRunContext.Poller.Both, .{
-            .stdout = child.stdout.?,
-            .stderr = child.stderr.?,
-        }),
-    } else if (options.stdout == .pipe) .{
-        .stdout = std.io.poll(allocator, ProcessAsyncRunContext.Poller.Out, .{
-            .stdout = child.stdout.?,
-        }),
-    } else if (options.stderr == .pipe) .{
-        .stderr = std.io.poll(allocator, ProcessAsyncRunContext.Poller.Err, .{
-            .stderr = child.stderr.?,
-        }),
-    } else null;
-
     var proc = try xev.Process.init(child.id);
     errdefer proc.deinit();
 
@@ -376,11 +406,17 @@ fn lua_run(L: *VM.lua.State) !i32 {
 
     self.* = .{
         .completion = .init(),
+        .stdout_completion = .init(),
+        .stderr_completion = .init(),
         .proc = proc,
         .stdout = child.stdout,
         .stderr = child.stderr,
-        .poller = poller,
         .ref = .init(L),
+        .state = .{
+            .executed = false,
+            .stdout = child.stdout != null,
+            .stderr = child.stderr != null,
+        },
     };
 
     proc.wait(
@@ -390,6 +426,29 @@ fn lua_run(L: *VM.lua.State) !i32 {
         self,
         ProcessAsyncRunContext.complete,
     );
+
+    if (self.stdout) |stdout| {
+        var file: xev.File = .initFd(stdout.handle);
+        file.read(
+            &scheduler.loop,
+            &self.stdout_completion,
+            .{ .slice = &self.stdout_read_buffer },
+            ProcessAsyncRunContext,
+            self,
+            ProcessAsyncRunContext.stdoutComplete,
+        );
+    }
+    if (self.stderr) |stderr| {
+        var file: xev.File = .initFd(stderr.handle);
+        file.read(
+            &scheduler.loop,
+            &self.stderr_completion,
+            .{ .slice = &self.stderr_read_buffer },
+            ProcessAsyncRunContext,
+            self,
+            ProcessAsyncRunContext.stderrComplete,
+        );
+    }
 
     scheduler.loop.submit() catch {};
 
