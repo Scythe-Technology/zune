@@ -931,16 +931,63 @@
       }
     ]
   },
-  "@roblox/globaltype/CryptoTlsServerConfig": {
+  "@roblox/globaltype/_zune_crypto_password": {
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "auth": "@roblox/globaltype/CryptoTlsServerConfig.auth"
+      "hash": "@roblox/globaltype/_zune_crypto_password.hash",
+      "verify": "@roblox/globaltype/_zune_crypto_password.verify"
     }
   },
-  "@roblox/globaltype/CryptoTlsServerConfig.auth": {
+  "@roblox/globaltype/_zune_crypto_password.hash": {
     "code_sample": "",
-    "documentation": "The certificate and key pair to use for the server."
+    "documentation": "\n\n**Parameters**\n- `password`: The password to hash.\n- `opts`: The options for the password hashing.\n\n\n**Throws**\n- Crypto Error\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/_zune_crypto_password.hash/return/0"
+    ],
+    "params": [
+      {
+        "name": "password",
+        "documentation": "@roblox/globaltype/_zune_crypto_password.hash/param/0"
+      },
+      {
+        "name": "opts",
+        "documentation": "@roblox/globaltype/_zune_crypto_password.hash/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/_zune_crypto_password.hash/param/0": {
+    "code_sample": "",
+    "documentation": "The password to hash."
+  },
+  "@roblox/globaltype/_zune_crypto_password.hash/param/1": {
+    "code_sample": "",
+    "documentation": "The options for the password hashing."
+  },
+  "@roblox/globaltype/_zune_crypto_password.verify": {
+    "code_sample": "",
+    "documentation": "\n\n**Parameters**\n- `password`: The password to verify.\n- `hash`: The hash to verify against.\n\n\n**Throws**\n- Crypto Error\n",
+    "returns": [
+      "@roblox/globaltype/_zune_crypto_password.verify/return/0"
+    ],
+    "params": [
+      {
+        "name": "password",
+        "documentation": "@roblox/globaltype/_zune_crypto_password.verify/param/0"
+      },
+      {
+        "name": "hash",
+        "documentation": "@roblox/globaltype/_zune_crypto_password.verify/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/_zune_crypto_password.verify/param/0": {
+    "code_sample": "",
+    "documentation": "The password to verify."
+  },
+  "@roblox/globaltype/_zune_crypto_password.verify/param/1": {
+    "code_sample": "",
+    "documentation": "The hash to verify against."
   },
   "@roblox/globaltype/_zune_time": {
     "code_sample": "",
@@ -2995,16 +3042,112 @@
     "code_sample": "",
     "documentation": "Whether to enable native code generation."
   },
-  "@roblox/globaltype/SerdeJsonDecodeConfig": {
+  "@roblox/globaltype/_zune_crypto_tls": {
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "preserve_null": "@roblox/globaltype/SerdeJsonDecodeConfig.preserve_null"
+      "bundleFromSystem": "@roblox/globaltype/_zune_crypto_tls.bundleFromSystem",
+      "setupServer": "@roblox/globaltype/_zune_crypto_tls.setupServer",
+      "setupClient": "@roblox/globaltype/_zune_crypto_tls.setupClient",
+      "keyPairFromFile": "@roblox/globaltype/_zune_crypto_tls.keyPairFromFile",
+      "bundleFromFile": "@roblox/globaltype/_zune_crypto_tls.bundleFromFile"
     }
   },
-  "@roblox/globaltype/SerdeJsonDecodeConfig.preserve_null": {
+  "@roblox/globaltype/_zune_crypto_tls.bundleFromSystem": {
     "code_sample": "",
-    "documentation": "Whether to preserve null values"
+    "documentation": "\n\n**Throws**\n- IO Error\n- Tls Error\n",
+    "returns": [
+      "@roblox/globaltype/_zune_crypto_tls.bundleFromSystem/return/0"
+    ],
+    "params": []
+  },
+  "@roblox/globaltype/_zune_crypto_tls.bundleFromFile": {
+    "code_sample": "",
+    "documentation": "\n\n**Parameters**\n- `file`: The file to load the bundle from.\n\n\n**Throws**\n- IO Error\n",
+    "returns": [
+      "@roblox/globaltype/_zune_crypto_tls.bundleFromFile/return/0"
+    ],
+    "params": [
+      {
+        "name": "file",
+        "documentation": "@roblox/globaltype/_zune_crypto_tls.bundleFromFile/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/_zune_crypto_tls.bundleFromFile/param/0": {
+    "code_sample": "",
+    "documentation": "The file to load the bundle from."
+  },
+  "@roblox/globaltype/_zune_crypto_tls.keyPairFromFile": {
+    "code_sample": "",
+    "documentation": "\n\n**Parameters**\n- `certFile`: The certificate file.\n- `keyFile`: The key file.\n\n\n**Throws**\n- IO Error\n- Tls Error\n",
+    "returns": [
+      "@roblox/globaltype/_zune_crypto_tls.keyPairFromFile/return/0"
+    ],
+    "params": [
+      {
+        "name": "certFile",
+        "documentation": "@roblox/globaltype/_zune_crypto_tls.keyPairFromFile/param/0"
+      },
+      {
+        "name": "keyFile",
+        "documentation": "@roblox/globaltype/_zune_crypto_tls.keyPairFromFile/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/_zune_crypto_tls.keyPairFromFile/param/0": {
+    "code_sample": "",
+    "documentation": "The certificate file."
+  },
+  "@roblox/globaltype/_zune_crypto_tls.keyPairFromFile/param/1": {
+    "code_sample": "",
+    "documentation": "The key file."
+  },
+  "@roblox/globaltype/_zune_crypto_tls.setupClient": {
+    "code_sample": "",
+    "documentation": "\n\n**Parameters**\n- `socket`: The socket to setup the client on.\n- `config`: The configuration for the client.\n\n\n**Throws**\n- Tls Error\n- Memory Error\n",
+    "returns": [],
+    "params": [
+      {
+        "name": "socket",
+        "documentation": "@roblox/globaltype/_zune_crypto_tls.setupClient/param/0"
+      },
+      {
+        "name": "config",
+        "documentation": "@roblox/globaltype/_zune_crypto_tls.setupClient/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/_zune_crypto_tls.setupClient/param/0": {
+    "code_sample": "",
+    "documentation": "The socket to setup the client on."
+  },
+  "@roblox/globaltype/_zune_crypto_tls.setupClient/param/1": {
+    "code_sample": "",
+    "documentation": "The configuration for the client."
+  },
+  "@roblox/globaltype/_zune_crypto_tls.setupServer": {
+    "code_sample": "",
+    "documentation": "\n\n**Parameters**\n- `socket`: The socket to setup the server on.\n- `config`: The configuration for the server.\n\n\n**Throws**\n- Tls Error\n- Memory Error\n",
+    "returns": [],
+    "params": [
+      {
+        "name": "socket",
+        "documentation": "@roblox/globaltype/_zune_crypto_tls.setupServer/param/0"
+      },
+      {
+        "name": "config",
+        "documentation": "@roblox/globaltype/_zune_crypto_tls.setupServer/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/_zune_crypto_tls.setupServer/param/0": {
+    "code_sample": "",
+    "documentation": "The socket to setup the server on."
+  },
+  "@roblox/globaltype/_zune_crypto_tls.setupServer/param/1": {
+    "code_sample": "",
+    "documentation": "The configuration for the server."
   },
   "@roblox/globaltype/SQLite3Result": {
     "code_sample": "",
@@ -5939,6 +6082,14 @@
     "code_sample": "",
     "documentation": "The stderr configuration for the process."
   },
+  "@roblox/globaltype/ThreadLoadOptions": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "native_code_gen": "@roblox/globaltype/ThreadLoadOptions.native_code_gen",
+      "chunk_name": "@roblox/globaltype/ThreadLoadOptions.chunk_name"
+    }
+  },
   "@roblox/globaltype/RegexMatch": {
     "code_sample": "",
     "documentation": "",
@@ -6004,21 +6155,25 @@
     "code_sample": "",
     "documentation": "The CA bundle to use for verification."
   },
-  "@roblox/globaltype/FileCreateOptions": {
+  "@roblox/globaltype/Metadata": {
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "truncate": "@roblox/globaltype/FileCreateOptions.truncate",
-      "exclusive": "@roblox/globaltype/FileCreateOptions.exclusive"
+      "accessed_at": "@roblox/globaltype/Metadata.accessed_at",
+      "permissions": "@roblox/globaltype/Metadata.permissions",
+      "symlink": "@roblox/globaltype/Metadata.symlink",
+      "modified_at": "@roblox/globaltype/Metadata.modified_at",
+      "kind": "@roblox/globaltype/Metadata.kind",
+      "created_at": "@roblox/globaltype/Metadata.created_at",
+      "size": "@roblox/globaltype/Metadata.size"
     }
   },
-  "@roblox/globaltype/FileCreateOptions.exclusive": {
+  "@roblox/globaltype/Metadata.permissions": {
     "code_sample": "",
-    "documentation": "If true, the function will fail if the file already exists."
-  },
-  "@roblox/globaltype/FileCreateOptions.truncate": {
-    "code_sample": "",
-    "documentation": "If true, the file will be truncated if it already exists."
+    "documentation": "",
+    "keys": {
+      "read_only": "@roblox/globaltype/Metadata.permissions.read_only"
+    }
   },
   "@roblox/globaltype/HttpServerResponse": {
     "code_sample": "",
@@ -6108,17 +6263,6 @@
     ],
     "params": []
   },
-  "@roblox/globaltype/SerdeJsonEncodeConfig": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "pretty_indent": "@roblox/globaltype/SerdeJsonEncodeConfig.pretty_indent"
-    }
-  },
-  "@roblox/globaltype/SerdeJsonEncodeConfig.pretty_indent": {
-    "code_sample": "",
-    "documentation": "The indentation level for pretty printing"
-  },
   "@roblox/globaltype/HttpServerRequest": {
     "code_sample": "",
     "documentation": "",
@@ -6127,6 +6271,7 @@
       "method": "@roblox/globaltype/HttpServerRequest.method",
       "query": "@roblox/globaltype/HttpServerRequest.query",
       "body": "@roblox/globaltype/HttpServerRequest.body",
+      "raw_path": "@roblox/globaltype/HttpServerRequest.raw_path",
       "headers": "@roblox/globaltype/HttpServerRequest.headers"
     }
   },
@@ -6182,6 +6327,32 @@
       "address": "@roblox/globaltype/NetworkAddress.address"
     }
   },
+  "@roblox/globaltype/ServerWebSocketHandlers": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "message": "@roblox/globaltype/ServerWebSocketHandlers.message",
+      "close": "@roblox/globaltype/ServerWebSocketHandlers.close",
+      "open": "@roblox/globaltype/ServerWebSocketHandlers.open",
+      "upgrade": "@roblox/globaltype/ServerWebSocketHandlers.upgrade"
+    }
+  },
+  "@roblox/globaltype/ServerWebSocketHandlers.upgrade": {
+    "code_sample": "",
+    "documentation": "The function to call when a WebSocket upgrade request is received.\n- If `true` is returned, the upgrade will be accepted.\n- If `false` is returned, the upgrade will be rejected."
+  },
+  "@roblox/globaltype/ServerWebSocketHandlers.open": {
+    "code_sample": "",
+    "documentation": "The function to call when a WebSocket connection is opened."
+  },
+  "@roblox/globaltype/ServerWebSocketHandlers.message": {
+    "code_sample": "",
+    "documentation": "The function to call when a message is received on a WebSocket connection."
+  },
+  "@roblox/globaltype/ServerWebSocketHandlers.close": {
+    "code_sample": "",
+    "documentation": "The function to call when a WebSocket connection is closed."
+  },
   "@roblox/globaltype/_zune_random_Isaac64": {
     "code_sample": "",
     "documentation": "",
@@ -6218,20 +6389,19 @@
     "code_sample": "",
     "documentation": "The endianness of the architecture the runtime was built for."
   },
-  "@roblox/globaltype/_zune_serde_brotli": {
+  "@roblox/globaltype/_zune_net_SOCKF": {
     "code_sample": "",
-    "documentation": "",
+    "documentation": "Table of socket flags.",
     "keys": {
-      "decompress": "@roblox/globaltype/_zune_serde_brotli.decompress",
-      "compress": "@roblox/globaltype/_zune_serde_brotli.compress"
-    }
-  },
-  "@roblox/globaltype/_zune_serde_zlib": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "decompress": "@roblox/globaltype/_zune_serde_zlib.decompress",
-      "compress": "@roblox/globaltype/_zune_serde_zlib.compress"
+      "DCCP": "@roblox/globaltype/_zune_net_SOCKF.DCCP",
+      "RAW": "@roblox/globaltype/_zune_net_SOCKF.RAW",
+      "RDM": "@roblox/globaltype/_zune_net_SOCKF.RDM",
+      "DGRAM": "@roblox/globaltype/_zune_net_SOCKF.DGRAM",
+      "PACKET": "@roblox/globaltype/_zune_net_SOCKF.PACKET",
+      "STREAM": "@roblox/globaltype/_zune_net_SOCKF.STREAM",
+      "SEQPACKET": "@roblox/globaltype/_zune_net_SOCKF.SEQPACKET",
+      "CLOEXEC": "@roblox/globaltype/_zune_net_SOCKF.CLOEXEC",
+      "NONBLOCK": "@roblox/globaltype/_zune_net_SOCKF.NONBLOCK"
     }
   },
   "@roblox/globaltype/_zune_require": {
@@ -6288,38 +6458,6 @@
         "documentation": "@roblox/globaltype/_zune_require.getCached/param/0"
       }
     ]
-  },
-  "@roblox/globaltype/_zune_ffi_c": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "compile": "@roblox/globaltype/_zune_ffi_c.compile"
-    }
-  },
-  "@roblox/globaltype/_zune_ffi_c.compile": {
-    "code_sample": "",
-    "documentation": "\n\n**Parameters**\n- `src`: The C source code to compile.\n- `opts`: The options for the compilation.\n",
-    "returns": [
-      "@roblox/globaltype/_zune_ffi_c.compile/return/0"
-    ],
-    "params": [
-      {
-        "name": "src",
-        "documentation": "@roblox/globaltype/_zune_ffi_c.compile/param/0"
-      },
-      {
-        "name": "opts",
-        "documentation": "@roblox/globaltype/_zune_ffi_c.compile/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/_zune_ffi_c.compile/param/0": {
-    "code_sample": "",
-    "documentation": "The C source code to compile."
-  },
-  "@roblox/globaltype/_zune_ffi_c.compile/param/1": {
-    "code_sample": "",
-    "documentation": "The options for the compilation."
   },
   "@roblox/globaltype/LuauCoverageData": {
     "code_sample": "",
@@ -6386,6 +6524,78 @@
   "@roblox/globaltype/_zune_crypto_random.fill/param/2": {
     "code_sample": "",
     "documentation": "The number of bytes to write."
+  },
+  "@roblox/globaltype/_zune_ffi_c": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "compile": "@roblox/globaltype/_zune_ffi_c.compile"
+    }
+  },
+  "@roblox/globaltype/_zune_ffi_c.compile": {
+    "code_sample": "",
+    "documentation": "\n\n**Parameters**\n- `src`: The C source code to compile.\n- `opts`: The options for the compilation.\n",
+    "returns": [
+      "@roblox/globaltype/_zune_ffi_c.compile/return/0"
+    ],
+    "params": [
+      {
+        "name": "src",
+        "documentation": "@roblox/globaltype/_zune_ffi_c.compile/param/0"
+      },
+      {
+        "name": "opts",
+        "documentation": "@roblox/globaltype/_zune_ffi_c.compile/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/_zune_ffi_c.compile/param/0": {
+    "code_sample": "",
+    "documentation": "The C source code to compile."
+  },
+  "@roblox/globaltype/_zune_ffi_c.compile/param/1": {
+    "code_sample": "",
+    "documentation": "The options for the compilation."
+  },
+  "@roblox/globaltype/SerdeJsonDecodeConfig": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "preserve_null": "@roblox/globaltype/SerdeJsonDecodeConfig.preserve_null"
+    }
+  },
+  "@roblox/globaltype/SerdeJsonDecodeConfig.preserve_null": {
+    "code_sample": "",
+    "documentation": "Whether to preserve null values"
+  },
+  "@roblox/globaltype/ParseResult": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "lines": "@roblox/globaltype/ParseResult.lines",
+      "errors": "@roblox/globaltype/ParseResult.errors",
+      "root": "@roblox/globaltype/ParseResult.root",
+      "lineOffsets": "@roblox/globaltype/ParseResult.lineOffsets",
+      "hotcomments": "@roblox/globaltype/ParseResult.hotcomments",
+      "eof": "@roblox/globaltype/ParseResult.eof"
+    }
+  },
+  "@roblox/globaltype/ParseResult.eof": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "text": "@roblox/globaltype/ParseResult.eof.text",
+      "tag": "@roblox/globaltype/ParseResult.eof.tag",
+      "position": "@roblox/globaltype/ParseResult.eof.position"
+    }
+  },
+  "@roblox/globaltype/ParseResult.eof.position": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "column": "@roblox/globaltype/ParseResult.eof.position.column",
+      "line": "@roblox/globaltype/ParseResult.eof.position.line"
+    }
   },
   "@roblox/globaltype/_zune_ffi": {
     "code_sample": "",
@@ -6695,35 +6905,6 @@
     "documentation": "The symbols to load from the library.",
     "keys": []
   },
-  "@roblox/globaltype/ParseResult": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "lines": "@roblox/globaltype/ParseResult.lines",
-      "errors": "@roblox/globaltype/ParseResult.errors",
-      "root": "@roblox/globaltype/ParseResult.root",
-      "lineOffsets": "@roblox/globaltype/ParseResult.lineOffsets",
-      "hotcomments": "@roblox/globaltype/ParseResult.hotcomments",
-      "eof": "@roblox/globaltype/ParseResult.eof"
-    }
-  },
-  "@roblox/globaltype/ParseResult.eof": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "text": "@roblox/globaltype/ParseResult.eof.text",
-      "tag": "@roblox/globaltype/ParseResult.eof.tag",
-      "position": "@roblox/globaltype/ParseResult.eof.position"
-    }
-  },
-  "@roblox/globaltype/ParseResult.eof.position": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "column": "@roblox/globaltype/ParseResult.eof.position.column",
-      "line": "@roblox/globaltype/ParseResult.eof.position.line"
-    }
-  },
   "@roblox/globaltype/_zune_net_IPPROTO": {
     "code_sample": "",
     "documentation": "Table of IP protocols.",
@@ -6763,89 +6944,12 @@
       "IP": "@roblox/globaltype/_zune_net_IPPROTO.IP"
     }
   },
-  "@roblox/globaltype/ThreadLoadOptions": {
+  "@roblox/globaltype/_zune_serde_zlib": {
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "native_code_gen": "@roblox/globaltype/ThreadLoadOptions.native_code_gen",
-      "chunk_name": "@roblox/globaltype/ThreadLoadOptions.chunk_name"
-    }
-  },
-  "@roblox/globaltype/_zune_serde_json": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "encode": "@roblox/globaltype/_zune_serde_json.encode",
-      "values": "@roblox/globaltype/_zune_serde_json.values",
-      "decode": "@roblox/globaltype/_zune_serde_json.decode",
-      "indents": "@roblox/globaltype/_zune_serde_json.indents"
-    }
-  },
-  "@roblox/globaltype/_zune_serde_json.encode": {
-    "code_sample": "",
-    "documentation": "Encodes a value to JSON.\n\n**Parameters**\n- `value`: The value to encode.\n- `config`: The configuration for the encoding.\n\n\n**Throws**\n- Memory Error\n",
-    "returns": [
-      "@roblox/globaltype/_zune_serde_json.encode/return/0"
-    ],
-    "params": [
-      {
-        "name": "value",
-        "documentation": "@roblox/globaltype/_zune_serde_json.encode/param/0"
-      },
-      {
-        "name": "config",
-        "documentation": "@roblox/globaltype/_zune_serde_json.encode/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/_zune_serde_json.encode/param/0": {
-    "code_sample": "",
-    "documentation": "The value to encode."
-  },
-  "@roblox/globaltype/_zune_serde_json.encode/param/1": {
-    "code_sample": "",
-    "documentation": "The configuration for the encoding."
-  },
-  "@roblox/globaltype/_zune_serde_json.decode": {
-    "code_sample": "",
-    "documentation": "Decodes JSON.\n\n**Parameters**\n- `json`: The JSON string to decode.\n- `config`: The configuration for the decoding.\n\n\n**Throws**\n- Memory Error\n",
-    "returns": [
-      "@roblox/globaltype/_zune_serde_json.decode/return/0"
-    ],
-    "params": [
-      {
-        "name": "json",
-        "documentation": "@roblox/globaltype/_zune_serde_json.decode/param/0"
-      },
-      {
-        "name": "config",
-        "documentation": "@roblox/globaltype/_zune_serde_json.decode/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/_zune_serde_json.decode/param/0": {
-    "code_sample": "",
-    "documentation": "The JSON string to decode."
-  },
-  "@roblox/globaltype/_zune_serde_json.decode/param/1": {
-    "code_sample": "",
-    "documentation": "The configuration for the decoding."
-  },
-  "@roblox/globaltype/_zune_serde_json.indents": {
-    "code_sample": "",
-    "documentation": "Indentation levels for JSON.",
-    "keys": {
-      "tabs": "@roblox/globaltype/_zune_serde_json.indents.tabs",
-      "four_spaces": "@roblox/globaltype/_zune_serde_json.indents.four_spaces",
-      "two_spaces": "@roblox/globaltype/_zune_serde_json.indents.two_spaces",
-      "none": "@roblox/globaltype/_zune_serde_json.indents.none"
-    }
-  },
-  "@roblox/globaltype/_zune_serde_json.values": {
-    "code_sample": "",
-    "documentation": "Special values for JSON.",
-    "keys": {
-      "null": "@roblox/globaltype/_zune_serde_json.values.null"
+      "decompress": "@roblox/globaltype/_zune_serde_zlib.decompress",
+      "compress": "@roblox/globaltype/_zune_serde_zlib.compress"
     }
   },
   "@roblox/globaltype/_zune_thread": {
@@ -6960,21 +7064,6 @@
   "@roblox/globaltype/_zune_sqlite.open/param/0": {
     "code_sample": "",
     "documentation": "The path to the database file."
-  },
-  "@roblox/globaltype/_zune_net_SOCKF": {
-    "code_sample": "",
-    "documentation": "Table of socket flags.",
-    "keys": {
-      "DCCP": "@roblox/globaltype/_zune_net_SOCKF.DCCP",
-      "RAW": "@roblox/globaltype/_zune_net_SOCKF.RAW",
-      "RDM": "@roblox/globaltype/_zune_net_SOCKF.RDM",
-      "DGRAM": "@roblox/globaltype/_zune_net_SOCKF.DGRAM",
-      "PACKET": "@roblox/globaltype/_zune_net_SOCKF.PACKET",
-      "STREAM": "@roblox/globaltype/_zune_net_SOCKF.STREAM",
-      "SEQPACKET": "@roblox/globaltype/_zune_net_SOCKF.SEQPACKET",
-      "CLOEXEC": "@roblox/globaltype/_zune_net_SOCKF.CLOEXEC",
-      "NONBLOCK": "@roblox/globaltype/_zune_net_SOCKF.NONBLOCK"
-    }
   },
   "@roblox/globaltype/_zune_time_instant": {
     "code_sample": "",
@@ -7731,26 +7820,6 @@
       "VSOCK": "@roblox/globaltype/_zune_net_ADDRF.VSOCK"
     }
   },
-  "@roblox/globaltype/Metadata": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "accessed_at": "@roblox/globaltype/Metadata.accessed_at",
-      "permissions": "@roblox/globaltype/Metadata.permissions",
-      "symlink": "@roblox/globaltype/Metadata.symlink",
-      "modified_at": "@roblox/globaltype/Metadata.modified_at",
-      "kind": "@roblox/globaltype/Metadata.kind",
-      "created_at": "@roblox/globaltype/Metadata.created_at",
-      "size": "@roblox/globaltype/Metadata.size"
-    }
-  },
-  "@roblox/globaltype/Metadata.permissions": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "read_only": "@roblox/globaltype/Metadata.permissions.read_only"
-    }
-  },
   "@roblox/globaltype/_zune_net": {
     "code_sample": "",
     "documentation": "A library to do networking in luau. Provides functions to create sockets, start an HTTP server, make HTTP requests, and handle WebSockets.",
@@ -8096,6 +8165,22 @@
     "code_sample": "",
     "documentation": "The options for the WebSocket."
   },
+  "@roblox/globaltype/FileCreateOptions": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "truncate": "@roblox/globaltype/FileCreateOptions.truncate",
+      "exclusive": "@roblox/globaltype/FileCreateOptions.exclusive"
+    }
+  },
+  "@roblox/globaltype/FileCreateOptions.exclusive": {
+    "code_sample": "",
+    "documentation": "If true, the function will fail if the file already exists."
+  },
+  "@roblox/globaltype/FileCreateOptions.truncate": {
+    "code_sample": "",
+    "documentation": "If true, the file will be truncated if it already exists."
+  },
   "@roblox/globaltype/_zune_luau": {
     "code_sample": "",
     "documentation": "A library to parse, compile and run luau code.",
@@ -8279,6 +8364,17 @@
       }
     ]
   },
+  "@roblox/globaltype/CryptoTlsServerConfig": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "auth": "@roblox/globaltype/CryptoTlsServerConfig.auth"
+    }
+  },
+  "@roblox/globaltype/CryptoTlsServerConfig.auth": {
+    "code_sample": "",
+    "documentation": "The certificate and key pair to use for the server."
+  },
   "@roblox/globaltype/_zune_process": {
     "code_sample": "",
     "documentation": "A library that interacts with the system process.",
@@ -8368,36 +8464,7 @@
   },
   "@roblox/globaltype/_zune_process.run": {
     "code_sample": "",
-    "documentation": "Runs a new process, and yields for the result.\n\n**Parameters**\n- `exec`: The executable to run.\n- `args`: The arguments to pass to the executable.\n- `opts`: The options for the process.\n\n\n**Throws**\n- Process Error\n",
-    "returns": [
-      "@roblox/globaltype/_zune_process.run/return/0"
-    ],
-    "params": [
-      {
-        "name": "exec",
-        "documentation": "@roblox/globaltype/_zune_process.run/param/0"
-      },
-      {
-        "name": "args",
-        "documentation": "@roblox/globaltype/_zune_process.run/param/1"
-      },
-      {
-        "name": "opts",
-        "documentation": "@roblox/globaltype/_zune_process.run/param/2"
-      }
-    ]
-  },
-  "@roblox/globaltype/_zune_process.run/param/0": {
-    "code_sample": "",
-    "documentation": "The executable to run."
-  },
-  "@roblox/globaltype/_zune_process.run/param/1": {
-    "code_sample": "",
-    "documentation": "The arguments to pass to the executable."
-  },
-  "@roblox/globaltype/_zune_process.run/param/2": {
-    "code_sample": "",
-    "documentation": "The options for the process."
+    "documentation": "Runs a new process, and yields for the result."
   },
   "@roblox/globaltype/_zune_process.exit": {
     "code_sample": "",
@@ -8441,64 +8508,6 @@
     "returns": [],
     "params": []
   },
-  "@roblox/globaltype/_zune_crypto_password": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "hash": "@roblox/globaltype/_zune_crypto_password.hash",
-      "verify": "@roblox/globaltype/_zune_crypto_password.verify"
-    }
-  },
-  "@roblox/globaltype/_zune_crypto_password.hash": {
-    "code_sample": "",
-    "documentation": "\n\n**Parameters**\n- `password`: The password to hash.\n- `opts`: The options for the password hashing.\n\n\n**Throws**\n- Crypto Error\n- Memory Error\n",
-    "returns": [
-      "@roblox/globaltype/_zune_crypto_password.hash/return/0"
-    ],
-    "params": [
-      {
-        "name": "password",
-        "documentation": "@roblox/globaltype/_zune_crypto_password.hash/param/0"
-      },
-      {
-        "name": "opts",
-        "documentation": "@roblox/globaltype/_zune_crypto_password.hash/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/_zune_crypto_password.hash/param/0": {
-    "code_sample": "",
-    "documentation": "The password to hash."
-  },
-  "@roblox/globaltype/_zune_crypto_password.hash/param/1": {
-    "code_sample": "",
-    "documentation": "The options for the password hashing."
-  },
-  "@roblox/globaltype/_zune_crypto_password.verify": {
-    "code_sample": "",
-    "documentation": "\n\n**Parameters**\n- `password`: The password to verify.\n- `hash`: The hash to verify against.\n\n\n**Throws**\n- Crypto Error\n",
-    "returns": [
-      "@roblox/globaltype/_zune_crypto_password.verify/return/0"
-    ],
-    "params": [
-      {
-        "name": "password",
-        "documentation": "@roblox/globaltype/_zune_crypto_password.verify/param/0"
-      },
-      {
-        "name": "hash",
-        "documentation": "@roblox/globaltype/_zune_crypto_password.verify/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/_zune_crypto_password.verify/param/0": {
-    "code_sample": "",
-    "documentation": "The password to verify."
-  },
-  "@roblox/globaltype/_zune_crypto_password.verify/param/1": {
-    "code_sample": "",
-    "documentation": "The hash to verify against."
-  },
   "@roblox/globaltype/_zune_random_Pcg32": {
     "code_sample": "",
     "documentation": "",
@@ -8518,6 +8527,37 @@
         "documentation": "@roblox/globaltype/_zune_random_Pcg32.new/param/0"
       }
     ]
+  },
+  "@roblox/globaltype/_zune_random_LuauPcg32": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "new": "@roblox/globaltype/_zune_random_LuauPcg32.new"
+    }
+  },
+  "@roblox/globaltype/_zune_random_LuauPcg32.new": {
+    "code_sample": "",
+    "documentation": "\n\n**Throws**\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/_zune_random_LuauPcg32.new/return/0"
+    ],
+    "params": [
+      {
+        "name": "seed",
+        "documentation": "@roblox/globaltype/_zune_random_LuauPcg32.new/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/SerdeJsonEncodeConfig": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "pretty_indent": "@roblox/globaltype/SerdeJsonEncodeConfig.pretty_indent"
+    }
+  },
+  "@roblox/globaltype/SerdeJsonEncodeConfig.pretty_indent": {
+    "code_sample": "",
+    "documentation": "The indentation level for pretty printing"
   },
   "@roblox/globaltype/_zune_random_Xoroshiro128": {
     "code_sample": "",
@@ -8556,26 +8596,6 @@
       "decompress": "@roblox/globaltype/_zune_serde_lz4.decompress",
       "compress": "@roblox/globaltype/_zune_serde_lz4.compress"
     }
-  },
-  "@roblox/globaltype/_zune_random_LuauPcg32": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "new": "@roblox/globaltype/_zune_random_LuauPcg32.new"
-    }
-  },
-  "@roblox/globaltype/_zune_random_LuauPcg32.new": {
-    "code_sample": "",
-    "documentation": "\n\n**Throws**\n- Memory Error\n",
-    "returns": [
-      "@roblox/globaltype/_zune_random_LuauPcg32.new/return/0"
-    ],
-    "params": [
-      {
-        "name": "seed",
-        "documentation": "@roblox/globaltype/_zune_random_LuauPcg32.new/param/0"
-      }
-    ]
   },
   "@roblox/globaltype/_zune_net_SOCKOPT": {
     "code_sample": "",
@@ -8650,32 +8670,6 @@
       "PRIORITY": "@roblox/globaltype/_zune_net_SOCKOPT.PRIORITY",
       "BSDCOMPAT": "@roblox/globaltype/_zune_net_SOCKOPT.BSDCOMPAT"
     }
-  },
-  "@roblox/globaltype/ServerWebSocketHandlers": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "message": "@roblox/globaltype/ServerWebSocketHandlers.message",
-      "close": "@roblox/globaltype/ServerWebSocketHandlers.close",
-      "open": "@roblox/globaltype/ServerWebSocketHandlers.open",
-      "upgrade": "@roblox/globaltype/ServerWebSocketHandlers.upgrade"
-    }
-  },
-  "@roblox/globaltype/ServerWebSocketHandlers.upgrade": {
-    "code_sample": "",
-    "documentation": "The function to call when a WebSocket upgrade request is received.\n- If `true` is returned, the upgrade will be accepted.\n- If `false` is returned, the upgrade will be rejected."
-  },
-  "@roblox/globaltype/ServerWebSocketHandlers.open": {
-    "code_sample": "",
-    "documentation": "The function to call when a WebSocket connection is opened."
-  },
-  "@roblox/globaltype/ServerWebSocketHandlers.message": {
-    "code_sample": "",
-    "documentation": "The function to call when a message is received on a WebSocket connection."
-  },
-  "@roblox/globaltype/ServerWebSocketHandlers.close": {
-    "code_sample": "",
-    "documentation": "The function to call when a WebSocket connection is closed."
   },
   "@roblox/globaltype/_zune_random_RomuTrio": {
     "code_sample": "",
@@ -8828,6 +8822,14 @@
   "@roblox/globaltype/_zune_task.count": {
     "code_sample": "",
     "documentation": "Counts the number of current tasks.\n\nOptional kinds parameter to count a specific kind of task.\n\nKinds:\n- `s` to count sleeping tasks.\n- `d` to count deferred tasks.\n- `w` to count awaiting tasks. (zune backend)\n- `t` to count internal tasks. (zune backend)"
+  },
+  "@roblox/globaltype/_zune_serde_brotli": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "decompress": "@roblox/globaltype/_zune_serde_brotli.decompress",
+      "compress": "@roblox/globaltype/_zune_serde_brotli.compress"
+    }
   },
   "@roblox/globaltype/_zune_time_date": {
     "code_sample": "",
@@ -9052,113 +9054,6 @@
     "code_sample": "",
     "documentation": "The handlers for WebSocket connections."
   },
-  "@roblox/globaltype/_zune_crypto_tls": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "bundleFromSystem": "@roblox/globaltype/_zune_crypto_tls.bundleFromSystem",
-      "setupServer": "@roblox/globaltype/_zune_crypto_tls.setupServer",
-      "setupClient": "@roblox/globaltype/_zune_crypto_tls.setupClient",
-      "keyPairFromFile": "@roblox/globaltype/_zune_crypto_tls.keyPairFromFile",
-      "bundleFromFile": "@roblox/globaltype/_zune_crypto_tls.bundleFromFile"
-    }
-  },
-  "@roblox/globaltype/_zune_crypto_tls.bundleFromSystem": {
-    "code_sample": "",
-    "documentation": "\n\n**Throws**\n- IO Error\n- Tls Error\n",
-    "returns": [
-      "@roblox/globaltype/_zune_crypto_tls.bundleFromSystem/return/0"
-    ],
-    "params": []
-  },
-  "@roblox/globaltype/_zune_crypto_tls.bundleFromFile": {
-    "code_sample": "",
-    "documentation": "\n\n**Parameters**\n- `file`: The file to load the bundle from.\n\n\n**Throws**\n- IO Error\n",
-    "returns": [
-      "@roblox/globaltype/_zune_crypto_tls.bundleFromFile/return/0"
-    ],
-    "params": [
-      {
-        "name": "file",
-        "documentation": "@roblox/globaltype/_zune_crypto_tls.bundleFromFile/param/0"
-      }
-    ]
-  },
-  "@roblox/globaltype/_zune_crypto_tls.bundleFromFile/param/0": {
-    "code_sample": "",
-    "documentation": "The file to load the bundle from."
-  },
-  "@roblox/globaltype/_zune_crypto_tls.keyPairFromFile": {
-    "code_sample": "",
-    "documentation": "\n\n**Parameters**\n- `certFile`: The certificate file.\n- `keyFile`: The key file.\n\n\n**Throws**\n- IO Error\n- Tls Error\n",
-    "returns": [
-      "@roblox/globaltype/_zune_crypto_tls.keyPairFromFile/return/0"
-    ],
-    "params": [
-      {
-        "name": "certFile",
-        "documentation": "@roblox/globaltype/_zune_crypto_tls.keyPairFromFile/param/0"
-      },
-      {
-        "name": "keyFile",
-        "documentation": "@roblox/globaltype/_zune_crypto_tls.keyPairFromFile/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/_zune_crypto_tls.keyPairFromFile/param/0": {
-    "code_sample": "",
-    "documentation": "The certificate file."
-  },
-  "@roblox/globaltype/_zune_crypto_tls.keyPairFromFile/param/1": {
-    "code_sample": "",
-    "documentation": "The key file."
-  },
-  "@roblox/globaltype/_zune_crypto_tls.setupClient": {
-    "code_sample": "",
-    "documentation": "\n\n**Parameters**\n- `socket`: The socket to setup the client on.\n- `config`: The configuration for the client.\n\n\n**Throws**\n- Tls Error\n- Memory Error\n",
-    "returns": [],
-    "params": [
-      {
-        "name": "socket",
-        "documentation": "@roblox/globaltype/_zune_crypto_tls.setupClient/param/0"
-      },
-      {
-        "name": "config",
-        "documentation": "@roblox/globaltype/_zune_crypto_tls.setupClient/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/_zune_crypto_tls.setupClient/param/0": {
-    "code_sample": "",
-    "documentation": "The socket to setup the client on."
-  },
-  "@roblox/globaltype/_zune_crypto_tls.setupClient/param/1": {
-    "code_sample": "",
-    "documentation": "The configuration for the client."
-  },
-  "@roblox/globaltype/_zune_crypto_tls.setupServer": {
-    "code_sample": "",
-    "documentation": "\n\n**Parameters**\n- `socket`: The socket to setup the server on.\n- `config`: The configuration for the server.\n\n\n**Throws**\n- Tls Error\n- Memory Error\n",
-    "returns": [],
-    "params": [
-      {
-        "name": "socket",
-        "documentation": "@roblox/globaltype/_zune_crypto_tls.setupServer/param/0"
-      },
-      {
-        "name": "config",
-        "documentation": "@roblox/globaltype/_zune_crypto_tls.setupServer/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/_zune_crypto_tls.setupServer/param/0": {
-    "code_sample": "",
-    "documentation": "The socket to setup the server on."
-  },
-  "@roblox/globaltype/_zune_crypto_tls.setupServer/param/1": {
-    "code_sample": "",
-    "documentation": "The configuration for the server."
-  },
   "@roblox/globaltype/SerdeGenericCompressionOptions": {
     "code_sample": "",
     "documentation": "",
@@ -9169,6 +9064,83 @@
   "@roblox/globaltype/SerdeGenericCompressionOptions.level": {
     "code_sample": "",
     "documentation": "The compression level"
+  },
+  "@roblox/globaltype/_zune_serde_json": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "encode": "@roblox/globaltype/_zune_serde_json.encode",
+      "values": "@roblox/globaltype/_zune_serde_json.values",
+      "decode": "@roblox/globaltype/_zune_serde_json.decode",
+      "indents": "@roblox/globaltype/_zune_serde_json.indents"
+    }
+  },
+  "@roblox/globaltype/_zune_serde_json.encode": {
+    "code_sample": "",
+    "documentation": "Encodes a value to JSON.\n\n**Parameters**\n- `value`: The value to encode.\n- `config`: The configuration for the encoding.\n\n\n**Throws**\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/_zune_serde_json.encode/return/0"
+    ],
+    "params": [
+      {
+        "name": "value",
+        "documentation": "@roblox/globaltype/_zune_serde_json.encode/param/0"
+      },
+      {
+        "name": "config",
+        "documentation": "@roblox/globaltype/_zune_serde_json.encode/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/_zune_serde_json.encode/param/0": {
+    "code_sample": "",
+    "documentation": "The value to encode."
+  },
+  "@roblox/globaltype/_zune_serde_json.encode/param/1": {
+    "code_sample": "",
+    "documentation": "The configuration for the encoding."
+  },
+  "@roblox/globaltype/_zune_serde_json.decode": {
+    "code_sample": "",
+    "documentation": "Decodes JSON.\n\n**Parameters**\n- `json`: The JSON string to decode.\n- `config`: The configuration for the decoding.\n\n\n**Throws**\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/_zune_serde_json.decode/return/0"
+    ],
+    "params": [
+      {
+        "name": "json",
+        "documentation": "@roblox/globaltype/_zune_serde_json.decode/param/0"
+      },
+      {
+        "name": "config",
+        "documentation": "@roblox/globaltype/_zune_serde_json.decode/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/_zune_serde_json.decode/param/0": {
+    "code_sample": "",
+    "documentation": "The JSON string to decode."
+  },
+  "@roblox/globaltype/_zune_serde_json.decode/param/1": {
+    "code_sample": "",
+    "documentation": "The configuration for the decoding."
+  },
+  "@roblox/globaltype/_zune_serde_json.indents": {
+    "code_sample": "",
+    "documentation": "Indentation levels for JSON.",
+    "keys": {
+      "tabs": "@roblox/globaltype/_zune_serde_json.indents.tabs",
+      "four_spaces": "@roblox/globaltype/_zune_serde_json.indents.four_spaces",
+      "two_spaces": "@roblox/globaltype/_zune_serde_json.indents.two_spaces",
+      "none": "@roblox/globaltype/_zune_serde_json.indents.none"
+    }
+  },
+  "@roblox/globaltype/_zune_serde_json.values": {
+    "code_sample": "",
+    "documentation": "Special values for JSON.",
+    "keys": {
+      "null": "@roblox/globaltype/_zune_serde_json.values.null"
+    }
   },
   "@roblox/globaltype/TimeDictionary": {
     "code_sample": "",

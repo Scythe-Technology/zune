@@ -35,8 +35,7 @@ test("Basic", function()
                 headers = {
                     ["Content-Type"] = "text/plain",
                 },
-                response_body_type = if (use_buffer) then "buffer" else "string",
-            });
+            }, use_buffer);
             expect(res).toBe(expect.type("table"));
             expect(res.ok).toBe(true);
             expect(res.status_code).toBe(200);
@@ -68,9 +67,8 @@ test("TLS", function()
         headers = {
             ["Content-Type"] = "text/plain",
         },
-        response_body_type = "string",
-    });
-
+    }, false);
+    
     expect(res).toBe(expect.type("table"));
     expect(res.ok).toBe(true);
     expect(res.status_code).toBe(200);

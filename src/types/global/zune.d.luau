@@ -538,9 +538,9 @@ export type ProcessResult = {
     ok: boolean,
     code: number, 
 }
-export type ProcessRunResult = ProcessResult & {
-    stdout: string,
-    stderr: string, 
+export type ProcessRunResult<T> = ProcessResult & {
+    stdout: T,
+    stderr: T, 
 }
 export type _zune_process_env = {
     [string]: string
@@ -560,7 +560,12 @@ export type _zune_process = {
     cwd: () -> string,
     pid: () -> number,
     create: (exec: string, args: {string}?, opts: ProcessOptions?) -> ProcessChild,
-    run: (exec: string, args: {string}?, opts: ProcessOptions?) -> ProcessRunResult,
+    run: 
+        & ((exec: string) -> ProcessRunResult<string>)
+        & ((exec: string, args: {string}?) -> ProcessRunResult<string>)
+        & ((exec: string, args: {string}?, opts: ProcessOptions?, bytes: false?) -> ProcessRunResult<string?>)
+        & ((exec: string, args: {string}?, opts: ProcessOptions?, bytes: true) -> ProcessRunResult<buffer?>)
+        & ((exec: string, args: {string}?, opts: ProcessOptions?, bytes: boolean?) -> ProcessRunResult<string | buffer?>),
     exit: (code: number) -> never,
     onSignal: (signal: "INT", callback: () -> ()) -> (), 
 }
@@ -806,6 +811,7 @@ export type NetworkAddress = {
 export type HttpServerRequest = {
     method: string,
     path: string,
+    raw_path: string,
     query: {
         [string | number]: string
     },
@@ -1068,14 +1074,11 @@ export type _zune_net_http = {
     serve: (opts: HttpServeOptions) -> HttpServer,
     request: 
         & ((host: string) -> HttpResponse<string>)
-        & ((host: string, opts: HttpRequestOptionsType<"string"?>?) -> HttpResponse<string>)
-        & ((host: string, opts: HttpRequestOptionsType<"buffer">?) -> HttpResponse<buffer>)
-        & ((host: string, opts: HttpRequestOptionsType<"string" | "buffer" | nil>?) -> HttpResponse<string | buffer>),
+        & ((host: string, opts: HttpRequestOptions?, bytes: false?) -> HttpResponse<string>)
+        & ((host: string, opts: HttpRequestOptions?, bytes: true) -> HttpResponse<buffer>)
+        & ((host: string, opts: HttpRequestOptions?, bytes: boolean?) -> HttpResponse<string | buffer>),
     websocket: (host: string, opts: HttpWebSocketOptions) -> HttpWebSocket, 
 }
-export type HttpRequestOptionsType<T> = (HttpRequestOptions & {
-    response_body_type: T
-})
 export type _zune_net = {
     ADDRF: _zune_net_ADDRF,
     SOCKF: _zune_net_SOCKF,

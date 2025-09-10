@@ -125,13 +125,22 @@ pub const AsyncReadContext = struct {
             L.pushstring(@errorName(e)) catch |err| std.debug.panic("{}", .{err});
             _ = Scheduler.resumeStateError(L, null) catch {};
         } else {
-            self.array.shrinkAndFree(allocator, @min(self.buffer_len, self.limit));
-            switch (self.lua_type) {
-                .Buffer => L.Zpushbuffer(self.array.items) catch |e| std.debug.panic("{}", .{e}),
-                .String => L.pushlstring(self.array.items) catch |e| std.debug.panic("{}", .{e}),
-                else => unreachable,
+            if (self.buffer_len > 0) {
+                self.array.shrinkAndFree(allocator, @min(self.buffer_len, self.limit));
+                switch (self.lua_type) {
+                    .Buffer => L.Zpushbuffer(self.array.items) catch |e| std.debug.panic("{}", .{e}),
+                    .String => L.pushlstring(self.array.items) catch |e| std.debug.panic("{}", .{e}),
+                    else => unreachable,
+                }
+                _ = Scheduler.resumeState(L, null, 1) catch {};
+            } else {
+                switch (self.lua_type) {
+                    .Buffer => L.Zpushbuffer("") catch |e| std.debug.panic("{}", .{e}),
+                    .String => L.pushlstring("") catch |e| std.debug.panic("{}", .{e}),
+                    else => unreachable,
+                }
+                _ = Scheduler.resumeState(L, null, 1) catch {};
             }
-            _ = Scheduler.resumeState(L, null, 1) catch {};
         }
         return .disarm;
     }
@@ -174,8 +183,13 @@ pub const AsyncReadContext = struct {
         const read_len = r catch |err| switch (err) {
             xev.ReadError.EOF => 0,
             else => {
-                self.err = err;
-                return self.cleanup(L, scheduler, completion, file);
+                switch (self.file_kind) {
+                    .File => {
+                        self.err = err;
+                        return self.cleanup(L, scheduler, completion, file);
+                    },
+                    .Tty => return self.cleanup(L, scheduler, completion, file),
+                }
             },
         };
 

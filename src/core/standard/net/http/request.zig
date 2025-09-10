@@ -554,6 +554,7 @@ pub const Parser = struct {
         if (self.url) |url| {
             const parsed = Url.parse(url);
             try L.Zsetfield(-1, "path", parsed.path);
+            try L.Zsetfield(-1, "raw_path", url);
             const queries = try self.parseQuery(parsed.query, 24);
             if (queries.len > 0) {
                 try L.createtable(0, @intCast(queries.len));
