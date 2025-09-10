@@ -122,11 +122,6 @@ pub fn build(b: *std.Build) !void {
     const release_ver = b.option(bool, "release-ver", "Set release version") orelse false;
     const use_llvm = b.option(bool, "llvm", "Use llvm");
 
-    if (release_ver) switch (optimize) {
-        .ReleaseFast, .ReleaseSmall => {},
-        else => std.debug.panic("Using release-var on non-release build", .{}),
-    };
-
     const prebuild_step = b.step("prebuild", "Setup project for build");
 
     try buildLegacyCompress(b, target, optimize);
