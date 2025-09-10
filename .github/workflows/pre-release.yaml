@@ -42,6 +42,9 @@ jobs:
           - name: Linux Risc-v64
             target: riscv64-linux
             artifact: zune-${{ needs.prep.outputs.version }}-linux-riscv64
+          - name: Linux PowerPC64LE
+            target: powerpc64le-linux
+            artifact: zune-${{ needs.prep.outputs.version }}-linux-powerpc64le
           - name: Windows x86_64
             target: x86_64-windows
             artifact: zune-${{ needs.prep.outputs.version }}-windows-x86_64
@@ -62,6 +65,12 @@ jobs:
           - name: FreeBSD Arm64
             target: aarch64-freebsd
             artifact: zune-${{ needs.prep.outputs.version }}-freebsd-aarch64
+          - name: FreeBSD Risc-v64
+            target: riscv64-freebsd
+            artifact: zune-${{ needs.prep.outputs.version }}-freebsd-riscv64
+          - name: FreeBSD PowerPC64LE
+            target: powerpc64le-freebsd
+            artifact: zune-${{ needs.prep.outputs.version }}-freebsd-powerpc64le
 
     name: ${{ matrix.name }}
     timeout-minutes: 20
