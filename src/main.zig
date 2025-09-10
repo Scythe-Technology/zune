@@ -419,7 +419,6 @@ pub fn main() !void {
         try ML.Lsandboxthread();
 
         try Runtime.Engine.setLuaFileContext(ML, .{
-            .source = if (b.mode.compiled == .debug) b.entry.data else null,
             .main = true,
         });
 

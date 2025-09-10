@@ -34,7 +34,6 @@ pub fn loadModule(L: *VM.lua.State, name: [:0]const u8, content: []const u8, cOp
 }
 
 const FileContext = struct {
-    source: ?[]const u8,
     main: bool = false,
 };
 
@@ -48,7 +47,6 @@ const StackInfo = struct {
 
 pub fn setLuaFileContext(L: *VM.lua.State, ctx: FileContext) !void {
     try L.Zpushvalue(.{
-        .source = if (Zune.STATE.USE_DETAILED_ERROR or Zune.STATE.RUN_MODE == .Test) ctx.source else null,
         .main = ctx.main,
     });
 
@@ -171,37 +169,44 @@ pub fn logDetailedDef(L: *VM.lua.State, idx: i32) !void {
                 source_line,
             });
 
-            L.getfenv(idx);
-            defer L.pop(1); // drop: env
-            if (L.typeOf(-1) != .Table) {
-                return printPreviewError(padded_string, source_line, "Failed to get function environment", .{});
-            }
-            defer L.pop(1); // drop: _FILE
-            if (L.rawgetfield(-1, "_FILE") != .Table) {
-                return printPreviewError(padded_string, source_line, "Failed to get file context", .{});
-            }
-            defer L.pop(1); // drop: source
-            if (L.rawgetfield(-1, "source") != .String) {
-                return printPreviewError(padded_string, source_line, "Failed to get file source", .{});
-            }
-            const content = L.tostring(-1) orelse unreachable;
+            var buffer: [4096]u8 = undefined;
+            var file: std.fs.File = undefined;
+            var file_reader: std.fs.File.Reader = undefined;
 
-            var stream = std.io.fixedBufferStream(content);
-            const reader = stream.reader();
+            if (Zune.STATE.BUNDLE) |b| {
+                const script = b.loadScript(src[1..]) catch |e| {
+                    return printPreviewError(padded_string, source_line, "Failed to open source file: {t}", .{e});
+                };
+                file_reader.interface = .fixed(script);
+            } else {
+                file = std.fs.cwd().openFile(src[1..], .{ .mode = .read_only }) catch |e| {
+                    return printPreviewError(padded_string, source_line, "Failed to open source file: {t}", .{e});
+                };
+                file_reader = file.reader(&buffer);
+            }
+            defer if (Zune.STATE.BUNDLE == null) file.close();
+
+            var reader = &file_reader.interface;
+
             if (source_line > 1) for (0..@intCast(source_line - 1)) |_| {
                 while (true) {
-                    if (reader.readByte() catch |e| {
-                        return printPreviewError(padded_string, source_line, "Failed to read line: {}", .{e});
-                    } == '\n') break;
+                    const slice = reader.takeDelimiterInclusive('\n') catch |e| switch (e) {
+                        error.EndOfStream => return printPreviewError(padded_string, source_line, "Line EOF", .{}),
+                        else => return printPreviewError(padded_string, source_line, "Failed to read line: {t}", .{e}),
+                    };
+                    if (slice[slice.len - 1] == '\n') break;
                 }
             };
 
-            const line_content = reader.readUntilDelimiterOrEofAlloc(allocator, '\n', std.math.maxInt(usize)) catch |e| {
-                return printPreviewError(padded_string, source_line, "Failed to read line: {}", .{e});
-            } orelse {
-                return printPreviewError(padded_string, source_line, "Failed to read line, ended too early", .{});
+            var allocaing: std.Io.Writer.Allocating = .init(allocator);
+            defer allocaing.deinit();
+
+            _ = reader.streamDelimiter(&allocaing.writer, '\n') catch |e| switch (e) {
+                error.EndOfStream => return printPreviewError(padded_string, source_line, "Line EOF", .{}),
+                else => return printPreviewError(padded_string, source_line, "Failed to read line: {t}", .{e}),
             };
-            defer allocator.free(line_content);
+
+            const line_content = allocaing.written();
 
             Zune.debug.print("{s}|\n", .{padded_string});
             _ = std.fmt.bufPrint(padded_string, "{d}", .{source_line}) catch |e| std.debug.panic("{}", .{e});
@@ -362,50 +367,44 @@ pub fn logDetailedError(L: *VM.lua.State) !void {
                 current_line,
             });
 
-            if (!L.getinfo(@intCast(lvl), "f", &ar)) {
-                printPreviewError(padded_string, current_line, "Failed to get function info", .{});
-                continue;
-            }
+            var buffer: [4096]u8 = undefined;
+            var file: std.fs.File = undefined;
+            var file_reader: std.fs.File.Reader = undefined;
 
-            if (L.typeOf(-1) != .Function)
-                return error.InternalError;
-            L.getfenv(-1);
-            defer L.pop(2); // drop: env, func
-            if (L.typeOf(-1) != .Table) {
-                printPreviewError(padded_string, current_line, "Failed to get function environment", .{});
-                continue;
+            if (Zune.STATE.BUNDLE) |b| {
+                const script = b.loadScript(src[1..]) catch |e| {
+                    return printPreviewError(padded_string, current_line, "Failed to open source file: {t}", .{e});
+                };
+                file_reader.interface = .fixed(script);
+            } else {
+                file = std.fs.cwd().openFile(src[1..], .{ .mode = .read_only }) catch |e| {
+                    return printPreviewError(padded_string, current_line, "Failed to open source file: {t}", .{e});
+                };
+                file_reader = file.reader(&buffer);
             }
-            defer L.pop(1); // drop: _FILE
-            if (L.rawgetfield(-1, "_FILE") != .Table) {
-                printPreviewError(padded_string, current_line, "Failed to get file context", .{});
-                continue;
-            }
-            defer L.pop(1); // drop: source
-            if (L.rawgetfield(-1, "source") != .String) {
-                printPreviewError(padded_string, current_line, "Failed to get file source", .{});
-                continue;
-            }
-            const content = L.tostring(-1) orelse unreachable;
+            defer if (Zune.STATE.BUNDLE == null) file.close();
 
-            var stream = std.io.fixedBufferStream(content);
-            const reader = stream.reader();
+            var reader = &file_reader.interface;
+
             if (current_line > 1) for (0..@intCast(current_line - 1)) |_| {
                 while (true) {
-                    if (reader.readByte() catch |e| {
-                        printPreviewError(padded_string, current_line, "Failed to read line: {}", .{e});
-                        break :blk;
-                    } == '\n') break;
+                    const slice = reader.takeDelimiterInclusive('\n') catch |e| switch (e) {
+                        error.EndOfStream => break :blk printPreviewError(padded_string, current_line, "Line EOF", .{}),
+                        else => break :blk printPreviewError(padded_string, current_line, "Failed to read line: {t}", .{e}),
+                    };
+                    if (slice[slice.len - 1] == '\n') break;
                 }
             };
 
-            const line_content = reader.readUntilDelimiterOrEofAlloc(allocator, '\n', std.math.maxInt(usize)) catch |e| {
-                printPreviewError(padded_string, current_line, "Failed to read line: {}", .{e});
-                break :blk;
-            } orelse {
-                printPreviewError(padded_string, current_line, "Failed to read line, ended too early", .{});
-                break :blk;
+            var allocaing: std.Io.Writer.Allocating = .init(allocator);
+            defer allocaing.deinit();
+
+            _ = reader.streamDelimiter(&allocaing.writer, '\n') catch |e| switch (e) {
+                error.EndOfStream => break :blk printPreviewError(padded_string, current_line, "Line EOF", .{}),
+                else => break :blk printPreviewError(padded_string, current_line, "Failed to read line: {t}", .{e}),
             };
-            defer allocator.free(line_content);
+
+            const line_content = allocaing.written();
 
             Zune.debug.print("{s}|\n", .{padded_string});
             _ = std.fmt.bufPrint(padded_string, "{d}", .{current_line}) catch |e| std.debug.panic("{}", .{e});

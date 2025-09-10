@@ -334,7 +334,6 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
         try ML.Lsandboxthread();
 
         try Engine.setLuaFileContext(ML, .{
-            .source = if (Zune.STATE.BUNDLE == null or Zune.STATE.BUNDLE.?.mode.compiled == .debug) file_content else null,
             .main = false,
         });
 

@@ -565,7 +565,6 @@ fn lua_fromModule(L: *VM.lua.State) !i32 {
     const ML = try createThread(allocator, L);
 
     try Zune.Runtime.Engine.setLuaFileContext(ML, .{
-        .source = if (Zune.STATE.BUNDLE == null or Zune.STATE.BUNDLE.?.mode.compiled == .debug) file_content else null,
         .main = false,
     });
 
@@ -597,7 +596,6 @@ fn lua_fromBytecode(L: *VM.lua.State) !i32 {
     const ML = try createThread(allocator, L);
 
     try Zune.Runtime.Engine.setLuaFileContext(ML, .{
-        .source = null,
         .main = true,
     });
 
