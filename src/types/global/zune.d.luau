@@ -7,49 +7,15 @@ export type SerdeJsonEncodeConfig = {
 export type SerdeJsonDecodeConfig = {
     preserve_null: boolean?, 
 }
-type JsonEncoder = {
-    encode: (value: any, config: SerdeJsonEncodeConfig?) -> string,
-    decode: (json: string, config: SerdeJsonDecodeConfig?) -> any,
-    indents: {
-        none: number,
-        two_spaces: number,
-        four_spaces: number,
-        tabs: number, 
-    },
-    values: {
-        null: any, 
-    }
-}
-type TomlEncoder = {
-    encode: (object: {[string]: any}) -> string,
-    decode: (toml: string | buffer) -> {[string]: any}, 
-}
 type YamlInput = string | number | boolean | {
     [string]: YamlInput
 }
 type YamlOuput = string | {
     [string]: YamlOuput
 }
-type YamlEncoder = {
-    encode: (object: YamlInput) -> string,
-    decode: (yaml: string | buffer) -> YamlOuput, 
-}
-type Base64Encoder = {
-    encode: 
-        & ((value: string) -> string)
-        & ((value: buffer) -> buffer)
-        & ((value: string | buffer) -> string | buffer),
-    decode: 
-        & ((base64: string) -> string)
-        & ((base64: string | buffer) -> string | buffer), 
-}
 export type SerdeGenericCompressionOptions = {
     level: number?, 
 }
-type CompressionFn = 
-    & ((raw: string) -> string)
-    & ((raw: buffer) -> buffer)
-    & ((raw: string | buffer) -> string | buffer)
 type AdvancedCompressionFn = 
     & ((raw: string, opts: SerdeGenericCompressionOptions?) -> string)
     & ((raw: buffer, opts: SerdeGenericCompressionOptions?) -> buffer)
@@ -168,10 +134,6 @@ export type _zune_serde_lz4 = {
         & ((compressed: string) -> string)
         & ((compressed: buffer) -> buffer)
         & ((compressed: string | buffer) -> string | buffer), 
-}
-type GenericCompressor = {
-    compress: AdvancedCompressionFn,
-    decompress: DecompressionFn, 
 }
 export type _zune_serde = {
     json: _zune_serde_json,
@@ -358,10 +320,6 @@ export type CryptoPasswordOptions = BcryptPasswordOptions | Argon2PasswordOption
 type EncryptedData = {
     cipher: buffer,
     tag: buffer, 
-}
-type Aead = {
-    encrypt: (data: Input, key: Input, nonce: Input, ad: Input?) -> EncryptedData,
-    decrypt: (cipher: Input, tag: Input, key: Input, nonce: Input, ad: Input?) -> string, 
 }
 export type CryptoTlsClientConfig = {
     host: string,
@@ -655,9 +613,6 @@ export type _zune_random_Sfc64 = {
 export type _zune_random_RomuTrio = {
     new: (seed: number?) -> Random, 
 }
-type RandomConstructor = {
-    new: RandomNewFn, 
-}
 export type _zune_random = {
     new: (seed: number?) -> Random,
     LuauPcg32: _zune_random_LuauPcg32,
@@ -762,23 +717,21 @@ export type _zune_luau = {
     garbagecollect: () -> (), 
 }
 --[[ platform ]]
-export type CPUArchitecture = 
+export type PlatformCPUArchitecture = 
     | "aarch64"
     | "x86_64"
     | "riscv64"
-export type OS = 
+    | "powerpc64le"
+export type PlatformOS = 
     | "linux"
     | "windows"
     | "macos"
     | "freebsd"
 export type _zune_platform_cpu = {
-    arch: 
-        | "aarch64"
-        | "x86_64"
-        | "riscv64",
+    arch: PlatformCPUArchitecture,
     endian: "big" | "little", 
 }
-export type ABI = 
+export type PlatformABI = 
     | "none"
     | "gnu"
     | "gnuabin32"
@@ -810,42 +763,8 @@ export type ABI =
     | "ohos"
     | "ohoseabi"
 export type _zune_platform = {
-    os: 
-        | "linux"
-        | "windows"
-        | "macos"
-        | "freebsd",
-    abi: 
-        | "none"
-        | "gnu"
-        | "gnuabin32"
-        | "gnuabi64"
-        | "gnueabi"
-        | "gnueabihf"
-        | "gnuf32"
-        | "gnusf"
-        | "gnux32"
-        | "code16"
-        | "eabi"
-        | "eabihf"
-        | "ilp32"
-        | "android"
-        | "androideabi"
-        | "musl"
-        | "muslabin32"
-        | "muslabi64"
-        | "musleabi"
-        | "musleabihf"
-        | "muslf32"
-        | "muslsf"
-        | "muslx32"
-        | "msvc"
-        | "itanium"
-        | "cygnus"
-        | "simulator"
-        | "macabi"
-        | "ohos"
-        | "ohoseabi",
+    os: PlatformOS,
+    abi: PlatformABI,
     cpu: _zune_platform_cpu,
     async: "io_uring" | "epoll" | "kqueue" | "iocp",
     getFreeMemory: () -> number,
@@ -947,203 +866,6 @@ export type HttpWebSocketOptions = {
     open: ((socket: HttpWebSocket) -> ())?,
     close: ((socket: HttpWebSocket, close: number?) -> ())?,
     message: ((socket: HttpWebSocket, message: string) -> ())?, 
-}
-type NetworkAddressFamily = {
-    RDS: number,
-    ROSE: number,
-    BRIDGE: number,
-    PHONET: number,
-    SNA: number,
-    FILE: number,
-    MPLS: number,
-    ROUTE: number,
-    WANPIPE: number,
-    UNSPEC: number,
-    CAIF: number,
-    NETROM: number,
-    UNIX: number,
-    INET: number,
-    ATMSVC: number,
-    MAX: number,
-    NETLINK: number,
-    IUCV: number,
-    SMC: number,
-    INET6: number,
-    TIPC: number,
-    KEY: number,
-    QIPCRTR: number,
-    VSOCK: number,
-    IPX: number,
-    ASH: number,
-    IB: number,
-    PACKET: number,
-    KCM: number,
-    DECnet: number,
-    RXRPC: number,
-    NETBEUI: number,
-    NFC: number,
-    ALG: number,
-    IEEE802154: number,
-    ISDN: number,
-    XDP: number,
-    LOCAL: number,
-    BLUETOOTH: number,
-    CAN: number,
-    LLC: number,
-    APPLETALK: number,
-    PPPOX: number,
-    ATMPVC: number,
-    AX25: number,
-    ECONET: number,
-    IRDA: number,
-    SECURITY: number,
-    X25: number, 
-}
-type NetworkSocketFlags = {
-    DCCP: number,
-    RAW: number,
-    RDM: number,
-    DGRAM: number,
-    PACKET: number,
-    STREAM: number,
-    SEQPACKET: number,
-    CLOEXEC: number,
-    NONBLOCK: number, 
-}
-type NetworkIPProtocols = {
-    COMP: number,
-    ICMP: number,
-    ESP: number,
-    IGMP: number,
-    TCP: number,
-    ICMPV6: number,
-    MTP: number,
-    GRE: number,
-    SCTP: number,
-    MAX: number,
-    NONE: number,
-    FRAGMENT: number,
-    IDP: number,
-    UDPLITE: number,
-    HOPOPTS: number,
-    MH: number,
-    BEETPH: number,
-    AH: number,
-    IPIP: number,
-    IPV6: number,
-    PIM: number,
-    DSTOPTS: number,
-    UDP: number,
-    DCCP: number,
-    RAW: number,
-    PUP: number,
-    MPLS: number,
-    ENCAP: number,
-    RSVP: number,
-    ROUTING: number,
-    EGP: number,
-    TP: number,
-    IP: number, 
-}
-type NetworkSocketOptionLevel = {
-    PPPOL2TP: number,
-    RDS: number,
-    TIPC: number,
-    ALG: number,
-    PNPIPE: number,
-    BLUETOOTH: number,
-    PACKET: number,
-    IPV6: number,
-    KCM: number,
-    RXRPC: number,
-    NETBEUI: number,
-    DECNET: number,
-    TLS: number,
-    ICMPV6: number,
-    RAW: number,
-    XDP: number,
-    SOCKET: number,
-    LLC: number,
-    NFC: number,
-    CAIF: number,
-    IUCV: number,
-    X25: number,
-    AAL: number,
-    NETLINK: number,
-    DCCP: number,
-    IRDA: number,
-    ATM: number,
-    IP: number, 
-}
-type NetworkSocketOption = {
-    ATTACH_FILTER: number,
-    CNX_ADVICE: number,
-    PEERCRED: number,
-    LINGER: number,
-    DEBUG: number,
-    RXQ_OVFL: number,
-    SNDBUF: number,
-    DONTROUTE: number,
-    ZEROCOPY: number,
-    PASSCRED: number,
-    DETACH_REUSEPORT_BPF: number,
-    ATTACH_REUSEPORT_EBPF: number,
-    MEMINFO: number,
-    COOKIE: number,
-    SNDBUFFORCE: number,
-    PRIORITY: number,
-    BSDCOMPAT: number,
-    SNDTIMEO: number,
-    BINDTODEVICE: number,
-    OOBINLINE: number,
-    BPF_EXTENSIONS: number,
-    TIMESTAMP_NEW: number,
-    NO_CHECK: number,
-    WIFI_STATUS: number,
-    PEERGROUPS: number,
-    TYPE: number,
-    NOFCS: number,
-    DOMAIN: number,
-    TIMESTAMPNS_NEW: number,
-    SNDLOWAT: number,
-    KEEPALIVE: number,
-    PEEK_OFF: number,
-    PEERSEC: number,
-    PEERNAME: number,
-    RCVBUF: number,
-    REUSEPORT: number?,
-    INCOMING_NAPI_ID: number,
-    TIMESTAMPING_OLD: number,
-    RCVBUFFORCE: number,
-    REUSEADDR: number,
-    MAX_PACING_RATE: number,
-    MARK: number,
-    RCVTIMEO_NEW: number,
-    BUSY_POLL: number,
-    TIMESTAMPING_NEW: number,
-    BINDTOIFINDEX: number,
-    TXTIME: number,
-    SECURITY_ENCRYPTION_NETWORK: number,
-    LOCK_FILTER: number,
-    RCVLOWAT: number,
-    SECURITY_ENCRYPTION_TRANSPORT: number,
-    ATTACH_BPF: number,
-    INCOMING_CPU: number,
-    ERROR: number,
-    SELECT_ERR_QUEUE: number,
-    DETACH_BPF: number,
-    SNDTIMEO_NEW: number,
-    TIMESTAMPNS_OLD: number,
-    PASSSEC: number,
-    TIMESTAMP_OLD: number,
-    GET_FILTER: number,
-    DETACH_FILTER: number,
-    ATTACH_REUSEPORT_CBPF: number,
-    BROADCAST: number,
-    SECURITY_AUTHENTICATION: number,
-    PROTOCOL: number,
-    ACCEPTCONN: number,
-    RCVTIMEO: number, 
 }
 export type _zune_net_ADDRF = {
     RDS: number,
@@ -1530,13 +1252,6 @@ declare class BufferSink
     writer: (self: BufferSink) -> IoWritable
     close: (self: BufferSink) -> () 
 end
-type Terminal = {
-    isTTY: boolean,
-    getCurrentMode: () -> "normal" | "raw",
-    enableRawMode: () -> boolean,
-    restoreMode: () -> boolean,
-    getSize: () -> (number?, number?), 
-}
 export type _zune_io_terminal = {
     isTTY: boolean,
     getCurrentMode: () -> "normal" | "raw",
