@@ -258,7 +258,7 @@ fn buildZune(
     const dep_brotli = b.dependency("brotli", .{ .target = target, .optimize = packed_optimize });
     const dep_zstd = b.dependency("zstd", .{ .target = target, .optimize = packed_optimize });
     const dep_pcre2 = b.dependency("pcre2", .{ .target = target, .optimize = packed_optimize });
-    const dep_tinycc = b.dependency("tinycc", .{ .target = target, .optimize = packed_optimize, .CONFIG_TCC_BACKTRACE = false });
+    const dep_tinycc = b.dependency("tinycc", .{ .target = target, .optimize = packed_optimize, .CONFIG_TCC_BACKTRACE = false, .no_fail = true });
     const dep_sqlite = b.dependency("sqlite", .{
         .target = target,
         .optimize = packed_optimize,
@@ -271,38 +271,32 @@ fn buildZune(
         .SQLITE_ENABLE_FTS3_PARENTHESIS = true,
     });
 
-    const mod_luau = dep_luau.module("luau");
-    const mod_xev = dep_xev.module("xev");
-    const mod_tls = dep_tls.module("tls");
-    const mod_json = dep_json.module("json");
-    const mod_yaml = dep_yaml.module("yaml");
-    const mod_toml = dep_toml.module("tomlz");
-    const mod_datetime = dep_datetime.module("zdt");
-    const mod_lz4 = dep_lz4.module("lz4");
-    const mod_brotli = dep_brotli.module("brotli");
-    const mod_zstd = dep_zstd.module("zig-zstd");
-    const mod_pcre2 = dep_pcre2.module("zpcre2");
-    const mod_sqlite = dep_sqlite.module("z-sqlite");
-    const mod_tinycc = dep_tinycc.module("tinycc");
-
     module.addImport("zune", module);
 
     module.addOptions("zune-info", zune_info);
 
-    module.addImport("luau", mod_luau);
-    module.addImport("xev", mod_xev);
-    module.addImport("tls", mod_tls);
-    module.addImport("yaml", mod_yaml);
-    module.addImport("lz4", mod_lz4);
-    module.addImport("brotli", mod_brotli);
-    module.addImport("zstd", mod_zstd);
-    module.addImport("json", mod_json);
-    module.addImport("regex", mod_pcre2);
-    module.addImport("datetime", mod_datetime);
-    module.addImport("toml", mod_toml);
-    module.addImport("sqlite", mod_sqlite);
-    if (target.result.os.tag != .windows or target.result.cpu.arch != .aarch64)
-        module.addImport("tinycc", mod_tinycc);
+    module.addImport("luau", dep_luau.module("luau"));
+    module.addImport("xev", dep_xev.module("xev"));
+    module.addImport("tls", dep_tls.module("tls"));
+    module.addImport("yaml", dep_yaml.module("yaml"));
+    module.addImport("lz4", dep_lz4.module("lz4"));
+    module.addImport("brotli", dep_brotli.module("brotli"));
+    module.addImport("zstd", dep_zstd.module("zig-zstd"));
+    module.addImport("json", dep_json.module("json"));
+    module.addImport("regex", dep_pcre2.module("zpcre2"));
+    module.addImport("datetime", dep_datetime.module("zdt"));
+    module.addImport("toml", dep_toml.module("tomlz"));
+    module.addImport("sqlite", dep_sqlite.module("z-sqlite"));
+    switch (target.result.os.tag) {
+        .windows => switch (target.result.cpu.arch) {
+            .aarch64 => {},
+            else => module.addImport("tinycc", dep_tinycc.module("tinycc")),
+        },
+        else => switch (target.result.cpu.arch) {
+            .x86_64, .aarch64, .riscv64 => module.addImport("tinycc", dep_tinycc.module("tinycc")),
+            else => {},
+        },
+    }
 
     module.addImport("lcompress", b.modules.get("legacy-compress").?);
 }

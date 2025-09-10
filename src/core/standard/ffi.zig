@@ -24,6 +24,9 @@ pub fn PlatformSupported() bool {
         .windows => !builtin.cpu.arch.isAARCH64(),
         .freebsd => true,
         else => false,
+    } and switch (comptime builtin.cpu.arch) {
+        .x86_64, .aarch64, .riscv64 => true,
+        else => false,
     };
 }
 
