@@ -8,8 +8,8 @@
             .hash = "luau-0.0.0+690-uDAGpxDDCQChy8x3_0CPPAYXBhKJjCpmW_BMMdSZIa7D",
         },
         .libxev = .{
-            .url = "https://codeload.github.com/Scythe-Technology/libxev/tar.gz/923fd685b5d23049d6a2ceea0c73eb57235212a9",
-            .hash = "libxev-0.0.0-GdacvjwjDABDtdJnwlFyNd_Ti23ysHQteZVebf1aHXGE",
+            .url = "https://codeload.github.com/Scythe-Technology/libxev/tar.gz/d44fc1f5478461a73d0cf8fc13bc3d888d1e0887",
+            .hash = "libxev-0.0.0-GdacvqAjDACInHnpske8OXGRkP_cCe6_y2n6lU2N2eTc",
         },
         .json = .{
             .url = "https://codeload.github.com/Scythe-Technology/zig-json/tar.gz/bfa3d87788301b0df3b05b29f6e323f91bf3abbe",
