@@ -290,8 +290,7 @@ const BufferSink = struct {
         } else if (std.mem.eql(u8, index, "closed")) {
             L.pushboolean(self.closed);
             return 1;
-        }
-        return L.Zerrorf("unknown index: {s}", .{index});
+        } else return L.Zerrorf("unknown index: {s}", .{index});
     }
 
     pub fn write(self: *BufferSink, value: []const u8) !void {
