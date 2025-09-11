@@ -116,6 +116,28 @@ describe("IO", function()
                 sink:close()
             end).never.toThrow();
         end)
+
+        test("Limited Small Init", function()
+            local sink = io.createBufferSink({
+                limit = 1024,
+                size = 1024,
+            });
+            expect(sink).toBe(expect.type("userdata"));
+    
+            local large = string.rep("a", 1024);
+            sink:write(large);
+            expect(sink.len).toBe(#large);
+            expect(buffer.tostring(sink:flush())).toBe(large);
+            expect(sink.len).toBe(0);
+
+            expect(function()
+                sink:write(large .. "a");
+            end).toThrow("limit exceeded");
+    
+            expect(function()
+                sink:close()
+            end).never.toThrow();
+        end)
     end)
 
     describe("FixedBufferStream", function()

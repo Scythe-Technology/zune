@@ -1198,12 +1198,17 @@
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "limit": "@roblox/globaltype/BufferSinkOptions.limit"
+      "limit": "@roblox/globaltype/BufferSinkOptions.limit",
+      "size": "@roblox/globaltype/BufferSinkOptions.size"
     }
   },
   "@roblox/globaltype/BufferSinkOptions.limit": {
     "code_sample": "",
     "documentation": "The maximum amount of bytes allowed to be written to the buffer."
+  },
+  "@roblox/globaltype/BufferSinkOptions.size": {
+    "code_sample": "",
+    "documentation": "The initial size of the buffer."
   },
   "@roblox/globaltype/_zune_crypto": {
     "code_sample": "",
@@ -5166,6 +5171,7 @@
       "indexOf": "@roblox/globaltype/_zune_mem.indexOf",
       "lastIndexOfAny": "@roblox/globaltype/_zune_mem.lastIndexOfAny",
       "copy": "@roblox/globaltype/_zune_mem.copy",
+      "indexOfDiffPos": "@roblox/globaltype/_zune_mem.indexOfDiffPos",
       "indexOfDiff": "@roblox/globaltype/_zune_mem.indexOfDiff",
       "endsWith": "@roblox/globaltype/_zune_mem.endsWith",
       "set": "@roblox/globaltype/_zune_mem.set",
@@ -5181,21 +5187,21 @@
       "indexOfScalar": "@roblox/globaltype/_zune_mem.indexOfScalar",
       "indexOfMax": "@roblox/globaltype/_zune_mem.indexOfMax",
       "eqlSlice": "@roblox/globaltype/_zune_mem.eqlSlice",
-      "MAX_SIZE": "@roblox/globaltype/_zune_mem.MAX_SIZE",
       "min": "@roblox/globaltype/_zune_mem.min",
-      "lastIndexOf": "@roblox/globaltype/_zune_mem.lastIndexOf",
-      "trimLeft": "@roblox/globaltype/_zune_mem.trimLeft",
       "slice": "@roblox/globaltype/_zune_mem.slice",
-      "indexOfAnyPos": "@roblox/globaltype/_zune_mem.indexOfAnyPos",
+      "MAX_SIZE": "@roblox/globaltype/_zune_mem.MAX_SIZE",
+      "trimLeft": "@roblox/globaltype/_zune_mem.trimLeft",
       "replaceScalar": "@roblox/globaltype/_zune_mem.replaceScalar",
+      "indexOfAnyPos": "@roblox/globaltype/_zune_mem.indexOfAnyPos",
+      "indexOfMin": "@roblox/globaltype/_zune_mem.indexOfMin",
       "indexOfMinMax": "@roblox/globaltype/_zune_mem.indexOfMinMax",
       "trimRight": "@roblox/globaltype/_zune_mem.trimRight",
       "startsWith": "@roblox/globaltype/_zune_mem.startsWith",
       "indexOfPos": "@roblox/globaltype/_zune_mem.indexOfPos",
       "len": "@roblox/globaltype/_zune_mem.len",
-      "indexOfMin": "@roblox/globaltype/_zune_mem.indexOfMin",
+      "lastIndexOfNone": "@roblox/globaltype/_zune_mem.lastIndexOfNone",
       "indexOfNone": "@roblox/globaltype/_zune_mem.indexOfNone",
-      "lastIndexOfNone": "@roblox/globaltype/_zune_mem.lastIndexOfNone"
+      "lastIndexOf": "@roblox/globaltype/_zune_mem.lastIndexOf"
     },
     "learn_more_link": "https://zune.sh/docs/v0.5.0/api/mem"
   },
@@ -5852,9 +5858,38 @@
     "code_sample": "",
     "documentation": "The source to search in."
   },
+  "@roblox/globaltype/_zune_mem.indexOfDiffPos": {
+    "code_sample": "",
+    "documentation": "Find the index of the first difference between two buffers, starting from the given offset.\n\n**Parameters**\n- `src`: The source to search in.\n- `offset`: The offset to start searching from.\n",
+    "returns": [
+      "@roblox/globaltype/_zune_mem.indexOfDiffPos/return/0"
+    ],
+    "params": [
+      {
+        "name": "src",
+        "documentation": "@roblox/globaltype/_zune_mem.indexOfDiffPos/param/0"
+      },
+      {
+        "name": "offset",
+        "documentation": "@roblox/globaltype/_zune_mem.indexOfDiffPos/param/1"
+      },
+      {
+        "name": "needle",
+        "documentation": "@roblox/globaltype/_zune_mem.indexOfDiffPos/param/2"
+      }
+    ]
+  },
+  "@roblox/globaltype/_zune_mem.indexOfDiffPos/param/0": {
+    "code_sample": "",
+    "documentation": "The source to search in."
+  },
+  "@roblox/globaltype/_zune_mem.indexOfDiffPos/param/1": {
+    "code_sample": "",
+    "documentation": "The offset to start searching from."
+  },
   "@roblox/globaltype/_zune_mem.indexOfMax": {
     "code_sample": "",
-    "documentation": "Find the index of the maximum value in the buffer.\n\nExpects the buffer to be non-empty.\n\n**Parameters**\n- `src`: The source to search in.\n",
+    "documentation": "Find the index of the maximum value in the buffer.\n\nExpects the buffer to be non-empty.\n\n**Parameters**\n- `src`: The source to search in.\n- `offset`: The offset to start searching from.\n- `count`: The number of bytes to search. If not provided, will search until the end of the buffer.\n",
     "returns": [
       "@roblox/globaltype/_zune_mem.indexOfMax/return/0"
     ],
@@ -5862,6 +5897,14 @@
       {
         "name": "src",
         "documentation": "@roblox/globaltype/_zune_mem.indexOfMax/param/0"
+      },
+      {
+        "name": "offset",
+        "documentation": "@roblox/globaltype/_zune_mem.indexOfMax/param/1"
+      },
+      {
+        "name": "count",
+        "documentation": "@roblox/globaltype/_zune_mem.indexOfMax/param/2"
       }
     ]
   },
@@ -5869,9 +5912,17 @@
     "code_sample": "",
     "documentation": "The source to search in."
   },
+  "@roblox/globaltype/_zune_mem.indexOfMax/param/1": {
+    "code_sample": "",
+    "documentation": "The offset to start searching from."
+  },
+  "@roblox/globaltype/_zune_mem.indexOfMax/param/2": {
+    "code_sample": "",
+    "documentation": "The number of bytes to search. If not provided, will search until the end of the buffer."
+  },
   "@roblox/globaltype/_zune_mem.indexOfMin": {
     "code_sample": "",
-    "documentation": "Find the index of the minimum value in the buffer.\n\nExpects the buffer to be non-empty.\n\n**Parameters**\n- `src`: The source to search in.\n",
+    "documentation": "Find the index of the minimum value in the buffer.\n\nExpects the buffer to be non-empty.\n\n**Parameters**\n- `src`: The source to search in.\n- `offset`: The offset to start searching from.\n- `count`: The number of bytes to search. If not provided, will search until the end of the buffer.\n",
     "returns": [
       "@roblox/globaltype/_zune_mem.indexOfMin/return/0"
     ],
@@ -5879,6 +5930,14 @@
       {
         "name": "src",
         "documentation": "@roblox/globaltype/_zune_mem.indexOfMin/param/0"
+      },
+      {
+        "name": "offset",
+        "documentation": "@roblox/globaltype/_zune_mem.indexOfMin/param/1"
+      },
+      {
+        "name": "count",
+        "documentation": "@roblox/globaltype/_zune_mem.indexOfMin/param/2"
       }
     ]
   },
@@ -5886,9 +5945,17 @@
     "code_sample": "",
     "documentation": "The source to search in."
   },
+  "@roblox/globaltype/_zune_mem.indexOfMin/param/1": {
+    "code_sample": "",
+    "documentation": "The offset to start searching from."
+  },
+  "@roblox/globaltype/_zune_mem.indexOfMin/param/2": {
+    "code_sample": "",
+    "documentation": "The number of bytes to search. If not provided, will search until the end of the buffer."
+  },
   "@roblox/globaltype/_zune_mem.indexOfMinMax": {
     "code_sample": "",
-    "documentation": "Find both the index of the minimum and maximum values in the buffer.\n\nExpects the buffer to be non-empty.\n\n**Parameters**\n- `src`: The source to search in.\n",
+    "documentation": "Find both the index of the minimum and maximum values in the buffer.\n\nExpects the buffer to be non-empty.\n\n**Parameters**\n- `src`: The source to search in.\n- `offset`: The offset to start searching from.\n- `count`: The number of bytes to search. If not provided, will search until the end of the buffer.\n",
     "returns": [
       "@roblox/globaltype/_zune_mem.indexOfMinMax/return/0",
       "@roblox/globaltype/_zune_mem.indexOfMinMax/return/1"
@@ -5897,6 +5964,14 @@
       {
         "name": "src",
         "documentation": "@roblox/globaltype/_zune_mem.indexOfMinMax/param/0"
+      },
+      {
+        "name": "offset",
+        "documentation": "@roblox/globaltype/_zune_mem.indexOfMinMax/param/1"
+      },
+      {
+        "name": "count",
+        "documentation": "@roblox/globaltype/_zune_mem.indexOfMinMax/param/2"
       }
     ]
   },
@@ -5904,9 +5979,17 @@
     "code_sample": "",
     "documentation": "The source to search in."
   },
+  "@roblox/globaltype/_zune_mem.indexOfMinMax/param/1": {
+    "code_sample": "",
+    "documentation": "The offset to start searching from."
+  },
+  "@roblox/globaltype/_zune_mem.indexOfMinMax/param/2": {
+    "code_sample": "",
+    "documentation": "The number of bytes to search. If not provided, will search until the end of the buffer."
+  },
   "@roblox/globaltype/_zune_mem.replaceScalar": {
     "code_sample": "",
-    "documentation": "Replaces all occurrences of a scalar in the buffer with another scalar.\n- `[1, 2, 3, 2]` with (`2`, `4`) -> `[1, 4, 3, 4]`\n\n**Parameters**\n- `src`: The source to replace in.\n- `char`: The byte to replace.\n- `replacement`: The byte to replace with.\n",
+    "documentation": "Replaces all occurrences of a scalar in the buffer with another scalar.\n- `[1, 2, 3, 2]` with (`2`, `4`) -> `[1, 4, 3, 4]`\n\n**Parameters**\n- `src`: The source to replace in.\n- `char`: The byte to replace.\n- `replacement`: The byte to replace with.\n- `offset`: The offset to start replacing from.\n- `count`: The number of bytes to replace. If not provided, will replace until the end of the buffer.\n",
     "returns": [],
     "params": [
       {
@@ -5920,6 +6003,14 @@
       {
         "name": "replacement",
         "documentation": "@roblox/globaltype/_zune_mem.replaceScalar/param/2"
+      },
+      {
+        "name": "offset",
+        "documentation": "@roblox/globaltype/_zune_mem.replaceScalar/param/3"
+      },
+      {
+        "name": "count",
+        "documentation": "@roblox/globaltype/_zune_mem.replaceScalar/param/4"
       }
     ]
   },
@@ -5935,9 +6026,17 @@
     "code_sample": "",
     "documentation": "The byte to replace with."
   },
+  "@roblox/globaltype/_zune_mem.replaceScalar/param/3": {
+    "code_sample": "",
+    "documentation": "The offset to start replacing from."
+  },
+  "@roblox/globaltype/_zune_mem.replaceScalar/param/4": {
+    "code_sample": "",
+    "documentation": "The number of bytes to replace. If not provided, will replace until the end of the buffer."
+  },
   "@roblox/globaltype/_zune_mem.max": {
     "code_sample": "",
-    "documentation": "Finds the maximum value in the buffer.\n\nExpects the buffer to be non-empty.\n\n**Parameters**\n- `src`: The source to search in.\n",
+    "documentation": "Finds the maximum value in the buffer.\n\nExpects the buffer to be non-empty.\n\n**Parameters**\n- `src`: The source to search in.\n- `offset`: The offset to start searching from.\n- `count`: The number of bytes to search. If not provided, will search until the end of the buffer.\n",
     "returns": [
       "@roblox/globaltype/_zune_mem.max/return/0"
     ],
@@ -5945,6 +6044,14 @@
       {
         "name": "src",
         "documentation": "@roblox/globaltype/_zune_mem.max/param/0"
+      },
+      {
+        "name": "offset",
+        "documentation": "@roblox/globaltype/_zune_mem.max/param/1"
+      },
+      {
+        "name": "count",
+        "documentation": "@roblox/globaltype/_zune_mem.max/param/2"
       }
     ]
   },
@@ -5952,9 +6059,17 @@
     "code_sample": "",
     "documentation": "The source to search in."
   },
+  "@roblox/globaltype/_zune_mem.max/param/1": {
+    "code_sample": "",
+    "documentation": "The offset to start searching from."
+  },
+  "@roblox/globaltype/_zune_mem.max/param/2": {
+    "code_sample": "",
+    "documentation": "The number of bytes to search. If not provided, will search until the end of the buffer."
+  },
   "@roblox/globaltype/_zune_mem.min": {
     "code_sample": "",
-    "documentation": "Finds the minimum value in the buffer.\n\nExpects the buffer to be non-empty.\n\n**Parameters**\n- `src`: The source to search in.\n",
+    "documentation": "Finds the minimum value in the buffer.\n\nExpects the buffer to be non-empty.\n\n**Parameters**\n- `src`: The source to search in.\n- `offset`: The offset to start searching from.\n- `count`: The number of bytes to search. If not provided, will search until\n",
     "returns": [
       "@roblox/globaltype/_zune_mem.min/return/0"
     ],
@@ -5962,6 +6077,14 @@
       {
         "name": "src",
         "documentation": "@roblox/globaltype/_zune_mem.min/param/0"
+      },
+      {
+        "name": "offset",
+        "documentation": "@roblox/globaltype/_zune_mem.min/param/1"
+      },
+      {
+        "name": "count",
+        "documentation": "@roblox/globaltype/_zune_mem.min/param/2"
       }
     ]
   },
@@ -5969,14 +6092,30 @@
     "code_sample": "",
     "documentation": "The source to search in."
   },
+  "@roblox/globaltype/_zune_mem.min/param/1": {
+    "code_sample": "",
+    "documentation": "The offset to start searching from."
+  },
+  "@roblox/globaltype/_zune_mem.min/param/2": {
+    "code_sample": "",
+    "documentation": "The number of bytes to search. If not provided, will search until"
+  },
   "@roblox/globaltype/_zune_mem.reverse": {
     "code_sample": "",
-    "documentation": "Reverses the buffer in place.\n- `[1, 2, 3]` -> `[3, 2, 1]`\n\n**Parameters**\n- `src`: The source to reverse in.\n",
+    "documentation": "Reverses the buffer in place.\n- `[1, 2, 3]` -> `[3, 2, 1]`\n\n**Parameters**\n- `src`: The source to reverse in.\n- `offset`: The offset to start reversing from.\n- `count`: The number of bytes to reverse. If not provided, will reverse until\n",
     "returns": [],
     "params": [
       {
         "name": "src",
         "documentation": "@roblox/globaltype/_zune_mem.reverse/param/0"
+      },
+      {
+        "name": "offset",
+        "documentation": "@roblox/globaltype/_zune_mem.reverse/param/1"
+      },
+      {
+        "name": "count",
+        "documentation": "@roblox/globaltype/_zune_mem.reverse/param/2"
       }
     ]
   },
@@ -5984,9 +6123,17 @@
     "code_sample": "",
     "documentation": "The source to reverse in."
   },
+  "@roblox/globaltype/_zune_mem.reverse/param/1": {
+    "code_sample": "",
+    "documentation": "The offset to start reversing from."
+  },
+  "@roblox/globaltype/_zune_mem.reverse/param/2": {
+    "code_sample": "",
+    "documentation": "The number of bytes to reverse. If not provided, will reverse until"
+  },
   "@roblox/globaltype/_zune_mem.rotate": {
     "code_sample": "",
-    "documentation": "Rotates the buffer to the left by the given amount.\n\nFor example, rotating `[1, 2, 3, 4, 5]` by `2` would result in `[3, 4, 5, 1, 2]`.\n\n**Parameters**\n- `src`: The source to rotate in.\n- `amount`: The amount to rotate by.\n",
+    "documentation": "Rotates the buffer to the left by the given amount.\n\nFor example, rotating `[1, 2, 3, 4, 5]` by `2` would result in `[3, 4, 5, 1, 2]`.\n\n**Parameters**\n- `src`: The source to rotate in.\n- `amount`: The amount to rotate by.\n- `offset`: The offset to start rotating from.\n- `count`: The number of bytes to rotate. If not provided, will rotate up to the end of the buffer.\n",
     "returns": [],
     "params": [
       {
@@ -5996,6 +6143,14 @@
       {
         "name": "amount",
         "documentation": "@roblox/globaltype/_zune_mem.rotate/param/1"
+      },
+      {
+        "name": "offset",
+        "documentation": "@roblox/globaltype/_zune_mem.rotate/param/2"
+      },
+      {
+        "name": "count",
+        "documentation": "@roblox/globaltype/_zune_mem.rotate/param/3"
       }
     ]
   },
@@ -6006,6 +6161,14 @@
   "@roblox/globaltype/_zune_mem.rotate/param/1": {
     "code_sample": "",
     "documentation": "The amount to rotate by."
+  },
+  "@roblox/globaltype/_zune_mem.rotate/param/2": {
+    "code_sample": "",
+    "documentation": "The offset to start rotating from."
+  },
+  "@roblox/globaltype/_zune_mem.rotate/param/3": {
+    "code_sample": "",
+    "documentation": "The number of bytes to rotate. If not provided, will rotate up to the end of the buffer."
   },
   "@roblox/globaltype/_zune_mem.set": {
     "code_sample": "",
