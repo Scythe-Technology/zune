@@ -147,8 +147,8 @@ const LuaStatement = struct {
             return 1;
         } else if (std.mem.eql(u8, namecall, "finalize")) {
             ptr.close(L);
-        }
-        return L.Zerrorf("unknown method: {s}", .{namecall});
+            return 0;
+        } else return L.Zerrorf("unknown method: {s}", .{namecall});
     }
 
     pub fn close(ptr: *LuaStatement, L: *VM.lua.State) void {
