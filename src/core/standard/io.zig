@@ -530,16 +530,28 @@ const BufferStream = struct {
 pub fn lua_createBufferSink(L: *VM.lua.State) !i32 {
     const allocator = luau.getallocator(L);
 
-    const opts = try L.Zcheckvalue(?struct {
-        limit: ?u32,
-    }, 1, null);
+    const Options = struct {
+        limit: u32 = mem.MAX_LUAU_SIZE,
+        size: u32 = 0,
+    };
+
+    const opts: Options = try L.Zcheckvalue(?Options, 1, null) orelse .{};
+
+    if (opts.size > mem.MAX_LUAU_SIZE)
+        return L.Zerror("size too large");
+    if (opts.limit > mem.MAX_LUAU_SIZE)
+        return L.Zerror("limit too large");
+    if (opts.size > opts.limit)
+        return L.Zerror("size cannot be larger than limit");
+
+    const array_list: std.ArrayListUnmanaged(u8) = if (opts.size > 0) try .initCapacity(allocator, opts.size) else .empty;
 
     const self = try L.newuserdatataggedwithmetatable(BufferSink, TAG_IO_BUFFERSINK);
 
     self.* = .{
         .alloc = allocator,
-        .buf = .{},
-        .limit = if (opts) |o| o.limit orelse mem.MAX_LUAU_SIZE else mem.MAX_LUAU_SIZE,
+        .buf = array_list,
+        .limit = opts.limit,
         .closed = false,
         .ref_table = try .init(L, true),
     };
