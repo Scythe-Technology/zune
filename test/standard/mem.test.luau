@@ -262,6 +262,24 @@ describe("Mem", function()
         expect(mem.indexOfDiff(a, "x")).toBe(0);
         expect(mem.indexOfDiff(a, "")).toBe(0);
     end)
+    test("indexOfDiffPos", function()
+        local a = buffer.fromstring("test");
+        expect(mem.indexOfDiffPos(a, 0, "te")).toBe(2);
+        expect(mem.indexOfDiffPos(a, 1, "te")).toBe(1);
+        expect(mem.indexOfDiffPos(a, 0, "t")).toBe(1);
+        expect(mem.indexOfDiffPos(a, 1, "t")).toBe(1);
+        expect(mem.indexOfDiffPos(a, 4, "t")).toBe(4);
+        expect(mem.indexOfDiffPos(a, 0, "test")).toBeNil();
+        expect(mem.indexOfDiffPos(a, 1, "test")).toBe(1);
+        expect(mem.indexOfDiffPos(a, 0, "es")).toBe(0);
+        expect(mem.indexOfDiffPos(a, 1, "es")).toBe(3);
+        expect(mem.indexOfDiffPos(a, 0, "st")).toBe(0);
+        expect(mem.indexOfDiffPos(a, 1, "st")).toBe(1);
+        expect(mem.indexOfDiffPos(a, 0, "e")).toBe(0);
+        expect(mem.indexOfDiffPos(a, 1, "e")).toBe(2);
+        expect(mem.indexOfDiffPos(a, 0, "x")).toBe(0);
+        expect(mem.indexOfDiffPos(a, 0, "")).toBe(0);
+    end)
     test("indexOfMax", function()
         local a = buffer.fromstring("test");
         expect(mem.indexOfMax(a)).toBe(0);
