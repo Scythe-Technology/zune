@@ -1263,7 +1263,8 @@ export type _zune_io_terminal = {
     getSize: () -> (number?, number?), 
 }
 export type BufferSinkOptions = {
-    limit: number?, 
+    limit: number?,
+    size: number?, 
 }
 export type _zune_io = {
     format: (...any) -> string,
@@ -1307,14 +1308,15 @@ export type _zune_mem = {
     indexOfNonePos: (src: MemReadableSlice, offset: number, needle: MemReadableSlice) -> number?,
     lastIndexOfNone: (src: MemReadableSlice, needle: MemReadableSlice) -> number?,
     indexOfDiff: (src: MemReadableSlice, needle: MemReadableSlice) -> number?,
-    indexOfMax: (src: MemReadableSlice) -> number,
-    indexOfMin: (src: MemReadableSlice) -> number,
-    indexOfMinMax: (src: MemReadableSlice) -> (number, number),
-    replaceScalar: (src: MemWritableSlice, char: number, replacement: number) -> (),
-    max: (src: MemReadableSlice) -> number,
-    min: (src: MemReadableSlice) -> number,
-    reverse: (src: MemWritableSlice) -> (),
-    rotate: (src: MemWritableSlice, amount: number) -> (),
+    indexOfDiffPos: (src: MemReadableSlice, offset: number, needle: MemReadableSlice) -> number?,
+    indexOfMax: (src: MemReadableSlice, offset: number?, count: number?) -> number,
+    indexOfMin: (src: MemReadableSlice, offset: number?, count: number?) -> number,
+    indexOfMinMax: (src: MemReadableSlice, offset: number?, count: number?) -> (number, number),
+    replaceScalar: (src: MemWritableSlice, char: number, replacement: number, offset: number?, count: number?) -> (),
+    max: (src: MemReadableSlice, offset: number?, count: number?) -> number,
+    min: (src: MemReadableSlice, offset: number?, count: number?) -> number,
+    reverse: (src: MemWritableSlice, offset: number?, count: number?) -> (),
+    rotate: (src: MemWritableSlice, amount: number, offset: number?, count: number?) -> (),
     set: (dest: MemWritableSlice, value: number, offset: number?, count: number?) -> (), 
 }
 --[[ sqlite ]]
