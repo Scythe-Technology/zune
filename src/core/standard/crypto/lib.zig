@@ -21,6 +21,7 @@ const hash = std.crypto.hash;
 const aead = std.crypto.aead;
 
 const tls = @import("tls.zig");
+const uuid = @import("uuid.zig");
 const random = @import("random.zig");
 const password = @import("password.zig");
 
@@ -373,6 +374,15 @@ pub fn loadLib(L: *VM.lua.State) !void {
         }
         L.setreadonly(-1, true);
         try L.rawsetfield(-2, "aead");
+    }
+
+    { // uuid
+        try L.Zpushvalue(.{
+            .v4 = uuid.lua_v4,
+            .v7 = uuid.lua_v7,
+        });
+        L.setreadonly(-1, true);
+        try L.rawsetfield(-2, "uuid");
     }
 
     { // tls

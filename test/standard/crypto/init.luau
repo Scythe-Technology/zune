@@ -46,6 +46,7 @@ end)
 require("@self/hash.test");
 require("@self/hmac.test");
 require("@self/random.test");
+require("@self/uuid.test");
 
 describe("aead", function()
     require("@self/aead/aegis");
