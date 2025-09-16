@@ -356,7 +356,7 @@ pub const Parser = struct {
                                             .ReservedFalse => "false",
                                             else => unreachable, // assert
                                         };
-                                        const key = try allocator.dupe(u8, alias);
+                                        const key = try std.ascii.allocLowerString(allocator, alias);
                                         errdefer allocator.free(key);
                                         const copy = try allocator.dupe(u8, value);
                                         errdefer allocator.free(copy);
