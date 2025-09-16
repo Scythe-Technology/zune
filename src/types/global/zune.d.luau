@@ -329,6 +329,10 @@ export type _zune_crypto_password = {
     hash: (password: string | buffer, opts: CryptoPasswordOptions?) -> string,
     verify: (password: string | buffer, hash: string | buffer) -> boolean, 
 }
+export type _zune_crypto_uuid = {
+    v4: () -> string,
+    v7: () -> string, 
+}
 export type _zune_crypto_random = {
     nextNumber: 
         & (() -> number)
@@ -462,6 +466,7 @@ export type CryptoTlsServerConfig = {
 export type _zune_crypto = {
     createHash: (algorithm: CryptoHashAlgorithms, secret: string?) -> CryptoHash,
     password: _zune_crypto_password,
+    uuid: _zune_crypto_uuid,
     random: _zune_crypto_random,
     aead: _zune_crypto_aead,
     tls: _zune_crypto_tls, 

@@ -101,10 +101,3 @@ jobs:
    
     - name: Build debug
       run: zig build -Dtarget=${{ matrix.target }} --verbose
-
-    - name: Upload Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ matrix.artifact }}
-        path: |
-          ./zig-out/bin/zune${{ matrix.ext }}
