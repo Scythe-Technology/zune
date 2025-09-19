@@ -1,11 +1,11 @@
 .{
     .name = .Zune,
     .version = "0.5.0",
-    .minimum_zig_version = "0.14.0",
+    .minimum_zig_version = "0.15.0",
     .dependencies = .{
         .luau = .{
-            .url = "https://codeload.github.com/Scythe-Technology/zig-luau/tar.gz/7d0b1db2f5b735f04f4b38e4f52513014d2c1086",
-            .hash = "luau-0.0.0+690-uDAGpxDDCQChy8x3_0CPPAYXBhKJjCpmW_BMMdSZIa7D",
+            .url = "https://codeload.github.com/Scythe-Technology/zig-luau/tar.gz/4434df9fd1d0fe42f12dc58f3ac48ad94b161db4",
+            .hash = "luau-0.0.0+691-uDAGpynDCQCIcMzvGyz4Tdr-QQApFMO_Ug3sbdx4V2Sn",
         },
         .libxev = .{
             .url = "https://codeload.github.com/Scythe-Technology/libxev/tar.gz/b34e5ade259b11cca070384e6921aa16d649494b",

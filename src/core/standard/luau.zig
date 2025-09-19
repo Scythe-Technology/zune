@@ -471,6 +471,7 @@ const AstSerializer = struct {
                 .Checked => if (attr.args.size > 0) "checked" else "@checked",
                 .Native => if (attr.args.size > 0) "native" else "@native",
                 .Deprecated => if (attr.args.size > 0) "deprecated" else "@deprecated",
+                .Unknown => @panic("unreachable"), // parse error?
             }, 1);
 
             try self.L.Zsetfield(-1, "tag", "attribute");
