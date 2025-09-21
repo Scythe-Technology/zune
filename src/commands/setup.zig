@@ -1,5 +1,6 @@
 const std = @import("std");
 const json = @import("json");
+const builtin = @import("builtin");
 const lcompress = @import("lcompress");
 
 const Zune = @import("zune");
@@ -71,26 +72,9 @@ fn setup(editor: EditorKind, allocator: std.mem.Allocator, setupInfo: SetupInfo)
             const LUAU_LSP_DEFINITION_FILES = "luau-lsp.types.definitionFiles";
             const LUAU_LSP_DOCUMENTATION_FILES = "luau-lsp.types.documentationFiles";
 
-            if (settings_content.len > 0) {
-                std.debug.print(
-                    \\Could not automatically update '{s}' because it already exists and has values.
-                    \\Add these setting values below to '{s}'
-                    \\
-                    \\{{
-                    \\  "luau-lsp.types.definitionFiles": [
-                    \\    "{s}/.zune/typedefs/global/zune.d.luau"
-                    \\  ],
-                    \\  "luau-lsp.types.documentationFiles": [
-                    \\    "{s}/.zune/typedefs/global/zune.d.json"
-                    \\  ]
-                    \\}}
-                    \\
-                , .{ settings_file_path, settings_file_path, setupInfo.home, setupInfo.home });
-                return;
-            }
-
             // Parse settings.json
-            var settings_root = json.parseJson5(allocator, if (settings_content.len > 2) settings_content else "{}") catch |err| switch (err) {
+            // settings_content
+            var settings_root = json.parseJson5(allocator, "{}") catch |err| switch (err) {
                 error.ParseValueError => {
                     std.debug.print("Failed to parse {s}\n", .{settings_file_path});
                     return;
@@ -158,49 +142,24 @@ fn setup(editor: EditorKind, allocator: std.mem.Allocator, setupInfo: SetupInfo)
 
             try settings_root.value.serialize(&serialized_array.writer, .SPACES_2, 0);
 
-            std.debug.print(
-                \\{{
-                \\  "luau-lsp.types.definitionFiles": [
-                \\    "{s}/.zune/typedefs/global/zune.d.luau"
-                \\  ],
-                \\  "luau-lsp.types.documentationFiles": [
-                \\    "{s}/.zune/typedefs/global/zune.d.json"
-                \\  ]
-                \\}}
-                \\
-            , .{ setupInfo.home, setupInfo.home });
-
-            break :output try serialized_array.toOwnedSlice();
-        },
-        .zed => output: {
-            if (settings_content.len > 0) {
+            if (settings_content.len > 2) {
                 std.debug.print(
                     \\Could not automatically update '{s}' because it already exists and has values.
                     \\Add these setting values below to '{s}'
                     \\
-                    \\{{
-                    \\  "lsp": {{
-                    \\    "luau-lsp": {{
-                    \\      "settings": {{
-                    \\        "ext": {{
-                    \\          "definitions": [
-                    \\            "{s}/.zune/typedefs/global/zune.d.luau"
-                    \\          ],
-                    \\          "documentation": [
-                    \\            "{s}/.zune/typedefs/global/zune.d.json"
-                    \\          ]
-                    \\        }}
-                    \\      }}
-                    \\    }}
-                    \\  }}
-                    \\}}
+                    \\{s}
                     \\
-                , .{ settings_file_path, settings_file_path, setupInfo.home, setupInfo.home });
+                , .{ settings_file_path, settings_file_path, serialized_array.written() });
                 return;
             }
 
+            std.debug.print("{s}\n", .{serialized_array.written()});
+
+            break :output try serialized_array.toOwnedSlice();
+        },
+        .zed => output: {
             // Parse settings.json
-            var settings_root = json.parseJson5(allocator, if (settings_content.len > 2) settings_content else "{}") catch |err| switch (err) {
+            var settings_root = json.parseJson5(allocator, "{}") catch |err| switch (err) {
                 error.ParseValueError => {
                     std.debug.print("Failed to parse {s}\n", .{settings_file_path});
                     return;
@@ -277,42 +236,52 @@ fn setup(editor: EditorKind, allocator: std.mem.Allocator, setupInfo: SetupInfo)
 
             try settings_root.value.serialize(&serialized_array.writer, .SPACES_2, 0);
 
-            std.debug.print(
-                \\{{
-                \\  "lsp": {{
-                \\    "luau-lsp": {{
-                \\      "settings": {{
-                \\        "ext": {{
-                \\          "definitions": [
-                \\            "{s}/.zune/typedefs/global/zune.d.luau"
-                \\          ],
-                \\          "documentation": [
-                \\            "{s}/.zune/typedefs/global/zune.d.json"
-                \\          ]
-                \\        }}
-                \\      }}
-                \\    }}
-                \\  }}
-                \\}}
-                \\
-            , .{ setupInfo.home, setupInfo.home });
+            if (settings_content.len > 2) {
+                std.debug.print(
+                    \\Could not automatically update '{s}' because it already exists and has values.
+                    \\Add these setting values below to '{s}'
+                    \\
+                    \\{s}
+                    \\
+                , .{ settings_file_path, settings_file_path, serialized_array.written() });
+                return;
+            }
+
+            std.debug.print("{s}\n", .{serialized_array.written()});
 
             break :output try serialized_array.toOwnedSlice();
         },
         .neovim => output: {
+            const SEP = std.fs.path.sep_str;
+            var typedef_path = try std.fmt.allocPrint(allocator, "{s}" ++ SEP ++ ".zune" ++ SEP ++ "typedefs" ++ SEP ++ "global" ++ SEP ++ "zune.d.luau", .{setupInfo.home});
+            defer allocator.free(typedef_path);
+            if (comptime builtin.os.tag == .windows) {
+                const allocated = typedef_path;
+                typedef_path = try std.mem.replaceOwned(u8, allocator, typedef_path, SEP, SEP ++ SEP);
+                allocator.free(allocated);
+            }
+
+            var typedocs_path = try std.fmt.allocPrint(allocator, "{s}" ++ SEP ++ ".zune" ++ SEP ++ "typedefs" ++ SEP ++ "global" ++ SEP ++ "zune.d.json", .{setupInfo.home});
+            defer allocator.free(typedocs_path);
+            if (comptime builtin.os.tag == .windows) {
+                const allocated = typedocs_path;
+                typedocs_path = try std.mem.replaceOwned(u8, allocator, typedocs_path, SEP, SEP ++ SEP);
+                allocator.free(allocated);
+            }
+
             const config = try std.fmt.allocPrint(allocator,
                 \\require("luau-lsp").config {{
                 \\  types = {{
                 \\    definition_files = {{
-                \\      "{s}/.zune/typedefs/global/zune.d.luau"
+                \\      "{s}"
                 \\    }},
                 \\    documentation_files = {{
-                \\      "{s}/.zune/typedefs/global/zune.d.json"
+                \\      "{s}"
                 \\    }},
                 \\  }},
                 \\}}
                 \\
-            , .{ setupInfo.home, setupInfo.home });
+            , .{ typedef_path, typedocs_path });
 
             if (settings_content.len > 0) {
                 defer allocator.free(config);
@@ -328,10 +297,19 @@ fn setup(editor: EditorKind, allocator: std.mem.Allocator, setupInfo: SetupInfo)
             break :output config;
         },
         .emacs => output: {
+            const SEP = std.fs.path.sep_str;
+            var typedef_path = try std.fmt.allocPrint(allocator, "{s}" ++ SEP ++ ".zune" ++ SEP ++ "typedefs" ++ SEP ++ "global" ++ SEP ++ "zune.d.luau", .{setupInfo.home});
+            defer allocator.free(typedef_path);
+            if (comptime builtin.os.tag == .windows) {
+                const allocated = typedef_path;
+                typedef_path = try std.mem.replaceOwned(u8, allocator, typedef_path, SEP, SEP ++ SEP);
+                allocator.free(allocated);
+            }
+
             const config = try std.fmt.allocPrint(allocator,
-                \\((nil . ((eglot-luau-custom-type-files . ("{s}/.zune/typedefs/global/zune.d.luau")))))
+                \\((nil . ((eglot-luau-custom-type-files . ("{s}")))))
                 \\
-            , .{setupInfo.home});
+            , .{typedef_path});
 
             if (settings_content.len > 0) {
                 std.debug.print(
