@@ -95,7 +95,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     switch (L.rawgetfield(luau.VM.lua.GLOBALSINDEX, "_VERSION")) {
         .String => try out.print("{s}\n", .{L.tostring(-1).?}),
-        else => try out.writeAll("Unknown Zune version\n"),
+        else => try out.writeAll("unknown zune version\n"),
     }
     L.pop(1);
 

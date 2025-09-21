@@ -81,7 +81,7 @@ fn ColorFormat(comptime fmt: []const u8, comptime use_colors: bool) []const u8 {
             }
             if (start >= 0) {
                 const color_name = fmt[start + 1 .. i];
-                const code = ColorMap.get(color_name) orelse @compileError("Unknown color: " ++ color_name);
+                const code = ColorMap.get(color_name) orelse @compileError("unknown color: " ++ color_name);
                 if (use_colors)
                     new_fmt = new_fmt ++ code;
                 start = -1;
