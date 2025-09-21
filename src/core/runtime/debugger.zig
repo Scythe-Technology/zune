@@ -1,5 +1,6 @@
 const std = @import("std");
 const luau = @import("luau");
+const zstd = @import("zstd");
 const builtin = @import("builtin");
 
 const Zune = @import("zune");
@@ -233,7 +234,7 @@ pub fn printResult(comptime fmt: []const u8, args: anytype) void {
     Zune.debug.print(DEBUG_RESULT_TAG ++ fmt, args);
 }
 
-const COMMAND_MAP = std.StaticStringMap(enum {
+const COMMAND_ENUM = enum(u8) {
     help,
     exit,
     @"break",
@@ -253,7 +254,10 @@ const COMMAND_MAP = std.StaticStringMap(enum {
     restart,
     output_mode,
     exception,
-}).initComptime(.{
+    _,
+};
+
+const COMMAND_MAP = std.StaticStringMap(COMMAND_ENUM).initComptime(.{
     .{ "help", .help },
     .{ "exit", .exit },
     .{ "break", .@"break" },
@@ -288,13 +292,16 @@ const COMMAND_MAP = std.StaticStringMap(enum {
     .{ "exception", .exception },
 });
 
-const BREAK_COMMAND_MAP = std.StaticStringMap(enum {
+const BREAK_COMMAND_ENUM = enum(u8) {
     help,
     add,
     remove,
     clear,
     list,
-}).initComptime(.{
+    _,
+};
+
+const BREAK_COMMAND_MAP = std.StaticStringMap(BREAK_COMMAND_ENUM).initComptime(.{
     .{ "help", .help },
     .{ "+", .add },
     .{ "add", .add },
@@ -305,10 +312,13 @@ const BREAK_COMMAND_MAP = std.StaticStringMap(enum {
     .{ "list", .list },
 });
 
-const LOCALS_COMMAND_MAP = std.StaticStringMap(enum {
+const LOCALS_COMMAND_ENUM = enum(u8) {
     help,
     list,
-}).initComptime(.{
+    _,
+};
+
+const LOCALS_COMMAND_MAP = std.StaticStringMap(LOCALS_COMMAND_ENUM).initComptime(.{
     .{ "help", .help },
     .{ "list", .list },
 });
@@ -368,7 +378,7 @@ fn promptOpBreak(allocator: std.mem.Allocator, break_args: []const u8) !void {
     }
     const command_input, const rest = getNextArg(break_args);
     switch (BREAK_COMMAND_MAP.get(command_input) orelse {
-        return printResult("Unknown break command\n", .{});
+        return printResult("unknown break command\n", .{});
     }) {
         .help => {
             printResult("Break Commands:\n", .{});
@@ -468,21 +478,17 @@ fn promptOpBreak(allocator: std.mem.Allocator, break_args: []const u8) !void {
                 }
             }
         },
+        _ => unreachable, // should not happen
     }
 }
 
 // 5 stack needed
-fn variableJsonDisassemble(allocator: std.mem.Allocator, L: *VM.lua.State, iter: *std.mem.SplitIterator(u8, .scalar), writer: anytype) !bool {
+fn variableJsonDisassemble(allocator: std.mem.Allocator, writer: *std.Io.Writer, L: *VM.lua.State, iter: *std.mem.SplitIterator(u8, .scalar)) !void {
     while (iter.next()) |iter_i| {
-        if (L.typeOf(-1) != .Table) {
-            printResult("[]\n", .{}); // variable not a table
-            return false;
-        }
+        if (L.typeOf(-1) != .Table)
+            return error.NoTable;
         var order: u32 = 1;
-        const id = std.fmt.parseInt(u32, iter_i, 10) catch |err| {
-            printResult("Id Parse Error: {}\n", .{err});
-            return false;
-        };
+        const id = try std.fmt.parseInt(u32, iter_i, 10);
         out: {
             var i: i32 = L.rawiter(-1, 0);
             while (i >= 0) : (i = L.rawiter(-1, i)) {
@@ -491,16 +497,13 @@ fn variableJsonDisassemble(allocator: std.mem.Allocator, L: *VM.lua.State, iter:
                     break :out;
                 L.pop(2);
             }
-            printResult("[]\n", .{}); // leads no where
-            return false;
+            return error.NoWhere; // leads no where
         }
         L.remove(-2); // remove key
         L.remove(-2); // remove old value (local/ref)
     }
-    if (L.typeOf(-1) != .Table) {
-        printResult("[]\n", .{}); // variable not a table
-        return false;
-    }
+    if (L.typeOf(-1) != .Table)
+        return error.NoTable; // variable not a table
     var first = false;
     var order: u32 = 1;
     var i: i32 = L.rawiter(-1, 0);
@@ -514,22 +517,91 @@ fn variableJsonDisassemble(allocator: std.mem.Allocator, L: *VM.lua.State, iter:
         const value_typename = VM.lapi.typename(L.typeOf(-1));
         const key_str = tostring(L, -2);
         const value = tostring(L, -2);
-        defer L.pop(2);
 
         const key_base64_buf, const base64_key = try toBase64(allocator, key_str);
         defer allocator.free(key_base64_buf);
         const value_base64_buf, const base64_value = try toBase64(allocator, value);
         defer allocator.free(value_base64_buf);
 
-        try writer.print("{{\"id\":{d},\"key\":\"{s}\",\"value\":\"{s}\",\"key_type\":\"{s}\",\"value_type\":\"{s}\"}}", .{
+        L.pop(2);
+
+        try writer.print("{{\"id\":{d},\"key\":{{\"value\":\"{s}\",\"type\":\"{s}\"}},\"value\":{{\"value\":\"{s}\",\"type\":\"{s}\"", .{
             order,
             base64_key,
-            base64_value,
             key_typename,
+            base64_value,
             value_typename,
         });
+        switch (L.typeOf(-1)) {
+            .Buffer => {
+                const buf = L.tobuffer(-1).?;
+                const compressed = try zstd.compressAlloc(allocator, buf, 11);
+                defer allocator.free(compressed);
+                const zbase64_buf, const zbase64_value = try toBase64(allocator, compressed);
+                defer allocator.free(zbase64_buf);
+                try writer.print(",\"zbase64\":\"{s}\"", .{zbase64_value});
+            },
+            else => {},
+        }
+        try writer.writeAll("}}");
     }
-    return true;
+}
+
+fn listLocalsJson(L: *VM.lua.State, allocator: std.mem.Allocator, writer: *std.Io.Writer, level: i32, args: []const u8) !void {
+    try L.rawcheckstack(6);
+    var iter = std.mem.splitScalar(u8, std.mem.trimLeft(u8, args, " "), ',');
+
+    try writer.writeByte('[');
+    const first_iter = iter.first();
+    if (first_iter.len > 0) {
+        const initial_idx = try std.fmt.parseInt(u32, first_iter, 10);
+        _ = L.getlocal(level, @intCast(initial_idx)) orelse {
+            return try writer.writeAll("[]");
+        };
+        defer L.pop(1);
+        variableJsonDisassemble(allocator, writer, L, &iter) catch |err| switch (err) {
+            error.NoTable, error.NoWhere => return writer.writeAll("[]"),
+            else => return err,
+        };
+    } else {
+        var i: i32 = 1;
+        var first = false;
+        while (true) : (i += 1) {
+            if (L.getlocal(level, i)) |name| {
+                defer L.pop(1);
+                if (first)
+                    try writer.writeByte(',');
+                first = true;
+                const typename = VM.lapi.typename(L.typeOf(-1));
+                const value = tostring(L, -1);
+
+                const value_base64_buf, const base64_value = try toBase64(allocator, value);
+                defer allocator.free(value_base64_buf);
+
+                L.pop(1);
+
+                try writer.print("{{\"id\":{d},\"key\":{{\"value\":\"{s}\",\"type\":\"literal\"}},\"value\":{{\"value\":\"{s}\",\"type\":\"{s}\"", .{
+                    i,
+                    name,
+                    base64_value,
+                    typename,
+                });
+                switch (L.typeOf(-1)) {
+                    .Buffer => {
+                        const buf = L.tobuffer(-1).?;
+                        const compressed = try zstd.compressAlloc(allocator, buf, 11);
+                        defer allocator.free(compressed);
+                        const zbase64_buf, const zbase64_value = try toBase64(allocator, compressed);
+                        defer allocator.free(zbase64_buf);
+                        try writer.print(",\"zbase64\":\"{s}\"", .{zbase64_value});
+                    },
+                    else => {},
+                }
+                try writer.writeAll("}}");
+            } else break;
+        }
+    }
+    try writer.writeByte(']');
 }
 
 fn promptOpLocals(L: *VM.lua.State, allocator: std.mem.Allocator, locals_args: []const u8) !void {
@@ -541,7 +613,7 @@ fn promptOpLocals(L: *VM.lua.State, allocator: std.mem.Allocator, locals_args: [
 
     const command_input, const rest = getNextArg(locals_args);
     switch (LOCALS_COMMAND_MAP.get(command_input) orelse {
-        return printResult("Unknown locals command\n", .{});
+        return printResult("unknown locals command\n", .{});
     }) {
         .help => { // locals help
             printResult("Locals Commands:\n", .{});
@@ -585,56 +657,96 @@ fn promptOpLocals(L: *VM.lua.State, allocator: std.mem.Allocator, locals_args: [
                         printResult("No locals found.\n", .{});
                 },
                 .Json => {
-                    try L.rawcheckstack(6);
-                    var iter = std.mem.splitScalar(u8, std.mem.trimLeft(u8, args_rest, " "), ',');
-
                     var allocating: std.Io.Writer.Allocating = .init(allocator);
                     defer allocating.deinit();
 
                     const writer = &allocating.writer;
 
-                    try writer.writeByte('[');
-                    const first_iter = iter.first();
-                    if (first_iter.len > 0) {
-                        const initial_idx = std.fmt.parseInt(u32, first_iter, 10) catch |err| {
-                            return printResult("Id Parse Error: {}\n", .{err});
-                        };
-                        _ = L.getlocal(level, @intCast(initial_idx)) orelse {
-                            return printResult("[]\n", .{});
-                        };
-                        defer L.pop(1);
-                        if (!try variableJsonDisassemble(allocator, L, &iter, writer))
-                            return;
-                    } else {
-                        var i: i32 = 1;
-                        var first = false;
-                        while (true) : (i += 1) {
-                            if (L.getlocal(level, i)) |name| {
-                                defer L.pop(1);
-                                if (first)
-                                    try writer.writeByte(',');
-                                first = true;
-                                const typename = VM.lapi.typename(L.typeOf(-1));
-                                const value = tostring(L, -1);
-                                defer L.pop(1);
+                    try listLocalsJson(L, allocator, writer, level, args_rest);
 
-                                const value_base64_buf, const base64_value = try toBase64(allocator, value);
-                                defer allocator.free(value_base64_buf);
-                                try writer.print("{{\"id\":{d},\"key\":\"{s}\",\"value\":\"{s}\",\"key_type\":\"literal\",\"value_type\":\"{s}\"}}", .{
-                                    i,
-                                    name,
-                                    base64_value,
-                                    typename,
-                                });
-                            } else break;
-                        }
-                    }
-                    try writer.writeByte(']');
                     printResult("{s}\n", .{allocating.written()});
                 },
             }
         },
+        _ => unreachable, // should not happen
     }
+}
+
+fn listParamsJson(L: *VM.lua.State, allocator: std.mem.Allocator, writer: *std.Io.Writer, level: i32, ar: *VM.lua.Debug, args: []const u8) !void {
+    try L.rawcheckstack(6);
+    if (!L.getinfo(level, "a", ar))
+        return writer.writeAll("[]"); // nothing
+    var iter = std.mem.splitScalar(u8, std.mem.trimLeft(u8, args, " "), ',');
+
+    try writer.writeByte('[');
+    const first_iter = iter.first();
+    if (first_iter.len > 0) {
+        const initial_idx = try std.fmt.parseInt(u32, first_iter, 10);
+        if (!L.getargument(level, @intCast(initial_idx)))
+            return writer.writeAll("[]");
+        defer L.pop(1);
+        variableJsonDisassemble(allocator, writer, L, &iter) catch |err| switch (err) {
+            error.NoTable, error.NoWhere => return writer.writeAll("[]"),
+            else => return err,
+        };
+    } else {
+        var i: i32 = 1;
+        var first = false;
+        while (true) : (i += 1) {
+            if (L.getargument(level, i)) {
+                defer L.pop(1);
+                if (first)
+                    try writer.writeByte(',');
+                first = true;
+                const typename = VM.lapi.typename(L.typeOf(-1));
+                const value = tostring(L, -1);
+
+                const value_base64_buf, const base64_value = try toBase64(allocator, value);
+                defer allocator.free(value_base64_buf);
+
+                L.pop(1);
+
+                if (i > ar.nparams) {
+                    try writer.print("{{\"id\":{d},\"key\":{{\"value\":\"var\",\"type\":\"literal\"}},\"value\":{{\"value\":\"{s}\",\"type\":\"{s}\"", .{
+                        i,
+                        base64_value,
+                        typename,
+                    });
+                    switch (L.typeOf(-1)) {
+                        .Buffer => {
+                            const buf = L.tobuffer(-1).?;
+                            const compressed = try zstd.compressAlloc(allocator, buf, 11);
+                            defer allocator.free(compressed);
+                            const zbase64_buf, const zbase64_value = try toBase64(allocator, compressed);
+                            defer allocator.free(zbase64_buf);
+                            try writer.print(",\"zbase64\":\"{s}\"", .{zbase64_value});
+                        },
+                        else => {},
+                    }
+                    try writer.writeAll("}}");
+                } else {
+                    try writer.print("{{\"id\":{d},\"key\":{{\"value\":\"param\",\"type\":\"literal\"}},\"value\":{{\"value\":\"{s}\",\"type\":\"{s}\"", .{
+                        i,
+                        base64_value,
+                        typename,
+                    });
+                    switch (L.typeOf(-1)) {
+                        .Buffer => {
+                            const buf = L.tobuffer(-1).?;
+                            const compressed = try zstd.compressAlloc(allocator, buf, 11);
+                            defer allocator.free(compressed);
+                            const zbase64_buf, const zbase64_value = try toBase64(allocator, compressed);
+                            defer allocator.free(zbase64_buf);
+                            try writer.print(",\"zbase64\":\"{s}\"", .{zbase64_value});
+                        },
+                        else => {},
+                    }
+                    try writer.writeAll("}}");
+                }
+            } else break;
+        }
+    }
+    try writer.writeByte(']');
 }
 
 fn promptOpParams(L: *VM.lua.State, allocator: std.mem.Allocator, params_args: []const u8) !void {
@@ -646,7 +758,7 @@ fn promptOpParams(L: *VM.lua.State, allocator: std.mem.Allocator, params_args: [
 
     const command_input, const rest = getNextArg(params_args);
     switch (LOCALS_COMMAND_MAP.get(command_input) orelse {
-        return printResult("Unknown params command\n", .{});
+        return printResult("unknown params command\n", .{});
     }) {
         .help => { // params help
             printResult("Params Commands:\n", .{});
@@ -696,65 +808,80 @@ fn promptOpParams(L: *VM.lua.State, allocator: std.mem.Allocator, params_args: [
                         printResult("No params found.\n", .{});
                 },
                 .Json => {
-                    try L.rawcheckstack(6);
-                    if (!L.getinfo(level, "a", &ar))
-                        return printResult("[]\n", .{}); // nothing
-                    var iter = std.mem.splitScalar(u8, std.mem.trimLeft(u8, args_rest, " "), ',');
-
                     var allocating: std.Io.Writer.Allocating = .init(allocator);
                     defer allocating.deinit();
 
                     const writer = &allocating.writer;
 
-                    try writer.writeByte('[');
-                    const first_iter = iter.first();
-                    if (first_iter.len > 0) {
-                        const initial_idx = std.fmt.parseInt(u32, first_iter, 10) catch |err| {
-                            return printResult("Id Parse Error: {}\n", .{err});
-                        };
-                        if (!L.getargument(level, @intCast(initial_idx)))
-                            return printResult("[]\n", .{});
-                        defer L.pop(1);
-                        if (!try variableJsonDisassemble(allocator, L, &iter, writer))
-                            return;
-                    } else {
-                        var i: i32 = 1;
-                        var first = false;
-                        while (true) : (i += 1) {
-                            if (L.getargument(level, i)) {
-                                defer L.pop(1);
-                                if (first)
-                                    try writer.writeByte(',');
-                                first = true;
-                                const typename = VM.lapi.typename(L.typeOf(-1));
-                                const value = tostring(L, -1);
-                                defer L.pop(1);
+                    try listParamsJson(L, allocator, writer, level, &ar, args_rest);
 
-                                const value_base64_buf, const base64_value = try toBase64(allocator, value);
-                                defer allocator.free(value_base64_buf);
-                                if (i > ar.nparams)
-                                    try writer.print("{{\"id\":{d},\"key\":\"{s}\",\"value\":\"{s}\",\"key_type\":\"literal\",\"value_type\":\"{s}\"}}", .{
-                                        i,
-                                        "var",
-                                        base64_value,
-                                        typename,
-                                    })
-                                else
-                                    try writer.print("{{\"id\":{d},\"key\":\"{s}\",\"value\":\"{s}\",\"key_type\":\"literal\",\"value_type\":\"{s}\"}}", .{
-                                        i,
-                                        "param",
-                                        base64_value,
-                                        typename,
-                                    });
-                            } else break;
-                        }
-                    }
-                    try writer.writeByte(']');
                     printResult("{s}\n", .{allocating.written()});
                 },
             }
         },
+        _ => unreachable, // should not happen
     }
+}
+
+fn listUpvaluesJson(L: *VM.lua.State, allocator: std.mem.Allocator, writer: *std.Io.Writer, level: i32, ar: *VM.lua.Debug, args: []const u8) !void {
+    try L.rawcheckstack(7);
+    if (!L.getinfo(level, "af", ar))
+        return writer.writeAll("[]"); // nothing
+    defer L.pop(1); // remove function
+    const fn_idx = L.gettop();
+    var iter = std.mem.splitScalar(u8, std.mem.trimLeft(u8, args, " "), ',');
+
+    try writer.writeByte('[');
+    const first_iter = iter.first();
+    if (first_iter.len > 0) {
+        const initial_idx = try std.fmt.parseInt(u32, first_iter, 10);
+        _ = L.getupvalue(@intCast(fn_idx), @intCast(initial_idx)) orelse {
+            return writer.writeAll("[]");
+        };
+        defer L.pop(1);
+        variableJsonDisassemble(allocator, writer, L, &iter) catch |err| switch (err) {
+            error.NoTable, error.NoWhere => return writer.writeAll("[]"),
+            else => return err,
+        };
+    } else {
+        var i: u32 = 1;
+        var first = false;
+        while (true) : (i += 1) {
+            if (L.getupvalue(@intCast(fn_idx), i)) |name| {
+                defer L.pop(1);
+                if (first)
+                    try writer.writeByte(',');
+                first = true;
+                const typename = VM.lapi.typename(L.typeOf(-1));
+                const value = tostring(L, -1);
+
+                const value_base64_buf, const base64_value = try toBase64(allocator, value);
+                defer allocator.free(value_base64_buf);
+
+                L.pop(1);
+
+                try writer.print("{{\"id\":{d},\"key\":{{\"value\":\"{s}\",\"type\":\"literal\"}},\"value\":{{\"value\":\"{s}\",\"type\":\"{s}\"", .{
+                    i,
+                    name,
+                    base64_value,
+                    typename,
+                });
+                switch (L.typeOf(-1)) {
+                    .Buffer => {
+                        const buf = L.tobuffer(-1).?;
+                        const compressed = try zstd.compressAlloc(allocator, buf, 11);
+                        defer allocator.free(compressed);
+                        const zbase64_buf, const zbase64_value = try toBase64(allocator, compressed);
+                        defer allocator.free(zbase64_buf);
+                        try writer.print(",\"zbase64\":\"{s}\"", .{zbase64_value});
+                    },
+                    else => {},
+                }
+                try writer.writeAll("}}");
+            } else break;
+        }
+    }
+    try writer.writeByte(']');
 }
 
 fn promptOpUpvalues(L: *VM.lua.State, allocator: std.mem.Allocator, params_args: []const u8) !void {
@@ -766,7 +893,7 @@ fn promptOpUpvalues(L: *VM.lua.State, allocator: std.mem.Allocator, params_args:
 
     const command_input, const rest = getNextArg(params_args);
     switch (LOCALS_COMMAND_MAP.get(command_input) orelse {
-        return printResult("Unknown upvalues command\n", .{});
+        return printResult("unknown upvalues command\n", .{});
     }) {
         .help => { // upvalues help
             printResult("Upvalues Commands:\n", .{});
@@ -815,60 +942,84 @@ fn promptOpUpvalues(L: *VM.lua.State, allocator: std.mem.Allocator, params_args:
                         printResult("No upvalue found.\n", .{});
                 },
                 .Json => {
-                    try L.rawcheckstack(7);
-                    if (!L.getinfo(level, "af", &ar))
-                        return printResult("[]\n", .{}); // nothing
-                    defer L.pop(1); // remove function
-                    const fn_idx = L.gettop();
-                    var iter = std.mem.splitScalar(u8, std.mem.trimLeft(u8, args_rest, " "), ',');
-
                     var allocating: std.Io.Writer.Allocating = .init(allocator);
                     defer allocating.deinit();
 
                     const writer = &allocating.writer;
 
-                    try writer.writeByte('[');
-                    const first_iter = iter.first();
-                    if (first_iter.len > 0) {
-                        const initial_idx = std.fmt.parseInt(u32, first_iter, 10) catch |err| {
-                            return printResult("Id Parse Error: {}\n", .{err});
-                        };
-                        _ = L.getupvalue(@intCast(fn_idx), @intCast(initial_idx)) orelse {
-                            return printResult("[]\n", .{});
-                        };
-                        defer L.pop(1);
-                        if (!try variableJsonDisassemble(allocator, L, &iter, writer))
-                            return;
-                    } else {
-                        var i: u32 = 1;
-                        var first = false;
-                        while (true) : (i += 1) {
-                            if (L.getupvalue(@intCast(fn_idx), i)) |name| {
-                                defer L.pop(1);
-                                if (first)
-                                    try writer.writeByte(',');
-                                first = true;
-                                const typename = VM.lapi.typename(L.typeOf(-1));
-                                const value = tostring(L, -1);
-                                defer L.pop(1);
+                    try listUpvaluesJson(L, allocator, writer, level, &ar, args_rest);
 
-                                const value_base64_buf, const base64_value = try toBase64(allocator, value);
-                                defer allocator.free(value_base64_buf);
-                                try writer.print("{{\"id\":{d},\"key\":\"{s}\",\"value\":\"{s}\",\"key_type\":\"literal\",\"value_type\":\"{s}\"}}", .{
-                                    i,
-                                    name,
-                                    base64_value,
-                                    typename,
-                                });
-                            } else break;
-                        }
-                    }
-                    try writer.writeByte(']');
                     printResult("{s}\n", .{allocating.written()});
                 },
             }
         },
+        _ => unreachable, // should not happen
     }
+}
+
+fn listGlobalsJson(L: *VM.lua.State, allocator: std.mem.Allocator, writer: *std.Io.Writer, level: i32, ar: *VM.lua.Debug, args: []const u8) !void {
+    try L.rawcheckstack(7);
+    if (!L.getinfo(level, "af", ar))
+        return try writer.writeAll("[]"); // nothing
+    L.getfenv(-1);
+    defer L.pop(1); // remove env
+    L.remove(-2); // remove function
+    if (L.typeOf(-1) != .Table)
+        return try writer.writeAll("[]"); // invalid
+    var iter = std.mem.splitScalar(u8, std.mem.trimLeft(u8, args, " "), ',');
+
+    try writer.writeByte('[');
+    const first_iter = iter.first();
+    if (first_iter.len > 0) {
+        iter.reset();
+        variableJsonDisassemble(allocator, writer, L, &iter) catch |err| switch (err) {
+            error.NoTable, error.NoWhere => return writer.writeAll("[]"),
+            else => return err,
+        };
+    } else {
+        var order: u32 = 1;
+        var first = false;
+        var i: i32 = L.rawiter(-1, 0);
+        while (i >= 0) : (i = L.rawiter(-1, i)) {
+            defer L.pop(2); // remove value, key
+            order += 1;
+            if (first)
+                try writer.writeByte(',');
+            first = true;
+            const key_typename = VM.lapi.typename(L.typeOf(-2));
+            const value_typename = VM.lapi.typename(L.typeOf(-1));
+            const key = tostring(L, -2);
+            const value = tostring(L, -2);
+
+            const key_base64_buf, const base64_key = try toBase64(allocator, key);
+            defer allocator.free(key_base64_buf);
+            const value_base64_buf, const base64_value = try toBase64(allocator, value);
+            defer allocator.free(value_base64_buf);
+
+            L.pop(2);
+
+            try writer.print("{{\"id\":{d},\"key\":{{\"value\":\"{s}\",\"type\":\"{s}\"}},\"value\":{{\"value\":\"{s}\",\"type\":\"{s}\"", .{
+                i,
+                base64_key,
+                key_typename,
+                base64_value,
+                value_typename,
+            });
+            switch (L.typeOf(-1)) {
+                .Buffer => {
+                    const buf = L.tobuffer(-1).?;
+                    const compressed = try zstd.compressAlloc(allocator, buf, 11);
+                    defer allocator.free(compressed);
+                    const zbase64_buf, const zbase64_value = try toBase64(allocator, compressed);
+                    defer allocator.free(zbase64_buf);
+                    try writer.print(",\"zbase64\":\"{s}\"", .{zbase64_value});
+                },
+                else => {},
+            }
+            try writer.writeAll("}}");
+        }
+    }
+    try writer.writeByte(']');
 }
 
 fn promptOpGlobals(L: *VM.lua.State, allocator: std.mem.Allocator, globals_args: []const u8) !void {
@@ -880,7 +1031,7 @@ fn promptOpGlobals(L: *VM.lua.State, allocator: std.mem.Allocator, globals_args:
 
     const command_input, const rest = getNextArg(globals_args);
     switch (LOCALS_COMMAND_MAP.get(command_input) orelse {
-        return printResult("Unknown globals command\n", .{});
+        return printResult("unknown globals command\n", .{});
     }) {
         .help => { // globals help
             printResult("Globals Commands:\n", .{});
@@ -932,60 +1083,18 @@ fn promptOpGlobals(L: *VM.lua.State, allocator: std.mem.Allocator, globals_args:
                         printResult("No globals found.\n", .{});
                 },
                 .Json => {
-                    try L.rawcheckstack(7);
-                    if (!L.getinfo(level, "af", &ar))
-                        return printResult("[]\n", .{}); // nothing
-                    L.getfenv(-1);
-                    defer L.pop(1); // remove env
-                    L.remove(-2); // remove function
-                    if (L.typeOf(-1) != .Table)
-                        return printResult("[]\n", .{}); // invalid
-                    var iter = std.mem.splitScalar(u8, std.mem.trimLeft(u8, args_rest, " "), ',');
-
                     var allocating: std.Io.Writer.Allocating = .init(allocator);
                     defer allocating.deinit();
 
                     const writer = &allocating.writer;
 
-                    try writer.writeByte('[');
-                    const first_iter = iter.first();
-                    if (first_iter.len > 0) {
-                        iter.reset();
-                        if (!try variableJsonDisassemble(allocator, L, &iter, writer))
-                            return;
-                    } else {
-                        var order: u32 = 1;
-                        var first = false;
-                        var i: i32 = L.rawiter(-1, 0);
-                        while (i >= 0) : (i = L.rawiter(-1, i)) {
-                            defer L.pop(4); // remove str_value, str_key, value, key
-                            order += 1;
-                            if (first)
-                                try writer.writeByte(',');
-                            first = true;
-                            const key_typename = VM.lapi.typename(L.typeOf(-2));
-                            const value_typename = VM.lapi.typename(L.typeOf(-1));
-                            const key = tostring(L, -2);
-                            const value = tostring(L, -2);
+                    try listGlobalsJson(L, allocator, writer, level, &ar, args_rest);
 
-                            const key_base64_buf, const base64_key = try toBase64(allocator, key);
-                            defer allocator.free(key_base64_buf);
-                            const value_base64_buf, const base64_value = try toBase64(allocator, value);
-                            defer allocator.free(value_base64_buf);
-                            try writer.print("{{\"id\":{d},\"key\":\"{s}\",\"value\":\"{s}\",\"key_type\":\"{s}\",\"value_type\":\"{s}\"}}", .{
-                                order,
-                                base64_key,
-                                base64_value,
-                                key_typename,
-                                value_typename,
-                            });
-                        }
-                    }
-                    try writer.writeByte(']');
                     printResult("{s}\n", .{allocating.written()});
                 },
             }
         },
+        _ => unreachable, // should not happen
     }
 }
 
@@ -1018,13 +1127,353 @@ const DebugState = struct {
 };
 pub var DEBUG: DebugState = .{};
 
-pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c.lua_Debug) !void {
+pub var COMM: union(enum) {
+    io: std.fs.File.Reader,
+    stream: std.net.Stream,
+} = undefined;
+
+const MessageOpcode = enum(u8) {
+    Paused,
+    Break,
+    Result,
+    Error,
+    Continued,
+};
+
+fn sendMessage(stream: std.net.Stream, opcode: MessageOpcode, message: ?[]const u8) !void {
+    var buf: [128]u8 = undefined;
+    var stream_writer = stream.writer(&buf);
+    const writer = &stream_writer.interface;
+
+    try writer.writeByte(@intFromEnum(opcode));
+    switch (opcode) {
+        .Paused, .Continued => std.debug.assert(message == null),
+        else => {
+            if (message) |msg|
+                try writer.writeAll(msg);
+            try writer.writeByte('\n');
+        },
+    }
+
+    try writer.flush();
+}
+
+fn printMessage(stream: std.net.Stream, opcode: MessageOpcode, comptime fmt: []const u8, args: anytype) !void {
+    var buf: [128]u8 = undefined;
+    var stream_writer = stream.writer(&buf);
+    const writer = &stream_writer.interface;
+
+    try writer.writeByte(@intFromEnum(opcode));
+    switch (opcode) {
+        .Paused, .Continued => unreachable, // should not happen
+        else => {
+            try writer.print(fmt, args);
+            try writer.writeByte('\n');
+        },
+    }
+
+    try writer.flush();
+}
+
+fn readStreamInput(reader: *std.Io.Reader, allocator: std.mem.Allocator) !std.Io.Writer.Allocating {
+    var input: std.Io.Writer.Allocating = .init(allocator);
+    errdefer input.deinit();
+    _ = try reader.streamDelimiter(&input.writer, '\n');
+    _ = try reader.discardShort(1);
+    return input;
+}
+
+fn promptSocket(stream: std.net.Stream, L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c.lua_Debug) !void {
     const allocator = luau.getallocator(L);
 
-    var stdin = std.fs.File.stdin();
-    var buf: [128]u8 = undefined;
-    var stdin_reader = stdin.reader(&buf);
-    var reader = &stdin_reader.interface;
+    var read_buf: [128]u8 = undefined;
+    var stream_reader = stream.reader(&read_buf);
+    const reader: *std.Io.Reader = stream_reader.interface();
+
+    switch (kind) {
+        .None => {},
+        .Breakpoint, .Stepped => |k| {
+            const ar = debug_info orelse std.debug.panic(DEBUG_RESULT_TAG ++ "Debugger crashed, missing debug info for breakpoint", .{});
+            try printMessage(stream, .Break, "{{\"break\":{d},\"line\":{d}}}", .{ @intFromEnum(k), ar.currentline });
+        },
+        .HandledException, .UnhandledException => try printMessage(stream, .Break, "{{\"break\":{d},\"line\":null}}", .{@intFromEnum(kind)}),
+    }
+
+    try sendMessage(stream, .Paused, null);
+
+    while (true) {
+        const cmd: COMMAND_ENUM = @enumFromInt(try reader.takeByte());
+        switch (cmd) {
+            .exit => {
+                DebuggerExit();
+                std.process.exit(0);
+            },
+            .@"break" => out: {
+                switch (@as(BREAK_COMMAND_ENUM, @enumFromInt(try reader.takeByte()))) {
+                    .add, .remove => |o| {
+                        var input = try readStreamInput(reader, allocator);
+                        defer input.deinit();
+
+                        var args = std.mem.splitBackwardsScalar(u8, input.written(), ':');
+                        const line_str = args.first();
+                        const file_str = args.rest();
+                        const line = std.fmt.parseInt(i32, line_str, 10) catch |err| {
+                            break :out try printMessage(stream, .Error, "Line Parse Error: {}", .{err});
+                        };
+                        const dir = std.fs.cwd();
+                        const file_path = dir.realpathAlloc(allocator, file_str) catch |err| switch (err) {
+                            error.FileNotFound => break :out try printMessage(stream, .Error, "file not found: {s}", .{file_str}),
+                            else => break :out try printMessage(stream, .Error, "failed to resolve file '{s}': {}", .{ file_str, err }),
+                        };
+                        defer allocator.free(file_path);
+                        if (o == .remove) {
+                            _ = removeBreakpoint(file_path, line);
+                            try sendMessage(stream, .Result, "removed");
+                        } else {
+                            if (try addBreakpoint(file_path, line) == .exists)
+                                try sendMessage(stream, .Result, "exists")
+                            else
+                                try sendMessage(stream, .Result, "added");
+                        }
+                    },
+                    else => try sendMessage(stream, .Error, "unknown break command"),
+                }
+            },
+            .trace => out: {
+                var input = try readStreamInput(reader, allocator);
+                defer input.deinit();
+
+                const written = input.written();
+                const levels: u32 = if (written.len > 0) std.fmt.parseInt(u32, written, 10) catch |err| {
+                    break :out try sendMessage(stream, .Error, @errorName(err));
+                } else 0;
+                var level_depth: u32 = 0;
+                var ar: VM.lua.Debug = .{ .ssbuf = undefined };
+                var allocating: std.Io.Writer.Allocating = .init(allocator);
+                defer allocating.deinit();
+
+                const writer = &allocating.writer;
+
+                try writer.writeByte('[');
+                while (L.getinfo(@intCast(level_depth), "sln", &ar)) : (level_depth += 1) {
+                    if (level_depth > levels and levels != 0)
+                        break;
+                    if (level_depth > 0)
+                        try writer.writeByte(',');
+                    const src_base64_buf, const base64_src = try toBase64(allocator, ar.short_src.?);
+                    defer allocator.free(src_base64_buf);
+                    if (ar.name) |fn_name|
+                        try writer.print("{{\"name\":\"{s}\",\"src\":\"{s}\",\"line\":{d},\"context\":{d}}}", .{
+                            fn_name,
+                            base64_src,
+                            ar.currentline orelse ar.linedefined orelse 0,
+                            @intFromEnum(ar.what),
+                        })
+                    else
+                        try writer.print("{{\"name\":null,\"src\":\"{s}\",\"line\":{d},\"context\":{d}}}", .{
+                            base64_src,
+                            ar.currentline orelse ar.linedefined orelse 0,
+                            @intFromEnum(ar.what),
+                        });
+                }
+                try writer.writeByte(']');
+                try sendMessage(stream, .Result, allocating.written());
+            },
+            .step => {
+                DEBUG.step = .Step;
+                if (debug_info) |ar|
+                    if (ar.currentline > 0) {
+                        DEBUG.line = @intCast(ar.currentline);
+                    };
+                try sendMessage(stream, .Continued, null);
+                break;
+            },
+            .step_out => {
+                DEBUG.step = .Step;
+                const depth = L.stackdepth();
+                if (depth > 0) {
+                    DEBUG.depth = depth - 1;
+                }
+                try sendMessage(stream, .Continued, null);
+                break;
+            },
+            .step_instruction => {
+                DEBUG.step = .Step;
+                try sendMessage(stream, .Continued, null);
+                break;
+            },
+            .next => {
+                DEBUG.step = .Step;
+                DEBUG.depth = L.stackdepth();
+                if (debug_info) |ar|
+                    if (ar.currentline > 0) {
+                        DEBUG.line = @intCast(ar.currentline);
+                    };
+                try sendMessage(stream, .Continued, null);
+                break;
+            },
+            .locals => out: {
+                switch (@as(LOCALS_COMMAND_ENUM, @enumFromInt(try reader.takeByte()))) {
+                    .list => {
+                        var input = try readStreamInput(reader, allocator);
+                        defer input.deinit();
+
+                        const level_in, const args_rest = getNextArg(input.written());
+                        var level: i32 = 0;
+                        if (level_in.len > 0) {
+                            level = std.fmt.parseInt(i32, level_in, 10) catch |err| {
+                                break :out try printMessage(stream, .Error, "Level Parse Error: {}", .{err});
+                            };
+                        }
+
+                        var allocating: std.Io.Writer.Allocating = .init(allocator);
+                        defer allocating.deinit();
+
+                        const writer = &allocating.writer;
+
+                        try listLocalsJson(L, allocator, writer, level, args_rest);
+
+                        try sendMessage(stream, .Result, allocating.written());
+                    },
+                    else => try sendMessage(stream, .Error, "unknown locals command"),
+                }
+            },
+            .params => out: {
+                switch (@as(LOCALS_COMMAND_ENUM, @enumFromInt(try reader.takeByte()))) {
+                    .list => {
+                        var input = try readStreamInput(reader, allocator);
+                        defer input.deinit();
+
+                        const level_in, const args_rest = getNextArg(input.written());
+                        var level: i32 = 0;
+                        if (level_in.len > 0) {
+                            level = std.fmt.parseInt(i32, level_in, 10) catch |err| {
+                                break :out try printMessage(stream, .Error, "Level Parse Error: {}", .{err});
+                            };
+                        }
+                        var ar: VM.lua.Debug = .{ .ssbuf = undefined };
+
+                        var allocating: std.Io.Writer.Allocating = .init(allocator);
+                        defer allocating.deinit();
+
+                        const writer = &allocating.writer;
+
+                        try listParamsJson(L, allocator, writer, level, &ar, args_rest);
+
+                        try sendMessage(stream, .Result, allocating.written());
+                    },
+                    else => try sendMessage(stream, .Error, "unknown params command"),
+                }
+            },
+            .upvalues => out: {
+                switch (@as(LOCALS_COMMAND_ENUM, @enumFromInt(try reader.takeByte()))) {
+                    .list => {
+                        var input = try readStreamInput(reader, allocator);
+                        defer input.deinit();
+
+                        const level_in, const args_rest = getNextArg(input.written());
+                        var level: i32 = 0;
+                        if (level_in.len > 0) {
+                            level = std.fmt.parseInt(i32, level_in, 10) catch |err| {
+                                break :out try printMessage(stream, .Error, "Level Parse Error: {}", .{err});
+                            };
+                        }
+                        var ar: VM.lua.Debug = .{ .ssbuf = undefined };
+
+                        var allocating: std.Io.Writer.Allocating = .init(allocator);
+                        defer allocating.deinit();
+
+                        const writer = &allocating.writer;
+
+                        try listUpvaluesJson(L, allocator, writer, level, &ar, args_rest);
+
+                        try sendMessage(stream, .Result, allocating.written());
+                    },
+                    else => try sendMessage(stream, .Error, "unknown upvalues command"),
+                }
+            },
+            .globals => out: {
+                switch (@as(LOCALS_COMMAND_ENUM, @enumFromInt(try reader.takeByte()))) {
+                    .list => {
+                        var input = try readStreamInput(reader, allocator);
+                        defer input.deinit();
+
+                        const level_in, const args_rest = getNextArg(input.written());
+                        var level: i32 = 0;
+                        if (level_in.len > 0) {
+                            level = std.fmt.parseInt(i32, level_in, 10) catch |err| {
+                                break :out try printMessage(stream, .Error, "Level Parse Error: {}", .{err});
+                            };
+                        }
+                        var ar: VM.lua.Debug = .{ .ssbuf = undefined };
+
+                        var allocating: std.Io.Writer.Allocating = .init(allocator);
+                        defer allocating.deinit();
+
+                        const writer = &allocating.writer;
+
+                        try listGlobalsJson(L, allocator, writer, level, &ar, args_rest);
+
+                        try sendMessage(stream, .Result, allocating.written());
+                    },
+                    else => try sendMessage(stream, .Error, "unknown globals command"),
+                }
+            },
+            .run => {
+                DEBUG.step = .Run;
+                try sendMessage(stream, .Continued, null);
+                break;
+            },
+            .restart => out: {
+                if (Zune.corelib.thread.THREADS.len > 0) {
+                    break :out try sendMessage(stream, .Error, "cannot restart while threads are running");
+                }
+                // force a break, ignoring yield status
+                L.curr_status = @intFromEnum(VM.lua.Status.Break);
+                DEBUG.dead = true;
+                Scheduler.KillSchedulers();
+                return;
+            },
+            .exception => {
+                var input = try readStreamInput(reader, allocator);
+                defer input.deinit();
+
+                const option, const args_rest = getNextArg(input.written());
+                const enabled = std.mem.eql(u8, std.mem.trimLeft(u8, args_rest, " "), "true");
+                if (std.mem.eql(u8, option, "UnhandledError")) {
+                    DEBUG.unhandled_exception = enabled;
+                    try printMessage(stream, .Result, "{}", .{DEBUG.unhandled_exception});
+                } else if (std.mem.eql(u8, option, "HandledError")) {
+                    DEBUG.handled_exception = enabled;
+                    try printMessage(stream, .Result, "{}", .{DEBUG.handled_exception});
+                } else {
+                    if (kind == .UnhandledException or kind == .HandledException) {
+                        if (L.gettop() > 0) {
+                            try L.rawcheckstack(1);
+                            const typename = VM.lapi.typename(L.typeOf(-1));
+                            const err = tostring(L, -1);
+                            defer L.pop(1);
+                            const err_base64_buf, const base64_err = try toBase64(allocator, err);
+                            defer allocator.free(err_base64_buf);
+                            try printMessage(stream, .Result, "{{\"reason\":\"{s}\",\"type\":\"{s}\",\"kind\":{d}}}", .{ base64_err, typename, @intFromEnum(kind) });
+                            continue;
+                        }
+                    }
+                    try printMessage(stream, .Result, "{{\"reason\":null,\"type\":null,\"kind\":{d}}}", .{@intFromEnum(kind)});
+                }
+            },
+            else => try sendMessage(stream, .Error, "unknown command"),
+        }
+    }
+}
+
+pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c.lua_Debug) !void {
+    const reader = switch (COMM) {
+        .io => &COMM.io.interface,
+        .stream => |s| return try promptSocket(s, L, kind, debug_info),
+    };
+
+    const allocator = luau.getallocator(L);
 
     const terminal = &(Zune.corelib.io.TERMINAL orelse std.debug.panic("Terminal not initialized", .{}));
     const history = HISTORY orelse std.debug.panic("History not initialized", .{});
@@ -1158,7 +1607,7 @@ pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c
                             position -= 1;
                         }
                     },
-                    else => |b| std.debug.print("Unknown escape sequence: {d}\n", .{b}),
+                    else => |b| std.debug.print("unknown escape sequence: {d}\n", .{b}),
                 }
             },
             Terminal.NEW_LINE => {
@@ -1477,6 +1926,7 @@ pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c
                                 }
                             }
                         },
+                        _ => unreachable, // should not happen
                     }
                 }
                 try terminal.clearStyles();
@@ -1519,10 +1969,11 @@ pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c
             else => |b| {
                 var byte: u8 = b;
                 switch (byte) {
-                    22...31 => std.debug.print("Unknown byte: {d}\n", .{byte}),
+                    22...31 => std.debug.print("unknown byte: {d}\n", .{byte}),
                     9 => byte = ' ',
                     else => {},
                 }
+
                 const append = position < input_buffer.items.len;
                 try input_buffer.insert(allocator, position, byte);
                 std.debug.print("{c}", .{byte});
