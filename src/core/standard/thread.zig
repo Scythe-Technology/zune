@@ -350,8 +350,6 @@ const LuaThread = struct {
     }
 
     pub fn lua_join(self: *LuaThread, L: *VM.lua.State) !i32 {
-        if (!L.isyieldable())
-            return L.Zyielderror();
         const runtime = self.runtime;
         runtime.access_mutex.lock();
         defer runtime.access_mutex.unlock();
@@ -359,6 +357,8 @@ const LuaThread = struct {
             .ready, .dead => return 0,
             .running => {},
         }
+        if (!L.isyieldable())
+            return L.Zyielderror();
         const scheduler = Scheduler.getScheduler(L);
 
         const state = try scheduler.createSync(Sync, Sync.joinComplete);

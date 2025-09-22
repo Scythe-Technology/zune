@@ -95,6 +95,10 @@ jobs:
       if: matrix.qemu-platform != ''
       uses: docker/setup-qemu-action@v1
 
+    - name: Run info
+      continue-on-error: ${{ matrix.qemu-platform != '' }}
+      run: zig build run -Dtarget=${{ matrix.target }}${{ matrix.llvm != '' && ' -Dllvm' || '' }}${{ matrix.qemu-platform != '' && ' -fqemu' || '' }} -- info all
+
     - name: Run tests
       continue-on-error: ${{ matrix.qemu-platform != '' }}
       run: zig build test -Dtarget=${{ matrix.target }}${{ matrix.llvm != '' && ' -Dllvm' || '' }}${{ matrix.qemu-platform != '' && ' -fqemu' || '' }} --verbose
