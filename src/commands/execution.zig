@@ -444,6 +444,7 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     var LOAD_FLAGS: Zune.Flags = .{};
     var ALWAYS_DEBUG = true;
+    var IPC_PORT: ?u16 = null;
 
     if (flags) |f| for (f) |flag| {
         if (flag.len < 2)
@@ -482,6 +483,13 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
                     LOAD_FLAGS.limbo = true;
                 } else if (std.mem.eql(u8, flag, "--no-fmt")) {
                     Zune.STATE.FORMAT.ENABLED = false;
+                } else if (std.mem.startsWith(u8, flag, "--ipc-port=")) {
+                    const port = flag[11..];
+                    if (port.len == 0) {
+                        Zune.debug.print("<red>error<clear>: invalid port number\n", .{});
+                        std.process.exit(1);
+                    }
+                    IPC_PORT = try std.fmt.parseInt(u16, port, 10);
                 } else continue :sw 0,
                 else => {
                     Zune.debug.print("<red>error<clear>: unknown flag '{s}'\n", .{flag});
@@ -508,6 +516,25 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
     };
     defer allocator.free(file_src_path);
     defer allocator.free(file_content);
+
+    const stdin = std.fs.File.stdin();
+    var reader_buffer: [128]u8 = undefined;
+    if (IPC_PORT) |port| {
+        const address = try std.net.Address.parseIp4("127.0.0.1", port);
+        Debugger.COMM = .{
+            .stream = try std.net.tcpConnectToAddress(address),
+        };
+        try Debugger.COMM.stream.writeAll("zune/" ++ Zune.info.version ++ "\n");
+        try Debugger.COMM.stream.writeAll(std.fmt.comptimePrint("luau/{d}.{d}\n", .{ luau.LUAU_VERSION.major, luau.LUAU_VERSION.minor }));
+    } else {
+        Debugger.COMM = .{
+            .io = stdin.reader(&reader_buffer),
+        };
+    }
+    defer switch (Debugger.COMM) {
+        .stream => |s| s.close(),
+        .io => {},
+    };
 
     while (true) {
         defer Debugger.DEBUG.dead = false;
