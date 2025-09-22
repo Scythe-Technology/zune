@@ -39,25 +39,6 @@ fn getFile(allocator: std.mem.Allocator, dir: std.fs.Dir, input: []const u8) !st
     return .{ maybe_src.?, maybe_content.? };
 }
 
-fn splitArgs(args: []const []const u8) struct { []const []const u8, ?[]const []const u8 } {
-    var run_args: []const []const u8 = args;
-    var flags: ?[]const []const u8 = null;
-    blk: {
-        for (args, 0..) |arg, ap| {
-            if (arg.len <= 1 or arg[0] != '-') {
-                if (ap > 0)
-                    flags = args[0..ap];
-                run_args = args[ap..];
-                break :blk;
-            }
-        }
-        flags = args;
-        run_args = &[0][]const u8{};
-        break :blk;
-    }
-    return .{ run_args, flags };
-}
-
 const ScanOptions = struct {
     glob: []const u8,
     kind: Kind = .script,
@@ -110,36 +91,63 @@ const COMPRESSION_MAP = std.StaticStringMap(Bundle.Section.Compression).initComp
 });
 
 fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
-    const bundle_args, const flags = splitArgs(args);
-
-    if (bundle_args.len < 1) {
-        Zune.debug.print("<red>usage<clear>: bundle [flags] <<luau file>> [...luau files]\n", .{});
+    if (args.len < 1) {
+        Zune.debug.print("<red>usage<clear>: bundle [...flags or files]\n", .{});
         return;
     }
 
     Zune.loadConfiguration(std.fs.cwd());
+
+    if (std.mem.eql(u8, args[0], "--read")) {
+        if (args.len != 2) {
+            Zune.debug.print("<red>usage<clear>: bundle --read <<file>>\n", .{});
+            return;
+        }
+        const path = args[1];
+        const file = try std.fs.cwd().openFile(path, .{ .mode = .read_only });
+        defer file.close();
+
+        const last_color = Zune.STATE.FORMAT.USE_COLOR;
+
+        const map = Bundle.getFromFile(allocator, file) catch |err| switch (err) {
+            error.CorruptBundle => {
+                Zune.debug.print("<red>error<clear>: '{s}' is not a valid zune bundle (corrupt)\n", .{path});
+                std.process.exit(1);
+            },
+            else => return err,
+        } orelse {
+            Zune.debug.print("<red>error<clear>: '{s}' is not a valid zune bundle\n", .{path});
+            std.process.exit(1);
+        };
+
+        Zune.STATE.FORMAT.USE_COLOR = last_color;
+
+        Zune.debug.print("<bold>bundled size<clear>: {d}\n", .{map.allocated.len});
+        Zune.debug.print("<bold>build mode<clear>:   <green>{t}<clear>\n", .{map.mode.compiled});
+        Zune.debug.print("<bold>sections<clear>:     {d}\n", .{map.map.size});
+        Zune.debug.print("<bold>entry<clear>:\n", .{});
+        Zune.debug.print("- <bold>name<clear>: {s}\n", .{map.entry.name[1..]});
+        Zune.debug.print("  <bold>size<clear>: {d}\n", .{map.entry.data.len});
+        return;
+    }
 
     var home_dir = File.getHomeDir(Zune.STATE.ENV_MAP) orelse "";
 
     var dir = try std.fs.cwd().openDir(".", .{ .iterate = true });
     defer dir.close();
 
-    const module = bundle_args[0];
-
     const cwd_path = try dir.realpathAlloc(allocator, ".");
     defer allocator.free(cwd_path);
 
-    const entry_file, const contents = getFile(allocator, dir, module) catch |err| switch (err) {
-        error.FileNotFound => {
-            Zune.debug.print("<red>error<clear>: file not found '{s}'\n", .{module});
-            std.process.exit(1);
-        },
-        else => return err,
-    };
-    defer allocator.free(entry_file);
-    defer allocator.free(contents);
-
-    const file_path = entry_file[1..];
+    var EXEC: ?[]const u8 = null;
+    var COMPRESSION: Bundle.Section.Compression = .none;
+    var BUILD_MODE: enum(u1) { debug, release } = .debug;
+    var OUTPUT: union(enum) {
+        stdout: void,
+        path: []const u8,
+        default: []const u8,
+    } = .{ .default = undefined };
+    var LOAD_FLAGS: Zune.Flags = .{};
 
     var SCRIPTS: std.StringArrayHashMapUnmanaged(void) = .empty;
     defer SCRIPTS.deinit(allocator);
@@ -149,20 +157,90 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
     defer for (FILES.keys()) |file| allocator.free(file);
 
     {
-        const abs_entry_file = try std.fs.path.resolve(allocator, &.{ cwd_path, file_path });
-        errdefer allocator.free(abs_entry_file);
-        try SCRIPTS.put(allocator, abs_entry_file, undefined);
-
         var basket: *std.StringArrayHashMapUnmanaged(void) = &SCRIPTS;
         var backet_kind: ScanOptions.Kind = .script;
-        for (bundle_args[1..]) |arg| {
+        for (args) |arg| {
             if (std.mem.startsWith(u8, arg, "-")) {
-                if (std.mem.eql(u8, arg, "--files") or std.mem.eql(u8, arg, "-f")) {
-                    basket = &FILES;
-                    backet_kind = .file;
-                } else if (std.mem.eql(u8, arg, "--scripts") or std.mem.eql(u8, arg, "-s")) {
-                    basket = &SCRIPTS;
-                    backet_kind = .script;
+                if (arg.len < 2)
+                    continue;
+                const flag = arg;
+                sw: switch (flag[1]) {
+                    'O' => if (flag.len == 3 and flag[2] >= '0' and flag[2] <= '2') {
+                        const level: u2 = switch (flag[2]) {
+                            '0' => 0,
+                            '1' => 1,
+                            '2' => 2,
+                            else => unreachable,
+                        };
+                        Zune.STATE.LUAU_OPTIONS.OPTIMIZATION_LEVEL = level;
+                    } else {
+                        Zune.debug.print("<red>error<clear>: invalid optimization level, usage: -O<<N>>\n", .{});
+                        std.process.exit(1);
+                    },
+                    'g' => {
+                        if (flag.len == 3 and flag[2] >= '0' and flag[2] <= '2') {
+                            const level: u2 = switch (flag[2]) {
+                                '0' => 0,
+                                '1' => 1,
+                                '2' => 2,
+                                else => unreachable,
+                            };
+                            Zune.STATE.LUAU_OPTIONS.DEBUG_LEVEL = level;
+                        } else {
+                            Zune.debug.print("<red>error<clear>: invalid debug level, usage: -g<<N>>\n", .{});
+                            std.process.exit(1);
+                        }
+                    },
+                    'f' => if (std.mem.eql(u8, arg, "-f")) {
+                        basket = &FILES;
+                        backet_kind = .file;
+                    } else continue :sw 0,
+                    's' => if (std.mem.eql(u8, arg, "-s")) {
+                        basket = &SCRIPTS;
+                        backet_kind = .script;
+                    } else continue :sw 0,
+                    '-' => if (std.mem.eql(u8, flag, "--native")) {
+                        Zune.STATE.LUAU_OPTIONS.CODEGEN = true;
+                    } else if (std.mem.eql(u8, flag, "--no-native")) {
+                        Zune.STATE.LUAU_OPTIONS.CODEGEN = false;
+                    } else if (std.mem.eql(u8, flag, "--no-jit")) {
+                        Zune.STATE.LUAU_OPTIONS.JIT_ENABLED = false;
+                    } else if (std.mem.eql(u8, flag, "--limbo")) {
+                        LOAD_FLAGS.limbo = true;
+                    } else if (std.mem.eql(u8, flag, "--no-fmt")) {
+                        Zune.STATE.FORMAT.ENABLED = false;
+                    } else if (std.mem.eql(u8, flag, "--release")) {
+                        BUILD_MODE = .release;
+                    } else if (std.mem.eql(u8, flag, "--debug")) {
+                        BUILD_MODE = .debug;
+                    } else if (std.mem.eql(u8, flag, "--no_home")) {
+                        home_dir = cwd_path;
+                    } else if (std.mem.eql(u8, arg, "--files")) {
+                        basket = &FILES;
+                        backet_kind = .file;
+                    } else if (std.mem.eql(u8, arg, "--scripts")) {
+                        basket = &SCRIPTS;
+                        backet_kind = .script;
+                    } else if (std.mem.startsWith(u8, flag, "--exe=") and flag.len > 6) {
+                        EXEC = flag[6..];
+                    } else if (std.mem.startsWith(u8, flag, "--out=") and flag.len > 6) {
+                        const path = flag[6..];
+                        if (path.len == 1 and path[0] == '-')
+                            OUTPUT = .stdout
+                        else
+                            OUTPUT = .{ .path = path };
+                    } else if (std.mem.startsWith(u8, flag, "--home=") and flag.len > 7) {
+                        home_dir = flag[7..];
+                    } else if (std.mem.startsWith(u8, flag, "--compression=") and flag.len > 14) {
+                        COMPRESSION = COMPRESSION_MAP.get(flag[14..]) orelse {
+                            Zune.debug.print("<red>error<clear>: unknown compression type '{s}'\n", .{flag[14..]});
+                            std.process.exit(1);
+                        };
+                    } else continue :sw 0,
+                    else => {
+                        Zune.debug.print("<red>error<clear>: unknown flag '{s}'\n", .{flag});
+                        std.process.exit(1);
+                    },
                 }
                 continue;
             }
@@ -185,82 +263,15 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
         }
     }
 
-    var EXEC: ?[]const u8 = null;
-    var COMPRESSION: Bundle.Section.Compression = .none;
-    var BUILD_MODE: enum(u1) { debug, release } = .debug;
-    var OUTPUT: union(enum) {
-        stdout: void,
-        path: []const u8,
-        default: []const u8,
-    } = .{ .default = std.fs.path.stem(file_path) };
-    var LOAD_FLAGS: Zune.Flags = .{};
-    if (flags) |f| for (f) |flag| {
-        if (flag.len < 2)
-            continue;
-        switch (flag[0]) {
-            '-' => sw: switch (flag[1]) {
-                'O' => if (flag.len == 3 and flag[2] >= '0' and flag[2] <= '2') {
-                    const level: u2 = switch (flag[2]) {
-                        '0' => 0,
-                        '1' => 1,
-                        '2' => 2,
-                        else => unreachable,
-                    };
-                    Zune.STATE.LUAU_OPTIONS.OPTIMIZATION_LEVEL = level;
-                } else {
-                    Zune.debug.print("<red>error<clear>: invalid optimization level, usage: -O<<N>>\n", .{});
-                    std.process.exit(1);
-                },
-                'g' => {
-                    if (flag.len == 3 and flag[2] >= '0' and flag[2] <= '2') {
-                        const level: u2 = switch (flag[2]) {
-                            '0' => 0,
-                            '1' => 1,
-                            '2' => 2,
-                            else => unreachable,
-                        };
-                        Zune.STATE.LUAU_OPTIONS.DEBUG_LEVEL = level;
-                    } else {
-                        Zune.debug.print("<red>error<clear>: invalid debug level, usage: -g<<N>>\n", .{});
-                        std.process.exit(1);
-                    }
-                },
-                '-' => if (std.mem.eql(u8, flag, "--native")) {
-                    Zune.STATE.LUAU_OPTIONS.CODEGEN = true;
-                } else if (std.mem.eql(u8, flag, "--no-native")) {
-                    Zune.STATE.LUAU_OPTIONS.CODEGEN = false;
-                } else if (std.mem.eql(u8, flag, "--no-jit")) {
-                    Zune.STATE.LUAU_OPTIONS.JIT_ENABLED = false;
-                } else if (std.mem.eql(u8, flag, "--limbo")) {
-                    LOAD_FLAGS.limbo = true;
-                } else if (std.mem.eql(u8, flag, "--no-fmt")) {
-                    Zune.STATE.FORMAT.ENABLED = false;
-                } else if (std.mem.eql(u8, flag, "--release")) {
-                    BUILD_MODE = .release;
-                } else if (std.mem.eql(u8, flag, "--debug")) {
-                    BUILD_MODE = .debug;
-                } else if (std.mem.eql(u8, flag, "--no_home")) {
-                    home_dir = cwd_path;
-                } else if (std.mem.startsWith(u8, flag, "--exe=") and flag.len > 6) {
-                    EXEC = flag[6..];
-                } else if (std.mem.startsWith(u8, flag, "--out=") and flag.len > 6) {
-                    OUTPUT = .{ .path = flag[6..] };
-                } else if (std.mem.startsWith(u8, flag, "--home=") and flag.len > 7) {
-                    home_dir = flag[7..];
-                } else if (std.mem.startsWith(u8, flag, "--compression=") and flag.len > 14) {
-                    COMPRESSION = COMPRESSION_MAP.get(flag[14..]) orelse {
-                        Zune.debug.print("<red>error<clear>: unknown compression type '{s}'\n", .{flag[14..]});
-                        std.process.exit(1);
-                    };
-                } else continue :sw 0,
-                else => {
-                    Zune.debug.print("<red>error<clear>: unknown flag '{s}'\n", .{flag});
-                    std.process.exit(1);
-                },
-            },
-            else => unreachable,
-        }
-    };
+    if (SCRIPTS.count() < 1) {
+        Zune.debug.print("<red>usage<clear>: bundle would have no entry file\n", .{});
+        return;
+    }
+
+    const entry_file = SCRIPTS.keys()[0];
+
+    if (OUTPUT == .default)
+        OUTPUT = .{ .default = std.fs.path.stem(entry_file) };
 
     const exe = if (EXEC) |path|
         std.fs.cwd().openFile(path, .{ .mode = .read_only }) catch |err| switch (err) {
