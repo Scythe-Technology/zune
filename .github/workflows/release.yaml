@@ -53,10 +53,10 @@ jobs:
             target: aarch64-windows
             artifact: zune-${{ needs.prep.outputs.version }}-windows-aarch64
             ext: .exe
-          - name: macOs x86_64
+          - name: macOS x86_64
             target: x86_64-macos
             artifact: zune-${{ needs.prep.outputs.version }}-macos-x86_64
-          - name: macOs Arm64
+          - name: macOS Arm64
             target: aarch64-macos
             artifact: zune-${{ needs.prep.outputs.version }}-macos-aarch64
           - name: FreeBSD x86_64

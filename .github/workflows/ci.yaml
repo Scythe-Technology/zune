@@ -59,13 +59,13 @@ jobs:
             target: x86_64-windows
             artifact: zune-${{ needs.prep.outputs.version }}-windows-x86_64
             ext: .exe
-          - os: macos-13
-            name: macOs x86_64
+          - os: macos-15-intel
+            name: macOS x86_64
             target: x86_64-macos
             llvm: true
             artifact: zune-${{ needs.prep.outputs.version }}-macos-x86_64
           - os: macos-14
-            name: macOs Arm64
+            name: macOS Arm64
             target: aarch64-macos
             artifact: zune-${{ needs.prep.outputs.version }}-macos-aarch64
           - os: ubuntu-22.04-arm
