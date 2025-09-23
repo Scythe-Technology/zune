@@ -56,6 +56,8 @@ pub const DataType = struct {
         f64,
         pointer,
         @"struct",
+        vector2_32,
+        vector3_32,
 
         pub fn asType(comptime self: Types) type {
             switch (self) {
@@ -72,6 +74,7 @@ pub const DataType = struct {
                 .f64 => return f64,
                 .pointer => return *anyopaque,
                 .@"struct" => return [*]u8,
+                .vector2_32, .vector3_32 => return [*]f32,
             }
         }
 
@@ -90,6 +93,8 @@ pub const DataType = struct {
                 .f64 => return "double",
                 .pointer => return "void*",
                 .@"struct" => return "struct",
+                .vector2_32 => return "struct vector2_32",
+                .vector3_32 => return "struct vector3_32",
             }
         }
 
@@ -108,6 +113,8 @@ pub const DataType = struct {
                 .f64 => @sizeOf(f64),
                 .pointer => @sizeOf(usize),
                 .@"struct" => 0,
+                .vector2_32 => @sizeOf([2]f32),
+                .vector3_32 => @sizeOf([3]f32),
             };
         }
     };
@@ -129,6 +136,8 @@ pub const DataType = struct {
             fields: [12]u8 = std.mem.zeroes([12]u8),
             field_len: u8 = 0,
         },
+        vector2_32: void,
+        vector3_32: void,
     };
 };
 
@@ -149,13 +158,16 @@ pub const DataTypes = struct {
         pub const type_float = DataType{ .size = 4, .alignment = 4, .kind = .f32 };
         pub const type_double = DataType{ .size = 8, .alignment = 8, .kind = .f64 };
         pub const type_pointer = DataType{ .size = 8, .alignment = 8, .kind = .{ .pointer = .{} } };
+        pub const type_vector2_32 = DataType{ .size = 8, .alignment = 4, .kind = .vector2_32 };
+        pub const type_vector3_32 = DataType{ .size = 12, .alignment = 4, .kind = .vector3_32 };
     };
 
     pub const order: []const *const DataType = &.{
-        &Types.type_void,  &Types.type_i8,     &Types.type_i16,
-        &Types.type_i32,   &Types.type_i64,    &Types.type_u8,
-        &Types.type_u16,   &Types.type_u32,    &Types.type_u64,
-        &Types.type_float, &Types.type_double, &Types.type_pointer,
+        &Types.type_void,       &Types.type_i8,         &Types.type_i16,
+        &Types.type_i32,        &Types.type_i64,        &Types.type_u8,
+        &Types.type_u16,        &Types.type_u32,        &Types.type_u64,
+        &Types.type_float,      &Types.type_double,     &Types.type_pointer,
+        &Types.type_vector2_32, &Types.type_vector3_32,
     };
 
     pub fn generateCTypeName(kind: DataType.Types, writer: *std.Io.Writer, id: usize, comptime pointer: bool) !void {
@@ -174,6 +186,8 @@ pub const DataTypes = struct {
             .f64 => try writer.writeAll("double" ++ suffix),
             .pointer => try writer.writeAll("void*" ++ suffix),
             .@"struct" => try writer.print("struct anon_{d}" ++ suffix, .{id}),
+            .vector2_32 => try writer.writeAll("struct vector2_32" ++ suffix),
+            .vector3_32 => try writer.writeAll("struct vector3_32" ++ suffix),
         }
     }
 };
@@ -207,6 +221,22 @@ pub fn makeStruct(allocator: std.mem.Allocator, fields: []const DataType) !struc
                         break;
                     for (0..info.field_len) |j| {
                         inherit[count] = info.fields[j];
+                        count += 1;
+                    }
+                },
+                .vector2_32 => {
+                    if (count + 2 > 12)
+                        break;
+                    inline for (0..2) |_| {
+                        inherit[count] = @intFromEnum(DataType.Types.f32) + 1;
+                        count += 1;
+                    }
+                },
+                .vector3_32 => {
+                    if (count + 3 > 12)
+                        break;
+                    inline for (0..3) |_| {
+                        inherit[count] = @intFromEnum(DataType.Types.f32) + 1;
                         count += 1;
                     }
                 },
@@ -836,6 +866,9 @@ fn compileCallableFunction(returns: DataType, args: []const DataType) !CallableF
     }
 
     try writer.writeByte('\n');
+    try generateTypesFromSymbol(writer, returns, args);
+
+    try writer.writeByte('\n');
     try generateSourceFromSymbol(writer, returns, args);
 
     state.compileStringOnce(allocator, source.written()) catch |err| {
@@ -913,8 +946,16 @@ const LuaClosure = struct {
 
 const LuaDataType = struct {
     type: DataType,
-    offsets: ?[]usize = null,
-    fields_map: ?std.StringArrayHashMap(DataType) = null,
+    info: Info = .none,
+
+    const Info = union(enum) {
+        none: void,
+        array: struct { DataType, u32 },
+        @"struct": struct {
+            offsets: []usize,
+            fields_map: std.StringArrayHashMap(DataType),
+        },
+    };
 
     pub fn lua_newTag(self: *LuaDataType, L: *VM.lua.State) !i32 {
         if (self.type.kind != .pointer)
@@ -944,11 +985,38 @@ const LuaDataType = struct {
     }
 
     pub fn lua_offset(self: *LuaDataType, L: *VM.lua.State) !i32 {
-        if (self.type.kind != .@"struct")
-            return L.Zerror("'offset' is only available for structs");
-        const field = try L.Zcheckvalue([]const u8, 2, null);
-        const order = self.fields_map.?.getIndex(field) orelse return L.Zerrorf("unknown field: {s}", .{field});
-        L.pushinteger(@intCast(self.offsets.?[order]));
+        switch (self.type.kind) {
+            .@"struct" => {
+                switch (self.info) {
+                    .array => |a| {
+                        const order = try L.Zcheckvalue(u32, 2, null);
+                        if (order >= a.@"1")
+                            return L.Zerror("index out of bounds");
+                        L.pushnumber(@floatFromInt(order * a.@"0".size));
+                    },
+                    .@"struct" => |s| {
+                        const field = try L.Zcheckvalue([]const u8, 2, null);
+                        const order = s.fields_map.getIndex(field) orelse return L.Zerrorf("unknown field: {s}", .{field});
+                        L.pushunsigned(@truncate(s.offsets[order]));
+                    },
+                    else => return error.InvalidState,
+                }
+            },
+            .vector2_32 => {
+                const index = try L.Zcheckvalue(u32, 2, null);
+                if (index >= 2)
+                    return L.Zerror("index out of bounds");
+                L.pushunsigned(@truncate(index * @sizeOf(f32)));
+            },
+            .vector3_32 => {
+                const index = try L.Zcheckvalue(u32, 2, null);
+                if (index >= 3)
+                    return L.Zerror("index out of bounds");
+                L.pushunsigned(@truncate(index * @sizeOf(f32)));
+            },
+            else => return L.Zerror("'offset' is only available for structs or vectors"),
+        }
+
         return 1;
     }
 
@@ -956,68 +1024,190 @@ const LuaDataType = struct {
         if (self.type.kind != .@"struct")
             return L.Zerror("'new' is only available for structs");
         try L.Zchecktype(2, .Table);
-        const allocator = luau.getallocator(L);
 
-        const fields_map = self.fields_map.?;
-        const offsets = self.offsets.?;
+        switch (self.info) {
+            .none => return error.InvalidState,
+            .array => |array| {
+                const datatype, const count = array;
 
-        const mem = try allocator.alloc(u8, self.type.size);
-        defer allocator.free(mem);
+                try L.rawcheckstack(2);
 
-        @memset(mem, 0);
+                const mem = try L.newbuffer(self.type.size);
 
-        for (fields_map.keys(), fields_map.values(), 0..) |field, field_value, order| {
-            defer L.pop(1);
-            try L.pushlstring(field);
-            if (L.rawget(2).isnoneornil())
-                return error.MissingField;
-            const pos = offsets[order];
-            const field_type = field_value;
-            switch (field_type.kind) {
-                .void => return error.InvalidArgType,
-                .pointer => switch (L.typeOf(-1)) {
-                    .Userdata => {
-                        const lptr = LuaPointer.value(L, -1) orelse return error.Failed;
-                        if (lptr.owner == .none)
-                            return L.Zerror("unavailable address");
-                        if (lptr.data.tag != field_type.kind.pointer.tag)
-                            return L.Zerrorf("tag mismatch for field: {s}", .{field});
-                        var bytes: [@sizeOf(usize)]u8 = @bitCast(@as(usize, @intFromPtr(lptr.ptr)));
-                        @memcpy(mem[pos .. pos + @sizeOf(usize)], &bytes);
-                    },
-                    else => return error.InvalidArgType,
-                },
-                .@"struct" => {
-                    if (L.typeOf(-1) != .Buffer)
-                        return error.InvalidArgType;
-                    const value = L.tobuffer(-1) orelse unreachable;
-                    if (value.len != field_type.size)
-                        return error.InvalidArgType;
-                    @memcpy(mem[pos .. pos + field_type.size], value);
-                },
-                inline else => |_, T| try FFITypeConversion(T.asType(), mem, L, -1, pos),
-            }
+                for (0..count) |i| {
+                    if (i > 0)
+                        L.pop(1);
+                    if (L.rawgeti(2, @as(i32, @intCast(i + 1))).isnoneornil())
+                        continue;
+                    const pos = i * datatype.size;
+                    switch (datatype.kind) {
+                        .void => return error.InvalidArgType,
+                        .pointer => switch (L.typeOf(-1)) {
+                            .Userdata => {
+                                const lptr = LuaPointer.value(L, -1) orelse return error.Failed;
+                                if (lptr.owner == .none)
+                                    return L.Zerror("unavailable address");
+                                if (lptr.data.tag != datatype.kind.pointer.tag)
+                                    return L.Zerrorf("tag mismatch at index {d}", .{i + 1});
+                                var bytes: [@sizeOf(usize)]u8 = @bitCast(@as(usize, @intFromPtr(lptr.ptr)));
+                                @memcpy(mem[pos .. pos + @sizeOf(usize)], &bytes);
+                            },
+                            else => return error.InvalidArgType,
+                        },
+                        .@"struct" => {
+                            if (L.typeOf(-1) != .Buffer)
+                                return L.Zerrorf("invalid type at index {d} (expected buffer, got {s})", .{ i + 1, VM.lapi.typename(L.typeOf(-1)) });
+                            const value = L.tobuffer(-1) orelse unreachable;
+                            if (value.len != datatype.size)
+                                return L.Zerrorf("size mismatch at index {d} (expected {d} bytes, got {d} bytes)", .{ i + 1, datatype.size, value.len });
+                            @memcpy(mem[pos .. pos + datatype.size], value);
+                        },
+                        .vector2_32 => switch (L.typeOf(-1)) {
+                            .Vector => {
+                                const vec = L.tovector(-1) orelse unreachable;
+                                @memcpy(@as([]f32, @ptrCast(@alignCast(mem[pos .. pos + (2 * @sizeOf(f32))]))), vec[0..2]);
+                            },
+                            .Buffer => {
+                                const value = L.tobuffer(-1) orelse unreachable;
+                                if (value.len != (2 * @sizeOf(f32)))
+                                    return L.Zerrorf("size mismatch at index {d} (expected {d} bytes, got {d} bytes)", .{ i + 1, datatype.size, value.len });
+                                @memcpy(mem[pos .. pos + (2 * @sizeOf(f32))], value);
+                            },
+                            else => return L.Zerrorf("invalid type at index {d} (expected vector/buffer, got {s})", .{ i + 1, VM.lapi.typename(L.typeOf(-1)) }),
+                        },
+                        .vector3_32 => switch (L.typeOf(-1)) {
+                            .Vector => {
+                                const vec = L.tovector(-1) orelse unreachable;
+                                @memcpy(@as([]f32, @ptrCast(@alignCast(mem[pos .. pos + (3 * @sizeOf(f32))]))), vec[0..3]);
+                            },
+                            .Buffer => {
+                                const value = L.tobuffer(-1) orelse unreachable;
+                                if (value.len != (3 * @sizeOf(f32)))
+                                    return L.Zerrorf("size mismatch at index {d} (expected {d} bytes, got {d} bytes)", .{ i + 1, datatype.size, value.len });
+                                @memcpy(mem[pos .. pos + (3 * @sizeOf(f32))], value);
+                            },
+                            else => return L.Zerrorf("invalid type at index {d} (expected vector/buffer, got {s})", .{ i + 1, VM.lapi.typename(L.typeOf(-1)) }),
+                        },
+                        inline else => |_, T| try FFITypeConversion(T.asType(), mem, L, -1, pos),
+                    }
+                }
+                L.pop(1);
+            },
+            .@"struct" => |@"struct"| {
+                const fields_map = @"struct".fields_map;
+                const offsets = @"struct".offsets;
+
+                try L.rawcheckstack(2);
+
+                const mem = try L.newbuffer(self.type.size);
+
+                for (fields_map.keys(), fields_map.values(), 0..) |field, field_value, order| {
+                    if (order > 0)
+                        L.pop(1);
+                    try L.pushlstring(field);
+                    if (L.rawget(2).isnoneornil())
+                        continue;
+                    const pos = offsets[order];
+                    const field_type = field_value;
+                    switch (field_type.kind) {
+                        .void => return error.InvalidArgType,
+                        .pointer => switch (L.typeOf(-1)) {
+                            .Userdata => {
+                                const lptr = LuaPointer.value(L, -1) orelse return error.Failed;
+                                if (lptr.owner == .none)
+                                    return L.Zerror("unavailable address");
+                                if (lptr.data.tag != field_type.kind.pointer.tag)
+                                    return L.Zerrorf("tag mismatch for field: {s}", .{field});
+                                var bytes: [@sizeOf(usize)]u8 = @bitCast(@as(usize, @intFromPtr(lptr.ptr)));
+                                @memcpy(mem[pos .. pos + @sizeOf(usize)], &bytes);
+                            },
+                            else => return error.InvalidArgType,
+                        },
+                        .@"struct" => {
+                            if (L.typeOf(-1) != .Buffer)
+                                return L.Zerrorf("invalid type for field '{s}' (expected buffer, got {s})", .{ field, VM.lapi.typename(L.typeOf(-1)) });
+                            const value = L.tobuffer(-1) orelse unreachable;
+                            if (value.len != field_type.size)
+                                return L.Zerrorf("size mismatch for field '{s}' (expected {d} bytes, got {d} bytes)", .{ field, field_type.size, value.len });
+                            @memcpy(mem[pos .. pos + field_type.size], value);
+                        },
+                        .vector2_32 => switch (L.typeOf(-1)) {
+                            .Vector => {
+                                const vec = L.tovector(-1) orelse unreachable;
+                                @memcpy(@as([]f32, @ptrCast(@alignCast(mem[pos .. pos + (2 * @sizeOf(f32))]))), vec[0..2]);
+                            },
+                            .Buffer => {
+                                const value = L.tobuffer(-1) orelse unreachable;
+                                if (value.len != (2 * @sizeOf(f32)))
+                                    return L.Zerrorf("size mismatch for field '{s}' (expected {d} bytes, got {d} bytes)", .{ field, field_type.size, value.len });
+                                @memcpy(mem[pos .. pos + (2 * @sizeOf(f32))], value);
+                            },
+                            else => return L.Zerrorf("invalid type for field '{s}' (expected vector/buffer, got {s})", .{ field, VM.lapi.typename(L.typeOf(-1)) }),
+                        },
+                        .vector3_32 => switch (L.typeOf(-1)) {
+                            .Vector => {
+                                const vec = L.tovector(-1) orelse unreachable;
+                                @memcpy(@as([]f32, @ptrCast(@alignCast(mem[pos .. pos + (3 * @sizeOf(f32))]))), vec[0..3]);
+                            },
+                            .Buffer => {
+                                const value = L.tobuffer(-1) orelse unreachable;
+                                if (value.len != (3 * @sizeOf(f32)))
+                                    return L.Zerrorf("size mismatch for field '{s}' (expected {d} bytes, got {d} bytes)", .{ field, field_type.size, value.len });
+                                @memcpy(mem[pos .. pos + (3 * @sizeOf(f32))], value);
+                            },
+                            else => return L.Zerrorf("invalid type for field '{s}' (expected vector/buffer, got {s})", .{ field, VM.lapi.typename(L.typeOf(-1)) }),
+                        },
+                        inline else => |_, T| try FFITypeConversion(T.asType(), mem, L, -1, pos),
+                    }
+                }
+                L.pop(1);
+            },
         }
-
-        try L.Zpushbuffer(mem);
-
         return 1;
     }
 
     pub fn lua_size(self: *LuaDataType, L: *VM.lua.State) !i32 {
-        L.pushinteger(@intCast(self.type.size));
+        L.pushunsigned(@truncate(self.type.size));
         return 1;
     }
 
     pub fn lua_alignment(self: *LuaDataType, L: *VM.lua.State) !i32 {
-        L.pushinteger(@intCast(self.type.alignment));
+        L.pushunsigned(@intCast(self.type.alignment));
         return 1;
     }
 
     pub fn lua_tag(self: *LuaDataType, L: *VM.lua.State) !i32 {
         if (self.type.kind != .pointer)
             return 0;
-        L.pushinteger(@intCast(self.type.kind.pointer.tag));
+        L.pushunsigned(self.type.kind.pointer.tag);
+        return 1;
+    }
+
+    pub fn lua_array(self: *LuaDataType, L: *VM.lua.State) !i32 {
+        const count = try L.Zcheckvalue(u32, 2, null);
+        if (count <= 0)
+            return L.Zerror("array count must be greater than zero");
+        if (count > std.math.maxInt(i32))
+            return L.Zerror("array count too large");
+        const datatype = try L.newuserdatataggedwithmetatable(LuaDataType, TAG_FFI_DATATYPE);
+        datatype.* = .{
+            .info = .{ .array = .{ self.type, count } },
+            .type = .{
+                .size = self.type.size * count,
+                .alignment = self.type.alignment,
+                .kind = .{
+                    .@"struct" = if (count <= 12) blk: {
+                        var fields: [12]u8 = undefined;
+                        for (0..count) |i|
+                            fields[i] = @intFromEnum(self.type.kind) + 1;
+                        break :blk .{
+                            .field_len = @intCast(count),
+                            .fields = fields,
+                        };
+                    } else .{},
+                },
+            },
+        };
         return 1;
     }
 
@@ -1028,19 +1218,22 @@ const LuaDataType = struct {
         .{ "size", lua_size },
         .{ "alignment", lua_alignment },
         .{ "tag", lua_tag },
+        .{ "array", lua_array },
     });
 
     pub fn __dtor(_: *VM.lua.State, self: *LuaDataType) void {
-        if (self.fields_map == null)
-            return;
-        const fields_map = &self.fields_map.?;
-        const allocator = fields_map.allocator;
-        var iter = fields_map.iterator();
-        while (iter.next()) |entry|
-            allocator.free(entry.key_ptr.*);
-        fields_map.deinit();
-        if (self.offsets) |offsets|
-            allocator.free(offsets);
+        switch (self.info) {
+            .@"struct" => |*s| {
+                const fields_map = &s.fields_map;
+                const allocator = fields_map.allocator;
+                var iter = fields_map.iterator();
+                while (iter.next()) |entry|
+                    allocator.free(entry.key_ptr.*);
+                fields_map.deinit();
+                allocator.free(s.offsets);
+            },
+            else => {},
+        }
     }
 };
 
@@ -1201,6 +1394,44 @@ const ffi_c_interface = struct {
     pub const checkf32 = FFIArgumentLoad(f32);
     pub const checkf64 = FFIArgumentLoad(f64);
 
+    const Vec2_32 = extern struct { x: f32, y: f32 };
+    pub fn checkvector2_32(L: *VM.lua.State, index: i32) callconv(.c) Vec2_32 {
+        const size = @sizeOf(f32) * 2;
+        switch (L.typeOf(index)) {
+            .Buffer => {
+                const lua_buf = L.tobuffer(index).?;
+                if (lua_buf.len < size)
+                    return L.LerrorL("buffer too small", .{}) catch |e| std.debug.panic("{}", .{e});
+                return std.mem.bytesToValue(Vec2_32, lua_buf[0..size]);
+            },
+            .Vector => {
+                const vec = L.tovector(index).?;
+                return .{ .x = vec[0], .y = vec[1] };
+            },
+            .Proto, .UpVal, .Deadkey => unreachable,
+            inline else => |e| L.LerrorL("invalid argument type (got {s})", .{comptime VM.lapi.typename(e)}) catch |err| std.debug.panic("{}", .{err}),
+        }
+    }
+
+    const Vec3_32 = extern struct { x: f32, y: f32, z: f32 };
+    pub fn checkvector3_32(L: *VM.lua.State, index: i32) callconv(.c) Vec3_32 {
+        const size = @sizeOf(f32) * 3;
+        switch (L.typeOf(index)) {
+            .Buffer => {
+                const lua_buf = L.tobuffer(index).?;
+                if (lua_buf.len < size)
+                    return L.LerrorL("buffer too small", .{}) catch |e| std.debug.panic("{}", .{e});
+                return std.mem.bytesToValue(Vec3_32, lua_buf[0..size]);
+            },
+            .Vector => {
+                const vec = L.tovector(index).?;
+                return .{ .x = vec[0], .y = vec[1], .z = vec[2] };
+            },
+            .Proto, .UpVal, .Deadkey => unreachable,
+            inline else => |e| L.LerrorL("invalid argument type (got {s})", .{comptime VM.lapi.typename(e)}) catch |err| std.debug.panic("{}", .{err}),
+        }
+    }
+
     pub const pushi8 = FFIArgumentPush(i8);
     pub const pushu8 = FFIArgumentPush(u8);
     pub const pushi16 = FFIArgumentPush(i16);
@@ -1218,6 +1449,13 @@ const ffi_c_interface = struct {
 
     pub fn pushmem(L: *VM.lua.State, ptr: [*c]u8, size: usize) callconv(.c) void {
         L.Zpushbuffer(ptr[0..size]) catch |e| std.debug.panic("{}", .{e});
+    }
+
+    pub fn pushvector2(L: *VM.lua.State, ptr: [*c]f32) callconv(.c) void {
+        L.pushvector(ptr[0], ptr[1], 0, null);
+    }
+    pub fn pushvector3(L: *VM.lua.State, ptr: [*c]f32) callconv(.c) void {
+        L.pushvector(ptr[0], ptr[1], ptr[2], null);
     }
 };
 
@@ -1310,8 +1548,12 @@ fn lua_struct(L: *VM.lua.State) !i32 {
 
     data.* = .{
         .type = datatype,
-        .offsets = offsets,
-        .fields_map = struct_map,
+        .info = .{
+            .@"struct" = .{
+                .offsets = offsets,
+                .fields_map = struct_map,
+            },
+        },
     };
 
     return 1;
@@ -1374,14 +1616,38 @@ fn generateStructTypeFromSymbol(writer: *std.Io.Writer, symbol: DataType, order:
 }
 
 fn generateTypesFromSymbol(writer: *std.Io.Writer, symbol_returns: DataType, symbol_args: []const DataType) !void {
-    if (symbol_returns.kind == .@"struct")
-        try generateStructTypeFromSymbol(writer, symbol_returns, 0);
+    var vector2_32_struct: bool = false;
+    var vector3_32_struct: bool = false;
+    switch (symbol_returns.kind) {
+        .vector2_32 => {
+            vector2_32_struct = true;
+            try writer.print("struct __attribute__((aligned({d}))) vector2_32 {{ float x, y; }};\n", .{4});
+        },
+        .vector3_32 => {
+            vector3_32_struct = true;
+            try writer.print("struct __attribute__((aligned({d}))) vector3_32 {{ float x, y, z; }};\n", .{4});
+        },
+        .@"struct" => try generateStructTypeFromSymbol(writer, symbol_returns, 0),
+        else => {},
+    }
 
     for (symbol_args, 0..) |arg, i| {
-        if (arg.kind != .@"struct")
-            continue;
-
-        try generateStructTypeFromSymbol(writer, arg, i + 1);
+        switch (arg.kind) {
+            .@"struct" => try generateStructTypeFromSymbol(writer, arg, i + 1),
+            .vector2_32 => {
+                if (!vector2_32_struct) {
+                    vector2_32_struct = true;
+                    try writer.print("struct __attribute__((aligned({d}))) vector2_32 {{ float x, y; }};\n", .{4});
+                }
+            },
+            .vector3_32 => {
+                if (!vector3_32_struct) {
+                    vector3_32_struct = true;
+                    try writer.print("struct __attribute__((aligned({d}))) vector3_32 {{ float x, y, z; }};\n", .{4});
+                }
+            },
+            else => continue,
+        }
     }
 
     try writer.writeAll("typedef ");
@@ -1397,8 +1663,6 @@ fn generateTypesFromSymbol(writer: *std.Io.Writer, symbol_returns: DataType, sym
 }
 
 fn generateSourceFromSymbol(writer: *std.Io.Writer, symbol_returns: DataType, symbol_args: []const DataType) !void {
-    try generateTypesFromSymbol(writer, symbol_returns, symbol_args);
-
     try writer.writeAll("void symbol_call(void* L, Fn* fn) {\n  ");
     if (symbol_returns.size > 0) {
         try generateTypeFromSymbol(writer, symbol_returns, 0, false);
@@ -1434,6 +1698,8 @@ fn generateSourceFromSymbol(writer: *std.Io.Writer, symbol_returns: DataType, sy
     switch (symbol_returns.kind) {
         .void => {},
         .@"struct" => try writer.print("  lua_ffi_pushmem(L, (unsigned char*)&ret, {d});\n", .{symbol_returns.size}),
+        .vector2_32 => try writer.print("  lua_ffi_pushvector2(L, (float*)&ret);\n", .{}),
+        .vector3_32 => try writer.print("  lua_ffi_pushvector3(L, (float*)&ret);\n", .{}),
         inline else => |_, T| try writer.print("  lua_ffi_push{s}(L, ret);\n", .{@tagName(T)}),
     }
 
@@ -1472,6 +1738,14 @@ fn dynamicLoadImport(writer: *std.Io.Writer, state: *tinycc.TCCState, returns: D
         .@"struct" => {
             try generateExported(writer, "lua_ffi_pushmem", "void", &.{ "void*", "unsigned char*", "unsigned long long" });
             _ = state.add_symbol("lua_ffi_pushmem", @ptrCast(@alignCast(&ffi_c_interface.pushmem)));
+        },
+        .vector2_32 => {
+            try generateExported(writer, "lua_ffi_pushvector2", "void", &.{ "void*", "float*" });
+            _ = state.add_symbol("lua_ffi_pushvector2", @ptrCast(@alignCast(&ffi_c_interface.pushvector2)));
+        },
+        .vector3_32 => {
+            try generateExported(writer, "lua_ffi_pushvector3", "void", &.{ "void*", "float*" });
+            _ = state.add_symbol("lua_ffi_pushvector3", @ptrCast(@alignCast(&ffi_c_interface.pushvector3)));
         },
         inline else => |_, T| {
             const declname = "push" ++ @tagName(T);
@@ -1666,6 +1940,10 @@ fn ffi_closure_inner(call_info: *const LuaClosure.CallInfo, extern_args: [*]?*an
         .value = undefined,
     };
 
+    const has_return = call_info.type.returns.size > 0;
+
+    L.rawcheckstack(call_info.type.args.len + 1 + @as(usize, if (has_return) 1 else 0)) catch |e| std.debug.panic("{}", .{e});
+
     _ = ref.push(L);
 
     for (call_info.type.args, 0..) |arg_type, i| {
@@ -1679,11 +1957,17 @@ fn ffi_closure_inner(call_info: *const LuaClosure.CallInfo, extern_args: [*]?*an
                 const bytes: [*]u8 = @ptrCast(@alignCast(args[i]));
                 L.Zpushbuffer(bytes[0..arg_type.size]) catch |e| std.debug.panic("{}", .{e});
             },
+            .vector2_32 => {
+                const vec = @as([*]f32, @ptrCast(@alignCast(args[i])));
+                L.pushvector(vec[0], vec[1], 0, null);
+            },
+            .vector3_32 => {
+                const vec = @as([*]f32, @ptrCast(@alignCast(args[i])));
+                L.pushvector(vec[0], vec[1], vec[2], null);
+            },
             inline else => |_, tag| FFIPushPtrType(tag.asType(), L, args[i].?),
         }
     }
-
-    const has_return = call_info.type.returns.size > 0;
 
     _ = L.pcall(@intCast(args.len), if (has_return) 1 else 0, 0).check() catch {
         std.debug.panic("C Closure Runtime Error: {s}", .{L.tostring(-1) orelse "UnknownError"});
@@ -1715,6 +1999,32 @@ fn ffi_closure_inner(call_info: *const LuaClosure.CallInfo, extern_args: [*]?*an
                 if (buf.len != call_info.type.returns.size)
                     return std.debug.panic("invalid return type (expected buffer of size {d} for struct)", .{call_info.type.returns.size});
                 @memcpy(@as([*]u8, @ptrCast(@alignCast(ret))), buf);
+            },
+            .vector2_32 => switch (L.typeOf(-1)) {
+                .Vector => {
+                    const vec = L.tovector(-1) orelse unreachable;
+                    @memcpy(@as([*]f32, @ptrCast(@alignCast(ret))), vec[0..2]);
+                },
+                .Buffer => {
+                    const buf = L.tobuffer(-1) orelse unreachable;
+                    if (buf.len < @sizeOf(f32) * 2)
+                        return std.debug.panic("invalid return type (expected buffer of size {d} for vector2_32)", .{@sizeOf(f32) * 2});
+                    @memcpy(@as([*]u8, @ptrCast(@alignCast(ret))), buf[0 .. @sizeOf(f32) * 2]);
+                },
+                else => return std.debug.panic("invalid return type (expected vector/buffer for vector2_32)", .{}),
+            },
+            .vector3_32 => switch (L.typeOf(-1)) {
+                .Vector => {
+                    const vec = L.tovector(-1) orelse unreachable;
+                    @memcpy(@as([*]f32, @ptrCast(@alignCast(ret))), vec[0..3]);
+                },
+                .Buffer => {
+                    const buf = L.tobuffer(-1) orelse unreachable;
+                    if (buf.len < @sizeOf(f32) * 3)
+                        return std.debug.panic("invalid return type (expected buffer of size {d} for vector3_32)", .{@sizeOf(f32) * 3});
+                    @memcpy(@as([*]u8, @ptrCast(@alignCast(ret))), buf[0 .. @sizeOf(f32) * 3]);
+                },
+                else => return std.debug.panic("invalid return type (expected vector/buffer for vector3_32)", .{}),
             },
             inline else => |_, T| FFIReturnTypeConversion(T.asType(), ret.?, L),
         }
@@ -1867,6 +2177,10 @@ const FFIFunction = struct {
         var arena: ?std.heap.ArenaAllocator = null;
         defer if (arena) |a| a.deinit();
 
+        const returns = self.code.sym.type.returns;
+        if (returns.size > 0)
+            try L.rawcheckstack(1);
+
         const pointers = self.code.pointers;
         if (pointers) |ptrs| {
             arena = std.heap.ArenaAllocator.init(allocator);
@@ -1894,6 +2208,11 @@ const FFIFunction = struct {
                             .Buffer => {
                                 const buf = L.tobuffer(idx).?;
                                 const dup = arena_allocator.dupe(u8, buf) catch return L.Zerrorf("OutOfMemory", .{});
+                                ptrs[order] = @ptrCast(@alignCast(dup.ptr));
+                            },
+                            .Vector => {
+                                const vec = L.tovector(idx).?;
+                                const dup = arena_allocator.dupe(f32, vec[0..3]) catch return L.Zerrorf("OutOfMemory", .{});
                                 ptrs[order] = @ptrCast(@alignCast(dup.ptr));
                             },
                             .Nil => ptrs[order] = @ptrFromInt(0),
@@ -1926,7 +2245,6 @@ const FFIFunction = struct {
             self.ptr,
         });
 
-        const returns = self.code.sym.type.returns;
         if (returns.size > 0) {
             if (returns.kind == .pointer and returns.kind.pointer.tag != 0) {
                 const ptr = LuaPointer.value(L, -1) orelse unreachable;
@@ -2019,6 +2337,16 @@ fn lua_alloc(L: *VM.lua.State) !i32 {
     return 1;
 }
 
+fn lua_create(L: *VM.lua.State) !i32 {
+    const datatype = try toFFIType(L, 1);
+    const ptr = try LuaPointer.allocBlockPtr(L, datatype.size, .fromByteUnits(datatype.alignment));
+    switch (datatype.kind) {
+        .pointer => |p| ptr.data.tag = p.tag,
+        else => {},
+    }
+    return 1;
+}
+
 fn lua_getLuaState(L: *VM.lua.State) !i32 {
     if (try L.Zcheckvalue(?bool, 1, null) orelse false) {
         _ = try LuaPointer.newStaticPtr(L, @ptrCast(L.mainthread()));
@@ -2070,6 +2398,14 @@ fn lua_dupe(L: *VM.lua.State) !i32 {
             @memcpy(
                 @as([*]u8, @ptrCast(@alignCast(ptr.ptr)))[0..buf.len],
                 buf,
+            );
+        },
+        .Vector => {
+            const vec = L.tovector(1) orelse unreachable;
+            const ptr = try LuaPointer.allocBlockPtr(L, @sizeOf(f32) * 3, .fromByteUnits(@alignOf(f32)));
+            @memcpy(
+                @as([*]f32, @ptrCast(@alignCast(ptr.ptr)))[0..3],
+                vec[0..3],
             );
         },
         .Userdata => {
@@ -2322,6 +2658,7 @@ pub fn loadLib(L: *VM.lua.State) !void {
     try L.Zsetfieldfn(-1, "fn", lua_fn);
 
     try L.Zsetfieldfn(-1, "alloc", lua_alloc);
+    try L.Zsetfieldfn(-1, "create", lua_create);
     try L.Zsetfieldfn(-1, "free", lua_free);
     try L.Zsetfieldfn(-1, "dupe", lua_dupe);
 
