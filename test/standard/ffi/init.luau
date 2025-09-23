@@ -1861,9 +1861,10 @@ describe("FFI", function()
                     }
                 ]]);
 
-                expect(compiled:listSymbols()[1]:find("hello$") ~= nil).toBeTruthy();
-                expect(compiled:listSymbols()[2]:find("add$") ~= nil).toBeTruthy();
-                expect(compiled:listSymbols()[3]:find("add_double$") ~= nil).toBeTruthy();
+                local start = if (platform.cpu.arch == "aarch64" or platform.cpu.arch == "riscv64") then 3 else 0;
+                expect(compiled:listSymbols()[start + 1]:find("hello$") ~= nil).toBeTruthy();
+                expect(compiled:listSymbols()[start + 2]:find("add$") ~= nil).toBeTruthy();
+                expect(compiled:listSymbols()[start + 3]:find("add_double$") ~= nil).toBeTruthy();
 
                 local hellofn = ffi.fn({ returns = ffi.types.i32, args = {} }, compiled:getSymbol("hello") or error("Symbol 'hello' not found"));
                 local addfn = ffi.fn({ returns = ffi.types.i32, args = {ffi.types.i32} }, compiled:getSymbol("add") or error("Symbol 'add' not found"));
