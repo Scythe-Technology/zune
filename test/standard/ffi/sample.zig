@@ -66,6 +66,40 @@ export fn check_struct3(foo: Foo3) bool {
     return foo.x == 1.1;
 }
 
+const Vec2_32 = extern struct {
+    x: f32,
+    y: f32,
+};
+
+export fn check_vec2_32(foo: Vec2_32) bool {
+    return foo.x == 1.23 and foo.y == 2.34;
+}
+
+const Vec3_32 = extern struct {
+    x: f32,
+    y: f32,
+    z: f32,
+};
+
+export fn check_vec3_32(foo: Vec3_32) bool {
+    return foo.x == 1.23 and foo.y == 2.34 and foo.z == 3.45;
+}
+
+export fn new_vec2_32(x: f32, y: f32) Vec2_32 {
+    return .{
+        .x = x,
+        .y = y,
+    };
+}
+
+export fn new_vec3_32(x: f32, y: f32, z: f32) Vec3_32 {
+    return .{
+        .x = x,
+        .y = y,
+        .z = z,
+    };
+}
+
 export fn new_i32() *i32 {
     const ptr = std.heap.page_allocator.create(i32) catch @panic("allocation failed");
     ptr.* = 123;
