@@ -796,6 +796,21 @@ const CallableFunction = struct {
     }
 };
 
+const std_symbols = struct {
+    pub fn memmove(dest: [*]u8, src: [*]const u8, n: usize) callconv(.c) [*]u8 {
+        @memmove(dest[0..n], src[0..n]);
+        return dest;
+    }
+    pub fn memset(s: [*]u8, c: i32, n: usize) callconv(.c) [*]u8 {
+        @memset(s[0..n], @as(u8, c));
+        return s;
+    }
+    pub fn memcpy(dest: [*]u8, src: [*]const u8, n: usize) callconv(.c) [*]u8 {
+        @memcpy(dest[0..n], src[0..n]);
+        return dest;
+    }
+};
+
 fn hashFunctionSignature(out: *[Hash.digest_length]u8, returns: DataType, args: []const DataType) void {
     const size_len = @sizeOf(usize) + 5;
     var buffer: [size_len]u8 = undefined;
@@ -849,6 +864,12 @@ fn compileCallableFunction(returns: DataType, args: []const DataType) !CallableF
 
     state.set_output_type(tinycc.TCC_OUTPUT_MEMORY);
     state.set_options("-std=c11 -nostdlib -Wl,--export-all-symbols");
+
+    if (comptime builtin.cpu.arch.isArm() or builtin.cpu.arch.isAARCH64()) {
+        _ = state.add_symbol("memmove", @ptrCast(@alignCast(&std_symbols.memmove)));
+        _ = state.add_symbol("memset", @ptrCast(@alignCast(&std_symbols.memset)));
+        _ = state.add_symbol("memcpy", @ptrCast(@alignCast(&std_symbols.memcpy)));
+    }
 
     var source: std.Io.Writer.Allocating = .init(allocator);
     defer source.deinit();
@@ -2474,6 +2495,12 @@ fn lua_compile(L: *VM.lua.State) !i32 {
 
     state.set_output_type(tinycc.TCC_OUTPUT_MEMORY);
     state.set_options("-std=c11 -nostdlib -Wl,--export-all-symbols");
+
+    if (comptime builtin.cpu.arch.isArm() or builtin.cpu.arch.isAARCH64()) {
+        _ = state.add_symbol("memmove", @ptrCast(@alignCast(&std_symbols.memmove)));
+        _ = state.add_symbol("memset", @ptrCast(@alignCast(&std_symbols.memset)));
+        _ = state.add_symbol("memcpy", @ptrCast(@alignCast(&std_symbols.memcpy)));
+    }
 
     var error_output: std.Io.Writer.Allocating = .init(allocator);
     defer error_output.deinit();
