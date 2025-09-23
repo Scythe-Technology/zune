@@ -802,7 +802,7 @@ const std_symbols = struct {
         return dest;
     }
     pub fn memset(s: [*]u8, c: i32, n: usize) callconv(.c) [*]u8 {
-        @memset(s[0..n], @as(u8, c));
+        @memset(s[0..n], @as(u8, @truncate(@as(u32, @bitCast(c)))));
         return s;
     }
     pub fn memcpy(dest: [*]u8, src: [*]const u8, n: usize) callconv(.c) [*]u8 {
