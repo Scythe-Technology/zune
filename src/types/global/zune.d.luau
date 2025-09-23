@@ -1105,17 +1105,24 @@ declare class FFICompiled
 end
 declare class FFIDataType
     size: (self: FFIDataType) -> number
-    alignment: (self: FFIDataType) -> number 
+    alignment: (self: FFIDataType) -> number
+    array: (self: FFIDataType, count: number) -> FFIArrayType 
+end
+declare class FFIVectorType extends FFIDataType
+    offset: (self: FFIVectorType, index: number) -> number 
 end
 declare class FFIStructureType extends FFIDataType
     offset: (self: FFIStructureType, field: string) -> number
-    new: (self: FFIStructureType, fields: {{[string]: buffer | number}}) -> buffer 
+    new: (self: FFIStructureType, fields: {[string]: buffer | number | FFIPointer | vector}) -> buffer 
+end
+declare class FFIArrayType extends FFIVectorType
+    new: (self: FFIArrayType, values: {[number]: buffer | number | FFIPointer | vector}) -> buffer 
 end
 declare class FFIPointerType extends FFIDataType
     tag: (self: FFIPointerType) -> number
     newTag: (self: FFIPointerType, tag: string | buffer) -> FFIPointerType 
 end
-export type FFIAnyDataType = FFIDataType | FFIStructureType | FFIPointerType
+export type FFIAnyDataType = FFIDataType | FFIStructureType | FFIArrayType | FFIPointerType
 export type FFIFunctionDefintion = {
     returns: FFIAnyDataType,
     args: {FFIAnyDataType}
@@ -1172,7 +1179,9 @@ export type _zune_ffi_types = {
     u64: FFIDataType,
     float: FFIDataType,
     double: FFIDataType,
-    pointer: FFIPointerType, 
+    pointer: FFIPointerType,
+    vector2_32: FFIVectorType,
+    vector3_32: FFIVectorType, 
 }
 export type _zune_ffi_c = {
     compile: (src: string, opts: FFICompileOptions?) -> FFICompiled, 
@@ -1198,8 +1207,9 @@ export type _zune_ffi = {
     ptrFromAddress: (src: buffer) -> FFIPointer,
     getLuaState: (mainthread: boolean?) -> FFIPointer,
     alloc: (size: number, alignment: number?) -> FFIPointer,
+    create: (type: FFIAnyDataType) -> FFIPointer,
     free: (src: FFIPointer) -> (),
-    dupe: (src: buffer | FFIPointer) -> FFIPointer,
+    dupe: (src: buffer | FFIPointer | vector) -> FFIPointer,
     tagName: (tag: number) -> string?,
     struct: (fields: {{[string]: FFIAnyDataType}}) -> FFIStructureType,
     fn: (definition: FFIFunctionDefintion, srcPtr: FFIPointer) -> ((...any) -> any),
@@ -1322,7 +1332,11 @@ export type _zune_mem = {
     min: (src: MemReadableSlice, offset: number?, count: number?) -> number,
     reverse: (src: MemWritableSlice, offset: number?, count: number?) -> (),
     rotate: (src: MemWritableSlice, amount: number, offset: number?, count: number?) -> (),
-    set: (dest: MemWritableSlice, value: number, offset: number?, count: number?) -> (), 
+    set: (dest: MemWritableSlice, value: number, offset: number?, count: number?) -> (),
+    toVector2: (src: MemReadableSlice, offset: number?) -> vector,
+    toVector3: (src: MemReadableSlice, offset: number?) -> vector,
+    writeVector2: (dest: MemWritableSlice, offset: number?, vec: vector) -> (),
+    writeVector3: (dest: MemWritableSlice, offset: number?, vec: vector) -> (), 
 }
 --[[ sqlite ]]
 export type SQLite3Values = {
