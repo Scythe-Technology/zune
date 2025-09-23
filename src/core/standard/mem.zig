@@ -424,6 +424,62 @@ fn lua_set(L: *VM.lua.State) !i32 {
     return 0;
 }
 
+fn lua_toVector2(L: *VM.lua.State) !i32 {
+    const slice = try getReadableSlice(L, 1);
+    const offset = try L.Zcheckvalue(u32, 2, null);
+
+    if (isOutOfBounds(offset, slice.len, 2 * @sizeOf(f32)))
+        return L.Zerror("access out of bounds");
+
+    const vec = @as([]const f32, @ptrCast(@alignCast(slice[offset..])))[0..2];
+
+    L.pushvector(vec[0], vec[1], 0, null);
+
+    return 1;
+}
+
+fn lua_toVector3(L: *VM.lua.State) !i32 {
+    const slice = try getReadableSlice(L, 1);
+    const offset = try L.Zcheckvalue(u32, 2, null);
+
+    if (isOutOfBounds(offset, slice.len, 3 * @sizeOf(f32)))
+        return L.Zerror("access out of bounds");
+
+    const vec = @as([]const f32, @ptrCast(@alignCast(slice[offset..])))[0..3];
+
+    L.pushvector(vec[0], vec[1], vec[2], null);
+
+    return 1;
+}
+
+fn lua_writeVector2(L: *VM.lua.State) !i32 {
+    const slice = try getWritableSlice(L, 1);
+    const offset = try L.Zcheckvalue(u32, 2, null);
+
+    if (isOutOfBounds(offset, slice.len, 2 * @sizeOf(f32)))
+        return L.Zerror("access out of bounds");
+
+    const vec = L.tovector(3) orelse return L.Zerror("expected a vector");
+
+    @memcpy(@as([]f32, @ptrCast(@alignCast(slice[offset..])))[0..2], vec[0..2]);
+
+    return 1;
+}
+
+fn lua_writeVector3(L: *VM.lua.State) !i32 {
+    const slice = try getWritableSlice(L, 1);
+    const offset = try L.Zcheckvalue(u32, 2, null);
+
+    if (isOutOfBounds(offset, slice.len, 3 * @sizeOf(f32)))
+        return L.Zerror("access out of bounds");
+
+    const vec = L.tovector(3) orelse return L.Zerror("expected a vector");
+
+    @memcpy(@as([]f32, @ptrCast(@alignCast(slice[offset..])))[0..3], vec[0..3]);
+
+    return 1;
+}
+
 pub fn loadLib(L: *VM.lua.State) !void {
     try L.Zpushvalue(.{
         .MAX_SIZE = MAX_LUAU_SIZE,
@@ -460,6 +516,10 @@ pub fn loadLib(L: *VM.lua.State) !void {
         .reverse = lua_reverse,
         .rotate = lua_rotate,
         .set = lua_set,
+        .toVector2 = lua_toVector2,
+        .toVector3 = lua_toVector3,
+        .writeVector2 = lua_writeVector2,
+        .writeVector3 = lua_writeVector3,
     });
     L.setreadonly(-1, true);
 
