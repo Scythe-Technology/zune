@@ -2496,12 +2496,6 @@ fn lua_compile(L: *VM.lua.State) !i32 {
     state.set_output_type(tinycc.TCC_OUTPUT_MEMORY);
     state.set_options("-std=c11 -nostdlib -Wl,--export-all-symbols");
 
-    if (comptime builtin.cpu.arch.isArm() or builtin.cpu.arch.isAARCH64()) {
-        _ = state.add_symbol("memmove", @ptrCast(@alignCast(&std_symbols.memmove)));
-        _ = state.add_symbol("memset", @ptrCast(@alignCast(&std_symbols.memset)));
-        _ = state.add_symbol("memcpy", @ptrCast(@alignCast(&std_symbols.memcpy)));
-    }
-
     var error_output: std.Io.Writer.Allocating = .init(allocator);
     defer error_output.deinit();
 
@@ -2593,6 +2587,15 @@ fn lua_compile(L: *VM.lua.State) !i32 {
     };
     if (error_output.written().len > 0)
         return L.Zerror(error_output.written());
+
+    if (comptime builtin.cpu.arch.isArm() or builtin.cpu.arch.isAARCH64()) {
+        if (state.get_symbol("memmove") == null)
+            _ = state.add_symbol("memmove", @ptrCast(@alignCast(&std_symbols.memmove)));
+        if (state.get_symbol("memset") == null)
+            _ = state.add_symbol("memset", @ptrCast(@alignCast(&std_symbols.memset)));
+        if (state.get_symbol("memcpy") == null)
+            _ = state.add_symbol("memcpy", @ptrCast(@alignCast(&std_symbols.memcpy)));
+    }
 
     state.set_error_func(null, struct {
         fn inner(_: ?*anyopaque, _: [*:0]const u8) callconv(.c) void {}
