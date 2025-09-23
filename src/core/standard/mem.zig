@@ -426,7 +426,7 @@ fn lua_set(L: *VM.lua.State) !i32 {
 
 fn lua_toVector2(L: *VM.lua.State) !i32 {
     const slice = try getReadableSlice(L, 1);
-    const offset = try L.Zcheckvalue(u32, 2, null);
+    const offset = try L.Zcheckvalue(?u32, 2, null) orelse 0;
 
     if (isOutOfBounds(offset, slice.len, 2 * @sizeOf(f32)))
         return L.Zerror("access out of bounds");
@@ -440,7 +440,7 @@ fn lua_toVector2(L: *VM.lua.State) !i32 {
 
 fn lua_toVector3(L: *VM.lua.State) !i32 {
     const slice = try getReadableSlice(L, 1);
-    const offset = try L.Zcheckvalue(u32, 2, null);
+    const offset = try L.Zcheckvalue(?u32, 2, null) orelse 0;
 
     if (isOutOfBounds(offset, slice.len, 3 * @sizeOf(f32)))
         return L.Zerror("access out of bounds");
@@ -454,7 +454,7 @@ fn lua_toVector3(L: *VM.lua.State) !i32 {
 
 fn lua_writeVector2(L: *VM.lua.State) !i32 {
     const slice = try getWritableSlice(L, 1);
-    const offset = try L.Zcheckvalue(u32, 2, null);
+    const offset = try L.Zcheckvalue(?u32, 2, null) orelse 0;
 
     if (isOutOfBounds(offset, slice.len, 2 * @sizeOf(f32)))
         return L.Zerror("access out of bounds");
@@ -468,7 +468,7 @@ fn lua_writeVector2(L: *VM.lua.State) !i32 {
 
 fn lua_writeVector3(L: *VM.lua.State) !i32 {
     const slice = try getWritableSlice(L, 1);
-    const offset = try L.Zcheckvalue(u32, 2, null);
+    const offset = try L.Zcheckvalue(?u32, 2, null) orelse 0;
 
     if (isOutOfBounds(offset, slice.len, 3 * @sizeOf(f32)))
         return L.Zerror("access out of bounds");
