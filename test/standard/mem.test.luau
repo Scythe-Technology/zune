@@ -356,4 +356,53 @@ describe("Mem", function()
         mem.set(a, string.byte('s'), 1, 3);
         expect(mem.eql(a, "tsss")).toBeTruthy();
     end)
+    test("toVector2", function()
+        local buf = buffer.create(8);
+        buffer.writef32(buf, 0, 1.0);
+        buffer.writef32(buf, 4, 2.0);
+        local vec = mem.toVector2(buf);
+        expect(vec.x).toBe(1);
+        expect(vec.y).toBe(2);
+        expect(function()
+            mem.toVector2(buffer.create(2));
+        end).toThrow("access out of bounds");
+    end)
+    test("toVector3", function()
+        local buf = buffer.create(12);
+        buffer.writef32(buf, 0, 1.0);
+        buffer.writef32(buf, 4, 2.0);
+        buffer.writef32(buf, 8, 3.0);
+        local vec = mem.toVector3(buf);
+        expect(vec.x).toBe(1);
+        expect(vec.y).toBe(2);
+        expect(vec.z).toBe(3);
+        expect(function()
+            mem.toVector3(buffer.create(2));
+        end).toThrow("access out of bounds");
+    end)
+    test("writeVector2", function()
+        local buf = buffer.create(8);
+        mem.writeVector2(buf, 0, vector.create(1.0, 2.0));
+        expect(buffer.readf32(buf, 0)).toBe(1.0);
+        expect(buffer.readf32(buf, 4)).toBe(2.0);
+        expect(function()
+            mem.writeVector2(buffer.create(2), 0, vector.create(1.0, 2.0));
+        end).toThrow("access out of bounds");
+        expect(function()
+            mem.writeVector2(buf, 5, vector.create(1.0, 2.0));
+        end).toThrow("access out of bounds");
+    end)
+    test("writeVector3", function()
+        local buf = buffer.create(12);
+        mem.writeVector3(buf, 0, vector.create(1.0, 2.0, 3.0));
+        expect(buffer.readf32(buf, 0)).toBe(1.0);
+        expect(buffer.readf32(buf, 4)).toBe(2.0);
+        expect(buffer.readf32(buf, 8)).toBe(3.0);
+        expect(function()
+            mem.writeVector3(buffer.create(2), 0, vector.create(1.0, 2.0, 3.0));
+        end).toThrow("access out of bounds");
+        expect(function()
+            mem.writeVector3(buf, 5, vector.create(1.0, 2.0, 3.0));
+        end).toThrow("access out of bounds");
+    end)
 end)

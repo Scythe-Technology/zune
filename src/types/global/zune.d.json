@@ -115,6 +115,14 @@
     ],
     "params": []
   },
+  "@roblox/globaltype/_zune_serde_zlib": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "decompress": "@roblox/globaltype/_zune_serde_zlib.decompress",
+      "compress": "@roblox/globaltype/_zune_serde_zlib.compress"
+    }
+  },
   "@roblox/globaltype/_zune_serde_zstd": {
     "code_sample": "",
     "documentation": "",
@@ -930,6 +938,17 @@
         "documentation": "@roblox/globaltype/FFILibrary.getSymbol/param/1"
       }
     ]
+  },
+  "@roblox/globaltype/CryptoTlsServerConfig": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "auth": "@roblox/globaltype/CryptoTlsServerConfig.auth"
+    }
+  },
+  "@roblox/globaltype/CryptoTlsServerConfig.auth": {
+    "code_sample": "",
+    "documentation": "The certificate and key pair to use for the server."
   },
   "@roblox/globaltype/_zune_time": {
     "code_sample": "",
@@ -3014,16 +3033,112 @@
     "code_sample": "",
     "documentation": "Whether to enable native code generation."
   },
-  "@roblox/globaltype/SerdeJsonDecodeConfig": {
+  "@roblox/globaltype/_zune_crypto_tls": {
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "preserve_null": "@roblox/globaltype/SerdeJsonDecodeConfig.preserve_null"
+      "bundleFromSystem": "@roblox/globaltype/_zune_crypto_tls.bundleFromSystem",
+      "setupServer": "@roblox/globaltype/_zune_crypto_tls.setupServer",
+      "setupClient": "@roblox/globaltype/_zune_crypto_tls.setupClient",
+      "keyPairFromFile": "@roblox/globaltype/_zune_crypto_tls.keyPairFromFile",
+      "bundleFromFile": "@roblox/globaltype/_zune_crypto_tls.bundleFromFile"
     }
   },
-  "@roblox/globaltype/SerdeJsonDecodeConfig.preserve_null": {
+  "@roblox/globaltype/_zune_crypto_tls.bundleFromSystem": {
     "code_sample": "",
-    "documentation": "Whether to preserve null values"
+    "documentation": "\n\n**Throws**\n- IO Error\n- Tls Error\n",
+    "returns": [
+      "@roblox/globaltype/_zune_crypto_tls.bundleFromSystem/return/0"
+    ],
+    "params": []
+  },
+  "@roblox/globaltype/_zune_crypto_tls.bundleFromFile": {
+    "code_sample": "",
+    "documentation": "\n\n**Parameters**\n- `file`: The file to load the bundle from.\n\n\n**Throws**\n- IO Error\n",
+    "returns": [
+      "@roblox/globaltype/_zune_crypto_tls.bundleFromFile/return/0"
+    ],
+    "params": [
+      {
+        "name": "file",
+        "documentation": "@roblox/globaltype/_zune_crypto_tls.bundleFromFile/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/_zune_crypto_tls.bundleFromFile/param/0": {
+    "code_sample": "",
+    "documentation": "The file to load the bundle from."
+  },
+  "@roblox/globaltype/_zune_crypto_tls.keyPairFromFile": {
+    "code_sample": "",
+    "documentation": "\n\n**Parameters**\n- `certFile`: The certificate file.\n- `keyFile`: The key file.\n\n\n**Throws**\n- IO Error\n- Tls Error\n",
+    "returns": [
+      "@roblox/globaltype/_zune_crypto_tls.keyPairFromFile/return/0"
+    ],
+    "params": [
+      {
+        "name": "certFile",
+        "documentation": "@roblox/globaltype/_zune_crypto_tls.keyPairFromFile/param/0"
+      },
+      {
+        "name": "keyFile",
+        "documentation": "@roblox/globaltype/_zune_crypto_tls.keyPairFromFile/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/_zune_crypto_tls.keyPairFromFile/param/0": {
+    "code_sample": "",
+    "documentation": "The certificate file."
+  },
+  "@roblox/globaltype/_zune_crypto_tls.keyPairFromFile/param/1": {
+    "code_sample": "",
+    "documentation": "The key file."
+  },
+  "@roblox/globaltype/_zune_crypto_tls.setupClient": {
+    "code_sample": "",
+    "documentation": "\n\n**Parameters**\n- `socket`: The socket to setup the client on.\n- `config`: The configuration for the client.\n\n\n**Throws**\n- Tls Error\n- Memory Error\n",
+    "returns": [],
+    "params": [
+      {
+        "name": "socket",
+        "documentation": "@roblox/globaltype/_zune_crypto_tls.setupClient/param/0"
+      },
+      {
+        "name": "config",
+        "documentation": "@roblox/globaltype/_zune_crypto_tls.setupClient/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/_zune_crypto_tls.setupClient/param/0": {
+    "code_sample": "",
+    "documentation": "The socket to setup the client on."
+  },
+  "@roblox/globaltype/_zune_crypto_tls.setupClient/param/1": {
+    "code_sample": "",
+    "documentation": "The configuration for the client."
+  },
+  "@roblox/globaltype/_zune_crypto_tls.setupServer": {
+    "code_sample": "",
+    "documentation": "\n\n**Parameters**\n- `socket`: The socket to setup the server on.\n- `config`: The configuration for the server.\n\n\n**Throws**\n- Tls Error\n- Memory Error\n",
+    "returns": [],
+    "params": [
+      {
+        "name": "socket",
+        "documentation": "@roblox/globaltype/_zune_crypto_tls.setupServer/param/0"
+      },
+      {
+        "name": "config",
+        "documentation": "@roblox/globaltype/_zune_crypto_tls.setupServer/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/_zune_crypto_tls.setupServer/param/0": {
+    "code_sample": "",
+    "documentation": "The socket to setup the server on."
+  },
+  "@roblox/globaltype/_zune_crypto_tls.setupServer/param/1": {
+    "code_sample": "",
+    "documentation": "The configuration for the server."
   },
   "@roblox/globaltype/SQLite3Result": {
     "code_sample": "",
@@ -3440,13 +3555,15 @@
     "code_sample": "",
     "documentation": "",
     "keys": {
+      "vector2_32": "@roblox/globaltype/_zune_ffi_types.vector2_32",
       "i16": "@roblox/globaltype/_zune_ffi_types.i16",
       "i32": "@roblox/globaltype/_zune_ffi_types.i32",
       "pointer": "@roblox/globaltype/_zune_ffi_types.pointer",
+      "float": "@roblox/globaltype/_zune_ffi_types.float",
       "double": "@roblox/globaltype/_zune_ffi_types.double",
       "i64": "@roblox/globaltype/_zune_ffi_types.i64",
       "u8": "@roblox/globaltype/_zune_ffi_types.u8",
-      "float": "@roblox/globaltype/_zune_ffi_types.float",
+      "vector3_32": "@roblox/globaltype/_zune_ffi_types.vector3_32",
       "u64": "@roblox/globaltype/_zune_ffi_types.u64",
       "void": "@roblox/globaltype/_zune_ffi_types.void",
       "i8": "@roblox/globaltype/_zune_ffi_types.i8",
@@ -5064,6 +5181,7 @@
     "documentation": "A library to manipulate/interact with bytes and buffers.",
     "keys": {
       "indexOf": "@roblox/globaltype/_zune_mem.indexOf",
+      "writeVector3": "@roblox/globaltype/_zune_mem.writeVector3",
       "lastIndexOfAny": "@roblox/globaltype/_zune_mem.lastIndexOfAny",
       "copy": "@roblox/globaltype/_zune_mem.copy",
       "indexOfDiffPos": "@roblox/globaltype/_zune_mem.indexOfDiffPos",
@@ -5082,6 +5200,9 @@
       "indexOfScalar": "@roblox/globaltype/_zune_mem.indexOfScalar",
       "indexOfMax": "@roblox/globaltype/_zune_mem.indexOfMax",
       "eqlSlice": "@roblox/globaltype/_zune_mem.eqlSlice",
+      "writeVector2": "@roblox/globaltype/_zune_mem.writeVector2",
+      "toVector3": "@roblox/globaltype/_zune_mem.toVector3",
+      "toVector2": "@roblox/globaltype/_zune_mem.toVector2",
       "min": "@roblox/globaltype/_zune_mem.min",
       "slice": "@roblox/globaltype/_zune_mem.slice",
       "MAX_SIZE": "@roblox/globaltype/_zune_mem.MAX_SIZE",
@@ -6104,6 +6225,118 @@
     "code_sample": "",
     "documentation": "The number of bytes to write. If not provided, will write until the end of the buffer."
   },
+  "@roblox/globaltype/_zune_mem.toVector2": {
+    "code_sample": "",
+    "documentation": "Reads a vector with only 2 elements from a buffer.\n\n**Parameters**\n- `src`: The source to read from.\n- `offset`: The offset to start reading from.\n",
+    "returns": [
+      "@roblox/globaltype/_zune_mem.toVector2/return/0"
+    ],
+    "params": [
+      {
+        "name": "src",
+        "documentation": "@roblox/globaltype/_zune_mem.toVector2/param/0"
+      },
+      {
+        "name": "offset",
+        "documentation": "@roblox/globaltype/_zune_mem.toVector2/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/_zune_mem.toVector2/param/0": {
+    "code_sample": "",
+    "documentation": "The source to read from."
+  },
+  "@roblox/globaltype/_zune_mem.toVector2/param/1": {
+    "code_sample": "",
+    "documentation": "The offset to start reading from."
+  },
+  "@roblox/globaltype/_zune_mem.toVector3": {
+    "code_sample": "",
+    "documentation": "Reads a vector with only 3 elements from a buffer.\n\n**Parameters**\n- `src`: The source to read from.\n- `offset`: The offset to start reading from.\n",
+    "returns": [
+      "@roblox/globaltype/_zune_mem.toVector3/return/0"
+    ],
+    "params": [
+      {
+        "name": "src",
+        "documentation": "@roblox/globaltype/_zune_mem.toVector3/param/0"
+      },
+      {
+        "name": "offset",
+        "documentation": "@roblox/globaltype/_zune_mem.toVector3/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/_zune_mem.toVector3/param/0": {
+    "code_sample": "",
+    "documentation": "The source to read from."
+  },
+  "@roblox/globaltype/_zune_mem.toVector3/param/1": {
+    "code_sample": "",
+    "documentation": "The offset to start reading from."
+  },
+  "@roblox/globaltype/_zune_mem.writeVector2": {
+    "code_sample": "",
+    "documentation": "Writes a vector with only 2 elements to a buffer.\n\n**Parameters**\n- `dest`: The destination to write to.\n- `offset`: The offset to start writing to.\n- `vec`: The vector to write.\n",
+    "returns": [],
+    "params": [
+      {
+        "name": "dest",
+        "documentation": "@roblox/globaltype/_zune_mem.writeVector2/param/0"
+      },
+      {
+        "name": "offset",
+        "documentation": "@roblox/globaltype/_zune_mem.writeVector2/param/1"
+      },
+      {
+        "name": "vec",
+        "documentation": "@roblox/globaltype/_zune_mem.writeVector2/param/2"
+      }
+    ]
+  },
+  "@roblox/globaltype/_zune_mem.writeVector2/param/0": {
+    "code_sample": "",
+    "documentation": "The destination to write to."
+  },
+  "@roblox/globaltype/_zune_mem.writeVector2/param/1": {
+    "code_sample": "",
+    "documentation": "The offset to start writing to."
+  },
+  "@roblox/globaltype/_zune_mem.writeVector2/param/2": {
+    "code_sample": "",
+    "documentation": "The vector to write."
+  },
+  "@roblox/globaltype/_zune_mem.writeVector3": {
+    "code_sample": "",
+    "documentation": "Writes a vector with only 3 elements to a buffer.\n\n**Parameters**\n- `dest`: The destination to write to.\n- `offset`: The offset to start writing to.\n- `vec`: The vector to write.\n",
+    "returns": [],
+    "params": [
+      {
+        "name": "dest",
+        "documentation": "@roblox/globaltype/_zune_mem.writeVector3/param/0"
+      },
+      {
+        "name": "offset",
+        "documentation": "@roblox/globaltype/_zune_mem.writeVector3/param/1"
+      },
+      {
+        "name": "vec",
+        "documentation": "@roblox/globaltype/_zune_mem.writeVector3/param/2"
+      }
+    ]
+  },
+  "@roblox/globaltype/_zune_mem.writeVector3/param/0": {
+    "code_sample": "",
+    "documentation": "The destination to write to."
+  },
+  "@roblox/globaltype/_zune_mem.writeVector3/param/1": {
+    "code_sample": "",
+    "documentation": "The offset to start writing to."
+  },
+  "@roblox/globaltype/_zune_mem.writeVector3/param/2": {
+    "code_sample": "",
+    "documentation": "The vector to write."
+  },
   "@roblox/globaltype/ProcessOptions": {
     "code_sample": "",
     "documentation": "",
@@ -6140,81 +6373,12 @@
     "code_sample": "",
     "documentation": "The stderr configuration for the process."
   },
-  "@roblox/globaltype/_zune_serde_json": {
+  "@roblox/globaltype/RegexMatch": {
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "encode": "@roblox/globaltype/_zune_serde_json.encode",
-      "values": "@roblox/globaltype/_zune_serde_json.values",
-      "decode": "@roblox/globaltype/_zune_serde_json.decode",
-      "indents": "@roblox/globaltype/_zune_serde_json.indents"
-    }
-  },
-  "@roblox/globaltype/_zune_serde_json.encode": {
-    "code_sample": "",
-    "documentation": "Encodes a value to JSON.\n\n**Parameters**\n- `value`: The value to encode.\n- `config`: The configuration for the encoding.\n\n\n**Throws**\n- Memory Error\n",
-    "returns": [
-      "@roblox/globaltype/_zune_serde_json.encode/return/0"
-    ],
-    "params": [
-      {
-        "name": "value",
-        "documentation": "@roblox/globaltype/_zune_serde_json.encode/param/0"
-      },
-      {
-        "name": "config",
-        "documentation": "@roblox/globaltype/_zune_serde_json.encode/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/_zune_serde_json.encode/param/0": {
-    "code_sample": "",
-    "documentation": "The value to encode."
-  },
-  "@roblox/globaltype/_zune_serde_json.encode/param/1": {
-    "code_sample": "",
-    "documentation": "The configuration for the encoding."
-  },
-  "@roblox/globaltype/_zune_serde_json.decode": {
-    "code_sample": "",
-    "documentation": "Decodes JSON.\n\n**Parameters**\n- `json`: The JSON string to decode.\n- `config`: The configuration for the decoding.\n\n\n**Throws**\n- Memory Error\n",
-    "returns": [
-      "@roblox/globaltype/_zune_serde_json.decode/return/0"
-    ],
-    "params": [
-      {
-        "name": "json",
-        "documentation": "@roblox/globaltype/_zune_serde_json.decode/param/0"
-      },
-      {
-        "name": "config",
-        "documentation": "@roblox/globaltype/_zune_serde_json.decode/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/_zune_serde_json.decode/param/0": {
-    "code_sample": "",
-    "documentation": "The JSON string to decode."
-  },
-  "@roblox/globaltype/_zune_serde_json.decode/param/1": {
-    "code_sample": "",
-    "documentation": "The configuration for the decoding."
-  },
-  "@roblox/globaltype/_zune_serde_json.indents": {
-    "code_sample": "",
-    "documentation": "Indentation levels for JSON.",
-    "keys": {
-      "tabs": "@roblox/globaltype/_zune_serde_json.indents.tabs",
-      "four_spaces": "@roblox/globaltype/_zune_serde_json.indents.four_spaces",
-      "two_spaces": "@roblox/globaltype/_zune_serde_json.indents.two_spaces",
-      "none": "@roblox/globaltype/_zune_serde_json.indents.none"
-    }
-  },
-  "@roblox/globaltype/_zune_serde_json.values": {
-    "code_sample": "",
-    "documentation": "Special values for JSON.",
-    "keys": {
-      "null": "@roblox/globaltype/_zune_serde_json.values.null"
+      "index": "@roblox/globaltype/RegexMatch.index",
+      "string": "@roblox/globaltype/RegexMatch.string"
     }
   },
   "@roblox/globaltype/FFICompileOptions": {
@@ -6299,6 +6463,21 @@
       "headers": "@roblox/globaltype/HttpServerResponse.headers"
     }
   },
+  "@roblox/globaltype/Location": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "begin": "@roblox/globaltype/Location.begin"
+    }
+  },
+  "@roblox/globaltype/Location.begin": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "column": "@roblox/globaltype/Location.begin.column",
+      "line": "@roblox/globaltype/Location.begin.line"
+    }
+  },
   "@roblox/globaltype/SQLite3Values": {
     "code_sample": "",
     "documentation": "",
@@ -6362,17 +6541,6 @@
       "@roblox/globaltype/_zune_io_terminal.getSize/return/1"
     ],
     "params": []
-  },
-  "@roblox/globaltype/SerdeJsonEncodeConfig": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "pretty_indent": "@roblox/globaltype/SerdeJsonEncodeConfig.pretty_indent"
-    }
-  },
-  "@roblox/globaltype/SerdeJsonEncodeConfig.pretty_indent": {
-    "code_sample": "",
-    "documentation": "The indentation level for pretty printing"
   },
   "@roblox/globaltype/HttpServerRequest": {
     "code_sample": "",
@@ -6438,32 +6606,6 @@
       "address": "@roblox/globaltype/NetworkAddress.address"
     }
   },
-  "@roblox/globaltype/ServerWebSocketHandlers": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "message": "@roblox/globaltype/ServerWebSocketHandlers.message",
-      "close": "@roblox/globaltype/ServerWebSocketHandlers.close",
-      "open": "@roblox/globaltype/ServerWebSocketHandlers.open",
-      "upgrade": "@roblox/globaltype/ServerWebSocketHandlers.upgrade"
-    }
-  },
-  "@roblox/globaltype/ServerWebSocketHandlers.upgrade": {
-    "code_sample": "",
-    "documentation": "The function to call when a WebSocket upgrade request is received.\n- If `true` is returned, the upgrade will be accepted.\n- If `false` is returned, the upgrade will be rejected."
-  },
-  "@roblox/globaltype/ServerWebSocketHandlers.open": {
-    "code_sample": "",
-    "documentation": "The function to call when a WebSocket connection is opened."
-  },
-  "@roblox/globaltype/ServerWebSocketHandlers.message": {
-    "code_sample": "",
-    "documentation": "The function to call when a message is received on a WebSocket connection."
-  },
-  "@roblox/globaltype/ServerWebSocketHandlers.close": {
-    "code_sample": "",
-    "documentation": "The function to call when a WebSocket connection is closed."
-  },
   "@roblox/globaltype/_zune_random_Isaac64": {
     "code_sample": "",
     "documentation": "",
@@ -6508,13 +6650,16 @@
     "code_sample": "",
     "documentation": "The endianness of the architecture the runtime was built for."
   },
-  "@roblox/globaltype/_zune_serde_zlib": {
+  "@roblox/globaltype/SerdeJsonDecodeConfig": {
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "decompress": "@roblox/globaltype/_zune_serde_zlib.decompress",
-      "compress": "@roblox/globaltype/_zune_serde_zlib.compress"
+      "preserve_null": "@roblox/globaltype/SerdeJsonDecodeConfig.preserve_null"
     }
+  },
+  "@roblox/globaltype/SerdeJsonDecodeConfig.preserve_null": {
+    "code_sample": "",
+    "documentation": "Whether to preserve null values"
   },
   "@roblox/globaltype/_zune_require": {
     "code_sample": "",
@@ -6669,113 +6814,6 @@
     "code_sample": "",
     "documentation": "The options for the compilation."
   },
-  "@roblox/globaltype/_zune_crypto_tls": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "bundleFromSystem": "@roblox/globaltype/_zune_crypto_tls.bundleFromSystem",
-      "setupServer": "@roblox/globaltype/_zune_crypto_tls.setupServer",
-      "setupClient": "@roblox/globaltype/_zune_crypto_tls.setupClient",
-      "keyPairFromFile": "@roblox/globaltype/_zune_crypto_tls.keyPairFromFile",
-      "bundleFromFile": "@roblox/globaltype/_zune_crypto_tls.bundleFromFile"
-    }
-  },
-  "@roblox/globaltype/_zune_crypto_tls.bundleFromSystem": {
-    "code_sample": "",
-    "documentation": "\n\n**Throws**\n- IO Error\n- Tls Error\n",
-    "returns": [
-      "@roblox/globaltype/_zune_crypto_tls.bundleFromSystem/return/0"
-    ],
-    "params": []
-  },
-  "@roblox/globaltype/_zune_crypto_tls.bundleFromFile": {
-    "code_sample": "",
-    "documentation": "\n\n**Parameters**\n- `file`: The file to load the bundle from.\n\n\n**Throws**\n- IO Error\n",
-    "returns": [
-      "@roblox/globaltype/_zune_crypto_tls.bundleFromFile/return/0"
-    ],
-    "params": [
-      {
-        "name": "file",
-        "documentation": "@roblox/globaltype/_zune_crypto_tls.bundleFromFile/param/0"
-      }
-    ]
-  },
-  "@roblox/globaltype/_zune_crypto_tls.bundleFromFile/param/0": {
-    "code_sample": "",
-    "documentation": "The file to load the bundle from."
-  },
-  "@roblox/globaltype/_zune_crypto_tls.keyPairFromFile": {
-    "code_sample": "",
-    "documentation": "\n\n**Parameters**\n- `certFile`: The certificate file.\n- `keyFile`: The key file.\n\n\n**Throws**\n- IO Error\n- Tls Error\n",
-    "returns": [
-      "@roblox/globaltype/_zune_crypto_tls.keyPairFromFile/return/0"
-    ],
-    "params": [
-      {
-        "name": "certFile",
-        "documentation": "@roblox/globaltype/_zune_crypto_tls.keyPairFromFile/param/0"
-      },
-      {
-        "name": "keyFile",
-        "documentation": "@roblox/globaltype/_zune_crypto_tls.keyPairFromFile/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/_zune_crypto_tls.keyPairFromFile/param/0": {
-    "code_sample": "",
-    "documentation": "The certificate file."
-  },
-  "@roblox/globaltype/_zune_crypto_tls.keyPairFromFile/param/1": {
-    "code_sample": "",
-    "documentation": "The key file."
-  },
-  "@roblox/globaltype/_zune_crypto_tls.setupClient": {
-    "code_sample": "",
-    "documentation": "\n\n**Parameters**\n- `socket`: The socket to setup the client on.\n- `config`: The configuration for the client.\n\n\n**Throws**\n- Tls Error\n- Memory Error\n",
-    "returns": [],
-    "params": [
-      {
-        "name": "socket",
-        "documentation": "@roblox/globaltype/_zune_crypto_tls.setupClient/param/0"
-      },
-      {
-        "name": "config",
-        "documentation": "@roblox/globaltype/_zune_crypto_tls.setupClient/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/_zune_crypto_tls.setupClient/param/0": {
-    "code_sample": "",
-    "documentation": "The socket to setup the client on."
-  },
-  "@roblox/globaltype/_zune_crypto_tls.setupClient/param/1": {
-    "code_sample": "",
-    "documentation": "The configuration for the client."
-  },
-  "@roblox/globaltype/_zune_crypto_tls.setupServer": {
-    "code_sample": "",
-    "documentation": "\n\n**Parameters**\n- `socket`: The socket to setup the server on.\n- `config`: The configuration for the server.\n\n\n**Throws**\n- Tls Error\n- Memory Error\n",
-    "returns": [],
-    "params": [
-      {
-        "name": "socket",
-        "documentation": "@roblox/globaltype/_zune_crypto_tls.setupServer/param/0"
-      },
-      {
-        "name": "config",
-        "documentation": "@roblox/globaltype/_zune_crypto_tls.setupServer/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/_zune_crypto_tls.setupServer/param/0": {
-    "code_sample": "",
-    "documentation": "The socket to setup the server on."
-  },
-  "@roblox/globaltype/_zune_crypto_tls.setupServer/param/1": {
-    "code_sample": "",
-    "documentation": "The configuration for the server."
-  },
   "@roblox/globaltype/ParseResult": {
     "code_sample": "",
     "documentation": "",
@@ -6809,22 +6847,23 @@
     "code_sample": "",
     "documentation": "A library to interact with foreign functions and libraries.",
     "keys": {
-      "dlopen": "@roblox/globaltype/_zune_ffi.dlopen",
-      "closure": "@roblox/globaltype/_zune_ffi.closure",
       "c": "@roblox/globaltype/_zune_ffi.c",
       "free": "@roblox/globaltype/_zune_ffi.free",
-      "fn": "@roblox/globaltype/_zune_ffi.fn",
-      "ptr": "@roblox/globaltype/_zune_ffi.ptr",
-      "tagName": "@roblox/globaltype/_zune_ffi.tagName",
       "getLuaState": "@roblox/globaltype/_zune_ffi.getLuaState",
-      "dupe": "@roblox/globaltype/_zune_ffi.dupe",
-      "ptrFromAddress": "@roblox/globaltype/_zune_ffi.ptrFromAddress",
       "prefix": "@roblox/globaltype/_zune_ffi.prefix",
       "suffix": "@roblox/globaltype/_zune_ffi.suffix",
+      "dupe": "@roblox/globaltype/_zune_ffi.dupe",
+      "types": "@roblox/globaltype/_zune_ffi.types",
+      "create": "@roblox/globaltype/_zune_ffi.create",
+      "tagName": "@roblox/globaltype/_zune_ffi.tagName",
+      "dlopen": "@roblox/globaltype/_zune_ffi.dlopen",
+      "closure": "@roblox/globaltype/_zune_ffi.closure",
+      "fn": "@roblox/globaltype/_zune_ffi.fn",
+      "ptrFromAddress": "@roblox/globaltype/_zune_ffi.ptrFromAddress",
       "alloc": "@roblox/globaltype/_zune_ffi.alloc",
       "struct": "@roblox/globaltype/_zune_ffi.struct",
       "null": "@roblox/globaltype/_zune_ffi.null",
-      "types": "@roblox/globaltype/_zune_ffi.types"
+      "ptr": "@roblox/globaltype/_zune_ffi.ptr"
     },
     "learn_more_link": "https://zune.sh/docs/v0.5.0/api/ffi"
   },
@@ -6834,19 +6873,21 @@
   },
   "@roblox/globaltype/_zune_ffi.suffix": {
     "code_sample": "",
-    "documentation": "The recommended suffix for the library file.\n\nPlatforms:\n- Windows: `.dll`\n- Linux: `.so`\n- macOS: `.dylib`"
+    "documentation": "The recommended suffix for the library file.\n\nPlatforms:\n- Windows: `dll`\n- Linux: `so`\n- macOS: `dylib`"
   },
   "@roblox/globaltype/_zune_ffi.types": {
     "code_sample": "",
     "documentation": "",
     "keys": {
+      "vector2_32": "@roblox/globaltype/_zune_ffi.types.vector2_32",
       "i16": "@roblox/globaltype/_zune_ffi.types.i16",
       "i32": "@roblox/globaltype/_zune_ffi.types.i32",
       "pointer": "@roblox/globaltype/_zune_ffi.types.pointer",
+      "float": "@roblox/globaltype/_zune_ffi.types.float",
       "double": "@roblox/globaltype/_zune_ffi.types.double",
       "i64": "@roblox/globaltype/_zune_ffi.types.i64",
       "u8": "@roblox/globaltype/_zune_ffi.types.u8",
-      "float": "@roblox/globaltype/_zune_ffi.types.float",
+      "vector3_32": "@roblox/globaltype/_zune_ffi.types.vector3_32",
       "u64": "@roblox/globaltype/_zune_ffi.types.u64",
       "void": "@roblox/globaltype/_zune_ffi.types.void",
       "i8": "@roblox/globaltype/_zune_ffi.types.i8",
@@ -6962,6 +7003,23 @@
     "code_sample": "",
     "documentation": "The alignment to allocate."
   },
+  "@roblox/globaltype/_zune_ffi.create": {
+    "code_sample": "",
+    "documentation": "\n\n**Parameters**\n- `type`: The data type to allocate.\n\n\n**Throws**\n- FFI Error\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/_zune_ffi.create/return/0"
+    ],
+    "params": [
+      {
+        "name": "type",
+        "documentation": "@roblox/globaltype/_zune_ffi.create/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/_zune_ffi.create/param/0": {
+    "code_sample": "",
+    "documentation": "The data type to allocate."
+  },
   "@roblox/globaltype/_zune_ffi.free": {
     "code_sample": "",
     "documentation": "\n\n**Parameters**\n- `src`: The pointer to free. If the pointer is static, it must have a known size.\n\n\n**Throws**\n- FFI Error\n- Memory Error\n",
@@ -7013,7 +7071,7 @@
   },
   "@roblox/globaltype/_zune_ffi.struct": {
     "code_sample": "",
-    "documentation": "Creates a structure data type.\n- The order of the fields is the number index of the field table.\n-- There cannot be multiple fields in the same field table.\n-- Multiple fields with the same field name is not allowed.```lua\nffi.struct {\n{ age = ffi.types.u8 },\n{ height = ffi.types.f32 },\n}\n```\n\n**Parameters**\n- `fields`: The fields of the structure.\n\n\n**Throws**\n- FFI Error\n- Memory Error\n",
+    "documentation": "Creates a structure data type.\n- The order of the fields is the number index of the field table.\n  - There cannot be multiple fields in the same field table.\n  - Multiple fields with the same field name is not allowed.\n```lua\nffi.struct {\n    { age = ffi.types.u8 },\n    { height = ffi.types.f32 },\n}\n```\n\n\n**Parameters**\n- `fields`: The fields of the structure.\n\n\n**Throws**\n- FFI Error\n- Memory Error\n",
     "returns": [
       "@roblox/globaltype/_zune_ffi.struct/return/0"
     ],
@@ -7152,184 +7210,25 @@
       "IP": "@roblox/globaltype/_zune_net_IPPROTO.IP"
     }
   },
-  "@roblox/globaltype/ThreadLoadOptions": {
+  "@roblox/globaltype/_zune_random_Pcg32": {
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "native_code_gen": "@roblox/globaltype/ThreadLoadOptions.native_code_gen",
-      "chunk_name": "@roblox/globaltype/ThreadLoadOptions.chunk_name"
+      "new": "@roblox/globaltype/_zune_random_Pcg32.new"
     }
   },
-  "@roblox/globaltype/_zune_time_date": {
+  "@roblox/globaltype/_zune_random_Pcg32.new": {
     "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "fromUnixTimestamp": "@roblox/globaltype/_zune_time_date.fromUnixTimestamp",
-      "now": "@roblox/globaltype/_zune_time_date.now",
-      "parse": "@roblox/globaltype/_zune_time_date.parse",
-      "fromUniversalTime": "@roblox/globaltype/_zune_time_date.fromUniversalTime",
-      "fromUnixTimestampMillis": "@roblox/globaltype/_zune_time_date.fromUnixTimestampMillis",
-      "fromLocalTime": "@roblox/globaltype/_zune_time_date.fromLocalTime",
-      "fromIsoDate": "@roblox/globaltype/_zune_time_date.fromIsoDate"
-    }
-  },
-  "@roblox/globaltype/_zune_time_date.now": {
-    "code_sample": "",
-    "documentation": "\n\n**Throws**\n- DateTime Error\n- Memory Error\n",
+    "documentation": "\n\n**Throws**\n- Memory Error\n",
     "returns": [
-      "@roblox/globaltype/_zune_time_date.now/return/0"
-    ],
-    "params": []
-  },
-  "@roblox/globaltype/_zune_time_date.fromIsoDate": {
-    "code_sample": "",
-    "documentation": "Parse a string in ISO8601 format, `YYYY-MM-DDTHH:MM:SSZ`.\n\n**Parameters**\n- `date`: The date string to parse.\n\n\n**Throws**\n- DateTime Error\n- Memory Error\n",
-    "returns": [
-      "@roblox/globaltype/_zune_time_date.fromIsoDate/return/0"
+      "@roblox/globaltype/_zune_random_Pcg32.new/return/0"
     ],
     "params": [
       {
-        "name": "date",
-        "documentation": "@roblox/globaltype/_zune_time_date.fromIsoDate/param/0"
+        "name": "seed",
+        "documentation": "@roblox/globaltype/_zune_random_Pcg32.new/param/0"
       }
     ]
-  },
-  "@roblox/globaltype/_zune_time_date.fromIsoDate/param/0": {
-    "code_sample": "",
-    "documentation": "The date string to parse."
-  },
-  "@roblox/globaltype/_zune_time_date.fromUnixTimestamp": {
-    "code_sample": "",
-    "documentation": "\n\n**Parameters**\n- `timestamp`: The unix timestamp in seconds.\n\n\n**Throws**\n- DateTime Error\n- Memory Error\n",
-    "returns": [
-      "@roblox/globaltype/_zune_time_date.fromUnixTimestamp/return/0"
-    ],
-    "params": [
-      {
-        "name": "timestamp",
-        "documentation": "@roblox/globaltype/_zune_time_date.fromUnixTimestamp/param/0"
-      }
-    ]
-  },
-  "@roblox/globaltype/_zune_time_date.fromUnixTimestamp/param/0": {
-    "code_sample": "",
-    "documentation": "The unix timestamp in seconds."
-  },
-  "@roblox/globaltype/_zune_time_date.fromUnixTimestampMillis": {
-    "code_sample": "",
-    "documentation": "\n\n**Parameters**\n- `timestamp`: The unix timestamp in milliseconds.\n\n\n**Throws**\n- DateTime Error\n- Memory Error\n",
-    "returns": [
-      "@roblox/globaltype/_zune_time_date.fromUnixTimestampMillis/return/0"
-    ],
-    "params": [
-      {
-        "name": "timestamp",
-        "documentation": "@roblox/globaltype/_zune_time_date.fromUnixTimestampMillis/param/0"
-      }
-    ]
-  },
-  "@roblox/globaltype/_zune_time_date.fromUnixTimestampMillis/param/0": {
-    "code_sample": "",
-    "documentation": "The unix timestamp in milliseconds."
-  },
-  "@roblox/globaltype/_zune_time_date.fromLocalTime": {
-    "code_sample": "",
-    "documentation": "\n\n**Throws**\n- DateTime Error\n- Memory Error\n",
-    "returns": [
-      "@roblox/globaltype/_zune_time_date.fromLocalTime/return/0"
-    ],
-    "params": [
-      {
-        "name": "year",
-        "documentation": "@roblox/globaltype/_zune_time_date.fromLocalTime/param/0"
-      },
-      {
-        "name": "month",
-        "documentation": "@roblox/globaltype/_zune_time_date.fromLocalTime/param/1"
-      },
-      {
-        "name": "day",
-        "documentation": "@roblox/globaltype/_zune_time_date.fromLocalTime/param/2"
-      },
-      {
-        "name": "hour",
-        "documentation": "@roblox/globaltype/_zune_time_date.fromLocalTime/param/3"
-      },
-      {
-        "name": "minute",
-        "documentation": "@roblox/globaltype/_zune_time_date.fromLocalTime/param/4"
-      },
-      {
-        "name": "second",
-        "documentation": "@roblox/globaltype/_zune_time_date.fromLocalTime/param/5"
-      },
-      {
-        "name": "millisecond",
-        "documentation": "@roblox/globaltype/_zune_time_date.fromLocalTime/param/6"
-      }
-    ]
-  },
-  "@roblox/globaltype/_zune_time_date.fromUniversalTime": {
-    "code_sample": "",
-    "documentation": "\n\n**Throws**\n- DateTime Error\n- Memory Error\n",
-    "returns": [
-      "@roblox/globaltype/_zune_time_date.fromUniversalTime/return/0"
-    ],
-    "params": [
-      {
-        "name": "year",
-        "documentation": "@roblox/globaltype/_zune_time_date.fromUniversalTime/param/0"
-      },
-      {
-        "name": "month",
-        "documentation": "@roblox/globaltype/_zune_time_date.fromUniversalTime/param/1"
-      },
-      {
-        "name": "day",
-        "documentation": "@roblox/globaltype/_zune_time_date.fromUniversalTime/param/2"
-      },
-      {
-        "name": "hour",
-        "documentation": "@roblox/globaltype/_zune_time_date.fromUniversalTime/param/3"
-      },
-      {
-        "name": "minute",
-        "documentation": "@roblox/globaltype/_zune_time_date.fromUniversalTime/param/4"
-      },
-      {
-        "name": "second",
-        "documentation": "@roblox/globaltype/_zune_time_date.fromUniversalTime/param/5"
-      },
-      {
-        "name": "millisecond",
-        "documentation": "@roblox/globaltype/_zune_time_date.fromUniversalTime/param/6"
-      }
-    ]
-  },
-  "@roblox/globaltype/_zune_time_date.parse": {
-    "code_sample": "",
-    "documentation": "Parse a date string.\n- Supports ISO8601 format, `YYYY-MM-DDTHH:MM:SSZ`.\n- Supports RFC3339 format, `YYYY-MM-DDTHH:MM:SS+00:00`.\n- Supports RFC2822 format, `Day, DD Mon YYYY HH:MM:SS GMT`.\n\n**Parameters**\n- `date`: The date string to parse.\n\n\n**Throws**\n- DateTime Error\n- Memory Error\n",
-    "returns": [
-      "@roblox/globaltype/_zune_time_date.parse/return/0"
-    ],
-    "params": [
-      {
-        "name": "date",
-        "documentation": "@roblox/globaltype/_zune_time_date.parse/param/0"
-      }
-    ]
-  },
-  "@roblox/globaltype/_zune_time_date.parse/param/0": {
-    "code_sample": "",
-    "documentation": "The date string to parse."
-  },
-  "@roblox/globaltype/RegexMatch": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "index": "@roblox/globaltype/RegexMatch.index",
-      "string": "@roblox/globaltype/RegexMatch.string"
-    }
   },
   "@roblox/globaltype/_zune_thread": {
     "code_sample": "",
@@ -7444,19 +7343,12 @@
     "code_sample": "",
     "documentation": "The path to the database file."
   },
-  "@roblox/globaltype/_zune_net_SOCKF": {
+  "@roblox/globaltype/ThreadLoadOptions": {
     "code_sample": "",
-    "documentation": "Table of socket flags.",
+    "documentation": "",
     "keys": {
-      "DCCP": "@roblox/globaltype/_zune_net_SOCKF.DCCP",
-      "RAW": "@roblox/globaltype/_zune_net_SOCKF.RAW",
-      "RDM": "@roblox/globaltype/_zune_net_SOCKF.RDM",
-      "DGRAM": "@roblox/globaltype/_zune_net_SOCKF.DGRAM",
-      "PACKET": "@roblox/globaltype/_zune_net_SOCKF.PACKET",
-      "STREAM": "@roblox/globaltype/_zune_net_SOCKF.STREAM",
-      "SEQPACKET": "@roblox/globaltype/_zune_net_SOCKF.SEQPACKET",
-      "CLOEXEC": "@roblox/globaltype/_zune_net_SOCKF.CLOEXEC",
-      "NONBLOCK": "@roblox/globaltype/_zune_net_SOCKF.NONBLOCK"
+      "native_code_gen": "@roblox/globaltype/ThreadLoadOptions.native_code_gen",
+      "chunk_name": "@roblox/globaltype/ThreadLoadOptions.chunk_name"
     }
   },
   "@roblox/globaltype/_zune_time_instant": {
@@ -8159,6 +8051,98 @@
       "null": "@roblox/globaltype/_zune_serde_json5.values.null"
     }
   },
+  "@roblox/globaltype/_zune_serde_json": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "encode": "@roblox/globaltype/_zune_serde_json.encode",
+      "values": "@roblox/globaltype/_zune_serde_json.values",
+      "decode": "@roblox/globaltype/_zune_serde_json.decode",
+      "indents": "@roblox/globaltype/_zune_serde_json.indents"
+    }
+  },
+  "@roblox/globaltype/_zune_serde_json.encode": {
+    "code_sample": "",
+    "documentation": "Encodes a value to JSON.\n\n**Parameters**\n- `value`: The value to encode.\n- `config`: The configuration for the encoding.\n\n\n**Throws**\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/_zune_serde_json.encode/return/0"
+    ],
+    "params": [
+      {
+        "name": "value",
+        "documentation": "@roblox/globaltype/_zune_serde_json.encode/param/0"
+      },
+      {
+        "name": "config",
+        "documentation": "@roblox/globaltype/_zune_serde_json.encode/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/_zune_serde_json.encode/param/0": {
+    "code_sample": "",
+    "documentation": "The value to encode."
+  },
+  "@roblox/globaltype/_zune_serde_json.encode/param/1": {
+    "code_sample": "",
+    "documentation": "The configuration for the encoding."
+  },
+  "@roblox/globaltype/_zune_serde_json.decode": {
+    "code_sample": "",
+    "documentation": "Decodes JSON.\n\n**Parameters**\n- `json`: The JSON string to decode.\n- `config`: The configuration for the decoding.\n\n\n**Throws**\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/_zune_serde_json.decode/return/0"
+    ],
+    "params": [
+      {
+        "name": "json",
+        "documentation": "@roblox/globaltype/_zune_serde_json.decode/param/0"
+      },
+      {
+        "name": "config",
+        "documentation": "@roblox/globaltype/_zune_serde_json.decode/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/_zune_serde_json.decode/param/0": {
+    "code_sample": "",
+    "documentation": "The JSON string to decode."
+  },
+  "@roblox/globaltype/_zune_serde_json.decode/param/1": {
+    "code_sample": "",
+    "documentation": "The configuration for the decoding."
+  },
+  "@roblox/globaltype/_zune_serde_json.indents": {
+    "code_sample": "",
+    "documentation": "Indentation levels for JSON.",
+    "keys": {
+      "tabs": "@roblox/globaltype/_zune_serde_json.indents.tabs",
+      "four_spaces": "@roblox/globaltype/_zune_serde_json.indents.four_spaces",
+      "two_spaces": "@roblox/globaltype/_zune_serde_json.indents.two_spaces",
+      "none": "@roblox/globaltype/_zune_serde_json.indents.none"
+    }
+  },
+  "@roblox/globaltype/_zune_serde_json.values": {
+    "code_sample": "",
+    "documentation": "Special values for JSON.",
+    "keys": {
+      "null": "@roblox/globaltype/_zune_serde_json.values.null"
+    }
+  },
+  "@roblox/globaltype/_zune_net_SOCKF": {
+    "code_sample": "",
+    "documentation": "Table of socket flags.",
+    "keys": {
+      "DCCP": "@roblox/globaltype/_zune_net_SOCKF.DCCP",
+      "RAW": "@roblox/globaltype/_zune_net_SOCKF.RAW",
+      "RDM": "@roblox/globaltype/_zune_net_SOCKF.RDM",
+      "DGRAM": "@roblox/globaltype/_zune_net_SOCKF.DGRAM",
+      "PACKET": "@roblox/globaltype/_zune_net_SOCKF.PACKET",
+      "STREAM": "@roblox/globaltype/_zune_net_SOCKF.STREAM",
+      "SEQPACKET": "@roblox/globaltype/_zune_net_SOCKF.SEQPACKET",
+      "CLOEXEC": "@roblox/globaltype/_zune_net_SOCKF.CLOEXEC",
+      "NONBLOCK": "@roblox/globaltype/_zune_net_SOCKF.NONBLOCK"
+    }
+  },
   "@roblox/globaltype/_zune_net_ADDRF": {
     "code_sample": "",
     "documentation": "The table of address families.",
@@ -8579,20 +8563,21 @@
     "code_sample": "",
     "documentation": "The options for the WebSocket."
   },
-  "@roblox/globaltype/Location": {
+  "@roblox/globaltype/_zune_serde_base64": {
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "begin": "@roblox/globaltype/Location.begin"
+      "encode": "@roblox/globaltype/_zune_serde_base64.encode",
+      "decode": "@roblox/globaltype/_zune_serde_base64.decode"
     }
   },
-  "@roblox/globaltype/Location.begin": {
+  "@roblox/globaltype/_zune_serde_base64.encode": {
     "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "column": "@roblox/globaltype/Location.begin.column",
-      "line": "@roblox/globaltype/Location.begin.line"
-    }
+    "documentation": "Encodes a string to Base64."
+  },
+  "@roblox/globaltype/_zune_serde_base64.decode": {
+    "code_sample": "",
+    "documentation": "Decodes a Base64 string."
   },
   "@roblox/globaltype/_zune_luau": {
     "code_sample": "",
@@ -8720,73 +8705,6 @@
     "documentation": "Runs a full garbage collection cycle.",
     "returns": [],
     "params": []
-  },
-  "@roblox/globaltype/CryptoTlsServerConfig": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "auth": "@roblox/globaltype/CryptoTlsServerConfig.auth"
-    }
-  },
-  "@roblox/globaltype/CryptoTlsServerConfig.auth": {
-    "code_sample": "",
-    "documentation": "The certificate and key pair to use for the server."
-  },
-  "@roblox/globaltype/_zune_serde_base64": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "encode": "@roblox/globaltype/_zune_serde_base64.encode",
-      "decode": "@roblox/globaltype/_zune_serde_base64.decode"
-    }
-  },
-  "@roblox/globaltype/_zune_serde_base64.encode": {
-    "code_sample": "",
-    "documentation": "Encodes a string to Base64."
-  },
-  "@roblox/globaltype/_zune_serde_base64.decode": {
-    "code_sample": "",
-    "documentation": "Decodes a Base64 string."
-  },
-  "@roblox/globaltype/_zune_random_Sfc64": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "new": "@roblox/globaltype/_zune_random_Sfc64.new"
-    }
-  },
-  "@roblox/globaltype/_zune_random_Sfc64.new": {
-    "code_sample": "",
-    "documentation": "\n\n**Throws**\n- Memory Error\n",
-    "returns": [
-      "@roblox/globaltype/_zune_random_Sfc64.new/return/0"
-    ],
-    "params": [
-      {
-        "name": "seed",
-        "documentation": "@roblox/globaltype/_zune_random_Sfc64.new/param/0"
-      }
-    ]
-  },
-  "@roblox/globaltype/_zune_random_Xoshiro256": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "new": "@roblox/globaltype/_zune_random_Xoshiro256.new"
-    }
-  },
-  "@roblox/globaltype/_zune_random_Xoshiro256.new": {
-    "code_sample": "",
-    "documentation": "\n\n**Throws**\n- Memory Error\n",
-    "returns": [
-      "@roblox/globaltype/_zune_random_Xoshiro256.new/return/0"
-    ],
-    "params": [
-      {
-        "name": "seed",
-        "documentation": "@roblox/globaltype/_zune_random_Xoshiro256.new/param/0"
-      }
-    ]
   },
   "@roblox/globaltype/_zune_process": {
     "code_sample": "",
@@ -8921,43 +8839,43 @@
     "returns": [],
     "params": []
   },
-  "@roblox/globaltype/_zune_random_LuauPcg32": {
+  "@roblox/globaltype/_zune_random_Sfc64": {
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "new": "@roblox/globaltype/_zune_random_LuauPcg32.new"
+      "new": "@roblox/globaltype/_zune_random_Sfc64.new"
     }
   },
-  "@roblox/globaltype/_zune_random_LuauPcg32.new": {
+  "@roblox/globaltype/_zune_random_Sfc64.new": {
     "code_sample": "",
     "documentation": "\n\n**Throws**\n- Memory Error\n",
     "returns": [
-      "@roblox/globaltype/_zune_random_LuauPcg32.new/return/0"
+      "@roblox/globaltype/_zune_random_Sfc64.new/return/0"
     ],
     "params": [
       {
         "name": "seed",
-        "documentation": "@roblox/globaltype/_zune_random_LuauPcg32.new/param/0"
+        "documentation": "@roblox/globaltype/_zune_random_Sfc64.new/param/0"
       }
     ]
   },
-  "@roblox/globaltype/_zune_random_Pcg32": {
+  "@roblox/globaltype/_zune_random_Xoshiro256": {
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "new": "@roblox/globaltype/_zune_random_Pcg32.new"
+      "new": "@roblox/globaltype/_zune_random_Xoshiro256.new"
     }
   },
-  "@roblox/globaltype/_zune_random_Pcg32.new": {
+  "@roblox/globaltype/_zune_random_Xoshiro256.new": {
     "code_sample": "",
     "documentation": "\n\n**Throws**\n- Memory Error\n",
     "returns": [
-      "@roblox/globaltype/_zune_random_Pcg32.new/return/0"
+      "@roblox/globaltype/_zune_random_Xoshiro256.new/return/0"
     ],
     "params": [
       {
         "name": "seed",
-        "documentation": "@roblox/globaltype/_zune_random_Pcg32.new/param/0"
+        "documentation": "@roblox/globaltype/_zune_random_Xoshiro256.new/param/0"
       }
     ]
   },
@@ -8998,6 +8916,17 @@
       "decompress": "@roblox/globaltype/_zune_serde_lz4.decompress",
       "compress": "@roblox/globaltype/_zune_serde_lz4.compress"
     }
+  },
+  "@roblox/globaltype/SerdeJsonEncodeConfig": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "pretty_indent": "@roblox/globaltype/SerdeJsonEncodeConfig.pretty_indent"
+    }
+  },
+  "@roblox/globaltype/SerdeJsonEncodeConfig.pretty_indent": {
+    "code_sample": "",
+    "documentation": "The indentation level for pretty printing"
   },
   "@roblox/globaltype/_zune_net_SOCKOPT": {
     "code_sample": "",
@@ -9130,6 +9059,52 @@
   "@roblox/globaltype/_zune_crypto_password.verify/param/1": {
     "code_sample": "",
     "documentation": "The hash to verify against."
+  },
+  "@roblox/globaltype/_zune_random_LuauPcg32": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "new": "@roblox/globaltype/_zune_random_LuauPcg32.new"
+    }
+  },
+  "@roblox/globaltype/_zune_random_LuauPcg32.new": {
+    "code_sample": "",
+    "documentation": "\n\n**Throws**\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/_zune_random_LuauPcg32.new/return/0"
+    ],
+    "params": [
+      {
+        "name": "seed",
+        "documentation": "@roblox/globaltype/_zune_random_LuauPcg32.new/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/ServerWebSocketHandlers": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "message": "@roblox/globaltype/ServerWebSocketHandlers.message",
+      "close": "@roblox/globaltype/ServerWebSocketHandlers.close",
+      "open": "@roblox/globaltype/ServerWebSocketHandlers.open",
+      "upgrade": "@roblox/globaltype/ServerWebSocketHandlers.upgrade"
+    }
+  },
+  "@roblox/globaltype/ServerWebSocketHandlers.upgrade": {
+    "code_sample": "",
+    "documentation": "The function to call when a WebSocket upgrade request is received.\n- If `true` is returned, the upgrade will be accepted.\n- If `false` is returned, the upgrade will be rejected."
+  },
+  "@roblox/globaltype/ServerWebSocketHandlers.open": {
+    "code_sample": "",
+    "documentation": "The function to call when a WebSocket connection is opened."
+  },
+  "@roblox/globaltype/ServerWebSocketHandlers.message": {
+    "code_sample": "",
+    "documentation": "The function to call when a message is received on a WebSocket connection."
+  },
+  "@roblox/globaltype/ServerWebSocketHandlers.close": {
+    "code_sample": "",
+    "documentation": "The function to call when a WebSocket connection is closed."
   },
   "@roblox/globaltype/_zune_random_RomuTrio": {
     "code_sample": "",
@@ -9283,6 +9258,180 @@
     "code_sample": "",
     "documentation": "Counts the number of current tasks.\n\nOptional kinds parameter to count a specific kind of task.\n\nKinds:\n- `s` to count sleeping tasks.\n- `d` to count deferred tasks.\n- `w` to count awaiting tasks. (zune backend)\n- `t` to count internal tasks. (zune backend)"
   },
+  "@roblox/globaltype/_zune_time_date": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "fromUnixTimestamp": "@roblox/globaltype/_zune_time_date.fromUnixTimestamp",
+      "now": "@roblox/globaltype/_zune_time_date.now",
+      "parse": "@roblox/globaltype/_zune_time_date.parse",
+      "fromUniversalTime": "@roblox/globaltype/_zune_time_date.fromUniversalTime",
+      "fromUnixTimestampMillis": "@roblox/globaltype/_zune_time_date.fromUnixTimestampMillis",
+      "fromLocalTime": "@roblox/globaltype/_zune_time_date.fromLocalTime",
+      "fromIsoDate": "@roblox/globaltype/_zune_time_date.fromIsoDate"
+    }
+  },
+  "@roblox/globaltype/_zune_time_date.now": {
+    "code_sample": "",
+    "documentation": "\n\n**Throws**\n- DateTime Error\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/_zune_time_date.now/return/0"
+    ],
+    "params": []
+  },
+  "@roblox/globaltype/_zune_time_date.fromIsoDate": {
+    "code_sample": "",
+    "documentation": "Parse a string in ISO8601 format, `YYYY-MM-DDTHH:MM:SSZ`.\n\n**Parameters**\n- `date`: The date string to parse.\n\n\n**Throws**\n- DateTime Error\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/_zune_time_date.fromIsoDate/return/0"
+    ],
+    "params": [
+      {
+        "name": "date",
+        "documentation": "@roblox/globaltype/_zune_time_date.fromIsoDate/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/_zune_time_date.fromIsoDate/param/0": {
+    "code_sample": "",
+    "documentation": "The date string to parse."
+  },
+  "@roblox/globaltype/_zune_time_date.fromUnixTimestamp": {
+    "code_sample": "",
+    "documentation": "\n\n**Parameters**\n- `timestamp`: The unix timestamp in seconds.\n\n\n**Throws**\n- DateTime Error\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/_zune_time_date.fromUnixTimestamp/return/0"
+    ],
+    "params": [
+      {
+        "name": "timestamp",
+        "documentation": "@roblox/globaltype/_zune_time_date.fromUnixTimestamp/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/_zune_time_date.fromUnixTimestamp/param/0": {
+    "code_sample": "",
+    "documentation": "The unix timestamp in seconds."
+  },
+  "@roblox/globaltype/_zune_time_date.fromUnixTimestampMillis": {
+    "code_sample": "",
+    "documentation": "\n\n**Parameters**\n- `timestamp`: The unix timestamp in milliseconds.\n\n\n**Throws**\n- DateTime Error\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/_zune_time_date.fromUnixTimestampMillis/return/0"
+    ],
+    "params": [
+      {
+        "name": "timestamp",
+        "documentation": "@roblox/globaltype/_zune_time_date.fromUnixTimestampMillis/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/_zune_time_date.fromUnixTimestampMillis/param/0": {
+    "code_sample": "",
+    "documentation": "The unix timestamp in milliseconds."
+  },
+  "@roblox/globaltype/_zune_time_date.fromLocalTime": {
+    "code_sample": "",
+    "documentation": "\n\n**Throws**\n- DateTime Error\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/_zune_time_date.fromLocalTime/return/0"
+    ],
+    "params": [
+      {
+        "name": "year",
+        "documentation": "@roblox/globaltype/_zune_time_date.fromLocalTime/param/0"
+      },
+      {
+        "name": "month",
+        "documentation": "@roblox/globaltype/_zune_time_date.fromLocalTime/param/1"
+      },
+      {
+        "name": "day",
+        "documentation": "@roblox/globaltype/_zune_time_date.fromLocalTime/param/2"
+      },
+      {
+        "name": "hour",
+        "documentation": "@roblox/globaltype/_zune_time_date.fromLocalTime/param/3"
+      },
+      {
+        "name": "minute",
+        "documentation": "@roblox/globaltype/_zune_time_date.fromLocalTime/param/4"
+      },
+      {
+        "name": "second",
+        "documentation": "@roblox/globaltype/_zune_time_date.fromLocalTime/param/5"
+      },
+      {
+        "name": "millisecond",
+        "documentation": "@roblox/globaltype/_zune_time_date.fromLocalTime/param/6"
+      }
+    ]
+  },
+  "@roblox/globaltype/_zune_time_date.fromUniversalTime": {
+    "code_sample": "",
+    "documentation": "\n\n**Throws**\n- DateTime Error\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/_zune_time_date.fromUniversalTime/return/0"
+    ],
+    "params": [
+      {
+        "name": "year",
+        "documentation": "@roblox/globaltype/_zune_time_date.fromUniversalTime/param/0"
+      },
+      {
+        "name": "month",
+        "documentation": "@roblox/globaltype/_zune_time_date.fromUniversalTime/param/1"
+      },
+      {
+        "name": "day",
+        "documentation": "@roblox/globaltype/_zune_time_date.fromUniversalTime/param/2"
+      },
+      {
+        "name": "hour",
+        "documentation": "@roblox/globaltype/_zune_time_date.fromUniversalTime/param/3"
+      },
+      {
+        "name": "minute",
+        "documentation": "@roblox/globaltype/_zune_time_date.fromUniversalTime/param/4"
+      },
+      {
+        "name": "second",
+        "documentation": "@roblox/globaltype/_zune_time_date.fromUniversalTime/param/5"
+      },
+      {
+        "name": "millisecond",
+        "documentation": "@roblox/globaltype/_zune_time_date.fromUniversalTime/param/6"
+      }
+    ]
+  },
+  "@roblox/globaltype/_zune_time_date.parse": {
+    "code_sample": "",
+    "documentation": "Parse a date string.\n- Supports ISO8601 format, `YYYY-MM-DDTHH:MM:SSZ`.\n- Supports RFC3339 format, `YYYY-MM-DDTHH:MM:SS+00:00`.\n- Supports RFC2822 format, `Day, DD Mon YYYY HH:MM:SS GMT`.\n\n**Parameters**\n- `date`: The date string to parse.\n\n\n**Throws**\n- DateTime Error\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/_zune_time_date.parse/return/0"
+    ],
+    "params": [
+      {
+        "name": "date",
+        "documentation": "@roblox/globaltype/_zune_time_date.parse/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/_zune_time_date.parse/param/0": {
+    "code_sample": "",
+    "documentation": "The date string to parse."
+  },
+  "@roblox/globaltype/SerdeGenericCompressionOptions": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "level": "@roblox/globaltype/SerdeGenericCompressionOptions.level"
+    }
+  },
+  "@roblox/globaltype/SerdeGenericCompressionOptions.level": {
+    "code_sample": "",
+    "documentation": "The compression level"
+  },
   "@roblox/globaltype/HttpServeOptions": {
     "code_sample": "",
     "documentation": "",
@@ -9342,17 +9491,6 @@
   "@roblox/globaltype/HttpServeOptions.websocket": {
     "code_sample": "",
     "documentation": "The handlers for WebSocket connections."
-  },
-  "@roblox/globaltype/SerdeGenericCompressionOptions": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "level": "@roblox/globaltype/SerdeGenericCompressionOptions.level"
-    }
-  },
-  "@roblox/globaltype/SerdeGenericCompressionOptions.level": {
-    "code_sample": "",
-    "documentation": "The compression level"
   },
   "@roblox/globaltype/TimeDictionary": {
     "code_sample": "",
@@ -9738,6 +9876,34 @@
     "code_sample": "",
     "documentation": "The values to send to the thread."
   },
+  "@roblox/globaltype/FFIVectorType": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "offset": "@roblox/globaltype/FFIVectorType.offset"
+    }
+  },
+  "@roblox/globaltype/FFIVectorType.offset": {
+    "code_sample": "",
+    "documentation": "Get the offset of a index in the type.\n\n**Parameters**\n- `index`: The index to get the offset of.\n",
+    "returns": [
+      "@roblox/globaltype/FFIVectorType.offset/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/FFIVectorType.offset/param/0"
+      },
+      {
+        "name": "index",
+        "documentation": "@roblox/globaltype/FFIVectorType.offset/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/FFIVectorType.offset/param/1": {
+    "code_sample": "",
+    "documentation": "The index to get the offset of."
+  },
   "@roblox/globaltype/BufferStream": {
     "code_sample": "",
     "documentation": "",
@@ -9887,1534 +10053,6 @@
     "code_sample": "",
     "documentation": "",
     "keys": []
-  },
-  "@roblox/globaltype/IoWritable": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "writei8": "@roblox/globaltype/IoWritable.writei8",
-      "writeu8": "@roblox/globaltype/IoWritable.writeu8",
-      "writef32": "@roblox/globaltype/IoWritable.writef32",
-      "writei32": "@roblox/globaltype/IoWritable.writei32",
-      "writef64": "@roblox/globaltype/IoWritable.writef64",
-      "write": "@roblox/globaltype/IoWritable.write",
-      "writeu32": "@roblox/globaltype/IoWritable.writeu32",
-      "writei16": "@roblox/globaltype/IoWritable.writei16",
-      "writeu16": "@roblox/globaltype/IoWritable.writeu16"
-    }
-  },
-  "@roblox/globaltype/IoWritable.write": {
-    "code_sample": "",
-    "documentation": "\n\n**Parameters**\n- `data`: The data to write to the stream.\n\n\n**Throws**\n- Writer Error\n",
-    "returns": [],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/IoWritable.write/param/0"
-      },
-      {
-        "name": "data",
-        "documentation": "@roblox/globaltype/IoWritable.write/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/IoWritable.write/param/1": {
-    "code_sample": "",
-    "documentation": "The data to write to the stream."
-  },
-  "@roblox/globaltype/IoWritable.writeu8": {
-    "code_sample": "",
-    "documentation": "\n\n**Throws**\n- Writer Error\n",
-    "returns": [],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/IoWritable.writeu8/param/0"
-      },
-      {
-        "name": "value",
-        "documentation": "@roblox/globaltype/IoWritable.writeu8/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/IoWritable.writeu16": {
-    "code_sample": "",
-    "documentation": "\n\n**Throws**\n- Writer Error\n",
-    "returns": [],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/IoWritable.writeu16/param/0"
-      },
-      {
-        "name": "value",
-        "documentation": "@roblox/globaltype/IoWritable.writeu16/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/IoWritable.writeu32": {
-    "code_sample": "",
-    "documentation": "\n\n**Throws**\n- Writer Error\n",
-    "returns": [],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/IoWritable.writeu32/param/0"
-      },
-      {
-        "name": "value",
-        "documentation": "@roblox/globaltype/IoWritable.writeu32/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/IoWritable.writei8": {
-    "code_sample": "",
-    "documentation": "\n\n**Throws**\n- Writer Error\n",
-    "returns": [],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/IoWritable.writei8/param/0"
-      },
-      {
-        "name": "value",
-        "documentation": "@roblox/globaltype/IoWritable.writei8/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/IoWritable.writei16": {
-    "code_sample": "",
-    "documentation": "\n\n**Throws**\n- Writer Error\n",
-    "returns": [],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/IoWritable.writei16/param/0"
-      },
-      {
-        "name": "value",
-        "documentation": "@roblox/globaltype/IoWritable.writei16/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/IoWritable.writei32": {
-    "code_sample": "",
-    "documentation": "\n\n**Throws**\n- Writer Error\n",
-    "returns": [],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/IoWritable.writei32/param/0"
-      },
-      {
-        "name": "value",
-        "documentation": "@roblox/globaltype/IoWritable.writei32/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/IoWritable.writef32": {
-    "code_sample": "",
-    "documentation": "\n\n**Throws**\n- Writer Error\n",
-    "returns": [],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/IoWritable.writef32/param/0"
-      },
-      {
-        "name": "value",
-        "documentation": "@roblox/globaltype/IoWritable.writef32/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/IoWritable.writef64": {
-    "code_sample": "",
-    "documentation": "\n\n**Throws**\n- Writer Error\n",
-    "returns": [],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/IoWritable.writef64/param/0"
-      },
-      {
-        "name": "value",
-        "documentation": "@roblox/globaltype/IoWritable.writef64/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/Random": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "nextInteger": "@roblox/globaltype/Random.nextInteger",
-      "nextNumber": "@roblox/globaltype/Random.nextNumber",
-      "clone": "@roblox/globaltype/Random.clone",
-      "nextBoolean": "@roblox/globaltype/Random.nextBoolean"
-    }
-  },
-  "@roblox/globaltype/Random.nextNumber": {
-    "code_sample": "",
-    "documentation": "Generates a random number.\n\nIf no arguments are provided, the function will generate a number between 0 and 1."
-  },
-  "@roblox/globaltype/Random.nextInteger": {
-    "code_sample": "",
-    "documentation": "Generates a random integer.\n\nIf no arguments are provided, the function will generate a number between the limits of a signed 32-bit integer.\n\n**Parameters**\n- `min`: The minimum value (inclusive).\n- `max`: The maximum value (inclusive).\n\n\n**Throws**\n- Range Error\n",
-    "returns": [
-      "@roblox/globaltype/Random.nextInteger/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/Random.nextInteger/param/0"
-      },
-      {
-        "name": "min",
-        "documentation": "@roblox/globaltype/Random.nextInteger/param/1"
-      },
-      {
-        "name": "max",
-        "documentation": "@roblox/globaltype/Random.nextInteger/param/2"
-      }
-    ]
-  },
-  "@roblox/globaltype/Random.nextInteger/param/1": {
-    "code_sample": "",
-    "documentation": "The minimum value (inclusive)."
-  },
-  "@roblox/globaltype/Random.nextInteger/param/2": {
-    "code_sample": "",
-    "documentation": "The maximum value (inclusive)."
-  },
-  "@roblox/globaltype/Random.nextBoolean": {
-    "code_sample": "",
-    "documentation": "Generates a random boolean.",
-    "returns": [
-      "@roblox/globaltype/Random.nextBoolean/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/Random.nextBoolean/param/0"
-      }
-    ]
-  },
-  "@roblox/globaltype/Random.clone": {
-    "code_sample": "",
-    "documentation": "Creates a new random number generator with the same state as the current one.",
-    "returns": [
-      "@roblox/globaltype/Random.clone/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/Random.clone/param/0"
-      }
-    ]
-  },
-  "@roblox/globaltype/NetworkSocket": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "isOpen": "@roblox/globaltype/NetworkSocket.isOpen",
-      "accept": "@roblox/globaltype/NetworkSocket.accept",
-      "send": "@roblox/globaltype/NetworkSocket.send",
-      "getName": "@roblox/globaltype/NetworkSocket.getName",
-      "sendMsg": "@roblox/globaltype/NetworkSocket.sendMsg",
-      "close": "@roblox/globaltype/NetworkSocket.close",
-      "connect": "@roblox/globaltype/NetworkSocket.connect",
-      "recvMsg": "@roblox/globaltype/NetworkSocket.recvMsg",
-      "setOption": "@roblox/globaltype/NetworkSocket.setOption",
-      "listen": "@roblox/globaltype/NetworkSocket.listen",
-      "bindIp": "@roblox/globaltype/NetworkSocket.bindIp",
-      "recv": "@roblox/globaltype/NetworkSocket.recv"
-    }
-  },
-  "@roblox/globaltype/NetworkSocket.send": {
-    "code_sample": "",
-    "documentation": "Sends data over the socket, and returns the number of bytes sent.\n\n**Parameters**\n- `data`: The data to send.\n- `offset`: The offset to start sending from.\n  - default: `0`\n\n\n**Throws**\n- Network Error\n- Memory Error\n",
-    "returns": [
-      "@roblox/globaltype/NetworkSocket.send/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/NetworkSocket.send/param/0"
-      },
-      {
-        "name": "data",
-        "documentation": "@roblox/globaltype/NetworkSocket.send/param/1"
-      },
-      {
-        "name": "offset",
-        "documentation": "@roblox/globaltype/NetworkSocket.send/param/2"
-      }
-    ]
-  },
-  "@roblox/globaltype/NetworkSocket.send/param/1": {
-    "code_sample": "",
-    "documentation": "The data to send."
-  },
-  "@roblox/globaltype/NetworkSocket.send/param/2": {
-    "code_sample": "",
-    "documentation": "The offset to start sending from."
-  },
-  "@roblox/globaltype/NetworkSocket.sendMsg": {
-    "code_sample": "",
-    "documentation": "Sends data over the socket, and returns the number of bytes sent.\n\n**Parameters**\n- `port`: The port to send the message to.\n- `address`: The address to send the message to.\n- `data`: The data to send.\n- `offset`: The offset to start sending from.\n  - default: `0`\n\n\n**Throws**\n- Network Error\n- Memory Error\n",
-    "returns": [
-      "@roblox/globaltype/NetworkSocket.sendMsg/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/NetworkSocket.sendMsg/param/0"
-      },
-      {
-        "name": "port",
-        "documentation": "@roblox/globaltype/NetworkSocket.sendMsg/param/1"
-      },
-      {
-        "name": "address",
-        "documentation": "@roblox/globaltype/NetworkSocket.sendMsg/param/2"
-      },
-      {
-        "name": "data",
-        "documentation": "@roblox/globaltype/NetworkSocket.sendMsg/param/3"
-      },
-      {
-        "name": "offset",
-        "documentation": "@roblox/globaltype/NetworkSocket.sendMsg/param/4"
-      }
-    ]
-  },
-  "@roblox/globaltype/NetworkSocket.sendMsg/param/1": {
-    "code_sample": "",
-    "documentation": "The port to send the message to."
-  },
-  "@roblox/globaltype/NetworkSocket.sendMsg/param/2": {
-    "code_sample": "",
-    "documentation": "The address to send the message to."
-  },
-  "@roblox/globaltype/NetworkSocket.sendMsg/param/3": {
-    "code_sample": "",
-    "documentation": "The data to send."
-  },
-  "@roblox/globaltype/NetworkSocket.sendMsg/param/4": {
-    "code_sample": "",
-    "documentation": "The offset to start sending from."
-  },
-  "@roblox/globaltype/NetworkSocket.recv": {
-    "code_sample": "",
-    "documentation": "\n\n**Parameters**\n- `max_size`: The maximum size of the data to receive.\n  - default: `8192`\n\n\n**Throws**\n- Network Error\n- Memory Error\n",
-    "returns": [
-      "@roblox/globaltype/NetworkSocket.recv/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/NetworkSocket.recv/param/0"
-      },
-      {
-        "name": "max_size",
-        "documentation": "@roblox/globaltype/NetworkSocket.recv/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/NetworkSocket.recv/param/1": {
-    "code_sample": "",
-    "documentation": "The maximum size of the data to receive."
-  },
-  "@roblox/globaltype/NetworkSocket.recvMsg": {
-    "code_sample": "",
-    "documentation": "\n\n**Parameters**\n- `max_size`: The maximum size of the message to receive.\n  - default: `8192`\n\n\n**Throws**\n- Network Error\n- Memory Error\n",
-    "returns": [
-      "@roblox/globaltype/NetworkSocket.recvMsg/return/0",
-      "@roblox/globaltype/NetworkSocket.recvMsg/return/1"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/NetworkSocket.recvMsg/param/0"
-      },
-      {
-        "name": "max_size",
-        "documentation": "@roblox/globaltype/NetworkSocket.recvMsg/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/NetworkSocket.recvMsg/param/1": {
-    "code_sample": "",
-    "documentation": "The maximum size of the message to receive."
-  },
-  "@roblox/globaltype/NetworkSocket.accept": {
-    "code_sample": "",
-    "documentation": "Yields and waits for a connection to be made on the socket, and returns a `NetworkSocket` object.\n\n**Throws**\n- IO Error\n",
-    "returns": [
-      "@roblox/globaltype/NetworkSocket.accept/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/NetworkSocket.accept/param/0"
-      }
-    ]
-  },
-  "@roblox/globaltype/NetworkSocket.connect": {
-    "code_sample": "",
-    "documentation": "Connects the socket to the specified address and port.\n\n**Parameters**\n- `address`: The address to connect to.\n- `port`: The port to connect to.\n\n\n**Throws**\n- Network Error\n",
-    "returns": [],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/NetworkSocket.connect/param/0"
-      },
-      {
-        "name": "address",
-        "documentation": "@roblox/globaltype/NetworkSocket.connect/param/1"
-      },
-      {
-        "name": "port",
-        "documentation": "@roblox/globaltype/NetworkSocket.connect/param/2"
-      }
-    ]
-  },
-  "@roblox/globaltype/NetworkSocket.connect/param/1": {
-    "code_sample": "",
-    "documentation": "The address to connect to."
-  },
-  "@roblox/globaltype/NetworkSocket.connect/param/2": {
-    "code_sample": "",
-    "documentation": "The port to connect to."
-  },
-  "@roblox/globaltype/NetworkSocket.listen": {
-    "code_sample": "",
-    "documentation": "Starts listening for incoming connections on the socket.\n\n**Parameters**\n- `backlog`: The maximum number of connections to backlog.\n  - default: `128`\n\n\n**Throws**\n- IO Error\n",
-    "returns": [],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/NetworkSocket.listen/param/0"
-      },
-      {
-        "name": "backlog",
-        "documentation": "@roblox/globaltype/NetworkSocket.listen/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/NetworkSocket.listen/param/1": {
-    "code_sample": "",
-    "documentation": "The maximum number of connections to backlog."
-  },
-  "@roblox/globaltype/NetworkSocket.bindIp": {
-    "code_sample": "",
-    "documentation": "Binds the socket to the specified address and port.\n\n**Parameters**\n- `address`: The address to bind to.\n- `port`: The port to bind to.\n\n\n**Throws**\n- Network Error\n",
-    "returns": [],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/NetworkSocket.bindIp/param/0"
-      },
-      {
-        "name": "address",
-        "documentation": "@roblox/globaltype/NetworkSocket.bindIp/param/1"
-      },
-      {
-        "name": "port",
-        "documentation": "@roblox/globaltype/NetworkSocket.bindIp/param/2"
-      }
-    ]
-  },
-  "@roblox/globaltype/NetworkSocket.bindIp/param/1": {
-    "code_sample": "",
-    "documentation": "The address to bind to."
-  },
-  "@roblox/globaltype/NetworkSocket.bindIp/param/2": {
-    "code_sample": "",
-    "documentation": "The port to bind to."
-  },
-  "@roblox/globaltype/NetworkSocket.getName": {
-    "code_sample": "",
-    "documentation": "\n\n**Throws**\n- Network Error\n- Memory Error\n",
-    "returns": [
-      "@roblox/globaltype/NetworkSocket.getName/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/NetworkSocket.getName/param/0"
-      }
-    ]
-  },
-  "@roblox/globaltype/NetworkSocket.setOption": {
-    "code_sample": "",
-    "documentation": "Sets a socket option on the socket.\n\n**Parameters**\n- `level`: The level of the option.\n- `optname`: The name of the option.\n- `value`: The value of the option.\n\n\n**Throws**\n- Network Error\n",
-    "returns": [],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/NetworkSocket.setOption/param/0"
-      },
-      {
-        "name": "level",
-        "documentation": "@roblox/globaltype/NetworkSocket.setOption/param/1"
-      },
-      {
-        "name": "optname",
-        "documentation": "@roblox/globaltype/NetworkSocket.setOption/param/2"
-      },
-      {
-        "name": "value",
-        "documentation": "@roblox/globaltype/NetworkSocket.setOption/param/3"
-      }
-    ]
-  },
-  "@roblox/globaltype/NetworkSocket.setOption/param/1": {
-    "code_sample": "",
-    "documentation": "The level of the option."
-  },
-  "@roblox/globaltype/NetworkSocket.setOption/param/2": {
-    "code_sample": "",
-    "documentation": "The name of the option."
-  },
-  "@roblox/globaltype/NetworkSocket.setOption/param/3": {
-    "code_sample": "",
-    "documentation": "The value of the option."
-  },
-  "@roblox/globaltype/NetworkSocket.close": {
-    "code_sample": "",
-    "documentation": "Closes the socket.\n\n**Throws**\n- IO Error\n- Network Error\n",
-    "returns": [],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/NetworkSocket.close/param/0"
-      }
-    ]
-  },
-  "@roblox/globaltype/NetworkSocket.isOpen": {
-    "code_sample": "",
-    "documentation": "Returns if the socket is open.",
-    "returns": [
-      "@roblox/globaltype/NetworkSocket.isOpen/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/NetworkSocket.isOpen/param/0"
-      }
-    ]
-  },
-  "@roblox/globaltype/IoReadable": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "readf64": "@roblox/globaltype/IoReadable.readf64",
-      "readi32": "@roblox/globaltype/IoReadable.readi32",
-      "readi8": "@roblox/globaltype/IoReadable.readi8",
-      "readu16": "@roblox/globaltype/IoReadable.readu16",
-      "read": "@roblox/globaltype/IoReadable.read",
-      "readu8": "@roblox/globaltype/IoReadable.readu8",
-      "readu32": "@roblox/globaltype/IoReadable.readu32",
-      "readf32": "@roblox/globaltype/IoReadable.readf32",
-      "readi16": "@roblox/globaltype/IoReadable.readi16"
-    }
-  },
-  "@roblox/globaltype/IoReadable.readu8": {
-    "code_sample": "",
-    "documentation": "",
-    "returns": [
-      "@roblox/globaltype/IoReadable.readu8/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/IoReadable.readu8/param/0"
-      }
-    ]
-  },
-  "@roblox/globaltype/IoReadable.readu16": {
-    "code_sample": "",
-    "documentation": "",
-    "returns": [
-      "@roblox/globaltype/IoReadable.readu16/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/IoReadable.readu16/param/0"
-      }
-    ]
-  },
-  "@roblox/globaltype/IoReadable.readu32": {
-    "code_sample": "",
-    "documentation": "",
-    "returns": [
-      "@roblox/globaltype/IoReadable.readu32/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/IoReadable.readu32/param/0"
-      }
-    ]
-  },
-  "@roblox/globaltype/IoReadable.readi8": {
-    "code_sample": "",
-    "documentation": "",
-    "returns": [
-      "@roblox/globaltype/IoReadable.readi8/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/IoReadable.readi8/param/0"
-      }
-    ]
-  },
-  "@roblox/globaltype/IoReadable.readi16": {
-    "code_sample": "",
-    "documentation": "",
-    "returns": [
-      "@roblox/globaltype/IoReadable.readi16/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/IoReadable.readi16/param/0"
-      }
-    ]
-  },
-  "@roblox/globaltype/IoReadable.readi32": {
-    "code_sample": "",
-    "documentation": "",
-    "returns": [
-      "@roblox/globaltype/IoReadable.readi32/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/IoReadable.readi32/param/0"
-      }
-    ]
-  },
-  "@roblox/globaltype/IoReadable.readf32": {
-    "code_sample": "",
-    "documentation": "",
-    "returns": [
-      "@roblox/globaltype/IoReadable.readf32/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/IoReadable.readf32/param/0"
-      }
-    ]
-  },
-  "@roblox/globaltype/IoReadable.readf64": {
-    "code_sample": "",
-    "documentation": "",
-    "returns": [
-      "@roblox/globaltype/IoReadable.readf64/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/IoReadable.readf64/param/0"
-      }
-    ]
-  },
-  "@roblox/globaltype/HttpServer": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "getPort": "@roblox/globaltype/HttpServer.getPort",
-      "stop": "@roblox/globaltype/HttpServer.stop",
-      "isRunning": "@roblox/globaltype/HttpServer.isRunning"
-    }
-  },
-  "@roblox/globaltype/HttpServer.stop": {
-    "code_sample": "",
-    "documentation": "Stop and kill server.",
-    "returns": [],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/HttpServer.stop/param/0"
-      }
-    ]
-  },
-  "@roblox/globaltype/HttpServer.getPort": {
-    "code_sample": "",
-    "documentation": "Returns the port the server is bound to.",
-    "returns": [
-      "@roblox/globaltype/HttpServer.getPort/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/HttpServer.getPort/param/0"
-      }
-    ]
-  },
-  "@roblox/globaltype/HttpServer.isRunning": {
-    "code_sample": "",
-    "documentation": "Returns if the server is running.",
-    "returns": [
-      "@roblox/globaltype/HttpServer.isRunning/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/HttpServer.isRunning/param/0"
-      }
-    ]
-  },
-  "@roblox/globaltype/BufferSink": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "write": "@roblox/globaltype/BufferSink.write",
-      "close": "@roblox/globaltype/BufferSink.close",
-      "len": "@roblox/globaltype/BufferSink.len",
-      "flush": "@roblox/globaltype/BufferSink.flush",
-      "writer": "@roblox/globaltype/BufferSink.writer",
-      "closed": "@roblox/globaltype/BufferSink.closed"
-    }
-  },
-  "@roblox/globaltype/BufferSink.write": {
-    "code_sample": "",
-    "documentation": "\n\n**Parameters**\n- `data`: The data to write to write.\n\n\n**Throws**\n- Memory Error\n",
-    "returns": [],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/BufferSink.write/param/0"
-      },
-      {
-        "name": "data",
-        "documentation": "@roblox/globaltype/BufferSink.write/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/BufferSink.write/param/1": {
-    "code_sample": "",
-    "documentation": "The data to write to write."
-  },
-  "@roblox/globaltype/BufferSink.writer": {
-    "code_sample": "",
-    "documentation": "\n\n**Throws**\n- Memory Error\n",
-    "returns": [
-      "@roblox/globaltype/BufferSink.writer/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/BufferSink.writer/param/0"
-      }
-    ]
-  },
-  "@roblox/globaltype/BufferSink.close": {
-    "code_sample": "",
-    "documentation": "",
-    "returns": [],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/BufferSink.close/param/0"
-      }
-    ]
-  },
-  "@roblox/globaltype/FFIPointerType": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "newTag": "@roblox/globaltype/FFIPointerType.newTag",
-      "tag": "@roblox/globaltype/FFIPointerType.tag"
-    }
-  },
-  "@roblox/globaltype/FFIPointerType.tag": {
-    "code_sample": "",
-    "documentation": "Get the tag id of the pointer type.",
-    "returns": [
-      "@roblox/globaltype/FFIPointerType.tag/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/FFIPointerType.tag/param/0"
-      }
-    ]
-  },
-  "@roblox/globaltype/FFIPointerType.newTag": {
-    "code_sample": "",
-    "documentation": "Creates a new pointer type with the given tag.\n\n**Parameters**\n- `tag`: The tag to set.\n\n\n**Throws**\n- FFI Error\n- Memory Error\n",
-    "returns": [
-      "@roblox/globaltype/FFIPointerType.newTag/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/FFIPointerType.newTag/param/0"
-      },
-      {
-        "name": "tag",
-        "documentation": "@roblox/globaltype/FFIPointerType.newTag/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/FFIPointerType.newTag/param/1": {
-    "code_sample": "",
-    "documentation": "The tag to set."
-  },
-  "@roblox/globaltype/DateTime": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "timestamp_millis": "@roblox/globaltype/DateTime.timestamp_millis",
-      "toIsoDate": "@roblox/globaltype/DateTime.toIsoDate",
-      "formatUniversalTime": "@roblox/globaltype/DateTime.formatUniversalTime",
-      "toLocalTime": "@roblox/globaltype/DateTime.toLocalTime",
-      "toUniversalTime": "@roblox/globaltype/DateTime.toUniversalTime",
-      "formatLocalTime": "@roblox/globaltype/DateTime.formatLocalTime",
-      "timestamp": "@roblox/globaltype/DateTime.timestamp"
-    }
-  },
-  "@roblox/globaltype/DateTime.toLocalTime": {
-    "code_sample": "",
-    "documentation": "\n\n**Throws**\n- DateTime Error\n",
-    "returns": [
-      "@roblox/globaltype/DateTime.toLocalTime/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/DateTime.toLocalTime/param/0"
-      }
-    ]
-  },
-  "@roblox/globaltype/DateTime.toUniversalTime": {
-    "code_sample": "",
-    "documentation": "\n\n**Throws**\n- DateTime Error\n",
-    "returns": [
-      "@roblox/globaltype/DateTime.toUniversalTime/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/DateTime.toUniversalTime/param/0"
-      }
-    ]
-  },
-  "@roblox/globaltype/DateTime.toIsoDate": {
-    "code_sample": "",
-    "documentation": "Return the date in ISO8601 format, `YYYY-MM-DDTHH:MM:SSZ`\n\n**Throws**\n- DateTime Error\n",
-    "returns": [
-      "@roblox/globaltype/DateTime.toIsoDate/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/DateTime.toIsoDate/param/0"
-      }
-    ]
-  },
-  "@roblox/globaltype/DateTime.formatLocalTime": {
-    "code_sample": "",
-    "documentation": "\n\n**Throws**\n- DateTime Error\n- Memory Error\n",
-    "returns": [
-      "@roblox/globaltype/DateTime.formatLocalTime/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/DateTime.formatLocalTime/param/0"
-      },
-      {
-        "name": "format",
-        "documentation": "@roblox/globaltype/DateTime.formatLocalTime/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/DateTime.formatUniversalTime": {
-    "code_sample": "",
-    "documentation": "\n\n**Throws**\n- DateTime Error\n- Memory Error\n",
-    "returns": [
-      "@roblox/globaltype/DateTime.formatUniversalTime/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/DateTime.formatUniversalTime/param/0"
-      },
-      {
-        "name": "format",
-        "documentation": "@roblox/globaltype/DateTime.formatUniversalTime/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/Regex": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "split": "@roblox/globaltype/Regex.split",
-      "replaceAll": "@roblox/globaltype/Regex.replaceAll",
-      "search": "@roblox/globaltype/Regex.search",
-      "captures": "@roblox/globaltype/Regex.captures",
-      "replace": "@roblox/globaltype/Regex.replace",
-      "format": "@roblox/globaltype/Regex.format",
-      "isMatch": "@roblox/globaltype/Regex.isMatch",
-      "match": "@roblox/globaltype/Regex.match"
-    }
-  },
-  "@roblox/globaltype/Regex.match": {
-    "code_sample": "",
-    "documentation": "\n\n**Parameters**\n- `input`: The input to match against the regex.\n\n\n**Throws**\n- Regex Error\n- Memory Error\n",
-    "returns": [
-      "@roblox/globaltype/Regex.match/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/Regex.match/param/0"
-      },
-      {
-        "name": "input",
-        "documentation": "@roblox/globaltype/Regex.match/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/Regex.match/param/1": {
-    "code_sample": "",
-    "documentation": "The input to match against the regex."
-  },
-  "@roblox/globaltype/Regex.search": {
-    "code_sample": "",
-    "documentation": "\n\n**Throws**\n- Regex Error\n- Memory Error\n",
-    "returns": [
-      "@roblox/globaltype/Regex.search/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/Regex.search/param/0"
-      },
-      {
-        "name": "input",
-        "documentation": "@roblox/globaltype/Regex.search/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/Regex.captures": {
-    "code_sample": "",
-    "documentation": "\n\n**Parameters**\n- `global`: If true, the function will return all captures instead of just the first\n  - default: `false`\n\n\n**Throws**\n- Regex Error\n- Memory Error\n",
-    "returns": [
-      "@roblox/globaltype/Regex.captures/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/Regex.captures/param/0"
-      },
-      {
-        "name": "input",
-        "documentation": "@roblox/globaltype/Regex.captures/param/1"
-      },
-      {
-        "name": "global",
-        "documentation": "@roblox/globaltype/Regex.captures/param/2"
-      }
-    ]
-  },
-  "@roblox/globaltype/Regex.captures/param/2": {
-    "code_sample": "",
-    "documentation": "If true, the function will return all captures instead of just the first"
-  },
-  "@roblox/globaltype/Regex.split": {
-    "code_sample": "",
-    "documentation": "\n\n**Parameters**\n- `input`: The input to split against the regex.\n- `global`: If true, the function will return all splits instead of just the first\n  - default: `false`\n\n\n**Throws**\n- Regex Error\n- Memory Error\n",
-    "returns": [
-      "@roblox/globaltype/Regex.split/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/Regex.split/param/0"
-      },
-      {
-        "name": "input",
-        "documentation": "@roblox/globaltype/Regex.split/param/1"
-      },
-      {
-        "name": "global",
-        "documentation": "@roblox/globaltype/Regex.split/param/2"
-      }
-    ]
-  },
-  "@roblox/globaltype/Regex.split/param/1": {
-    "code_sample": "",
-    "documentation": "The input to split against the regex."
-  },
-  "@roblox/globaltype/Regex.split/param/2": {
-    "code_sample": "",
-    "documentation": "If true, the function will return all splits instead of just the first"
-  },
-  "@roblox/globaltype/Regex.isMatch": {
-    "code_sample": "",
-    "documentation": "Returns if a string matches the pattern.\n\n**Throws**\n- Regex Error\n",
-    "returns": [
-      "@roblox/globaltype/Regex.isMatch/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/Regex.isMatch/param/0"
-      },
-      {
-        "name": "input",
-        "documentation": "@roblox/globaltype/Regex.isMatch/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/Regex.format": {
-    "code_sample": "",
-    "documentation": "Format a string.\n\n**Parameters**\n- `str`: The string to replace.\n\n\n**Throws**\n- Regex Error\n- Memory Error\n",
-    "returns": [
-      "@roblox/globaltype/Regex.format/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/Regex.format/param/0"
-      },
-      {
-        "name": "str",
-        "documentation": "@roblox/globaltype/Regex.format/param/1"
-      },
-      {
-        "name": "format",
-        "documentation": "@roblox/globaltype/Regex.format/param/2"
-      }
-    ]
-  },
-  "@roblox/globaltype/Regex.format/param/1": {
-    "code_sample": "",
-    "documentation": "The string to replace."
-  },
-  "@roblox/globaltype/Regex.replace": {
-    "code_sample": "",
-    "documentation": "Replace the first occurrence of a string.\n\n**Parameters**\n- `str`: The string to replace.\n- `replacement`: The replacement string.\n\n\n**Throws**\n- Regex Error\n- Memory Error\n",
-    "returns": [
-      "@roblox/globaltype/Regex.replace/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/Regex.replace/param/0"
-      },
-      {
-        "name": "str",
-        "documentation": "@roblox/globaltype/Regex.replace/param/1"
-      },
-      {
-        "name": "replacement",
-        "documentation": "@roblox/globaltype/Regex.replace/param/2"
-      }
-    ]
-  },
-  "@roblox/globaltype/Regex.replace/param/1": {
-    "code_sample": "",
-    "documentation": "The string to replace."
-  },
-  "@roblox/globaltype/Regex.replace/param/2": {
-    "code_sample": "",
-    "documentation": "The replacement string."
-  },
-  "@roblox/globaltype/Regex.replaceAll": {
-    "code_sample": "",
-    "documentation": "Replace all occurrences of a string.\n\n**Parameters**\n- `str`: The string to replace.\n- `replacement`: The replacement string.\n\n\n**Throws**\n- Regex Error\n- Memory Error\n",
-    "returns": [
-      "@roblox/globaltype/Regex.replaceAll/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/Regex.replaceAll/param/0"
-      },
-      {
-        "name": "str",
-        "documentation": "@roblox/globaltype/Regex.replaceAll/param/1"
-      },
-      {
-        "name": "replacement",
-        "documentation": "@roblox/globaltype/Regex.replaceAll/param/2"
-      }
-    ]
-  },
-  "@roblox/globaltype/Regex.replaceAll/param/1": {
-    "code_sample": "",
-    "documentation": "The string to replace."
-  },
-  "@roblox/globaltype/Regex.replaceAll/param/2": {
-    "code_sample": "",
-    "documentation": "The replacement string."
-  },
-  "@roblox/globaltype/SQLite3Database": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "close": "@roblox/globaltype/SQLite3Database.close",
-      "transaction": "@roblox/globaltype/SQLite3Database.transaction",
-      "exec": "@roblox/globaltype/SQLite3Database.exec",
-      "query": "@roblox/globaltype/SQLite3Database.query"
-    }
-  },
-  "@roblox/globaltype/SQLite3Database.transaction": {
-    "code_sample": "",
-    "documentation": "Creates a transaction function.\n\n**Parameters**\n- `callback`: The callback to run inside the transaction.\n- `kind`: The transaction mode to use.\n\n\n**Throws**\n- Luau Error\n",
-    "returns": [
-      "@roblox/globaltype/SQLite3Database.transaction/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/SQLite3Database.transaction/param/0"
-      },
-      {
-        "name": "callback",
-        "documentation": "@roblox/globaltype/SQLite3Database.transaction/param/1"
-      },
-      {
-        "name": "kind",
-        "documentation": "@roblox/globaltype/SQLite3Database.transaction/param/2"
-      }
-    ]
-  },
-  "@roblox/globaltype/SQLite3Database.transaction/param/1": {
-    "code_sample": "",
-    "documentation": "The callback to run inside the transaction."
-  },
-  "@roblox/globaltype/SQLite3Database.transaction/param/2": {
-    "code_sample": "",
-    "documentation": "The transaction mode to use."
-  },
-  "@roblox/globaltype/SQLite3Database.query": {
-    "code_sample": "",
-    "documentation": "\n\n**Parameters**\n- `query`: The query to prepare.\n\n\n**Throws**\n- SQLite3 Error\n- Memory Error\n",
-    "returns": [
-      "@roblox/globaltype/SQLite3Database.query/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/SQLite3Database.query/param/0"
-      },
-      {
-        "name": "query",
-        "documentation": "@roblox/globaltype/SQLite3Database.query/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/SQLite3Database.query/param/1": {
-    "code_sample": "",
-    "documentation": "The query to prepare."
-  },
-  "@roblox/globaltype/SQLite3Database.exec": {
-    "code_sample": "",
-    "documentation": "\n\n**Parameters**\n- `query`: The query to execute.\n- `args`: The arguments to bind to the query.\n\n\n**Throws**\n- SQLite3 Error\n- Memory Error\n",
-    "returns": [
-      "@roblox/globaltype/SQLite3Database.exec/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/SQLite3Database.exec/param/0"
-      },
-      {
-        "name": "query",
-        "documentation": "@roblox/globaltype/SQLite3Database.exec/param/1"
-      },
-      {
-        "name": "args",
-        "documentation": "@roblox/globaltype/SQLite3Database.exec/param/2"
-      }
-    ]
-  },
-  "@roblox/globaltype/SQLite3Database.exec/param/1": {
-    "code_sample": "",
-    "documentation": "The query to execute."
-  },
-  "@roblox/globaltype/SQLite3Database.exec/param/2": {
-    "code_sample": "",
-    "documentation": "The arguments to bind to the query."
-  },
-  "@roblox/globaltype/SQLite3Database.close": {
-    "code_sample": "",
-    "documentation": "",
-    "returns": [],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/SQLite3Database.close/param/0"
-      }
-    ]
-  },
-  "@roblox/globaltype/SQLite3Statement": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "finalize": "@roblox/globaltype/SQLite3Statement.finalize",
-      "all": "@roblox/globaltype/SQLite3Statement.all",
-      "run": "@roblox/globaltype/SQLite3Statement.run",
-      "get": "@roblox/globaltype/SQLite3Statement.get"
-    }
-  },
-  "@roblox/globaltype/SQLite3Statement.run": {
-    "code_sample": "",
-    "documentation": "\n\n**Parameters**\n- `args`: The arguments to bind to the statement.\n\n\n**Throws**\n- SQLite3 Error\n- Memory Error\n",
-    "returns": [
-      "@roblox/globaltype/SQLite3Statement.run/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/SQLite3Statement.run/param/0"
-      },
-      {
-        "name": "args",
-        "documentation": "@roblox/globaltype/SQLite3Statement.run/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/SQLite3Statement.run/param/1": {
-    "code_sample": "",
-    "documentation": "The arguments to bind to the statement."
-  },
-  "@roblox/globaltype/SQLite3Statement.get": {
-    "code_sample": "",
-    "documentation": "\n\n**Parameters**\n- `args`: The arguments to bind to the statement.\n\n\n**Throws**\n- SQLite3 Error\n- Memory Error\n",
-    "returns": [
-      "@roblox/globaltype/SQLite3Statement.get/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/SQLite3Statement.get/param/0"
-      },
-      {
-        "name": "args",
-        "documentation": "@roblox/globaltype/SQLite3Statement.get/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/SQLite3Statement.get/param/1": {
-    "code_sample": "",
-    "documentation": "The arguments to bind to the statement."
-  },
-  "@roblox/globaltype/SQLite3Statement.all": {
-    "code_sample": "",
-    "documentation": "\n\n**Parameters**\n- `args`: The arguments to bind to the statement.\n\n\n**Throws**\n- SQLite3 Error\n- Memory Error\n",
-    "returns": [
-      "@roblox/globaltype/SQLite3Statement.all/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/SQLite3Statement.all/param/0"
-      },
-      {
-        "name": "args",
-        "documentation": "@roblox/globaltype/SQLite3Statement.all/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/SQLite3Statement.all/param/1": {
-    "code_sample": "",
-    "documentation": "The arguments to bind to the statement."
-  },
-  "@roblox/globaltype/SQLite3Statement.finalize": {
-    "code_sample": "",
-    "documentation": "Closes the statement and frees resources.",
-    "returns": [],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/SQLite3Statement.finalize/param/0"
-      }
-    ]
-  },
-  "@roblox/globaltype/FFIDataType": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "alignment": "@roblox/globaltype/FFIDataType.alignment",
-      "size": "@roblox/globaltype/FFIDataType.size"
-    }
-  },
-  "@roblox/globaltype/FFIDataType.size": {
-    "code_sample": "",
-    "documentation": "Get the size of the data type.",
-    "returns": [
-      "@roblox/globaltype/FFIDataType.size/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/FFIDataType.size/param/0"
-      }
-    ]
-  },
-  "@roblox/globaltype/FFIDataType.alignment": {
-    "code_sample": "",
-    "documentation": "Get the alignment of the data type.",
-    "returns": [
-      "@roblox/globaltype/FFIDataType.alignment/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/FFIDataType.alignment/param/0"
-      }
-    ]
-  },
-  "@roblox/globaltype/FFICompiled": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "listSymbols": "@roblox/globaltype/FFICompiled.listSymbols",
-      "getSymbol": "@roblox/globaltype/FFICompiled.getSymbol"
-    }
-  },
-  "@roblox/globaltype/FFICompiled.getSymbol": {
-    "code_sample": "",
-    "documentation": "\n\n**Parameters**\n- `symbol`: The symbol to get.\n\n\n**Throws**\n- FFI Error\n- Memory Error\n",
-    "returns": [
-      "@roblox/globaltype/FFICompiled.getSymbol/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/FFICompiled.getSymbol/param/0"
-      },
-      {
-        "name": "symbol",
-        "documentation": "@roblox/globaltype/FFICompiled.getSymbol/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/FFICompiled.getSymbol/param/1": {
-    "code_sample": "",
-    "documentation": "The symbol to get."
-  },
-  "@roblox/globaltype/FFICompiled.listSymbols": {
-    "code_sample": "",
-    "documentation": "Lists all symbols in the compiled object.\n\n**Throws**\n- FFI Error\n- Memory Error\n",
-    "returns": [
-      "@roblox/globaltype/FFICompiled.listSymbols/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/FFICompiled.listSymbols/param/0"
-      }
-    ]
-  },
-  "@roblox/globaltype/CryptoHash": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "copy": "@roblox/globaltype/CryptoHash.copy",
-      "update": "@roblox/globaltype/CryptoHash.update",
-      "digest": "@roblox/globaltype/CryptoHash.digest"
-    }
-  },
-  "@roblox/globaltype/CryptoHash.digest": {
-    "code_sample": "",
-    "documentation": "Returns the finalized hash value.\n\nIf the hash object was created with a key, this would close the object."
-  },
-  "@roblox/globaltype/CryptoHash.update": {
-    "code_sample": "",
-    "documentation": "\n\n**Parameters**\n- `value`: The value to update the hash with.\n\n\n**Throws**\n- Crypto Error\n",
-    "returns": [],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/CryptoHash.update/param/0"
-      },
-      {
-        "name": "value",
-        "documentation": "@roblox/globaltype/CryptoHash.update/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/CryptoHash.update/param/1": {
-    "code_sample": "",
-    "documentation": "The value to update the hash with."
-  },
-  "@roblox/globaltype/CryptoHash.copy": {
-    "code_sample": "",
-    "documentation": "Copies the current hash state.\n\nIf the hash object was created with a key, the object must still be opened.\n\n**Throws**\n- Crypto Error\n- Memory Error\n",
-    "returns": [
-      "@roblox/globaltype/CryptoHash.copy/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/CryptoHash.copy/param/0"
-      }
-    ]
-  },
-  "@roblox/globaltype/TlsCertBundle": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": []
-  },
-  "@roblox/globaltype/FFIStructureType": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "offset": "@roblox/globaltype/FFIStructureType.offset",
-      "new": "@roblox/globaltype/FFIStructureType.new"
-    }
-  },
-  "@roblox/globaltype/FFIStructureType.offset": {
-    "code_sample": "",
-    "documentation": "Get the offset of a field in the structure.\n\n**Parameters**\n- `field`: The field to get the offset of.\n",
-    "returns": [
-      "@roblox/globaltype/FFIStructureType.offset/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/FFIStructureType.offset/param/0"
-      },
-      {
-        "name": "field",
-        "documentation": "@roblox/globaltype/FFIStructureType.offset/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/FFIStructureType.offset/param/1": {
-    "code_sample": "",
-    "documentation": "The field to get the offset of."
-  },
-  "@roblox/globaltype/FFIStructureType.new": {
-    "code_sample": "",
-    "documentation": "Creates a new instance of the structure.\n\n**Parameters**\n- `fields`: The fields to set in the structure.\n\n\n**Throws**\n- FFI Error\n- Memory Error\n",
-    "returns": [
-      "@roblox/globaltype/FFIStructureType.new/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/FFIStructureType.new/param/0"
-      },
-      {
-        "name": "fields",
-        "documentation": "@roblox/globaltype/FFIStructureType.new/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/FFIStructureType.new/param/1": {
-    "code_sample": "",
-    "documentation": "The fields to set in the structure."
-  },
-  "@roblox/globaltype/ProcessChild": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "pid": "@roblox/globaltype/ProcessChild.pid",
-      "kill": "@roblox/globaltype/ProcessChild.kill",
-      "stderr": "@roblox/globaltype/ProcessChild.stderr",
-      "stdout": "@roblox/globaltype/ProcessChild.stdout",
-      "stdin": "@roblox/globaltype/ProcessChild.stdin",
-      "wait": "@roblox/globaltype/ProcessChild.wait"
-    }
-  },
-  "@roblox/globaltype/ProcessChild.wait": {
-    "code_sample": "",
-    "documentation": "Kills the process and yields until the process exits.\n\n**Throws**\n- Process Error\n",
-    "returns": [
-      "@roblox/globaltype/ProcessChild.wait/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/ProcessChild.wait/param/0"
-      }
-    ]
-  },
-  "@roblox/globaltype/ProcessChild.kill": {
-    "code_sample": "",
-    "documentation": "Yields until the process exits.\n\n**Throws**\n- Process Error\n",
-    "returns": [
-      "@roblox/globaltype/ProcessChild.kill/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/ProcessChild.kill/param/0"
-      }
-    ]
-  },
-  "@roblox/globaltype/HttpWebSocket": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "send": "@roblox/globaltype/HttpWebSocket.send",
-      "isConnected": "@roblox/globaltype/HttpWebSocket.isConnected",
-      "close": "@roblox/globaltype/HttpWebSocket.close"
-    }
-  },
-  "@roblox/globaltype/HttpWebSocket.send": {
-    "code_sample": "",
-    "documentation": "Sends a message to the connected WebSocket.\n\n**Parameters**\n- `message`: The message to send.\n\n\n**Throws**\n- Memory Error\n- WebSocket Error\n",
-    "returns": [],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/HttpWebSocket.send/param/0"
-      },
-      {
-        "name": "message",
-        "documentation": "@roblox/globaltype/HttpWebSocket.send/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/HttpWebSocket.send/param/1": {
-    "code_sample": "",
-    "documentation": "The message to send."
-  },
-  "@roblox/globaltype/HttpWebSocket.close": {
-    "code_sample": "",
-    "documentation": "Closes the WebSocket connection.\n\n**Parameters**\n- `code`: The close code to send.\n  - default: `1000`\n\n\n**Throws**\n- Memory Error\n- WebSocket Error\n",
-    "returns": [],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/HttpWebSocket.close/param/0"
-      },
-      {
-        "name": "code",
-        "documentation": "@roblox/globaltype/HttpWebSocket.close/param/1"
-      }
-    ]
-  },
-  "@roblox/globaltype/HttpWebSocket.close/param/1": {
-    "code_sample": "",
-    "documentation": "The close code to send."
-  },
-  "@roblox/globaltype/HttpWebSocket.isConnected": {
-    "code_sample": "",
-    "documentation": "Returns if the WebSocket is connected.",
-    "returns": [
-      "@roblox/globaltype/HttpWebSocket.isConnected/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@roblox/globaltype/HttpWebSocket.isConnected/param/0"
-      }
-    ]
   },
   "@roblox/globaltype/FFIPointer": {
     "code_sample": "",
@@ -11976,6 +10614,1582 @@
       {
         "name": "offset",
         "documentation": "@roblox/globaltype/FFIPointer.span/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/IoWritable": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "writei8": "@roblox/globaltype/IoWritable.writei8",
+      "writeu8": "@roblox/globaltype/IoWritable.writeu8",
+      "writef32": "@roblox/globaltype/IoWritable.writef32",
+      "writei32": "@roblox/globaltype/IoWritable.writei32",
+      "writef64": "@roblox/globaltype/IoWritable.writef64",
+      "write": "@roblox/globaltype/IoWritable.write",
+      "writeu32": "@roblox/globaltype/IoWritable.writeu32",
+      "writei16": "@roblox/globaltype/IoWritable.writei16",
+      "writeu16": "@roblox/globaltype/IoWritable.writeu16"
+    }
+  },
+  "@roblox/globaltype/IoWritable.write": {
+    "code_sample": "",
+    "documentation": "\n\n**Parameters**\n- `data`: The data to write to the stream.\n\n\n**Throws**\n- Writer Error\n",
+    "returns": [],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/IoWritable.write/param/0"
+      },
+      {
+        "name": "data",
+        "documentation": "@roblox/globaltype/IoWritable.write/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/IoWritable.write/param/1": {
+    "code_sample": "",
+    "documentation": "The data to write to the stream."
+  },
+  "@roblox/globaltype/IoWritable.writeu8": {
+    "code_sample": "",
+    "documentation": "\n\n**Throws**\n- Writer Error\n",
+    "returns": [],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/IoWritable.writeu8/param/0"
+      },
+      {
+        "name": "value",
+        "documentation": "@roblox/globaltype/IoWritable.writeu8/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/IoWritable.writeu16": {
+    "code_sample": "",
+    "documentation": "\n\n**Throws**\n- Writer Error\n",
+    "returns": [],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/IoWritable.writeu16/param/0"
+      },
+      {
+        "name": "value",
+        "documentation": "@roblox/globaltype/IoWritable.writeu16/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/IoWritable.writeu32": {
+    "code_sample": "",
+    "documentation": "\n\n**Throws**\n- Writer Error\n",
+    "returns": [],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/IoWritable.writeu32/param/0"
+      },
+      {
+        "name": "value",
+        "documentation": "@roblox/globaltype/IoWritable.writeu32/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/IoWritable.writei8": {
+    "code_sample": "",
+    "documentation": "\n\n**Throws**\n- Writer Error\n",
+    "returns": [],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/IoWritable.writei8/param/0"
+      },
+      {
+        "name": "value",
+        "documentation": "@roblox/globaltype/IoWritable.writei8/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/IoWritable.writei16": {
+    "code_sample": "",
+    "documentation": "\n\n**Throws**\n- Writer Error\n",
+    "returns": [],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/IoWritable.writei16/param/0"
+      },
+      {
+        "name": "value",
+        "documentation": "@roblox/globaltype/IoWritable.writei16/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/IoWritable.writei32": {
+    "code_sample": "",
+    "documentation": "\n\n**Throws**\n- Writer Error\n",
+    "returns": [],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/IoWritable.writei32/param/0"
+      },
+      {
+        "name": "value",
+        "documentation": "@roblox/globaltype/IoWritable.writei32/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/IoWritable.writef32": {
+    "code_sample": "",
+    "documentation": "\n\n**Throws**\n- Writer Error\n",
+    "returns": [],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/IoWritable.writef32/param/0"
+      },
+      {
+        "name": "value",
+        "documentation": "@roblox/globaltype/IoWritable.writef32/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/IoWritable.writef64": {
+    "code_sample": "",
+    "documentation": "\n\n**Throws**\n- Writer Error\n",
+    "returns": [],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/IoWritable.writef64/param/0"
+      },
+      {
+        "name": "value",
+        "documentation": "@roblox/globaltype/IoWritable.writef64/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/Random": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "nextInteger": "@roblox/globaltype/Random.nextInteger",
+      "nextNumber": "@roblox/globaltype/Random.nextNumber",
+      "clone": "@roblox/globaltype/Random.clone",
+      "nextBoolean": "@roblox/globaltype/Random.nextBoolean"
+    }
+  },
+  "@roblox/globaltype/Random.nextNumber": {
+    "code_sample": "",
+    "documentation": "Generates a random number.\n\nIf no arguments are provided, the function will generate a number between 0 and 1."
+  },
+  "@roblox/globaltype/Random.nextInteger": {
+    "code_sample": "",
+    "documentation": "Generates a random integer.\n\nIf no arguments are provided, the function will generate a number between the limits of a signed 32-bit integer.\n\n**Parameters**\n- `min`: The minimum value (inclusive).\n- `max`: The maximum value (inclusive).\n\n\n**Throws**\n- Range Error\n",
+    "returns": [
+      "@roblox/globaltype/Random.nextInteger/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/Random.nextInteger/param/0"
+      },
+      {
+        "name": "min",
+        "documentation": "@roblox/globaltype/Random.nextInteger/param/1"
+      },
+      {
+        "name": "max",
+        "documentation": "@roblox/globaltype/Random.nextInteger/param/2"
+      }
+    ]
+  },
+  "@roblox/globaltype/Random.nextInteger/param/1": {
+    "code_sample": "",
+    "documentation": "The minimum value (inclusive)."
+  },
+  "@roblox/globaltype/Random.nextInteger/param/2": {
+    "code_sample": "",
+    "documentation": "The maximum value (inclusive)."
+  },
+  "@roblox/globaltype/Random.nextBoolean": {
+    "code_sample": "",
+    "documentation": "Generates a random boolean.",
+    "returns": [
+      "@roblox/globaltype/Random.nextBoolean/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/Random.nextBoolean/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/Random.clone": {
+    "code_sample": "",
+    "documentation": "Creates a new random number generator with the same state as the current one.",
+    "returns": [
+      "@roblox/globaltype/Random.clone/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/Random.clone/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/NetworkSocket": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "isOpen": "@roblox/globaltype/NetworkSocket.isOpen",
+      "accept": "@roblox/globaltype/NetworkSocket.accept",
+      "send": "@roblox/globaltype/NetworkSocket.send",
+      "getName": "@roblox/globaltype/NetworkSocket.getName",
+      "sendMsg": "@roblox/globaltype/NetworkSocket.sendMsg",
+      "close": "@roblox/globaltype/NetworkSocket.close",
+      "connect": "@roblox/globaltype/NetworkSocket.connect",
+      "recvMsg": "@roblox/globaltype/NetworkSocket.recvMsg",
+      "setOption": "@roblox/globaltype/NetworkSocket.setOption",
+      "listen": "@roblox/globaltype/NetworkSocket.listen",
+      "bindIp": "@roblox/globaltype/NetworkSocket.bindIp",
+      "recv": "@roblox/globaltype/NetworkSocket.recv"
+    }
+  },
+  "@roblox/globaltype/NetworkSocket.send": {
+    "code_sample": "",
+    "documentation": "Sends data over the socket, and returns the number of bytes sent.\n\n**Parameters**\n- `data`: The data to send.\n- `offset`: The offset to start sending from.\n  - default: `0`\n\n\n**Throws**\n- Network Error\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/NetworkSocket.send/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/NetworkSocket.send/param/0"
+      },
+      {
+        "name": "data",
+        "documentation": "@roblox/globaltype/NetworkSocket.send/param/1"
+      },
+      {
+        "name": "offset",
+        "documentation": "@roblox/globaltype/NetworkSocket.send/param/2"
+      }
+    ]
+  },
+  "@roblox/globaltype/NetworkSocket.send/param/1": {
+    "code_sample": "",
+    "documentation": "The data to send."
+  },
+  "@roblox/globaltype/NetworkSocket.send/param/2": {
+    "code_sample": "",
+    "documentation": "The offset to start sending from."
+  },
+  "@roblox/globaltype/NetworkSocket.sendMsg": {
+    "code_sample": "",
+    "documentation": "Sends data over the socket, and returns the number of bytes sent.\n\n**Parameters**\n- `port`: The port to send the message to.\n- `address`: The address to send the message to.\n- `data`: The data to send.\n- `offset`: The offset to start sending from.\n  - default: `0`\n\n\n**Throws**\n- Network Error\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/NetworkSocket.sendMsg/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/NetworkSocket.sendMsg/param/0"
+      },
+      {
+        "name": "port",
+        "documentation": "@roblox/globaltype/NetworkSocket.sendMsg/param/1"
+      },
+      {
+        "name": "address",
+        "documentation": "@roblox/globaltype/NetworkSocket.sendMsg/param/2"
+      },
+      {
+        "name": "data",
+        "documentation": "@roblox/globaltype/NetworkSocket.sendMsg/param/3"
+      },
+      {
+        "name": "offset",
+        "documentation": "@roblox/globaltype/NetworkSocket.sendMsg/param/4"
+      }
+    ]
+  },
+  "@roblox/globaltype/NetworkSocket.sendMsg/param/1": {
+    "code_sample": "",
+    "documentation": "The port to send the message to."
+  },
+  "@roblox/globaltype/NetworkSocket.sendMsg/param/2": {
+    "code_sample": "",
+    "documentation": "The address to send the message to."
+  },
+  "@roblox/globaltype/NetworkSocket.sendMsg/param/3": {
+    "code_sample": "",
+    "documentation": "The data to send."
+  },
+  "@roblox/globaltype/NetworkSocket.sendMsg/param/4": {
+    "code_sample": "",
+    "documentation": "The offset to start sending from."
+  },
+  "@roblox/globaltype/NetworkSocket.recv": {
+    "code_sample": "",
+    "documentation": "\n\n**Parameters**\n- `max_size`: The maximum size of the data to receive.\n  - default: `8192`\n\n\n**Throws**\n- Network Error\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/NetworkSocket.recv/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/NetworkSocket.recv/param/0"
+      },
+      {
+        "name": "max_size",
+        "documentation": "@roblox/globaltype/NetworkSocket.recv/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/NetworkSocket.recv/param/1": {
+    "code_sample": "",
+    "documentation": "The maximum size of the data to receive."
+  },
+  "@roblox/globaltype/NetworkSocket.recvMsg": {
+    "code_sample": "",
+    "documentation": "\n\n**Parameters**\n- `max_size`: The maximum size of the message to receive.\n  - default: `8192`\n\n\n**Throws**\n- Network Error\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/NetworkSocket.recvMsg/return/0",
+      "@roblox/globaltype/NetworkSocket.recvMsg/return/1"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/NetworkSocket.recvMsg/param/0"
+      },
+      {
+        "name": "max_size",
+        "documentation": "@roblox/globaltype/NetworkSocket.recvMsg/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/NetworkSocket.recvMsg/param/1": {
+    "code_sample": "",
+    "documentation": "The maximum size of the message to receive."
+  },
+  "@roblox/globaltype/NetworkSocket.accept": {
+    "code_sample": "",
+    "documentation": "Yields and waits for a connection to be made on the socket, and returns a `NetworkSocket` object.\n\n**Throws**\n- IO Error\n",
+    "returns": [
+      "@roblox/globaltype/NetworkSocket.accept/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/NetworkSocket.accept/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/NetworkSocket.connect": {
+    "code_sample": "",
+    "documentation": "Connects the socket to the specified address and port.\n\n**Parameters**\n- `address`: The address to connect to.\n- `port`: The port to connect to.\n\n\n**Throws**\n- Network Error\n",
+    "returns": [],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/NetworkSocket.connect/param/0"
+      },
+      {
+        "name": "address",
+        "documentation": "@roblox/globaltype/NetworkSocket.connect/param/1"
+      },
+      {
+        "name": "port",
+        "documentation": "@roblox/globaltype/NetworkSocket.connect/param/2"
+      }
+    ]
+  },
+  "@roblox/globaltype/NetworkSocket.connect/param/1": {
+    "code_sample": "",
+    "documentation": "The address to connect to."
+  },
+  "@roblox/globaltype/NetworkSocket.connect/param/2": {
+    "code_sample": "",
+    "documentation": "The port to connect to."
+  },
+  "@roblox/globaltype/NetworkSocket.listen": {
+    "code_sample": "",
+    "documentation": "Starts listening for incoming connections on the socket.\n\n**Parameters**\n- `backlog`: The maximum number of connections to backlog.\n  - default: `128`\n\n\n**Throws**\n- IO Error\n",
+    "returns": [],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/NetworkSocket.listen/param/0"
+      },
+      {
+        "name": "backlog",
+        "documentation": "@roblox/globaltype/NetworkSocket.listen/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/NetworkSocket.listen/param/1": {
+    "code_sample": "",
+    "documentation": "The maximum number of connections to backlog."
+  },
+  "@roblox/globaltype/NetworkSocket.bindIp": {
+    "code_sample": "",
+    "documentation": "Binds the socket to the specified address and port.\n\n**Parameters**\n- `address`: The address to bind to.\n- `port`: The port to bind to.\n\n\n**Throws**\n- Network Error\n",
+    "returns": [],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/NetworkSocket.bindIp/param/0"
+      },
+      {
+        "name": "address",
+        "documentation": "@roblox/globaltype/NetworkSocket.bindIp/param/1"
+      },
+      {
+        "name": "port",
+        "documentation": "@roblox/globaltype/NetworkSocket.bindIp/param/2"
+      }
+    ]
+  },
+  "@roblox/globaltype/NetworkSocket.bindIp/param/1": {
+    "code_sample": "",
+    "documentation": "The address to bind to."
+  },
+  "@roblox/globaltype/NetworkSocket.bindIp/param/2": {
+    "code_sample": "",
+    "documentation": "The port to bind to."
+  },
+  "@roblox/globaltype/NetworkSocket.getName": {
+    "code_sample": "",
+    "documentation": "\n\n**Throws**\n- Network Error\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/NetworkSocket.getName/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/NetworkSocket.getName/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/NetworkSocket.setOption": {
+    "code_sample": "",
+    "documentation": "Sets a socket option on the socket.\n\n**Parameters**\n- `level`: The level of the option.\n- `optname`: The name of the option.\n- `value`: The value of the option.\n\n\n**Throws**\n- Network Error\n",
+    "returns": [],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/NetworkSocket.setOption/param/0"
+      },
+      {
+        "name": "level",
+        "documentation": "@roblox/globaltype/NetworkSocket.setOption/param/1"
+      },
+      {
+        "name": "optname",
+        "documentation": "@roblox/globaltype/NetworkSocket.setOption/param/2"
+      },
+      {
+        "name": "value",
+        "documentation": "@roblox/globaltype/NetworkSocket.setOption/param/3"
+      }
+    ]
+  },
+  "@roblox/globaltype/NetworkSocket.setOption/param/1": {
+    "code_sample": "",
+    "documentation": "The level of the option."
+  },
+  "@roblox/globaltype/NetworkSocket.setOption/param/2": {
+    "code_sample": "",
+    "documentation": "The name of the option."
+  },
+  "@roblox/globaltype/NetworkSocket.setOption/param/3": {
+    "code_sample": "",
+    "documentation": "The value of the option."
+  },
+  "@roblox/globaltype/NetworkSocket.close": {
+    "code_sample": "",
+    "documentation": "Closes the socket.\n\n**Throws**\n- IO Error\n- Network Error\n",
+    "returns": [],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/NetworkSocket.close/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/NetworkSocket.isOpen": {
+    "code_sample": "",
+    "documentation": "Returns if the socket is open.",
+    "returns": [
+      "@roblox/globaltype/NetworkSocket.isOpen/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/NetworkSocket.isOpen/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/BufferSink": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "write": "@roblox/globaltype/BufferSink.write",
+      "close": "@roblox/globaltype/BufferSink.close",
+      "len": "@roblox/globaltype/BufferSink.len",
+      "flush": "@roblox/globaltype/BufferSink.flush",
+      "writer": "@roblox/globaltype/BufferSink.writer",
+      "closed": "@roblox/globaltype/BufferSink.closed"
+    }
+  },
+  "@roblox/globaltype/BufferSink.write": {
+    "code_sample": "",
+    "documentation": "\n\n**Parameters**\n- `data`: The data to write to write.\n\n\n**Throws**\n- Memory Error\n",
+    "returns": [],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/BufferSink.write/param/0"
+      },
+      {
+        "name": "data",
+        "documentation": "@roblox/globaltype/BufferSink.write/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/BufferSink.write/param/1": {
+    "code_sample": "",
+    "documentation": "The data to write to write."
+  },
+  "@roblox/globaltype/BufferSink.writer": {
+    "code_sample": "",
+    "documentation": "\n\n**Throws**\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/BufferSink.writer/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/BufferSink.writer/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/BufferSink.close": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/BufferSink.close/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/HttpServer": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "getPort": "@roblox/globaltype/HttpServer.getPort",
+      "stop": "@roblox/globaltype/HttpServer.stop",
+      "isRunning": "@roblox/globaltype/HttpServer.isRunning"
+    }
+  },
+  "@roblox/globaltype/HttpServer.stop": {
+    "code_sample": "",
+    "documentation": "Stop and kill server.",
+    "returns": [],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/HttpServer.stop/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/HttpServer.getPort": {
+    "code_sample": "",
+    "documentation": "Returns the port the server is bound to.",
+    "returns": [
+      "@roblox/globaltype/HttpServer.getPort/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/HttpServer.getPort/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/HttpServer.isRunning": {
+    "code_sample": "",
+    "documentation": "Returns if the server is running.",
+    "returns": [
+      "@roblox/globaltype/HttpServer.isRunning/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/HttpServer.isRunning/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/DateTime": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "timestamp_millis": "@roblox/globaltype/DateTime.timestamp_millis",
+      "toIsoDate": "@roblox/globaltype/DateTime.toIsoDate",
+      "formatUniversalTime": "@roblox/globaltype/DateTime.formatUniversalTime",
+      "toLocalTime": "@roblox/globaltype/DateTime.toLocalTime",
+      "toUniversalTime": "@roblox/globaltype/DateTime.toUniversalTime",
+      "formatLocalTime": "@roblox/globaltype/DateTime.formatLocalTime",
+      "timestamp": "@roblox/globaltype/DateTime.timestamp"
+    }
+  },
+  "@roblox/globaltype/DateTime.toLocalTime": {
+    "code_sample": "",
+    "documentation": "\n\n**Throws**\n- DateTime Error\n",
+    "returns": [
+      "@roblox/globaltype/DateTime.toLocalTime/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/DateTime.toLocalTime/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/DateTime.toUniversalTime": {
+    "code_sample": "",
+    "documentation": "\n\n**Throws**\n- DateTime Error\n",
+    "returns": [
+      "@roblox/globaltype/DateTime.toUniversalTime/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/DateTime.toUniversalTime/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/DateTime.toIsoDate": {
+    "code_sample": "",
+    "documentation": "Return the date in ISO8601 format, `YYYY-MM-DDTHH:MM:SSZ`\n\n**Throws**\n- DateTime Error\n",
+    "returns": [
+      "@roblox/globaltype/DateTime.toIsoDate/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/DateTime.toIsoDate/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/DateTime.formatLocalTime": {
+    "code_sample": "",
+    "documentation": "\n\n**Throws**\n- DateTime Error\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/DateTime.formatLocalTime/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/DateTime.formatLocalTime/param/0"
+      },
+      {
+        "name": "format",
+        "documentation": "@roblox/globaltype/DateTime.formatLocalTime/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/DateTime.formatUniversalTime": {
+    "code_sample": "",
+    "documentation": "\n\n**Throws**\n- DateTime Error\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/DateTime.formatUniversalTime/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/DateTime.formatUniversalTime/param/0"
+      },
+      {
+        "name": "format",
+        "documentation": "@roblox/globaltype/DateTime.formatUniversalTime/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/HttpWebSocket": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "send": "@roblox/globaltype/HttpWebSocket.send",
+      "isConnected": "@roblox/globaltype/HttpWebSocket.isConnected",
+      "close": "@roblox/globaltype/HttpWebSocket.close"
+    }
+  },
+  "@roblox/globaltype/HttpWebSocket.send": {
+    "code_sample": "",
+    "documentation": "Sends a message to the connected WebSocket.\n\n**Parameters**\n- `message`: The message to send.\n\n\n**Throws**\n- Memory Error\n- WebSocket Error\n",
+    "returns": [],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/HttpWebSocket.send/param/0"
+      },
+      {
+        "name": "message",
+        "documentation": "@roblox/globaltype/HttpWebSocket.send/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/HttpWebSocket.send/param/1": {
+    "code_sample": "",
+    "documentation": "The message to send."
+  },
+  "@roblox/globaltype/HttpWebSocket.close": {
+    "code_sample": "",
+    "documentation": "Closes the WebSocket connection.\n\n**Parameters**\n- `code`: The close code to send.\n  - default: `1000`\n\n\n**Throws**\n- Memory Error\n- WebSocket Error\n",
+    "returns": [],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/HttpWebSocket.close/param/0"
+      },
+      {
+        "name": "code",
+        "documentation": "@roblox/globaltype/HttpWebSocket.close/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/HttpWebSocket.close/param/1": {
+    "code_sample": "",
+    "documentation": "The close code to send."
+  },
+  "@roblox/globaltype/HttpWebSocket.isConnected": {
+    "code_sample": "",
+    "documentation": "Returns if the WebSocket is connected.",
+    "returns": [
+      "@roblox/globaltype/HttpWebSocket.isConnected/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/HttpWebSocket.isConnected/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/FFIArrayType": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "new": "@roblox/globaltype/FFIArrayType.new"
+    }
+  },
+  "@roblox/globaltype/FFIArrayType.new": {
+    "code_sample": "",
+    "documentation": "Creates a new instance of the array structure.\n\n**Parameters**\n- `values`: The values to set in the array.\n\n\n**Throws**\n- FFI Error\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/FFIArrayType.new/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/FFIArrayType.new/param/0"
+      },
+      {
+        "name": "values",
+        "documentation": "@roblox/globaltype/FFIArrayType.new/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/FFIArrayType.new/param/1": {
+    "code_sample": "",
+    "documentation": "The values to set in the array.",
+    "keys": []
+  },
+  "@roblox/globaltype/Regex": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "split": "@roblox/globaltype/Regex.split",
+      "replaceAll": "@roblox/globaltype/Regex.replaceAll",
+      "search": "@roblox/globaltype/Regex.search",
+      "captures": "@roblox/globaltype/Regex.captures",
+      "replace": "@roblox/globaltype/Regex.replace",
+      "format": "@roblox/globaltype/Regex.format",
+      "isMatch": "@roblox/globaltype/Regex.isMatch",
+      "match": "@roblox/globaltype/Regex.match"
+    }
+  },
+  "@roblox/globaltype/Regex.match": {
+    "code_sample": "",
+    "documentation": "\n\n**Parameters**\n- `input`: The input to match against the regex.\n\n\n**Throws**\n- Regex Error\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/Regex.match/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/Regex.match/param/0"
+      },
+      {
+        "name": "input",
+        "documentation": "@roblox/globaltype/Regex.match/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/Regex.match/param/1": {
+    "code_sample": "",
+    "documentation": "The input to match against the regex."
+  },
+  "@roblox/globaltype/Regex.search": {
+    "code_sample": "",
+    "documentation": "\n\n**Throws**\n- Regex Error\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/Regex.search/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/Regex.search/param/0"
+      },
+      {
+        "name": "input",
+        "documentation": "@roblox/globaltype/Regex.search/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/Regex.captures": {
+    "code_sample": "",
+    "documentation": "\n\n**Parameters**\n- `global`: If true, the function will return all captures instead of just the first\n  - default: `false`\n\n\n**Throws**\n- Regex Error\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/Regex.captures/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/Regex.captures/param/0"
+      },
+      {
+        "name": "input",
+        "documentation": "@roblox/globaltype/Regex.captures/param/1"
+      },
+      {
+        "name": "global",
+        "documentation": "@roblox/globaltype/Regex.captures/param/2"
+      }
+    ]
+  },
+  "@roblox/globaltype/Regex.captures/param/2": {
+    "code_sample": "",
+    "documentation": "If true, the function will return all captures instead of just the first"
+  },
+  "@roblox/globaltype/Regex.split": {
+    "code_sample": "",
+    "documentation": "\n\n**Parameters**\n- `input`: The input to split against the regex.\n- `global`: If true, the function will return all splits instead of just the first\n  - default: `false`\n\n\n**Throws**\n- Regex Error\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/Regex.split/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/Regex.split/param/0"
+      },
+      {
+        "name": "input",
+        "documentation": "@roblox/globaltype/Regex.split/param/1"
+      },
+      {
+        "name": "global",
+        "documentation": "@roblox/globaltype/Regex.split/param/2"
+      }
+    ]
+  },
+  "@roblox/globaltype/Regex.split/param/1": {
+    "code_sample": "",
+    "documentation": "The input to split against the regex."
+  },
+  "@roblox/globaltype/Regex.split/param/2": {
+    "code_sample": "",
+    "documentation": "If true, the function will return all splits instead of just the first"
+  },
+  "@roblox/globaltype/Regex.isMatch": {
+    "code_sample": "",
+    "documentation": "Returns if a string matches the pattern.\n\n**Throws**\n- Regex Error\n",
+    "returns": [
+      "@roblox/globaltype/Regex.isMatch/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/Regex.isMatch/param/0"
+      },
+      {
+        "name": "input",
+        "documentation": "@roblox/globaltype/Regex.isMatch/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/Regex.format": {
+    "code_sample": "",
+    "documentation": "Format a string.\n\n**Parameters**\n- `str`: The string to replace.\n\n\n**Throws**\n- Regex Error\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/Regex.format/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/Regex.format/param/0"
+      },
+      {
+        "name": "str",
+        "documentation": "@roblox/globaltype/Regex.format/param/1"
+      },
+      {
+        "name": "format",
+        "documentation": "@roblox/globaltype/Regex.format/param/2"
+      }
+    ]
+  },
+  "@roblox/globaltype/Regex.format/param/1": {
+    "code_sample": "",
+    "documentation": "The string to replace."
+  },
+  "@roblox/globaltype/Regex.replace": {
+    "code_sample": "",
+    "documentation": "Replace the first occurrence of a string.\n\n**Parameters**\n- `str`: The string to replace.\n- `replacement`: The replacement string.\n\n\n**Throws**\n- Regex Error\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/Regex.replace/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/Regex.replace/param/0"
+      },
+      {
+        "name": "str",
+        "documentation": "@roblox/globaltype/Regex.replace/param/1"
+      },
+      {
+        "name": "replacement",
+        "documentation": "@roblox/globaltype/Regex.replace/param/2"
+      }
+    ]
+  },
+  "@roblox/globaltype/Regex.replace/param/1": {
+    "code_sample": "",
+    "documentation": "The string to replace."
+  },
+  "@roblox/globaltype/Regex.replace/param/2": {
+    "code_sample": "",
+    "documentation": "The replacement string."
+  },
+  "@roblox/globaltype/Regex.replaceAll": {
+    "code_sample": "",
+    "documentation": "Replace all occurrences of a string.\n\n**Parameters**\n- `str`: The string to replace.\n- `replacement`: The replacement string.\n\n\n**Throws**\n- Regex Error\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/Regex.replaceAll/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/Regex.replaceAll/param/0"
+      },
+      {
+        "name": "str",
+        "documentation": "@roblox/globaltype/Regex.replaceAll/param/1"
+      },
+      {
+        "name": "replacement",
+        "documentation": "@roblox/globaltype/Regex.replaceAll/param/2"
+      }
+    ]
+  },
+  "@roblox/globaltype/Regex.replaceAll/param/1": {
+    "code_sample": "",
+    "documentation": "The string to replace."
+  },
+  "@roblox/globaltype/Regex.replaceAll/param/2": {
+    "code_sample": "",
+    "documentation": "The replacement string."
+  },
+  "@roblox/globaltype/SQLite3Database": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "close": "@roblox/globaltype/SQLite3Database.close",
+      "transaction": "@roblox/globaltype/SQLite3Database.transaction",
+      "exec": "@roblox/globaltype/SQLite3Database.exec",
+      "query": "@roblox/globaltype/SQLite3Database.query"
+    }
+  },
+  "@roblox/globaltype/SQLite3Database.transaction": {
+    "code_sample": "",
+    "documentation": "Creates a transaction function.\n\n**Parameters**\n- `callback`: The callback to run inside the transaction.\n- `kind`: The transaction mode to use.\n\n\n**Throws**\n- Luau Error\n",
+    "returns": [
+      "@roblox/globaltype/SQLite3Database.transaction/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/SQLite3Database.transaction/param/0"
+      },
+      {
+        "name": "callback",
+        "documentation": "@roblox/globaltype/SQLite3Database.transaction/param/1"
+      },
+      {
+        "name": "kind",
+        "documentation": "@roblox/globaltype/SQLite3Database.transaction/param/2"
+      }
+    ]
+  },
+  "@roblox/globaltype/SQLite3Database.transaction/param/1": {
+    "code_sample": "",
+    "documentation": "The callback to run inside the transaction."
+  },
+  "@roblox/globaltype/SQLite3Database.transaction/param/2": {
+    "code_sample": "",
+    "documentation": "The transaction mode to use."
+  },
+  "@roblox/globaltype/SQLite3Database.query": {
+    "code_sample": "",
+    "documentation": "\n\n**Parameters**\n- `query`: The query to prepare.\n\n\n**Throws**\n- SQLite3 Error\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/SQLite3Database.query/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/SQLite3Database.query/param/0"
+      },
+      {
+        "name": "query",
+        "documentation": "@roblox/globaltype/SQLite3Database.query/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/SQLite3Database.query/param/1": {
+    "code_sample": "",
+    "documentation": "The query to prepare."
+  },
+  "@roblox/globaltype/SQLite3Database.exec": {
+    "code_sample": "",
+    "documentation": "\n\n**Parameters**\n- `query`: The query to execute.\n- `args`: The arguments to bind to the query.\n\n\n**Throws**\n- SQLite3 Error\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/SQLite3Database.exec/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/SQLite3Database.exec/param/0"
+      },
+      {
+        "name": "query",
+        "documentation": "@roblox/globaltype/SQLite3Database.exec/param/1"
+      },
+      {
+        "name": "args",
+        "documentation": "@roblox/globaltype/SQLite3Database.exec/param/2"
+      }
+    ]
+  },
+  "@roblox/globaltype/SQLite3Database.exec/param/1": {
+    "code_sample": "",
+    "documentation": "The query to execute."
+  },
+  "@roblox/globaltype/SQLite3Database.exec/param/2": {
+    "code_sample": "",
+    "documentation": "The arguments to bind to the query."
+  },
+  "@roblox/globaltype/SQLite3Database.close": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/SQLite3Database.close/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/SQLite3Statement": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "finalize": "@roblox/globaltype/SQLite3Statement.finalize",
+      "all": "@roblox/globaltype/SQLite3Statement.all",
+      "run": "@roblox/globaltype/SQLite3Statement.run",
+      "get": "@roblox/globaltype/SQLite3Statement.get"
+    }
+  },
+  "@roblox/globaltype/SQLite3Statement.run": {
+    "code_sample": "",
+    "documentation": "\n\n**Parameters**\n- `args`: The arguments to bind to the statement.\n\n\n**Throws**\n- SQLite3 Error\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/SQLite3Statement.run/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/SQLite3Statement.run/param/0"
+      },
+      {
+        "name": "args",
+        "documentation": "@roblox/globaltype/SQLite3Statement.run/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/SQLite3Statement.run/param/1": {
+    "code_sample": "",
+    "documentation": "The arguments to bind to the statement."
+  },
+  "@roblox/globaltype/SQLite3Statement.get": {
+    "code_sample": "",
+    "documentation": "\n\n**Parameters**\n- `args`: The arguments to bind to the statement.\n\n\n**Throws**\n- SQLite3 Error\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/SQLite3Statement.get/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/SQLite3Statement.get/param/0"
+      },
+      {
+        "name": "args",
+        "documentation": "@roblox/globaltype/SQLite3Statement.get/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/SQLite3Statement.get/param/1": {
+    "code_sample": "",
+    "documentation": "The arguments to bind to the statement."
+  },
+  "@roblox/globaltype/SQLite3Statement.all": {
+    "code_sample": "",
+    "documentation": "\n\n**Parameters**\n- `args`: The arguments to bind to the statement.\n\n\n**Throws**\n- SQLite3 Error\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/SQLite3Statement.all/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/SQLite3Statement.all/param/0"
+      },
+      {
+        "name": "args",
+        "documentation": "@roblox/globaltype/SQLite3Statement.all/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/SQLite3Statement.all/param/1": {
+    "code_sample": "",
+    "documentation": "The arguments to bind to the statement."
+  },
+  "@roblox/globaltype/SQLite3Statement.finalize": {
+    "code_sample": "",
+    "documentation": "Closes the statement and frees resources.",
+    "returns": [],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/SQLite3Statement.finalize/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/FFIDataType": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "array": "@roblox/globaltype/FFIDataType.array",
+      "alignment": "@roblox/globaltype/FFIDataType.alignment",
+      "size": "@roblox/globaltype/FFIDataType.size"
+    }
+  },
+  "@roblox/globaltype/FFIDataType.size": {
+    "code_sample": "",
+    "documentation": "Get the size of the data type.",
+    "returns": [
+      "@roblox/globaltype/FFIDataType.size/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/FFIDataType.size/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/FFIDataType.alignment": {
+    "code_sample": "",
+    "documentation": "Get the alignment of the data type.",
+    "returns": [
+      "@roblox/globaltype/FFIDataType.alignment/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/FFIDataType.alignment/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/FFIDataType.array": {
+    "code_sample": "",
+    "documentation": "Create an array data type of the given count.",
+    "returns": [
+      "@roblox/globaltype/FFIDataType.array/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/FFIDataType.array/param/0"
+      },
+      {
+        "name": "count",
+        "documentation": "@roblox/globaltype/FFIDataType.array/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/FFICompiled": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "listSymbols": "@roblox/globaltype/FFICompiled.listSymbols",
+      "getSymbol": "@roblox/globaltype/FFICompiled.getSymbol"
+    }
+  },
+  "@roblox/globaltype/FFICompiled.getSymbol": {
+    "code_sample": "",
+    "documentation": "\n\n**Parameters**\n- `symbol`: The symbol to get.\n\n\n**Throws**\n- FFI Error\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/FFICompiled.getSymbol/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/FFICompiled.getSymbol/param/0"
+      },
+      {
+        "name": "symbol",
+        "documentation": "@roblox/globaltype/FFICompiled.getSymbol/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/FFICompiled.getSymbol/param/1": {
+    "code_sample": "",
+    "documentation": "The symbol to get."
+  },
+  "@roblox/globaltype/FFICompiled.listSymbols": {
+    "code_sample": "",
+    "documentation": "Lists all symbols in the compiled object.\n\n**Throws**\n- FFI Error\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/FFICompiled.listSymbols/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/FFICompiled.listSymbols/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/CryptoHash": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "copy": "@roblox/globaltype/CryptoHash.copy",
+      "update": "@roblox/globaltype/CryptoHash.update",
+      "digest": "@roblox/globaltype/CryptoHash.digest"
+    }
+  },
+  "@roblox/globaltype/CryptoHash.digest": {
+    "code_sample": "",
+    "documentation": "Returns the finalized hash value.\n\nIf the hash object was created with a key, this would close the object."
+  },
+  "@roblox/globaltype/CryptoHash.update": {
+    "code_sample": "",
+    "documentation": "\n\n**Parameters**\n- `value`: The value to update the hash with.\n\n\n**Throws**\n- Crypto Error\n",
+    "returns": [],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/CryptoHash.update/param/0"
+      },
+      {
+        "name": "value",
+        "documentation": "@roblox/globaltype/CryptoHash.update/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/CryptoHash.update/param/1": {
+    "code_sample": "",
+    "documentation": "The value to update the hash with."
+  },
+  "@roblox/globaltype/CryptoHash.copy": {
+    "code_sample": "",
+    "documentation": "Copies the current hash state.\n\nIf the hash object was created with a key, the object must still be opened.\n\n**Throws**\n- Crypto Error\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/CryptoHash.copy/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/CryptoHash.copy/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/TlsCertBundle": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": []
+  },
+  "@roblox/globaltype/FFIStructureType": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "offset": "@roblox/globaltype/FFIStructureType.offset",
+      "new": "@roblox/globaltype/FFIStructureType.new"
+    }
+  },
+  "@roblox/globaltype/FFIStructureType.offset": {
+    "code_sample": "",
+    "documentation": "Get the offset of a field in the structure.\n\n**Parameters**\n- `field`: The field to get the offset of.\n",
+    "returns": [
+      "@roblox/globaltype/FFIStructureType.offset/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/FFIStructureType.offset/param/0"
+      },
+      {
+        "name": "field",
+        "documentation": "@roblox/globaltype/FFIStructureType.offset/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/FFIStructureType.offset/param/1": {
+    "code_sample": "",
+    "documentation": "The field to get the offset of."
+  },
+  "@roblox/globaltype/FFIStructureType.new": {
+    "code_sample": "",
+    "documentation": "Creates a new instance of the structure.\n\n**Parameters**\n- `fields`: The fields to set in the structure.\n\n\n**Throws**\n- FFI Error\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/FFIStructureType.new/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/FFIStructureType.new/param/0"
+      },
+      {
+        "name": "fields",
+        "documentation": "@roblox/globaltype/FFIStructureType.new/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/FFIStructureType.new/param/1": {
+    "code_sample": "",
+    "documentation": "The fields to set in the structure.",
+    "keys": []
+  },
+  "@roblox/globaltype/IoReadable": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "readf64": "@roblox/globaltype/IoReadable.readf64",
+      "readi32": "@roblox/globaltype/IoReadable.readi32",
+      "readi8": "@roblox/globaltype/IoReadable.readi8",
+      "readu16": "@roblox/globaltype/IoReadable.readu16",
+      "read": "@roblox/globaltype/IoReadable.read",
+      "readu8": "@roblox/globaltype/IoReadable.readu8",
+      "readu32": "@roblox/globaltype/IoReadable.readu32",
+      "readf32": "@roblox/globaltype/IoReadable.readf32",
+      "readi16": "@roblox/globaltype/IoReadable.readi16"
+    }
+  },
+  "@roblox/globaltype/IoReadable.readu8": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@roblox/globaltype/IoReadable.readu8/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/IoReadable.readu8/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/IoReadable.readu16": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@roblox/globaltype/IoReadable.readu16/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/IoReadable.readu16/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/IoReadable.readu32": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@roblox/globaltype/IoReadable.readu32/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/IoReadable.readu32/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/IoReadable.readi8": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@roblox/globaltype/IoReadable.readi8/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/IoReadable.readi8/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/IoReadable.readi16": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@roblox/globaltype/IoReadable.readi16/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/IoReadable.readi16/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/IoReadable.readi32": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@roblox/globaltype/IoReadable.readi32/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/IoReadable.readi32/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/IoReadable.readf32": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@roblox/globaltype/IoReadable.readf32/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/IoReadable.readf32/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/IoReadable.readf64": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@roblox/globaltype/IoReadable.readf64/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/IoReadable.readf64/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/FFIPointerType": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "newTag": "@roblox/globaltype/FFIPointerType.newTag",
+      "tag": "@roblox/globaltype/FFIPointerType.tag"
+    }
+  },
+  "@roblox/globaltype/FFIPointerType.tag": {
+    "code_sample": "",
+    "documentation": "Get the tag id of the pointer type.",
+    "returns": [
+      "@roblox/globaltype/FFIPointerType.tag/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/FFIPointerType.tag/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/FFIPointerType.newTag": {
+    "code_sample": "",
+    "documentation": "Creates a new pointer type with the given tag.\n\n**Parameters**\n- `tag`: The tag to set.\n\n\n**Throws**\n- FFI Error\n- Memory Error\n",
+    "returns": [
+      "@roblox/globaltype/FFIPointerType.newTag/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/FFIPointerType.newTag/param/0"
+      },
+      {
+        "name": "tag",
+        "documentation": "@roblox/globaltype/FFIPointerType.newTag/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/FFIPointerType.newTag/param/1": {
+    "code_sample": "",
+    "documentation": "The tag to set."
+  },
+  "@roblox/globaltype/ProcessChild": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "pid": "@roblox/globaltype/ProcessChild.pid",
+      "kill": "@roblox/globaltype/ProcessChild.kill",
+      "stderr": "@roblox/globaltype/ProcessChild.stderr",
+      "stdout": "@roblox/globaltype/ProcessChild.stdout",
+      "stdin": "@roblox/globaltype/ProcessChild.stdin",
+      "wait": "@roblox/globaltype/ProcessChild.wait"
+    }
+  },
+  "@roblox/globaltype/ProcessChild.wait": {
+    "code_sample": "",
+    "documentation": "Kills the process and yields until the process exits.\n\n**Throws**\n- Process Error\n",
+    "returns": [
+      "@roblox/globaltype/ProcessChild.wait/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/ProcessChild.wait/param/0"
+      }
+    ]
+  },
+  "@roblox/globaltype/ProcessChild.kill": {
+    "code_sample": "",
+    "documentation": "Yields until the process exits.\n\n**Throws**\n- Process Error\n",
+    "returns": [
+      "@roblox/globaltype/ProcessChild.kill/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@roblox/globaltype/ProcessChild.kill/param/0"
       }
     ]
   }
