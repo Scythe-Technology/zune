@@ -14,6 +14,8 @@ const Lists = Zune.Utils.Lists;
 
 const Response = @import("../response.zig");
 
+const TAG_CRYPTO_TLS_CERTBUNDLE = Zune.Tags.get("CRYPTO_TLS_CERTBUNDLE").?;
+
 const VM = luau.VM;
 
 const ZUNE_CLIENT_HEADER = "zune/" ++ Zune.info.version;
@@ -691,6 +693,11 @@ pub fn lua_request(L: *VM.lua.State) !i32 {
     var max_body_size: ?usize = null;
     var max_header_size: ?usize = null;
     var max_headers: ?u32 = null;
+    var host_copy: ?[]const u8 = null;
+    var ca_bundle: ?tls.config.cert.Bundle = null;
+
+    errdefer if (host_copy) |h| allocator.free(h);
+    errdefer if (ca_bundle) |*b| b.deinit(allocator);
 
     var headers: std.ArrayListUnmanaged(u8) = .empty;
     defer headers.deinit(allocator);
@@ -701,6 +708,26 @@ pub fn lua_request(L: *VM.lua.State) !i32 {
         try L.Zchecktype(2, .Table);
         if (try L.Zcheckfield(?[]const u8, 2, "body")) |body|
             payload = body;
+        L.pop(1);
+
+        const tls_type = L.rawgetfield(2, "tls");
+        if (!tls_type.isnoneornil()) {
+            if (tls_type != .Table)
+                return L.Zerror("invalid tls (expected table)");
+            if (try L.Zcheckfield(?[]const u8, -1, "host")) |h|
+                host_copy = try allocator.dupe(u8, h);
+            L.pop(1);
+            const ca_type = L.rawgetfield(-1, "ca");
+            if (!ca_type.isnoneornil()) {
+                if (ca_type != .Userdata or L.userdatatag(-1) != TAG_CRYPTO_TLS_CERTBUNDLE)
+                    return L.Zerror("field 'tls.ca' must be a CertBundle");
+                ca_bundle = try @import("../../../crypto/tls.zig").cloneCertBundle(
+                    allocator,
+                    L.touserdatatagged(tls.config.cert.Bundle, -1, TAG_CRYPTO_TLS_CERTBUNDLE).?.*,
+                );
+            }
+            L.pop(1);
+        }
         L.pop(1);
 
         const headers_type = L.rawgetfield(2, "headers");
@@ -808,9 +835,8 @@ pub fn lua_request(L: *VM.lua.State) !i32 {
     errdefer if (tls_ctx) |ctx| allocator.destroy(ctx);
     if (protocol == .tls) {
         tls_ctx = try allocator.create(TlsContext);
-        const host_copy = try allocator.dupe(u8, host);
-        errdefer allocator.free(host_copy);
-        const ca_bundle = try tls.config.cert.fromSystem(allocator);
+        host_copy = host_copy orelse try allocator.dupe(u8, host);
+        ca_bundle = ca_bundle orelse try tls.config.cert.fromSystem(allocator);
         tls_ctx.?.* = .{
             .record = .{
                 .buffer = &tls_ctx.?.record_buffer,
@@ -839,8 +865,8 @@ pub fn lua_request(L: *VM.lua.State) !i32 {
             .connection = .{
                 .handshake = .{
                     .client = .init(.{
-                        .host = host_copy,
-                        .root_ca = ca_bundle,
+                        .host = host_copy.?,
+                        .root_ca = ca_bundle.?,
                         .cipher_suites = tls.config.cipher_suites.secure,
                         .key_log_callback = tls.config.key_log.callback,
                     }),
