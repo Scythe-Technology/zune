@@ -669,7 +669,7 @@ test "allowedHeaderValueByte" {
 
 fn testParseProcedural(input: []const u8, max: u32) !Parser {
     const allocator = std.testing.allocator;
-    var parser = Parser.init(allocator, max);
+    var parser = Parser.init(allocator, 1_048_576, 4096, max);
     errdefer parser.deinit();
 
     var tiny_buf: [1]u8 = undefined;
@@ -691,7 +691,7 @@ fn testParseProceduralIncomplete(input: []const u8, max: u32) !void {
 
 fn testParseFull(comptime input: []const u8, max: u32) !Parser {
     const allocator = std.testing.allocator;
-    var parser = Parser.init(allocator, max);
+    var parser = Parser.init(allocator, 1_048_576, 4096, max);
     errdefer parser.deinit();
 
     if (try parser.parse(input)) {
