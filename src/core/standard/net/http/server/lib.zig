@@ -422,7 +422,7 @@ pub fn lua_serve(L: *VM.lua.State) !i32 {
         backlog: ?u31,
         max_body_size: ?u32,
         max_header_size: ?u32,
-        max_header_count: ?u32,
+        max_headers: ?u32,
         client_timeout: ?u32,
         max_connections: ?u32,
     }, 1, null);
@@ -556,7 +556,7 @@ pub fn lua_serve(L: *VM.lua.State) !i32 {
             .client_timeout = serve_info.client_timeout orelse 10,
             .max_body_size = @min(serve_info.max_body_size orelse 1_048_576, LuaHelper.MAX_LUAU_SIZE),
             .max_header_size = @min(serve_info.max_header_size orelse 4092, LuaHelper.MAX_LUAU_SIZE),
-            .max_header_count = @min(serve_info.max_header_count orelse 100, 1_024),
+            .max_header_count = @min(serve_info.max_headers orelse 100, 1_024),
             .max_connections = serve_info.max_connections orelse 1024,
         },
         .tls = tls,
