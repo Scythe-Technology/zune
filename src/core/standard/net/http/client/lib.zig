@@ -693,6 +693,7 @@ pub fn lua_request(L: *VM.lua.State) !i32 {
     var max_body_size: ?usize = null;
     var max_header_size: ?usize = null;
     var max_headers: ?u32 = null;
+    var force_tls = false;
     var host_copy: ?[]const u8 = null;
     var ca_bundle: ?tls.config.cert.Bundle = null;
 
@@ -714,6 +715,7 @@ pub fn lua_request(L: *VM.lua.State) !i32 {
         if (!tls_type.isnoneornil()) {
             if (tls_type != .Table)
                 return L.Zerror("invalid tls (expected table)");
+            force_tls = true;
             if (try L.Zcheckfield(?[]const u8, -1, "host")) |h|
                 host_copy = try allocator.dupe(u8, h);
             L.pop(1);
@@ -833,7 +835,7 @@ pub fn lua_request(L: *VM.lua.State) !i32 {
 
     var tls_ctx: ?*TlsContext = null;
     errdefer if (tls_ctx) |ctx| allocator.destroy(ctx);
-    if (protocol == .tls) {
+    if (protocol == .tls or force_tls) {
         tls_ctx = try allocator.create(TlsContext);
         host_copy = host_copy orelse try allocator.dupe(u8, host);
         ca_bundle = ca_bundle orelse try tls.config.cert.fromSystem(allocator);
