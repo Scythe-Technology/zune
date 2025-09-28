@@ -14,6 +14,48 @@ const TAG_CRYPTO_TLS_CERTKEYPAIR = Zune.Tags.get("CRYPTO_TLS_CERTKEYPAIR").?;
 
 const VM = luau.VM;
 
+const BundleMapContext = struct {
+    const der = std.crypto.Certificate.der;
+
+    cb: *const tls.config.cert.Bundle,
+
+    pub fn hash(ctx: BundleMapContext, k: der.Element.Slice) u64 {
+        return std.hash_map.hashString(ctx.cb.bytes.items[k.start..k.end]);
+    }
+
+    pub fn eql(ctx: BundleMapContext, a: der.Element.Slice, b: der.Element.Slice) bool {
+        const bytes = ctx.cb.bytes.items;
+        return std.mem.eql(
+            u8,
+            bytes[a.start..a.end],
+            bytes[b.start..b.end],
+        );
+    }
+};
+
+pub fn cloneCertBundle(allocator: std.mem.Allocator, bundle: tls.config.cert.Bundle) !tls.config.cert.Bundle {
+    var bytes = try bundle.bytes.clone(allocator);
+    errdefer bytes.deinit(allocator);
+
+    var b: tls.config.cert.Bundle = .{
+        .bytes = bytes,
+        .map = .empty,
+    };
+    const context: BundleMapContext = .{ .cb = @ptrCast(&b) };
+
+    const map = try bundle.map.cloneContext(allocator, context);
+    b.map = @as(*const @TypeOf(b.map), @ptrCast(&map)).*;
+
+    return b;
+}
+
+pub fn cloneCertKeyPair(allocator: std.mem.Allocator, pair: tls.config.CertKeyPair) !tls.config.CertKeyPair {
+    return .{
+        .bundle = try cloneCertBundle(allocator, pair.bundle),
+        .key = pair.key,
+    };
+}
+
 pub fn lua_bundleFromSystem(L: *VM.lua.State) !i32 {
     const allocator = luau.getallocator(L);
 
@@ -55,7 +97,7 @@ pub fn lua_keyPairFromFile(L: *VM.lua.State) !i32 {
 pub fn lua_setupClient(L: *VM.lua.State) !i32 {
     const socket = L.touserdatatagged(Socket, 1, TAG_NET_SOCKET) orelse return L.Zerror("argument #1 must be a Socket");
 
-    if (socket.tls_context != .none)
+    if (socket.tls != .none)
         return L.Zerror("socket already has a TLS context");
 
     switch (socket.open) {
@@ -71,13 +113,10 @@ pub fn lua_setupClient(L: *VM.lua.State) !i32 {
     if (L.rawgetfield(2, "ca") != .Userdata or L.userdatatag(-1) != TAG_CRYPTO_TLS_CERTBUNDLE)
         return L.Zerror("argument #2 field 'ca' must be a CertBundle");
 
-    const ca_bundle = L.touserdatatagged(tls.config.cert.Bundle, -1, TAG_CRYPTO_TLS_CERTBUNDLE) orelse @panic("unreachable");
-
-    const ca_ref: LuaHelper.Ref(void) = .init(L, -1, undefined);
-
-    L.pop(1);
-
     const allocator = luau.getallocator(L);
+
+    const ca_bundle = try cloneCertBundle(allocator, L.touserdatatagged(tls.config.cert.Bundle, -1, TAG_CRYPTO_TLS_CERTBUNDLE).?.*);
+    L.pop(1);
 
     const client_context = try allocator.create(Socket.TlsContext.Client);
     errdefer allocator.destroy(client_context);
@@ -112,11 +151,9 @@ pub fn lua_setupClient(L: *VM.lua.State) !i32 {
         },
         .connection = .{
             .handshake = .{
-                .GL = L.mainthread(),
-                .ca_ref = ca_ref,
                 .client = .init(.{
                     .host = host,
-                    .root_ca = ca_bundle.*,
+                    .root_ca = ca_bundle,
                     .cipher_suites = tls.config.cipher_suites.secure,
                     .key_log_callback = tls.config.key_log.callback,
                 }),
@@ -124,7 +161,7 @@ pub fn lua_setupClient(L: *VM.lua.State) !i32 {
         },
     };
 
-    socket.tls_context = .{
+    socket.tls = .{
         .client = client_context,
     };
 
@@ -134,7 +171,7 @@ pub fn lua_setupClient(L: *VM.lua.State) !i32 {
 pub fn lua_setupServer(L: *VM.lua.State) !i32 {
     const socket = L.touserdatatagged(Socket, 1, TAG_NET_SOCKET) orelse return L.Zerror("argument #1 must be a Socket");
 
-    if (socket.tls_context != .none)
+    if (socket.tls != .none)
         return L.Zerror("socket already has a TLS context");
 
     switch (socket.open) {
@@ -148,26 +185,21 @@ pub fn lua_setupServer(L: *VM.lua.State) !i32 {
     if (L.rawgetfield(2, "auth") != .Userdata or L.userdatatag(-1) != TAG_CRYPTO_TLS_CERTKEYPAIR)
         return L.Zerror("argument #2 field 'ca' must be a CertBundle");
 
-    const ca_keypair = L.touserdatatagged(tls.config.CertKeyPair, -1, TAG_CRYPTO_TLS_CERTKEYPAIR) orelse @panic("unreachable");
+    const allocator = luau.getallocator(L);
 
-    const ca_ref: LuaHelper.Ref(void) = .init(L, -1, undefined);
+    var ca_keypair = try cloneCertKeyPair(allocator, L.touserdatatagged(tls.config.CertKeyPair, -1, TAG_CRYPTO_TLS_CERTKEYPAIR).?.*);
+    errdefer ca_keypair.deinit(allocator);
 
     L.pop(1);
-
-    const allocator = luau.getallocator(L);
 
     const context = try allocator.create(Socket.TlsContext.ServerRef);
     errdefer allocator.destroy(context);
 
     context.* = .{
-        .GL = L.mainthread(),
-        .ca_keypair_ref = ca_ref,
-        .server = .init(.{
-            .auth = ca_keypair,
-        }),
+        .server = ca_keypair,
     };
 
-    socket.tls_context = .{
+    socket.tls = .{
         .server_ref = context,
     };
 
