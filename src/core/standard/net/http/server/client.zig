@@ -1046,15 +1046,24 @@ pub fn start(
                     );
                     return;
                 },
-                .active => {},
+                .active => self.stream_read(
+                    loop,
+                    &self.completion,
+                    self.socket,
+                    onRecv,
+                ),
             }
+            unreachable;
+        } else {
+            self.socket.read(
+                loop,
+                &self.completion,
+                .{ .slice = &self.buffers.in },
+                Self,
+                self,
+                onRecv,
+            );
         }
-        self.stream_read(
-            loop,
-            &self.completion,
-            self.socket,
-            onRecv,
-        );
     }
 }
 

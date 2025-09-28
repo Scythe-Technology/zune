@@ -76,13 +76,15 @@ pub const Parser = struct {
 
     const Stage = enum { method, url, protocol, headers, body, done };
 
-    pub fn init(allocator: Allocator, max_header_count: u32) Parser {
+    pub fn init(allocator: Allocator, max_body_size: usize, max_header_size: usize, max_header_count: u32) Parser {
         var headers: std.StringHashMapUnmanaged([]const u8) = .empty;
         headers.ensureTotalCapacity(allocator, max_header_count) catch |err| std.debug.panic("{}\n", .{err});
         return .{
             .arena = .init(allocator),
             .headers = headers,
+            .max_body_size = max_body_size,
             .max_header_count = max_header_count,
+            .max_header_size = max_header_size,
         };
     }
 
