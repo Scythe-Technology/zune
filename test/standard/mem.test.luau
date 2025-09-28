@@ -110,199 +110,273 @@ describe("Mem", function()
         expect(mem.eql(mem.trimRight(a, ""), a)).toBeTruthy();
         expect(mem.eql(mem.trimRight(a, " "), "  test")).toBeTruthy();
     end)
-    test("indexOf", function()
+    test("find", function()
         local a = buffer.fromstring("test");
-        expect(mem.indexOf(a, "te")).toBe(0);
-        expect(mem.indexOf(a, "t")).toBe(0);
-        expect(mem.indexOf(a, "test")).toBe(0);
-        expect(mem.indexOf(a, "es")).toBe(1);
-        expect(mem.indexOf(a, "st")).toBe(2);
-        expect(mem.indexOf(a, "e")).toBe(1);
-        expect(mem.indexOf(a, "x")).toBeNil();
-        expect(mem.indexOf(a, "")).toBe(0);
+        expect(mem.find(a, "te")).toBe(0);
+        expect(mem.find(a, "t")).toBe(0);
+        expect(mem.find(a, "test")).toBe(0);
+        expect(mem.find(a, "es")).toBe(1);
+        expect(mem.find(a, "st")).toBe(2);
+        expect(mem.find(a, "e")).toBe(1);
+        expect(mem.find(a, "x")).toBeNil();
+        expect(mem.find(a, "")).toBe(0);
     end)
-    test("indexOfPos", function()
+    test("findPos", function()
         local a = buffer.fromstring("test");
-        expect(mem.indexOfPos(a, 0, "te")).toBe(0);
-        expect(mem.indexOfPos(a, 1, "te")).toBeNil();
-        expect(mem.indexOfPos(a, 0, "t")).toBe(0);
-        expect(mem.indexOfPos(a, 1, "t")).toBe(3);
-        expect(mem.indexOfPos(a, 4, "t")).toBeNil();
-        expect(mem.indexOfPos(a, 0, "test")).toBe(0);
-        expect(mem.indexOfPos(a, 1, "test")).toBeNil();
-        expect(mem.indexOfPos(a, 0, "es")).toBe(1);
+        expect(mem.findPos(a, 0, "te")).toBe(0);
+        expect(mem.findPos(a, 1, "te")).toBeNil();
+        expect(mem.findPos(a, 0, "t")).toBe(0);
+        expect(mem.findPos(a, 1, "t")).toBe(3);
+        expect(mem.findPos(a, 4, "t")).toBeNil();
+        expect(mem.findPos(a, 0, "test")).toBe(0);
+        expect(mem.findPos(a, 1, "test")).toBeNil();
+        expect(mem.findPos(a, 0, "es")).toBe(1);
     end)
-    test("lastIndexOf", function()
+    test("findLast", function()
         local a = buffer.fromstring("test");
-        expect(mem.lastIndexOf(a, "te")).toBe(0);
-        expect(mem.lastIndexOf(a, "t")).toBe(3);
-        expect(mem.lastIndexOf(a, "test")).toBe(0);
-        expect(mem.lastIndexOf(a, "es")).toBe(1);
-        expect(mem.lastIndexOf(a, "st")).toBe(2);
-        expect(mem.lastIndexOf(a, "e")).toBe(1);
-        expect(mem.lastIndexOf(a, "x")).toBeNil();
-        expect(mem.lastIndexOf(a, "")).toBe(4);
+        expect(mem.findLast(a, "te")).toBe(0);
+        expect(mem.findLast(a, "t")).toBe(3);
+        expect(mem.findLast(a, "test")).toBe(0);
+        expect(mem.findLast(a, "es")).toBe(1);
+        expect(mem.findLast(a, "st")).toBe(2);
+        expect(mem.findLast(a, "e")).toBe(1);
+        expect(mem.findLast(a, "x")).toBeNil();
+        expect(mem.findLast(a, "")).toBe(4);
     end)
-    test("indexOfScalar", function()
+    test("findScalar", function()
         local a = buffer.fromstring("test");
-        expect(mem.indexOfScalar(a, string.byte('t'))).toBe(0);
-        expect(mem.indexOfScalar(a, string.byte('e'))).toBe(1);
-        expect(mem.indexOfScalar(a, string.byte('s'))).toBe(2);
-        expect(mem.indexOfScalar(a, string.byte('x'))).toBeNil();
-        expect(mem.indexOfScalar(a, 0)).toBeNil();
+        expect(mem.findScalar(a, string.byte('t'))).toBe(0);
+        expect(mem.findScalar(a, string.byte('e'))).toBe(1);
+        expect(mem.findScalar(a, string.byte('s'))).toBe(2);
+        expect(mem.findScalar(a, string.byte('x'))).toBeNil();
+        expect(mem.findScalar(a, 0)).toBeNil();
     end)
-    test("indexOfScalarPos", function()
+    test("findScalarPos", function()
         local a = buffer.fromstring("test");
-        expect(mem.indexOfScalarPos(a, 0, string.byte('t'))).toBe(0);
-        expect(mem.indexOfScalarPos(a, 1, string.byte('t'))).toBe(3);
-        expect(mem.indexOfScalarPos(a, 4, string.byte('t'))).toBeNil();
-        expect(mem.indexOfScalarPos(a, 0, string.byte('e'))).toBe(1);
-        expect(mem.indexOfScalarPos(a, 2, string.byte('e'))).toBeNil();
-        expect(mem.indexOfScalarPos(a, 0, string.byte('s'))).toBe(2);
-        expect(mem.indexOfScalarPos(a, 1, string.byte('s'))).toBe(2);
-        expect(mem.indexOfScalarPos(a, 0, string.byte('x'))).toBeNil();
-        expect(mem.indexOfScalarPos(a, 0, 0)).toBeNil();
+        expect(mem.findScalarPos(a, 0, string.byte('t'))).toBe(0);
+        expect(mem.findScalarPos(a, 1, string.byte('t'))).toBe(3);
+        expect(mem.findScalarPos(a, 4, string.byte('t'))).toBeNil();
+        expect(mem.findScalarPos(a, 0, string.byte('e'))).toBe(1);
+        expect(mem.findScalarPos(a, 2, string.byte('e'))).toBeNil();
+        expect(mem.findScalarPos(a, 0, string.byte('s'))).toBe(2);
+        expect(mem.findScalarPos(a, 1, string.byte('s'))).toBe(2);
+        expect(mem.findScalarPos(a, 0, string.byte('x'))).toBeNil();
+        expect(mem.findScalarPos(a, 0, 0)).toBeNil();
     end)
-    test("lastIndexOfScalar", function()
+    test("findScalarLast", function()
         local a = buffer.fromstring("test");
-        expect(mem.lastIndexOfScalar(a, string.byte('t'))).toBe(3);
-        expect(mem.lastIndexOfScalar(a, string.byte('e'))).toBe(1);
-        expect(mem.lastIndexOfScalar(a, string.byte('s'))).toBe(2);
-        expect(mem.lastIndexOfScalar(a, string.byte('x'))).toBeNil();
-        expect(mem.lastIndexOfScalar(a, 0)).toBeNil();
+        expect(mem.findScalarLast(a, string.byte('t'))).toBe(3);
+        expect(mem.findScalarLast(a, string.byte('e'))).toBe(1);
+        expect(mem.findScalarLast(a, string.byte('s'))).toBe(2);
+        expect(mem.findScalarLast(a, string.byte('x'))).toBeNil();
+        expect(mem.findScalarLast(a, 0)).toBeNil();
     end)
-    test("indexOfAny", function()
+    test("findAny", function()
         local a = buffer.fromstring("test");
-        expect(mem.indexOfAny(a, "te")).toBe(0);
-        expect(mem.indexOfAny(a, "t")).toBe(0);
-        expect(mem.indexOfAny(a, "test")).toBe(0);
-        expect(mem.indexOfAny(a, "es")).toBe(1);
-        expect(mem.indexOfAny(a, "st")).toBe(0);
-        expect(mem.indexOfAny(a, "e")).toBe(1);
-        expect(mem.indexOfAny(a, "x")).toBeNil();
-        expect(mem.indexOfAny(a, "")).toBeNil();
+        expect(mem.findAny(a, "te")).toBe(0);
+        expect(mem.findAny(a, "t")).toBe(0);
+        expect(mem.findAny(a, "test")).toBe(0);
+        expect(mem.findAny(a, "es")).toBe(1);
+        expect(mem.findAny(a, "st")).toBe(0);
+        expect(mem.findAny(a, "e")).toBe(1);
+        expect(mem.findAny(a, "x")).toBeNil();
+        expect(mem.findAny(a, "")).toBeNil();
     end)
-    test("indexOfAnyPos", function()
+    test("findAnyPos", function()
         local a = buffer.fromstring("test");
-        expect(mem.indexOfAnyPos(a, 0, "te")).toBe(0);
-        expect(mem.indexOfAnyPos(a, 1, "te")).toBe(1);
-        expect(mem.indexOfAnyPos(a, 0, "t")).toBe(0);
-        expect(mem.indexOfAnyPos(a, 1, "t")).toBe(3);
-        expect(mem.indexOfAnyPos(a, 4, "t")).toBeNil();
-        expect(mem.indexOfAnyPos(a, 0, "test")).toBe(0);
-        expect(mem.indexOfAnyPos(a, 1, "test")).toBe(1);
-        expect(mem.indexOfAnyPos(a, 0, "es")).toBe(1);
-        expect(mem.indexOfAnyPos(a, 1, "es")).toBe(1);
-        expect(mem.indexOfAnyPos(a, 0, "st")).toBe(0);
-        expect(mem.indexOfAnyPos(a, 1, "st")).toBe(2);
-        expect(mem.indexOfAnyPos(a, 0, "e")).toBe(1);
-        expect(mem.indexOfAnyPos(a, 2, "e")).toBeNil();
-        expect(mem.indexOfAnyPos(a, 0, "x")).toBeNil();
-        expect(mem.indexOfAnyPos(a, 0, "")).toBeNil();
+        expect(mem.findAnyPos(a, 0, "te")).toBe(0);
+        expect(mem.findAnyPos(a, 1, "te")).toBe(1);
+        expect(mem.findAnyPos(a, 0, "t")).toBe(0);
+        expect(mem.findAnyPos(a, 1, "t")).toBe(3);
+        expect(mem.findAnyPos(a, 4, "t")).toBeNil();
+        expect(mem.findAnyPos(a, 0, "test")).toBe(0);
+        expect(mem.findAnyPos(a, 1, "test")).toBe(1);
+        expect(mem.findAnyPos(a, 0, "es")).toBe(1);
+        expect(mem.findAnyPos(a, 1, "es")).toBe(1);
+        expect(mem.findAnyPos(a, 0, "st")).toBe(0);
+        expect(mem.findAnyPos(a, 1, "st")).toBe(2);
+        expect(mem.findAnyPos(a, 0, "e")).toBe(1);
+        expect(mem.findAnyPos(a, 2, "e")).toBeNil();
+        expect(mem.findAnyPos(a, 0, "x")).toBeNil();
+        expect(mem.findAnyPos(a, 0, "")).toBeNil();
     end)
-    test("lastIndexOfAny", function()
+    test("findAnyLast", function()
         local a = buffer.fromstring("test");
-        expect(mem.lastIndexOfAny(a, "te")).toBe(3);
-        expect(mem.lastIndexOfAny(a, "t")).toBe(3);
-        expect(mem.lastIndexOfAny(a, "test")).toBe(3);
-        expect(mem.lastIndexOfAny(a, "es")).toBe(2);
-        expect(mem.lastIndexOfAny(a, "st")).toBe(3);
-        expect(mem.lastIndexOfAny(a, "e")).toBe(1);
-        expect(mem.lastIndexOfAny(a, "x")).toBeNil();
-        expect(mem.lastIndexOfAny(a, "")).toBeNil();
+        expect(mem.findAnyLast(a, "te")).toBe(3);
+        expect(mem.findAnyLast(a, "t")).toBe(3);
+        expect(mem.findAnyLast(a, "test")).toBe(3);
+        expect(mem.findAnyLast(a, "es")).toBe(2);
+        expect(mem.findAnyLast(a, "st")).toBe(3);
+        expect(mem.findAnyLast(a, "e")).toBe(1);
+        expect(mem.findAnyLast(a, "x")).toBeNil();
+        expect(mem.findAnyLast(a, "")).toBeNil();
     end)
-    test("indexOfNone", function()
+    test("findNone", function()
         local a = buffer.fromstring("test");
-        expect(mem.indexOfNone(a, "te")).toBe(2);
-        expect(mem.indexOfNone(a, "t")).toBe(1);
-        expect(mem.indexOfNone(a, "test")).toBeNil();
-        expect(mem.indexOfNone(a, "es")).toBe(0);
-        expect(mem.indexOfNone(a, "st")).toBe(1);
-        expect(mem.indexOfNone(a, "e")).toBe(0);
-        expect(mem.indexOfNone(a, "x")).toBe(0);
-        expect(mem.indexOfNone(a, "")).toBe(0);
+        expect(mem.findNone(a, "te")).toBe(2);
+        expect(mem.findNone(a, "t")).toBe(1);
+        expect(mem.findNone(a, "test")).toBeNil();
+        expect(mem.findNone(a, "es")).toBe(0);
+        expect(mem.findNone(a, "st")).toBe(1);
+        expect(mem.findNone(a, "e")).toBe(0);
+        expect(mem.findNone(a, "x")).toBe(0);
+        expect(mem.findNone(a, "")).toBe(0);
     end)
-    test("indexOfNonePos", function()
+    test("findNonePos", function()
         local a = buffer.fromstring("test");
-        expect(mem.indexOfNonePos(a, 0, "te")).toBe(2);
-        expect(mem.indexOfNonePos(a, 1, "te")).toBe(2);
-        expect(mem.indexOfNonePos(a, 0, "t")).toBe(1);
-        expect(mem.indexOfNonePos(a, 1, "t")).toBe(1);
-        expect(mem.indexOfNonePos(a, 4, "t")).toBeNil();
-        expect(mem.indexOfNonePos(a, 0, "test")).toBeNil();
-        expect(mem.indexOfNonePos(a, 1, "test")).toBeNil();
-        expect(mem.indexOfNonePos(a, 0, "es")).toBe(0);
-        expect(mem.indexOfNonePos(a, 1, "es")).toBe(3);
-        expect(mem.indexOfNonePos(a, 0, "st")).toBe(1);
-        expect(mem.indexOfNonePos(a, 1, "st")).toBe(1);
-        expect(mem.indexOfNonePos(a, 0, "e")).toBe(0);
-        expect(mem.indexOfNonePos(a, 1, "e")).toBe(2);
-        expect(mem.indexOfNonePos(a, 0, "x")).toBe(0);
-        expect(mem.indexOfNonePos(a, 0, "")).toBe(0);
+        expect(mem.findNonePos(a, 0, "te")).toBe(2);
+        expect(mem.findNonePos(a, 1, "te")).toBe(2);
+        expect(mem.findNonePos(a, 0, "t")).toBe(1);
+        expect(mem.findNonePos(a, 1, "t")).toBe(1);
+        expect(mem.findNonePos(a, 4, "t")).toBeNil();
+        expect(mem.findNonePos(a, 0, "test")).toBeNil();
+        expect(mem.findNonePos(a, 1, "test")).toBeNil();
+        expect(mem.findNonePos(a, 0, "es")).toBe(0);
+        expect(mem.findNonePos(a, 1, "es")).toBe(3);
+        expect(mem.findNonePos(a, 0, "st")).toBe(1);
+        expect(mem.findNonePos(a, 1, "st")).toBe(1);
+        expect(mem.findNonePos(a, 0, "e")).toBe(0);
+        expect(mem.findNonePos(a, 1, "e")).toBe(2);
+        expect(mem.findNonePos(a, 0, "x")).toBe(0);
+        expect(mem.findNonePos(a, 0, "")).toBe(0);
     end)
-    test("lastIndexOfNone", function()
+    test("findNoneLast", function()
         local a = buffer.fromstring("test");
-        expect(mem.lastIndexOfNone(a, "te")).toBe(2);
-        expect(mem.lastIndexOfNone(a, "t")).toBe(2);
-        expect(mem.lastIndexOfNone(a, "test")).toBeNil();
-        expect(mem.lastIndexOfNone(a, "es")).toBe(3);
-        expect(mem.lastIndexOfNone(a, "st")).toBe(1);
-        expect(mem.lastIndexOfNone(a, "e")).toBe(3);
-        expect(mem.lastIndexOfNone(a, "x")).toBe(3);
-        expect(mem.lastIndexOfNone(a, "")).toBe(3);
+        expect(mem.findNoneLast(a, "te")).toBe(2);
+        expect(mem.findNoneLast(a, "t")).toBe(2);
+        expect(mem.findNoneLast(a, "test")).toBeNil();
+        expect(mem.findNoneLast(a, "es")).toBe(3);
+        expect(mem.findNoneLast(a, "st")).toBe(1);
+        expect(mem.findNoneLast(a, "e")).toBe(3);
+        expect(mem.findNoneLast(a, "x")).toBe(3);
+        expect(mem.findNoneLast(a, "")).toBe(3);
     end)
-    test("indexOfDiff", function()
+    test("findDiff", function()
         local a = buffer.fromstring("test");
-        expect(mem.indexOfDiff(a, "te")).toBe(2);
-        expect(mem.indexOfDiff(a, "t")).toBe(1);
-        expect(mem.indexOfDiff(a, "test")).toBeNil();
-        expect(mem.indexOfDiff(a, "es")).toBe(0);
-        expect(mem.indexOfDiff(a, "st")).toBe(0);
-        expect(mem.indexOfDiff(a, "e")).toBe(0);
-        expect(mem.indexOfDiff(a, "x")).toBe(0);
-        expect(mem.indexOfDiff(a, "")).toBe(0);
+        expect(mem.findDiff(a, "te")).toBe(2);
+        expect(mem.findDiff(a, "t")).toBe(1);
+        expect(mem.findDiff(a, "test")).toBeNil();
+        expect(mem.findDiff(a, "es")).toBe(0);
+        expect(mem.findDiff(a, "st")).toBe(0);
+        expect(mem.findDiff(a, "e")).toBe(0);
+        expect(mem.findDiff(a, "x")).toBe(0);
+        expect(mem.findDiff(a, "")).toBe(0);
     end)
-    test("indexOfDiffPos", function()
+    test("findDiffPos", function()
         local a = buffer.fromstring("test");
-        expect(mem.indexOfDiffPos(a, 0, "te")).toBe(2);
-        expect(mem.indexOfDiffPos(a, 1, "te")).toBe(1);
-        expect(mem.indexOfDiffPos(a, 0, "t")).toBe(1);
-        expect(mem.indexOfDiffPos(a, 1, "t")).toBe(1);
-        expect(mem.indexOfDiffPos(a, 4, "t")).toBe(4);
-        expect(mem.indexOfDiffPos(a, 0, "test")).toBeNil();
-        expect(mem.indexOfDiffPos(a, 1, "test")).toBe(1);
-        expect(mem.indexOfDiffPos(a, 0, "es")).toBe(0);
-        expect(mem.indexOfDiffPos(a, 1, "es")).toBe(3);
-        expect(mem.indexOfDiffPos(a, 0, "st")).toBe(0);
-        expect(mem.indexOfDiffPos(a, 1, "st")).toBe(1);
-        expect(mem.indexOfDiffPos(a, 0, "e")).toBe(0);
-        expect(mem.indexOfDiffPos(a, 1, "e")).toBe(2);
-        expect(mem.indexOfDiffPos(a, 0, "x")).toBe(0);
-        expect(mem.indexOfDiffPos(a, 0, "")).toBe(0);
+        expect(mem.findDiffPos(a, 0, "te")).toBe(2);
+        expect(mem.findDiffPos(a, 1, "te")).toBe(1);
+        expect(mem.findDiffPos(a, 0, "t")).toBe(1);
+        expect(mem.findDiffPos(a, 1, "t")).toBe(1);
+        expect(mem.findDiffPos(a, 4, "t")).toBe(4);
+        expect(mem.findDiffPos(a, 0, "test")).toBeNil();
+        expect(mem.findDiffPos(a, 1, "test")).toBe(1);
+        expect(mem.findDiffPos(a, 0, "es")).toBe(0);
+        expect(mem.findDiffPos(a, 1, "es")).toBe(3);
+        expect(mem.findDiffPos(a, 0, "st")).toBe(0);
+        expect(mem.findDiffPos(a, 1, "st")).toBe(1);
+        expect(mem.findDiffPos(a, 0, "e")).toBe(0);
+        expect(mem.findDiffPos(a, 1, "e")).toBe(2);
+        expect(mem.findDiffPos(a, 0, "x")).toBe(0);
+        expect(mem.findDiffPos(a, 0, "")).toBe(0);
     end)
-    test("indexOfMax", function()
+    test("findMax", function()
         local a = buffer.fromstring("test");
-        expect(mem.indexOfMax(a)).toBe(0);
-        expect(mem.indexOfMax("1234")).toBe(3);
+        expect(mem.findMax(a)).toBe(0);
+        expect(mem.findMax("1234")).toBe(3);
         expect(function()
-            mem.indexOfMax(buffer.fromstring(""))
+            mem.findMax(buffer.fromstring(""))
         end).toThrow("cannot find max of empty slice");
     end)
-    test("indexOfMin", function()
+    test("findMin", function()
         local a = buffer.fromstring("test");
-        expect(mem.indexOfMin(a)).toBe(1);
-        expect(mem.indexOfMin("1234")).toBe(0);
+        expect(mem.findMin(a)).toBe(1);
+        expect(mem.findMin("1234")).toBe(0);
         expect(function()
-            mem.indexOfMin(buffer.fromstring(""))
+            mem.findMin(buffer.fromstring(""))
         end).toThrow("cannot find min of empty slice");
     end)
-    test("indexOfMinMax", function()
+    test("findMinMax", function()
         local a = buffer.fromstring("test");
-        expect({mem.indexOfMinMax(a)}).toBe(expect.similar({1, 0}));
-        expect({mem.indexOfMinMax("1234")}).toBe(expect.similar({0, 3}));
+        expect({mem.findMinMax(a)}).toBe(expect.similar({1, 0}));
+        expect({mem.findMinMax("1234")}).toBe(expect.similar({0, 3}));
         expect(function()
-            mem.indexOfMinMax(buffer.fromstring(""))
+            mem.findMinMax(buffer.fromstring(""))
         end).toThrow("cannot find min/max of empty slice");
+    end)
+    test("cutPrefix", function()
+        local a = buffer.fromstring("test");
+        local b = mem.cutPrefix(a, "te");
+        expect(mem.eql(b :: buffer, "st")).toBeTruthy();
+        expect(mem.eql(mem.cutPrefix(a, "t") :: buffer, "est")).toBeTruthy();
+        expect(mem.eql(mem.cutPrefix(a, "test") :: buffer, "")).toBeTruthy();
+        expect(mem.cutPrefix(a, "x")).toBeNil();
+        expect(mem.eql(mem.cutPrefix(a, "") :: buffer, a)).toBeTruthy();
+    end)
+    test("cutSuffix", function()
+        local a = buffer.fromstring("test");
+        local b = mem.cutSuffix(a, "st");
+        expect(mem.eql(b :: buffer, "te")).toBeTruthy();
+        expect(mem.eql(mem.cutSuffix(a, "t") :: buffer, "tes")).toBeTruthy();
+        expect(mem.eql(mem.cutSuffix(a, "test") :: buffer, "")).toBeTruthy();
+        expect(mem.cutSuffix(a, "x")).toBeNil();
+        expect(mem.eql(mem.cutSuffix(a, "") :: buffer, a)).toBeTruthy();
+    end)
+    test("cut", function()
+        local a = buffer.fromstring("test");
+        local left, right = mem.cut(a, "es");
+        assert(left);
+        assert(right);
+        expect(mem.eql(left, "t")).toBeTruthy();
+        expect(mem.eql(right, "t")).toBeTruthy();
+        expect((mem.cut(a, "x"))).toBeNil();
+        left, right = mem.cut(a, "t");
+        assert(left);
+        assert(right);
+        expect(mem.eql(left, "")).toBeTruthy();
+        expect(mem.eql(right, "est")).toBeTruthy();
+    end)
+    test("cutLast", function()
+        local a = buffer.fromstring("testest");
+        local left, right = mem.cutLast(a, "es");
+        assert(left);
+        assert(right);
+        expect(mem.eql(left, "test")).toBeTruthy();
+        expect(mem.eql(right, "t")).toBeTruthy();
+        expect((mem.cutLast(a, "x"))).toBeNil();
+        left, right = mem.cutLast(a, "t");
+        assert(left);
+        assert(right);
+        expect(mem.eql(left, "testes")).toBeTruthy();
+        expect(mem.eql(right, "")).toBeTruthy();
+    end)
+    test("cutScalar", function()
+        local a = buffer.fromstring("test");
+        local left, right = mem.cutScalar(a, string.byte('e'));
+        assert(left);
+        assert(right);
+        expect(mem.eql(left, "t")).toBeTruthy();
+        expect(mem.eql(right, "st")).toBeTruthy();
+        expect((mem.cutScalar(a, string.byte('x')))).toBeNil();
+        left, right = mem.cutScalar(a, string.byte('t'));
+        assert(left);
+        assert(right);
+        expect(mem.eql(left, "")).toBeTruthy();
+        expect(mem.eql(right, "est")).toBeTruthy();
+    end)
+    test("cutScalarLast", function()
+        local a = buffer.fromstring("testest");
+        local left, right = mem.cutScalarLast(a, string.byte('e'));
+        assert(left);
+        assert(right);
+        expect(mem.eql(left, "test")).toBeTruthy();
+        expect(mem.eql(right, "st")).toBeTruthy();
+        expect((mem.cutScalarLast(a, string.byte('x')))).toBeNil();
+        left, right = mem.cutScalarLast(a, string.byte('t'));
+        assert(left);
+        assert(right);
+        expect(mem.eql(left, "testes")).toBeTruthy();
+        expect(mem.eql(right, "")).toBeTruthy();
     end)
     test("replaceScalar", function()
         local a = buffer.fromstring("test");
