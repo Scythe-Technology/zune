@@ -829,11 +829,13 @@
     "documentation": "",
     "keys": {
       "protocols": "@roblox/globaltype/HttpWebSocketOptions.protocols",
+      "tls": "@roblox/globaltype/HttpWebSocketOptions.tls",
       "timeout": "@roblox/globaltype/HttpWebSocketOptions.timeout",
       "accept": "@roblox/globaltype/HttpWebSocketOptions.accept",
       "message": "@roblox/globaltype/HttpWebSocketOptions.message",
+      "close": "@roblox/globaltype/HttpWebSocketOptions.close",
       "open": "@roblox/globaltype/HttpWebSocketOptions.open",
-      "close": "@roblox/globaltype/HttpWebSocketOptions.close"
+      "headers": "@roblox/globaltype/HttpWebSocketOptions.headers"
     }
   },
   "@roblox/globaltype/HttpWebSocketOptions.protocols": {
@@ -859,6 +861,10 @@
   "@roblox/globaltype/HttpWebSocketOptions.message": {
     "code_sample": "",
     "documentation": "The function to call when a message is received."
+  },
+  "@roblox/globaltype/HttpWebSocketOptions.tls": {
+    "code_sample": "",
+    "documentation": "Tls options for the WebSocket connection."
   },
   "@roblox/globaltype/_zune_net_http": {
     "code_sample": "",
@@ -5180,44 +5186,50 @@
     "code_sample": "",
     "documentation": "A library to manipulate/interact with bytes and buffers.",
     "keys": {
-      "indexOf": "@roblox/globaltype/_zune_mem.indexOf",
-      "writeVector3": "@roblox/globaltype/_zune_mem.writeVector3",
-      "lastIndexOfAny": "@roblox/globaltype/_zune_mem.lastIndexOfAny",
-      "copy": "@roblox/globaltype/_zune_mem.copy",
-      "indexOfDiffPos": "@roblox/globaltype/_zune_mem.indexOfDiffPos",
-      "indexOfDiff": "@roblox/globaltype/_zune_mem.indexOfDiff",
+      "findAny": "@roblox/globaltype/_zune_mem.findAny",
+      "findMin": "@roblox/globaltype/_zune_mem.findMin",
+      "findScalar": "@roblox/globaltype/_zune_mem.findScalar",
+      "cut": "@roblox/globaltype/_zune_mem.cut",
+      "findAnyLast": "@roblox/globaltype/_zune_mem.findAnyLast",
+      "slice": "@roblox/globaltype/_zune_mem.slice",
+      "cutLast": "@roblox/globaltype/_zune_mem.cutLast",
+      "findNoneLast": "@roblox/globaltype/_zune_mem.findNoneLast",
       "endsWith": "@roblox/globaltype/_zune_mem.endsWith",
-      "set": "@roblox/globaltype/_zune_mem.set",
+      "findPos": "@roblox/globaltype/_zune_mem.findPos",
       "max": "@roblox/globaltype/_zune_mem.max",
-      "trim": "@roblox/globaltype/_zune_mem.trim",
-      "indexOfScalarPos": "@roblox/globaltype/_zune_mem.indexOfScalarPos",
-      "indexOfAny": "@roblox/globaltype/_zune_mem.indexOfAny",
-      "reverse": "@roblox/globaltype/_zune_mem.reverse",
+      "findAnyPos": "@roblox/globaltype/_zune_mem.findAnyPos",
+      "find": "@roblox/globaltype/_zune_mem.find",
+      "toVector3": "@roblox/globaltype/_zune_mem.toVector3",
+      "findNonePos": "@roblox/globaltype/_zune_mem.findNonePos",
       "eql": "@roblox/globaltype/_zune_mem.eql",
       "rotate": "@roblox/globaltype/_zune_mem.rotate",
-      "lastIndexOfScalar": "@roblox/globaltype/_zune_mem.lastIndexOfScalar",
-      "indexOfNonePos": "@roblox/globaltype/_zune_mem.indexOfNonePos",
-      "indexOfScalar": "@roblox/globaltype/_zune_mem.indexOfScalar",
-      "indexOfMax": "@roblox/globaltype/_zune_mem.indexOfMax",
+      "findDiffPos": "@roblox/globaltype/_zune_mem.findDiffPos",
+      "writeVector3": "@roblox/globaltype/_zune_mem.writeVector3",
       "eqlSlice": "@roblox/globaltype/_zune_mem.eqlSlice",
       "writeVector2": "@roblox/globaltype/_zune_mem.writeVector2",
-      "toVector3": "@roblox/globaltype/_zune_mem.toVector3",
       "toVector2": "@roblox/globaltype/_zune_mem.toVector2",
+      "set": "@roblox/globaltype/_zune_mem.set",
+      "reverse": "@roblox/globaltype/_zune_mem.reverse",
       "min": "@roblox/globaltype/_zune_mem.min",
-      "slice": "@roblox/globaltype/_zune_mem.slice",
+      "findNone": "@roblox/globaltype/_zune_mem.findNone",
+      "findScalarLast": "@roblox/globaltype/_zune_mem.findScalarLast",
+      "replaceScalar": "@roblox/globaltype/_zune_mem.replaceScalar",
+      "cutScalarLast": "@roblox/globaltype/_zune_mem.cutScalarLast",
+      "cutScalar": "@roblox/globaltype/_zune_mem.cutScalar",
+      "cutPrefix": "@roblox/globaltype/_zune_mem.cutPrefix",
       "MAX_SIZE": "@roblox/globaltype/_zune_mem.MAX_SIZE",
       "trimLeft": "@roblox/globaltype/_zune_mem.trimLeft",
-      "replaceScalar": "@roblox/globaltype/_zune_mem.replaceScalar",
-      "indexOfAnyPos": "@roblox/globaltype/_zune_mem.indexOfAnyPos",
-      "indexOfMin": "@roblox/globaltype/_zune_mem.indexOfMin",
-      "indexOfMinMax": "@roblox/globaltype/_zune_mem.indexOfMinMax",
+      "findMax": "@roblox/globaltype/_zune_mem.findMax",
+      "findScalarPos": "@roblox/globaltype/_zune_mem.findScalarPos",
+      "trim": "@roblox/globaltype/_zune_mem.trim",
+      "findDiff": "@roblox/globaltype/_zune_mem.findDiff",
       "trimRight": "@roblox/globaltype/_zune_mem.trimRight",
       "startsWith": "@roblox/globaltype/_zune_mem.startsWith",
-      "indexOfPos": "@roblox/globaltype/_zune_mem.indexOfPos",
+      "copy": "@roblox/globaltype/_zune_mem.copy",
       "len": "@roblox/globaltype/_zune_mem.len",
-      "lastIndexOfNone": "@roblox/globaltype/_zune_mem.lastIndexOfNone",
-      "indexOfNone": "@roblox/globaltype/_zune_mem.indexOfNone",
-      "lastIndexOf": "@roblox/globaltype/_zune_mem.lastIndexOf"
+      "findLast": "@roblox/globaltype/_zune_mem.findLast",
+      "cutSuffix": "@roblox/globaltype/_zune_mem.cutSuffix",
+      "findMinMax": "@roblox/globaltype/_zune_mem.findMinMax"
     },
     "learn_more_link": "https://zune.sh/docs/v0.5.0/api/mem"
   },
@@ -5521,487 +5533,593 @@
     "code_sample": "",
     "documentation": "The values to trim from the source."
   },
-  "@roblox/globaltype/_zune_mem.indexOf": {
+  "@roblox/globaltype/_zune_mem.find": {
     "code_sample": "",
     "documentation": "Find the index of a needle in the buffer.\n\n**Parameters**\n- `src`: The source to search in.\n- `needle`: The needle to search for.\n",
     "returns": [
-      "@roblox/globaltype/_zune_mem.indexOf/return/0"
+      "@roblox/globaltype/_zune_mem.find/return/0"
     ],
     "params": [
       {
         "name": "src",
-        "documentation": "@roblox/globaltype/_zune_mem.indexOf/param/0"
+        "documentation": "@roblox/globaltype/_zune_mem.find/param/0"
       },
       {
         "name": "needle",
-        "documentation": "@roblox/globaltype/_zune_mem.indexOf/param/1"
+        "documentation": "@roblox/globaltype/_zune_mem.find/param/1"
       }
     ]
   },
-  "@roblox/globaltype/_zune_mem.indexOf/param/0": {
+  "@roblox/globaltype/_zune_mem.find/param/0": {
     "code_sample": "",
     "documentation": "The source to search in."
   },
-  "@roblox/globaltype/_zune_mem.indexOf/param/1": {
+  "@roblox/globaltype/_zune_mem.find/param/1": {
     "code_sample": "",
     "documentation": "The needle to search for."
   },
-  "@roblox/globaltype/_zune_mem.indexOfPos": {
+  "@roblox/globaltype/_zune_mem.findPos": {
     "code_sample": "",
     "documentation": "Find the index of a needle in the buffer, starting from the given offset.\n\n**Parameters**\n- `src`: The source to search in.\n- `offset`: The offset to start searching from.\n- `needle`: The needle to search for.\n",
     "returns": [
-      "@roblox/globaltype/_zune_mem.indexOfPos/return/0"
+      "@roblox/globaltype/_zune_mem.findPos/return/0"
     ],
     "params": [
       {
         "name": "src",
-        "documentation": "@roblox/globaltype/_zune_mem.indexOfPos/param/0"
+        "documentation": "@roblox/globaltype/_zune_mem.findPos/param/0"
       },
       {
         "name": "offset",
-        "documentation": "@roblox/globaltype/_zune_mem.indexOfPos/param/1"
+        "documentation": "@roblox/globaltype/_zune_mem.findPos/param/1"
       },
       {
         "name": "needle",
-        "documentation": "@roblox/globaltype/_zune_mem.indexOfPos/param/2"
+        "documentation": "@roblox/globaltype/_zune_mem.findPos/param/2"
       }
     ]
   },
-  "@roblox/globaltype/_zune_mem.indexOfPos/param/0": {
+  "@roblox/globaltype/_zune_mem.findPos/param/0": {
     "code_sample": "",
     "documentation": "The source to search in."
   },
-  "@roblox/globaltype/_zune_mem.indexOfPos/param/1": {
+  "@roblox/globaltype/_zune_mem.findPos/param/1": {
     "code_sample": "",
     "documentation": "The offset to start searching from."
   },
-  "@roblox/globaltype/_zune_mem.indexOfPos/param/2": {
+  "@roblox/globaltype/_zune_mem.findPos/param/2": {
     "code_sample": "",
     "documentation": "The needle to search for."
   },
-  "@roblox/globaltype/_zune_mem.lastIndexOf": {
+  "@roblox/globaltype/_zune_mem.findLast": {
     "code_sample": "",
     "documentation": "Find the last index of a needle in the buffer.\n\n**Parameters**\n- `src`: The source to search in.\n- `needle`: The needle to search for.\n",
     "returns": [
-      "@roblox/globaltype/_zune_mem.lastIndexOf/return/0"
+      "@roblox/globaltype/_zune_mem.findLast/return/0"
     ],
     "params": [
       {
         "name": "src",
-        "documentation": "@roblox/globaltype/_zune_mem.lastIndexOf/param/0"
+        "documentation": "@roblox/globaltype/_zune_mem.findLast/param/0"
       },
       {
         "name": "needle",
-        "documentation": "@roblox/globaltype/_zune_mem.lastIndexOf/param/1"
+        "documentation": "@roblox/globaltype/_zune_mem.findLast/param/1"
       }
     ]
   },
-  "@roblox/globaltype/_zune_mem.lastIndexOf/param/0": {
+  "@roblox/globaltype/_zune_mem.findLast/param/0": {
     "code_sample": "",
     "documentation": "The source to search in."
   },
-  "@roblox/globaltype/_zune_mem.lastIndexOf/param/1": {
+  "@roblox/globaltype/_zune_mem.findLast/param/1": {
     "code_sample": "",
     "documentation": "The needle to search for."
   },
-  "@roblox/globaltype/_zune_mem.indexOfScalar": {
+  "@roblox/globaltype/_zune_mem.findScalar": {
     "code_sample": "",
     "documentation": "Find the index of a scalar/char in the buffer.\n\n**Parameters**\n- `src`: The source to search in.\n- `char`: The byte to search for.\n",
     "returns": [
-      "@roblox/globaltype/_zune_mem.indexOfScalar/return/0"
+      "@roblox/globaltype/_zune_mem.findScalar/return/0"
     ],
     "params": [
       {
         "name": "src",
-        "documentation": "@roblox/globaltype/_zune_mem.indexOfScalar/param/0"
+        "documentation": "@roblox/globaltype/_zune_mem.findScalar/param/0"
       },
       {
         "name": "char",
-        "documentation": "@roblox/globaltype/_zune_mem.indexOfScalar/param/1"
+        "documentation": "@roblox/globaltype/_zune_mem.findScalar/param/1"
       }
     ]
   },
-  "@roblox/globaltype/_zune_mem.indexOfScalar/param/0": {
+  "@roblox/globaltype/_zune_mem.findScalar/param/0": {
     "code_sample": "",
     "documentation": "The source to search in."
   },
-  "@roblox/globaltype/_zune_mem.indexOfScalar/param/1": {
+  "@roblox/globaltype/_zune_mem.findScalar/param/1": {
     "code_sample": "",
     "documentation": "The byte to search for."
   },
-  "@roblox/globaltype/_zune_mem.indexOfScalarPos": {
+  "@roblox/globaltype/_zune_mem.findScalarPos": {
     "code_sample": "",
     "documentation": "Find the index of a scalar/char in the buffer, starting from the given offset.\n\n**Parameters**\n- `src`: The source to search in.\n- `offset`: The offset to start searching from.\n- `char`: The byte to search for.\n",
     "returns": [
-      "@roblox/globaltype/_zune_mem.indexOfScalarPos/return/0"
+      "@roblox/globaltype/_zune_mem.findScalarPos/return/0"
     ],
     "params": [
       {
         "name": "src",
-        "documentation": "@roblox/globaltype/_zune_mem.indexOfScalarPos/param/0"
+        "documentation": "@roblox/globaltype/_zune_mem.findScalarPos/param/0"
       },
       {
         "name": "offset",
-        "documentation": "@roblox/globaltype/_zune_mem.indexOfScalarPos/param/1"
+        "documentation": "@roblox/globaltype/_zune_mem.findScalarPos/param/1"
       },
       {
         "name": "char",
-        "documentation": "@roblox/globaltype/_zune_mem.indexOfScalarPos/param/2"
+        "documentation": "@roblox/globaltype/_zune_mem.findScalarPos/param/2"
       }
     ]
   },
-  "@roblox/globaltype/_zune_mem.indexOfScalarPos/param/0": {
+  "@roblox/globaltype/_zune_mem.findScalarPos/param/0": {
     "code_sample": "",
     "documentation": "The source to search in."
   },
-  "@roblox/globaltype/_zune_mem.indexOfScalarPos/param/1": {
+  "@roblox/globaltype/_zune_mem.findScalarPos/param/1": {
     "code_sample": "",
     "documentation": "The offset to start searching from."
   },
-  "@roblox/globaltype/_zune_mem.indexOfScalarPos/param/2": {
+  "@roblox/globaltype/_zune_mem.findScalarPos/param/2": {
     "code_sample": "",
     "documentation": "The byte to search for."
   },
-  "@roblox/globaltype/_zune_mem.lastIndexOfScalar": {
+  "@roblox/globaltype/_zune_mem.findScalarLast": {
     "code_sample": "",
     "documentation": "Find the last index of a scalar/char in the buffer.\n\n**Parameters**\n- `src`: The source to search in.\n- `char`: The byte to search for.\n",
     "returns": [
-      "@roblox/globaltype/_zune_mem.lastIndexOfScalar/return/0"
+      "@roblox/globaltype/_zune_mem.findScalarLast/return/0"
     ],
     "params": [
       {
         "name": "src",
-        "documentation": "@roblox/globaltype/_zune_mem.lastIndexOfScalar/param/0"
+        "documentation": "@roblox/globaltype/_zune_mem.findScalarLast/param/0"
       },
       {
         "name": "char",
-        "documentation": "@roblox/globaltype/_zune_mem.lastIndexOfScalar/param/1"
+        "documentation": "@roblox/globaltype/_zune_mem.findScalarLast/param/1"
       }
     ]
   },
-  "@roblox/globaltype/_zune_mem.lastIndexOfScalar/param/0": {
+  "@roblox/globaltype/_zune_mem.findScalarLast/param/0": {
     "code_sample": "",
     "documentation": "The source to search in."
   },
-  "@roblox/globaltype/_zune_mem.lastIndexOfScalar/param/1": {
+  "@roblox/globaltype/_zune_mem.findScalarLast/param/1": {
     "code_sample": "",
     "documentation": "The byte to search for."
   },
-  "@roblox/globaltype/_zune_mem.indexOfAny": {
+  "@roblox/globaltype/_zune_mem.findAny": {
     "code_sample": "",
     "documentation": "Find the index of the first byte that is in the given `needle`.\n\n**Parameters**\n- `src`: The source to search in.\n- `needle`: The bytes to search for.\n",
     "returns": [
-      "@roblox/globaltype/_zune_mem.indexOfAny/return/0"
+      "@roblox/globaltype/_zune_mem.findAny/return/0"
     ],
     "params": [
       {
         "name": "src",
-        "documentation": "@roblox/globaltype/_zune_mem.indexOfAny/param/0"
+        "documentation": "@roblox/globaltype/_zune_mem.findAny/param/0"
       },
       {
         "name": "needle",
-        "documentation": "@roblox/globaltype/_zune_mem.indexOfAny/param/1"
+        "documentation": "@roblox/globaltype/_zune_mem.findAny/param/1"
       }
     ]
   },
-  "@roblox/globaltype/_zune_mem.indexOfAny/param/0": {
+  "@roblox/globaltype/_zune_mem.findAny/param/0": {
     "code_sample": "",
     "documentation": "The source to search in."
   },
-  "@roblox/globaltype/_zune_mem.indexOfAny/param/1": {
+  "@roblox/globaltype/_zune_mem.findAny/param/1": {
     "code_sample": "",
     "documentation": "The bytes to search for."
   },
-  "@roblox/globaltype/_zune_mem.indexOfAnyPos": {
+  "@roblox/globaltype/_zune_mem.findAnyPos": {
     "code_sample": "",
     "documentation": "Find the index of the first byte that is in the given `needle`, starting from the given `offset`.\n\n**Parameters**\n- `src`: The source to search in.\n- `offset`: The offset to start searching from.\n- `needle`: The bytes to search for.\n",
     "returns": [
-      "@roblox/globaltype/_zune_mem.indexOfAnyPos/return/0"
+      "@roblox/globaltype/_zune_mem.findAnyPos/return/0"
     ],
     "params": [
       {
         "name": "src",
-        "documentation": "@roblox/globaltype/_zune_mem.indexOfAnyPos/param/0"
+        "documentation": "@roblox/globaltype/_zune_mem.findAnyPos/param/0"
       },
       {
         "name": "offset",
-        "documentation": "@roblox/globaltype/_zune_mem.indexOfAnyPos/param/1"
+        "documentation": "@roblox/globaltype/_zune_mem.findAnyPos/param/1"
       },
       {
         "name": "needle",
-        "documentation": "@roblox/globaltype/_zune_mem.indexOfAnyPos/param/2"
+        "documentation": "@roblox/globaltype/_zune_mem.findAnyPos/param/2"
       }
     ]
   },
-  "@roblox/globaltype/_zune_mem.indexOfAnyPos/param/0": {
+  "@roblox/globaltype/_zune_mem.findAnyPos/param/0": {
     "code_sample": "",
     "documentation": "The source to search in."
   },
-  "@roblox/globaltype/_zune_mem.indexOfAnyPos/param/1": {
+  "@roblox/globaltype/_zune_mem.findAnyPos/param/1": {
     "code_sample": "",
     "documentation": "The offset to start searching from."
   },
-  "@roblox/globaltype/_zune_mem.indexOfAnyPos/param/2": {
+  "@roblox/globaltype/_zune_mem.findAnyPos/param/2": {
     "code_sample": "",
     "documentation": "The bytes to search for."
   },
-  "@roblox/globaltype/_zune_mem.lastIndexOfAny": {
+  "@roblox/globaltype/_zune_mem.findAnyLast": {
     "code_sample": "",
     "documentation": "Find the last index of a byte that is in the given `needle`.\n\n**Parameters**\n- `src`: The source to search in.\n- `needle`: The bytes to search for.\n",
     "returns": [
-      "@roblox/globaltype/_zune_mem.lastIndexOfAny/return/0"
+      "@roblox/globaltype/_zune_mem.findAnyLast/return/0"
     ],
     "params": [
       {
         "name": "src",
-        "documentation": "@roblox/globaltype/_zune_mem.lastIndexOfAny/param/0"
+        "documentation": "@roblox/globaltype/_zune_mem.findAnyLast/param/0"
       },
       {
         "name": "needle",
-        "documentation": "@roblox/globaltype/_zune_mem.lastIndexOfAny/param/1"
+        "documentation": "@roblox/globaltype/_zune_mem.findAnyLast/param/1"
       }
     ]
   },
-  "@roblox/globaltype/_zune_mem.lastIndexOfAny/param/0": {
+  "@roblox/globaltype/_zune_mem.findAnyLast/param/0": {
     "code_sample": "",
     "documentation": "The source to search in."
   },
-  "@roblox/globaltype/_zune_mem.lastIndexOfAny/param/1": {
+  "@roblox/globaltype/_zune_mem.findAnyLast/param/1": {
     "code_sample": "",
     "documentation": "The bytes to search for."
   },
-  "@roblox/globaltype/_zune_mem.indexOfNone": {
+  "@roblox/globaltype/_zune_mem.findNone": {
     "code_sample": "",
     "documentation": "Find the index of the first byte that is not in the given `needle`.\n\n**Parameters**\n- `src`: The source to search in.\n- `needle`: The bytes to not search for.\n",
     "returns": [
-      "@roblox/globaltype/_zune_mem.indexOfNone/return/0"
+      "@roblox/globaltype/_zune_mem.findNone/return/0"
     ],
     "params": [
       {
         "name": "src",
-        "documentation": "@roblox/globaltype/_zune_mem.indexOfNone/param/0"
+        "documentation": "@roblox/globaltype/_zune_mem.findNone/param/0"
       },
       {
         "name": "needle",
-        "documentation": "@roblox/globaltype/_zune_mem.indexOfNone/param/1"
+        "documentation": "@roblox/globaltype/_zune_mem.findNone/param/1"
       }
     ]
   },
-  "@roblox/globaltype/_zune_mem.indexOfNone/param/0": {
+  "@roblox/globaltype/_zune_mem.findNone/param/0": {
     "code_sample": "",
     "documentation": "The source to search in."
   },
-  "@roblox/globaltype/_zune_mem.indexOfNone/param/1": {
+  "@roblox/globaltype/_zune_mem.findNone/param/1": {
     "code_sample": "",
     "documentation": "The bytes to not search for."
   },
-  "@roblox/globaltype/_zune_mem.indexOfNonePos": {
+  "@roblox/globaltype/_zune_mem.findNonePos": {
     "code_sample": "",
     "documentation": "Find the index of the first byte that is not in the given `needle`, starting from the given `offset`.\n\n**Parameters**\n- `src`: The source to search in.\n- `offset`: The offset to start searching from.\n- `needle`: The bytes to not search for.\n",
     "returns": [
-      "@roblox/globaltype/_zune_mem.indexOfNonePos/return/0"
+      "@roblox/globaltype/_zune_mem.findNonePos/return/0"
     ],
     "params": [
       {
         "name": "src",
-        "documentation": "@roblox/globaltype/_zune_mem.indexOfNonePos/param/0"
+        "documentation": "@roblox/globaltype/_zune_mem.findNonePos/param/0"
       },
       {
         "name": "offset",
-        "documentation": "@roblox/globaltype/_zune_mem.indexOfNonePos/param/1"
+        "documentation": "@roblox/globaltype/_zune_mem.findNonePos/param/1"
       },
       {
         "name": "needle",
-        "documentation": "@roblox/globaltype/_zune_mem.indexOfNonePos/param/2"
+        "documentation": "@roblox/globaltype/_zune_mem.findNonePos/param/2"
       }
     ]
   },
-  "@roblox/globaltype/_zune_mem.indexOfNonePos/param/0": {
+  "@roblox/globaltype/_zune_mem.findNonePos/param/0": {
     "code_sample": "",
     "documentation": "The source to search in."
   },
-  "@roblox/globaltype/_zune_mem.indexOfNonePos/param/1": {
+  "@roblox/globaltype/_zune_mem.findNonePos/param/1": {
     "code_sample": "",
     "documentation": "The offset to start searching from."
   },
-  "@roblox/globaltype/_zune_mem.indexOfNonePos/param/2": {
+  "@roblox/globaltype/_zune_mem.findNonePos/param/2": {
     "code_sample": "",
     "documentation": "The bytes to not search for."
   },
-  "@roblox/globaltype/_zune_mem.lastIndexOfNone": {
+  "@roblox/globaltype/_zune_mem.findNoneLast": {
     "code_sample": "",
     "documentation": "Find the last index of a byte that is not in the given `needle`.\n\n**Parameters**\n- `src`: The source to search in.\n- `needle`: The bytes to not search for.\n",
     "returns": [
-      "@roblox/globaltype/_zune_mem.lastIndexOfNone/return/0"
+      "@roblox/globaltype/_zune_mem.findNoneLast/return/0"
     ],
     "params": [
       {
         "name": "src",
-        "documentation": "@roblox/globaltype/_zune_mem.lastIndexOfNone/param/0"
+        "documentation": "@roblox/globaltype/_zune_mem.findNoneLast/param/0"
       },
       {
         "name": "needle",
-        "documentation": "@roblox/globaltype/_zune_mem.lastIndexOfNone/param/1"
+        "documentation": "@roblox/globaltype/_zune_mem.findNoneLast/param/1"
       }
     ]
   },
-  "@roblox/globaltype/_zune_mem.lastIndexOfNone/param/0": {
+  "@roblox/globaltype/_zune_mem.findNoneLast/param/0": {
     "code_sample": "",
     "documentation": "The source to search in."
   },
-  "@roblox/globaltype/_zune_mem.lastIndexOfNone/param/1": {
+  "@roblox/globaltype/_zune_mem.findNoneLast/param/1": {
     "code_sample": "",
     "documentation": "The bytes to not search for."
   },
-  "@roblox/globaltype/_zune_mem.indexOfDiff": {
+  "@roblox/globaltype/_zune_mem.findDiff": {
     "code_sample": "",
     "documentation": "Find the index of the first difference between two buffers.\n\n**Parameters**\n- `src`: The source to search in.\n",
     "returns": [
-      "@roblox/globaltype/_zune_mem.indexOfDiff/return/0"
+      "@roblox/globaltype/_zune_mem.findDiff/return/0"
     ],
     "params": [
       {
         "name": "src",
-        "documentation": "@roblox/globaltype/_zune_mem.indexOfDiff/param/0"
+        "documentation": "@roblox/globaltype/_zune_mem.findDiff/param/0"
       },
       {
         "name": "needle",
-        "documentation": "@roblox/globaltype/_zune_mem.indexOfDiff/param/1"
+        "documentation": "@roblox/globaltype/_zune_mem.findDiff/param/1"
       }
     ]
   },
-  "@roblox/globaltype/_zune_mem.indexOfDiff/param/0": {
+  "@roblox/globaltype/_zune_mem.findDiff/param/0": {
     "code_sample": "",
     "documentation": "The source to search in."
   },
-  "@roblox/globaltype/_zune_mem.indexOfDiffPos": {
+  "@roblox/globaltype/_zune_mem.findDiffPos": {
     "code_sample": "",
     "documentation": "Find the index of the first difference between two buffers, starting from the given offset.\n\n**Parameters**\n- `src`: The source to search in.\n- `offset`: The offset to start searching from.\n",
     "returns": [
-      "@roblox/globaltype/_zune_mem.indexOfDiffPos/return/0"
+      "@roblox/globaltype/_zune_mem.findDiffPos/return/0"
     ],
     "params": [
       {
         "name": "src",
-        "documentation": "@roblox/globaltype/_zune_mem.indexOfDiffPos/param/0"
+        "documentation": "@roblox/globaltype/_zune_mem.findDiffPos/param/0"
       },
       {
         "name": "offset",
-        "documentation": "@roblox/globaltype/_zune_mem.indexOfDiffPos/param/1"
+        "documentation": "@roblox/globaltype/_zune_mem.findDiffPos/param/1"
       },
       {
         "name": "needle",
-        "documentation": "@roblox/globaltype/_zune_mem.indexOfDiffPos/param/2"
+        "documentation": "@roblox/globaltype/_zune_mem.findDiffPos/param/2"
       }
     ]
   },
-  "@roblox/globaltype/_zune_mem.indexOfDiffPos/param/0": {
+  "@roblox/globaltype/_zune_mem.findDiffPos/param/0": {
     "code_sample": "",
     "documentation": "The source to search in."
   },
-  "@roblox/globaltype/_zune_mem.indexOfDiffPos/param/1": {
+  "@roblox/globaltype/_zune_mem.findDiffPos/param/1": {
     "code_sample": "",
     "documentation": "The offset to start searching from."
   },
-  "@roblox/globaltype/_zune_mem.indexOfMax": {
+  "@roblox/globaltype/_zune_mem.findMax": {
     "code_sample": "",
     "documentation": "Find the index of the maximum value in the buffer.\n\nExpects the buffer to be non-empty.\n\n**Parameters**\n- `src`: The source to search in.\n- `offset`: The offset to start searching from.\n- `count`: The number of bytes to search. If not provided, will search until the end of the buffer.\n",
     "returns": [
-      "@roblox/globaltype/_zune_mem.indexOfMax/return/0"
+      "@roblox/globaltype/_zune_mem.findMax/return/0"
     ],
     "params": [
       {
         "name": "src",
-        "documentation": "@roblox/globaltype/_zune_mem.indexOfMax/param/0"
+        "documentation": "@roblox/globaltype/_zune_mem.findMax/param/0"
       },
       {
         "name": "offset",
-        "documentation": "@roblox/globaltype/_zune_mem.indexOfMax/param/1"
+        "documentation": "@roblox/globaltype/_zune_mem.findMax/param/1"
       },
       {
         "name": "count",
-        "documentation": "@roblox/globaltype/_zune_mem.indexOfMax/param/2"
+        "documentation": "@roblox/globaltype/_zune_mem.findMax/param/2"
       }
     ]
   },
-  "@roblox/globaltype/_zune_mem.indexOfMax/param/0": {
+  "@roblox/globaltype/_zune_mem.findMax/param/0": {
     "code_sample": "",
     "documentation": "The source to search in."
   },
-  "@roblox/globaltype/_zune_mem.indexOfMax/param/1": {
+  "@roblox/globaltype/_zune_mem.findMax/param/1": {
     "code_sample": "",
     "documentation": "The offset to start searching from."
   },
-  "@roblox/globaltype/_zune_mem.indexOfMax/param/2": {
+  "@roblox/globaltype/_zune_mem.findMax/param/2": {
     "code_sample": "",
     "documentation": "The number of bytes to search. If not provided, will search until the end of the buffer."
   },
-  "@roblox/globaltype/_zune_mem.indexOfMin": {
+  "@roblox/globaltype/_zune_mem.findMin": {
     "code_sample": "",
     "documentation": "Find the index of the minimum value in the buffer.\n\nExpects the buffer to be non-empty.\n\n**Parameters**\n- `src`: The source to search in.\n- `offset`: The offset to start searching from.\n- `count`: The number of bytes to search. If not provided, will search until the end of the buffer.\n",
     "returns": [
-      "@roblox/globaltype/_zune_mem.indexOfMin/return/0"
+      "@roblox/globaltype/_zune_mem.findMin/return/0"
     ],
     "params": [
       {
         "name": "src",
-        "documentation": "@roblox/globaltype/_zune_mem.indexOfMin/param/0"
+        "documentation": "@roblox/globaltype/_zune_mem.findMin/param/0"
       },
       {
         "name": "offset",
-        "documentation": "@roblox/globaltype/_zune_mem.indexOfMin/param/1"
+        "documentation": "@roblox/globaltype/_zune_mem.findMin/param/1"
       },
       {
         "name": "count",
-        "documentation": "@roblox/globaltype/_zune_mem.indexOfMin/param/2"
+        "documentation": "@roblox/globaltype/_zune_mem.findMin/param/2"
       }
     ]
   },
-  "@roblox/globaltype/_zune_mem.indexOfMin/param/0": {
+  "@roblox/globaltype/_zune_mem.findMin/param/0": {
     "code_sample": "",
     "documentation": "The source to search in."
   },
-  "@roblox/globaltype/_zune_mem.indexOfMin/param/1": {
+  "@roblox/globaltype/_zune_mem.findMin/param/1": {
     "code_sample": "",
     "documentation": "The offset to start searching from."
   },
-  "@roblox/globaltype/_zune_mem.indexOfMin/param/2": {
+  "@roblox/globaltype/_zune_mem.findMin/param/2": {
     "code_sample": "",
     "documentation": "The number of bytes to search. If not provided, will search until the end of the buffer."
   },
-  "@roblox/globaltype/_zune_mem.indexOfMinMax": {
+  "@roblox/globaltype/_zune_mem.findMinMax": {
     "code_sample": "",
     "documentation": "Find both the index of the minimum and maximum values in the buffer.\n\nExpects the buffer to be non-empty.\n\n**Parameters**\n- `src`: The source to search in.\n- `offset`: The offset to start searching from.\n- `count`: The number of bytes to search. If not provided, will search until the end of the buffer.\n",
     "returns": [
-      "@roblox/globaltype/_zune_mem.indexOfMinMax/return/0",
-      "@roblox/globaltype/_zune_mem.indexOfMinMax/return/1"
+      "@roblox/globaltype/_zune_mem.findMinMax/return/0",
+      "@roblox/globaltype/_zune_mem.findMinMax/return/1"
     ],
     "params": [
       {
         "name": "src",
-        "documentation": "@roblox/globaltype/_zune_mem.indexOfMinMax/param/0"
+        "documentation": "@roblox/globaltype/_zune_mem.findMinMax/param/0"
       },
       {
         "name": "offset",
-        "documentation": "@roblox/globaltype/_zune_mem.indexOfMinMax/param/1"
+        "documentation": "@roblox/globaltype/_zune_mem.findMinMax/param/1"
       },
       {
         "name": "count",
-        "documentation": "@roblox/globaltype/_zune_mem.indexOfMinMax/param/2"
+        "documentation": "@roblox/globaltype/_zune_mem.findMinMax/param/2"
       }
     ]
   },
-  "@roblox/globaltype/_zune_mem.indexOfMinMax/param/0": {
+  "@roblox/globaltype/_zune_mem.findMinMax/param/0": {
     "code_sample": "",
     "documentation": "The source to search in."
   },
-  "@roblox/globaltype/_zune_mem.indexOfMinMax/param/1": {
+  "@roblox/globaltype/_zune_mem.findMinMax/param/1": {
     "code_sample": "",
     "documentation": "The offset to start searching from."
   },
-  "@roblox/globaltype/_zune_mem.indexOfMinMax/param/2": {
+  "@roblox/globaltype/_zune_mem.findMinMax/param/2": {
     "code_sample": "",
     "documentation": "The number of bytes to search. If not provided, will search until the end of the buffer."
+  },
+  "@roblox/globaltype/_zune_mem.cutPrefix": {
+    "code_sample": "",
+    "documentation": "Cuts the buffer only if it starts with the given prefix.",
+    "returns": [
+      "@roblox/globaltype/_zune_mem.cutPrefix/return/0"
+    ],
+    "params": [
+      {
+        "name": "src",
+        "documentation": "@roblox/globaltype/_zune_mem.cutPrefix/param/0"
+      },
+      {
+        "name": "prefix",
+        "documentation": "@roblox/globaltype/_zune_mem.cutPrefix/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/_zune_mem.cutSuffix": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@roblox/globaltype/_zune_mem.cutSuffix/return/0"
+    ],
+    "params": [
+      {
+        "name": "src",
+        "documentation": "@roblox/globaltype/_zune_mem.cutSuffix/param/0"
+      },
+      {
+        "name": "suffix",
+        "documentation": "@roblox/globaltype/_zune_mem.cutSuffix/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/_zune_mem.cut": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@roblox/globaltype/_zune_mem.cut/return/0",
+      "@roblox/globaltype/_zune_mem.cut/return/1"
+    ],
+    "params": [
+      {
+        "name": "src",
+        "documentation": "@roblox/globaltype/_zune_mem.cut/param/0"
+      },
+      {
+        "name": "needle",
+        "documentation": "@roblox/globaltype/_zune_mem.cut/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/_zune_mem.cutLast": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@roblox/globaltype/_zune_mem.cutLast/return/0",
+      "@roblox/globaltype/_zune_mem.cutLast/return/1"
+    ],
+    "params": [
+      {
+        "name": "src",
+        "documentation": "@roblox/globaltype/_zune_mem.cutLast/param/0"
+      },
+      {
+        "name": "needle",
+        "documentation": "@roblox/globaltype/_zune_mem.cutLast/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/_zune_mem.cutScalar": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@roblox/globaltype/_zune_mem.cutScalar/return/0",
+      "@roblox/globaltype/_zune_mem.cutScalar/return/1"
+    ],
+    "params": [
+      {
+        "name": "src",
+        "documentation": "@roblox/globaltype/_zune_mem.cutScalar/param/0"
+      },
+      {
+        "name": "char",
+        "documentation": "@roblox/globaltype/_zune_mem.cutScalar/param/1"
+      }
+    ]
+  },
+  "@roblox/globaltype/_zune_mem.cutScalarLast": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@roblox/globaltype/_zune_mem.cutScalarLast/return/0",
+      "@roblox/globaltype/_zune_mem.cutScalarLast/return/1"
+    ],
+    "params": [
+      {
+        "name": "src",
+        "documentation": "@roblox/globaltype/_zune_mem.cutScalarLast/param/0"
+      },
+      {
+        "name": "char",
+        "documentation": "@roblox/globaltype/_zune_mem.cutScalarLast/param/1"
+      }
+    ]
   },
   "@roblox/globaltype/_zune_mem.replaceScalar": {
     "code_sample": "",
@@ -9444,6 +9562,7 @@
       "address": "@roblox/globaltype/HttpServeOptions.address",
       "request": "@roblox/globaltype/HttpServeOptions.request",
       "max_body_size": "@roblox/globaltype/HttpServeOptions.max_body_size",
+      "tls": "@roblox/globaltype/HttpServeOptions.tls",
       "websocket": "@roblox/globaltype/HttpServeOptions.websocket"
     }
   },
@@ -9492,6 +9611,10 @@
     "code_sample": "",
     "documentation": "The handlers for WebSocket connections."
   },
+  "@roblox/globaltype/HttpServeOptions.tls": {
+    "code_sample": "",
+    "documentation": "Tls options for the server."
+  },
   "@roblox/globaltype/TimeDictionary": {
     "code_sample": "",
     "documentation": "",
@@ -9509,11 +9632,12 @@
     "code_sample": "",
     "documentation": "",
     "keys": {
+      "tls": "@roblox/globaltype/HttpRequestOptions.tls",
+      "timeout": "@roblox/globaltype/HttpRequestOptions.timeout",
       "body": "@roblox/globaltype/HttpRequestOptions.body",
       "max_header_size": "@roblox/globaltype/HttpRequestOptions.max_header_size",
       "method": "@roblox/globaltype/HttpRequestOptions.method",
       "allow_redirects": "@roblox/globaltype/HttpRequestOptions.allow_redirects",
-      "timeout": "@roblox/globaltype/HttpRequestOptions.timeout",
       "max_body_size": "@roblox/globaltype/HttpRequestOptions.max_body_size",
       "max_headers": "@roblox/globaltype/HttpRequestOptions.max_headers",
       "headers": "@roblox/globaltype/HttpRequestOptions.headers"
@@ -9534,6 +9658,10 @@
   "@roblox/globaltype/HttpRequestOptions.max_headers": {
     "code_sample": "",
     "documentation": "The maximum number of headers to parse from the response."
+  },
+  "@roblox/globaltype/HttpRequestOptions.tls": {
+    "code_sample": "",
+    "documentation": "Tls options for the request."
   },
   "@roblox/globaltype/FileHandle": {
     "code_sample": "",
