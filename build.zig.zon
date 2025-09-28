@@ -4,8 +4,8 @@
     .minimum_zig_version = "0.15.0",
     .dependencies = .{
         .luau = .{
-            .url = "https://codeload.github.com/Scythe-Technology/zig-luau/tar.gz/a06098fde39d4725f5d9810d0901ba4bb9aa0754",
-            .hash = "luau-0.0.0+692-uDAGpynDCQA_bY34Rk3_Tv7Uwx-BhJ69y743L5BIY4rv",
+            .url = "https://codeload.github.com/Scythe-Technology/zig-luau/tar.gz/2680214e80785785daa771a5ddcf566236ddcf62",
+            .hash = "luau-0.0.0+693-uDAGp6rECQDwPHVS1Zt99Q-K2R1sSjdUmbPYucR9dJJL",
         },
         .libxev = .{
             .url = "https://codeload.github.com/Scythe-Technology/libxev/tar.gz/b34e5ade259b11cca070384e6921aa16d649494b",
