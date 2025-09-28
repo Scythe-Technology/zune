@@ -844,6 +844,8 @@ export type HttpServeOptions = {
     reuse_address: boolean?,
     backlog: number?,
     max_body_size: number?,
+    max_header_size: number?,
+    max_headers: number?,
     client_timeout: number?,
     max_connections: number?,
     request: (request: HttpServerRequest) -> string | buffer | HttpServerResponse,

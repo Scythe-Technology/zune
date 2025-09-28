@@ -6017,7 +6017,7 @@
   },
   "@roblox/globaltype/_zune_mem.cutPrefix": {
     "code_sample": "",
-    "documentation": "Cuts the buffer only if it starts with the given prefix.",
+    "documentation": "Cuts the buffer only if it starts with the given prefix. Returning the rest of the buffer.\n\n**Parameters**\n- `src`: The source to cut from.\n- `prefix`: The prefix to check for.\n\n\n**Throws**\n- Memory Error\n",
     "returns": [
       "@roblox/globaltype/_zune_mem.cutPrefix/return/0"
     ],
@@ -6032,9 +6032,17 @@
       }
     ]
   },
+  "@roblox/globaltype/_zune_mem.cutPrefix/param/0": {
+    "code_sample": "",
+    "documentation": "The source to cut from."
+  },
+  "@roblox/globaltype/_zune_mem.cutPrefix/param/1": {
+    "code_sample": "",
+    "documentation": "The prefix to check for."
+  },
   "@roblox/globaltype/_zune_mem.cutSuffix": {
     "code_sample": "",
-    "documentation": "",
+    "documentation": "Cuts the buffer only if it ends with the given suffix. Returning the rest of the buffer.\n\n**Parameters**\n- `src`: The source to cut from.\n- `suffix`: The suffix to check for.\n\n\n**Throws**\n- Memory Error\n",
     "returns": [
       "@roblox/globaltype/_zune_mem.cutSuffix/return/0"
     ],
@@ -6049,9 +6057,17 @@
       }
     ]
   },
+  "@roblox/globaltype/_zune_mem.cutSuffix/param/0": {
+    "code_sample": "",
+    "documentation": "The source to cut from."
+  },
+  "@roblox/globaltype/_zune_mem.cutSuffix/param/1": {
+    "code_sample": "",
+    "documentation": "The suffix to check for."
+  },
   "@roblox/globaltype/_zune_mem.cut": {
     "code_sample": "",
-    "documentation": "",
+    "documentation": "Cuts the buffer at the first occurrence of the needle, returning the part before and after the needle.\nIf the needle is not found, returns nil.\n\n**Parameters**\n- `src`: The source to cut from.\n- `needle`: The needle to cut at.\n\n\n**Throws**\n- Memory Error\n",
     "returns": [
       "@roblox/globaltype/_zune_mem.cut/return/0",
       "@roblox/globaltype/_zune_mem.cut/return/1"
@@ -6067,9 +6083,17 @@
       }
     ]
   },
+  "@roblox/globaltype/_zune_mem.cut/param/0": {
+    "code_sample": "",
+    "documentation": "The source to cut from."
+  },
+  "@roblox/globaltype/_zune_mem.cut/param/1": {
+    "code_sample": "",
+    "documentation": "The needle to cut at."
+  },
   "@roblox/globaltype/_zune_mem.cutLast": {
     "code_sample": "",
-    "documentation": "",
+    "documentation": "Cuts the buffer at the last occurrence of the needle, returning the part before and after the needle.\nIf the needle is not found, returns nil.\n\n**Parameters**\n- `src`: The source to cut from.\n- `needle`: The needle to cut at.\n\n\n**Throws**\n- Memory Error\n",
     "returns": [
       "@roblox/globaltype/_zune_mem.cutLast/return/0",
       "@roblox/globaltype/_zune_mem.cutLast/return/1"
@@ -6085,9 +6109,17 @@
       }
     ]
   },
+  "@roblox/globaltype/_zune_mem.cutLast/param/0": {
+    "code_sample": "",
+    "documentation": "The source to cut from."
+  },
+  "@roblox/globaltype/_zune_mem.cutLast/param/1": {
+    "code_sample": "",
+    "documentation": "The needle to cut at."
+  },
   "@roblox/globaltype/_zune_mem.cutScalar": {
     "code_sample": "",
-    "documentation": "",
+    "documentation": "Cuts the buffer at the first occurrence of the scalar/char, returning the part before and after the char.\nIf the char is not found, returns nil.\n\n**Parameters**\n- `src`: The source to cut from.\n- `char`: The byte to cut at.\n\n\n**Throws**\n- Memory Error\n",
     "returns": [
       "@roblox/globaltype/_zune_mem.cutScalar/return/0",
       "@roblox/globaltype/_zune_mem.cutScalar/return/1"
@@ -6103,9 +6135,17 @@
       }
     ]
   },
+  "@roblox/globaltype/_zune_mem.cutScalar/param/0": {
+    "code_sample": "",
+    "documentation": "The source to cut from."
+  },
+  "@roblox/globaltype/_zune_mem.cutScalar/param/1": {
+    "code_sample": "",
+    "documentation": "The byte to cut at."
+  },
   "@roblox/globaltype/_zune_mem.cutScalarLast": {
     "code_sample": "",
-    "documentation": "",
+    "documentation": "Cuts the buffer at the last occurrence of the scalar/char, returning the part before and after the char.\nIf the char is not found, returns nil.\n\n**Parameters**\n- `src`: The source to cut from.\n- `char`: The byte to cut at.\n\n\n**Throws**\n- Memory Error\n",
     "returns": [
       "@roblox/globaltype/_zune_mem.cutScalarLast/return/0",
       "@roblox/globaltype/_zune_mem.cutScalarLast/return/1"
@@ -6120,6 +6160,14 @@
         "documentation": "@roblox/globaltype/_zune_mem.cutScalarLast/param/1"
       }
     ]
+  },
+  "@roblox/globaltype/_zune_mem.cutScalarLast/param/0": {
+    "code_sample": "",
+    "documentation": "The source to cut from."
+  },
+  "@roblox/globaltype/_zune_mem.cutScalarLast/param/1": {
+    "code_sample": "",
+    "documentation": "The byte to cut at."
   },
   "@roblox/globaltype/_zune_mem.replaceScalar": {
     "code_sample": "",
@@ -9558,12 +9606,14 @@
       "reuse_address": "@roblox/globaltype/HttpServeOptions.reuse_address",
       "backlog": "@roblox/globaltype/HttpServeOptions.backlog",
       "client_timeout": "@roblox/globaltype/HttpServeOptions.client_timeout",
-      "port": "@roblox/globaltype/HttpServeOptions.port",
+      "tls": "@roblox/globaltype/HttpServeOptions.tls",
+      "max_header_size": "@roblox/globaltype/HttpServeOptions.max_header_size",
+      "websocket": "@roblox/globaltype/HttpServeOptions.websocket",
       "address": "@roblox/globaltype/HttpServeOptions.address",
       "request": "@roblox/globaltype/HttpServeOptions.request",
       "max_body_size": "@roblox/globaltype/HttpServeOptions.max_body_size",
-      "tls": "@roblox/globaltype/HttpServeOptions.tls",
-      "websocket": "@roblox/globaltype/HttpServeOptions.websocket"
+      "max_headers": "@roblox/globaltype/HttpServeOptions.max_headers",
+      "port": "@roblox/globaltype/HttpServeOptions.port"
     }
   },
   "@roblox/globaltype/HttpServeOptions.port": {
@@ -9585,6 +9635,14 @@
   "@roblox/globaltype/HttpServeOptions.max_body_size": {
     "code_sample": "",
     "documentation": "The maximum size of the request body."
+  },
+  "@roblox/globaltype/HttpServeOptions.max_header_size": {
+    "code_sample": "",
+    "documentation": "The maximum size of the request headers for the parser."
+  },
+  "@roblox/globaltype/HttpServeOptions.max_headers": {
+    "code_sample": "",
+    "documentation": "The maximum number of headers to parse from the request."
   },
   "@roblox/globaltype/HttpServeOptions.client_timeout": {
     "code_sample": "",
