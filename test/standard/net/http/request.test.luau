@@ -62,19 +62,42 @@ test("TLS", function()
         print(`Skip TLS test`);
         return;
     end
-    local res = net.http.request("https://github.com", {
-        method = "GET",
-        headers = {
-            ["Content-Type"] = "text/plain",
-        },
-    }, false);
-    
-    expect(res).toBe(expect.type("table"));
-    expect(res.ok).toBe(true);
-    expect(res.status_code).toBe(200);
-    expect(res.body).toBe(nil);
-    expect(res.headers).toBe(expect.type("table"));
-    expect(res.headers["content-type"]).toBe(expect.type("string"));
+    do
+        local res = net.http.request("https://github.com", {
+            method = "GET",
+            headers = {
+                ["Content-Type"] = "text/plain",
+            },
+        }, false);
+        
+        expect(res).toBe(expect.type("table"));
+        expect(res.ok).toBe(true);
+        expect(res.status_code).toBe(200);
+        expect(res.body).toBe(expect.type("string"));
+        expect(res.headers).toBe(expect.type("table"));
+        expect(res.headers["content-type"]).toBe(expect.type("string"));
+    end
+    do
+        -- should be able to use http protocol and tls port
+        -- the tls config should force tls usage
+        local res = net.http.request("http://github.com:443", {
+            method = "GET",
+            headers = {
+                ["Content-Type"] = "text/plain",
+            },
+            tls = {
+                host = "github.com",
+                ca = zune.crypto.tls.bundleFromSystem(),
+            },
+        }, false);
+        
+        expect(res).toBe(expect.type("table"));
+        expect(res.ok).toBe(true);
+        expect(res.status_code).toBe(200);
+        expect(res.body).toBe(expect.type("string"));
+        expect(res.headers).toBe(expect.type("table"));
+        expect(res.headers["content-type"]).toBe(expect.type("string"));
+    end
 end)
 
 return nil;
