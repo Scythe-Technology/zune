@@ -149,7 +149,7 @@ fn lua_trimRight(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn lua_indexOf(L: *VM.lua.State) !i32 {
+fn lua_find(L: *VM.lua.State) !i32 {
     const slice = try getReadableSlice(L, 1);
     const needle = try getReadableSlice(L, 2);
     if (std.mem.indexOf(u8, slice, needle)) |pos|
@@ -159,7 +159,7 @@ fn lua_indexOf(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn lua_indexOfPos(L: *VM.lua.State) !i32 {
+fn lua_findPos(L: *VM.lua.State) !i32 {
     const slice = try getReadableSlice(L, 1);
     const offset = try L.Zcheckvalue(u32, 2, null);
     const needle = try getReadableSlice(L, 3);
@@ -172,7 +172,7 @@ fn lua_indexOfPos(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn lua_lastIndexOf(L: *VM.lua.State) !i32 {
+fn lua_findLast(L: *VM.lua.State) !i32 {
     const slice = try getReadableSlice(L, 1);
     const needle = try getReadableSlice(L, 2);
     if (std.mem.lastIndexOf(u8, slice, needle)) |pos|
@@ -182,7 +182,7 @@ fn lua_lastIndexOf(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn lua_indexOfScalar(L: *VM.lua.State) !i32 {
+fn lua_findScalar(L: *VM.lua.State) !i32 {
     const slice = try getReadableSlice(L, 1);
     const scalar: u8 = @truncate(try L.Zcheckvalue(u32, 2, null));
     if (std.mem.indexOfScalar(u8, slice, scalar)) |pos|
@@ -192,7 +192,7 @@ fn lua_indexOfScalar(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn lua_indexOfScalarPos(L: *VM.lua.State) !i32 {
+fn lua_findScalarPos(L: *VM.lua.State) !i32 {
     const slice = try getReadableSlice(L, 1);
     const offset = try L.Zcheckvalue(u32, 2, null);
     const scalar: u8 = @truncate(try L.Zcheckvalue(u32, 3, null));
@@ -205,7 +205,7 @@ fn lua_indexOfScalarPos(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn lua_lastIndexOfScalar(L: *VM.lua.State) !i32 {
+fn lua_findScalarLast(L: *VM.lua.State) !i32 {
     const slice = try getReadableSlice(L, 1);
     const scalar: u8 = @truncate(try L.Zcheckvalue(u32, 2, null));
     if (std.mem.lastIndexOfScalar(u8, slice, scalar)) |pos|
@@ -215,7 +215,7 @@ fn lua_lastIndexOfScalar(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn lua_indexOfAny(L: *VM.lua.State) !i32 {
+fn lua_findAny(L: *VM.lua.State) !i32 {
     const slice = try getReadableSlice(L, 1);
     const values = try getReadableSlice(L, 2);
     if (std.mem.indexOfAny(u8, slice, values)) |pos|
@@ -225,7 +225,7 @@ fn lua_indexOfAny(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn lua_indexOfAnyPos(L: *VM.lua.State) !i32 {
+fn lua_findAnyPos(L: *VM.lua.State) !i32 {
     const slice = try getReadableSlice(L, 1);
     const offset = try L.Zcheckvalue(u32, 2, null);
     const values = try getReadableSlice(L, 3);
@@ -238,7 +238,7 @@ fn lua_indexOfAnyPos(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn lua_lastIndexOfAny(L: *VM.lua.State) !i32 {
+fn lua_findAnyLast(L: *VM.lua.State) !i32 {
     const slice = try getReadableSlice(L, 1);
     const values = try getReadableSlice(L, 2);
     if (std.mem.lastIndexOfAny(u8, slice, values)) |pos|
@@ -248,7 +248,7 @@ fn lua_lastIndexOfAny(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn lua_indexOfNone(L: *VM.lua.State) !i32 {
+fn lua_findNone(L: *VM.lua.State) !i32 {
     const slice = try getReadableSlice(L, 1);
     const values = try getReadableSlice(L, 2);
     if (std.mem.indexOfNone(u8, slice, values)) |pos|
@@ -258,7 +258,7 @@ fn lua_indexOfNone(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn lua_indexOfNonePos(L: *VM.lua.State) !i32 {
+fn lua_findNonePos(L: *VM.lua.State) !i32 {
     const slice = try getReadableSlice(L, 1);
     const offset = try L.Zcheckvalue(u32, 2, null);
     const values = try getReadableSlice(L, 3);
@@ -271,7 +271,7 @@ fn lua_indexOfNonePos(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn lua_lastIndexOfNone(L: *VM.lua.State) !i32 {
+fn lua_findNoneLast(L: *VM.lua.State) !i32 {
     const slice = try getReadableSlice(L, 1);
     const values = try getReadableSlice(L, 2);
     if (std.mem.lastIndexOfNone(u8, slice, values)) |pos|
@@ -281,7 +281,7 @@ fn lua_lastIndexOfNone(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn lua_indexOfDiff(L: *VM.lua.State) !i32 {
+fn lua_findDiff(L: *VM.lua.State) !i32 {
     const a = try getReadableSlice(L, 1);
     const b = try getReadableSlice(L, 2);
     if (std.mem.indexOfDiff(u8, a, b)) |pos|
@@ -291,7 +291,7 @@ fn lua_indexOfDiff(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn lua_indexOfDiffPos(L: *VM.lua.State) !i32 {
+fn lua_findDiffPos(L: *VM.lua.State) !i32 {
     const a = try getReadableSlice(L, 1);
     const offset = try L.Zcheckvalue(u32, 2, null);
     const b = try getReadableSlice(L, 3);
@@ -305,7 +305,7 @@ fn lua_indexOfDiffPos(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn lua_indexOfMax(L: *VM.lua.State) !i32 {
+fn lua_findMax(L: *VM.lua.State) !i32 {
     const slice = try getReadableSlice(L, 1);
     const offset = try L.Zcheckvalue(?u32, 2, null) orelse 0;
     const count = try L.Zcheckvalue(?u32, 3, null);
@@ -318,7 +318,7 @@ fn lua_indexOfMax(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn lua_indexOfMin(L: *VM.lua.State) !i32 {
+fn lua_findMin(L: *VM.lua.State) !i32 {
     const slice = try getReadableSlice(L, 1);
     const offset = try L.Zcheckvalue(?u32, 2, null) orelse 0;
     const count = try L.Zcheckvalue(?u32, 3, null);
@@ -331,7 +331,7 @@ fn lua_indexOfMin(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn lua_indexOfMinMax(L: *VM.lua.State) !i32 {
+fn lua_findMinMax(L: *VM.lua.State) !i32 {
     const slice = try getReadableSlice(L, 1);
     const offset = try L.Zcheckvalue(?u32, 2, null) orelse 0;
     const count = try L.Zcheckvalue(?u32, 3, null);
@@ -343,6 +343,78 @@ fn lua_indexOfMinMax(L: *VM.lua.State) !i32 {
     const min, const max = std.mem.indexOfMinMax(u8, buf);
     L.pushunsigned(@as(u32, @truncate(min)) + offset);
     L.pushunsigned(@as(u32, @truncate(max)) + offset);
+    return 2;
+}
+
+fn lua_cutPrefix(L: *VM.lua.State) !i32 {
+    const slice = try getReadableSlice(L, 1);
+    const prefix = try getReadableSlice(L, 2);
+    if (std.mem.startsWith(u8, slice, prefix))
+        try L.Zpushbuffer(slice[prefix.len..])
+    else
+        L.pushnil();
+    return 1;
+}
+
+fn lua_cutSuffix(L: *VM.lua.State) !i32 {
+    const slice = try getReadableSlice(L, 1);
+    const suffix = try getReadableSlice(L, 2);
+    if (std.mem.endsWith(u8, slice, suffix))
+        try L.Zpushbuffer(slice[0 .. slice.len - suffix.len])
+    else
+        L.pushnil();
+    return 1;
+}
+
+fn lua_cut(L: *VM.lua.State) !i32 {
+    const slice = try getReadableSlice(L, 1);
+    const needle = try getReadableSlice(L, 2);
+    if (std.mem.indexOf(u8, slice, needle)) |index| {
+        try L.Zpushbuffer(slice[0..index]);
+        try L.Zpushbuffer(slice[index + needle.len ..]);
+    } else {
+        L.pushnil();
+        L.pushnil();
+    }
+    return 2;
+}
+
+fn lua_cutLast(L: *VM.lua.State) !i32 {
+    const slice = try getReadableSlice(L, 1);
+    const needle = try getReadableSlice(L, 2);
+    if (std.mem.lastIndexOf(u8, slice, needle)) |index| {
+        try L.Zpushbuffer(slice[0..index]);
+        try L.Zpushbuffer(slice[index + needle.len ..]);
+    } else {
+        L.pushnil();
+        L.pushnil();
+    }
+    return 2;
+}
+
+fn lua_cutScalar(L: *VM.lua.State) !i32 {
+    const slice = try getReadableSlice(L, 1);
+    const scalar: u8 = @truncate(try L.Zcheckvalue(u32, 2, null));
+    if (std.mem.indexOfScalar(u8, slice, scalar)) |index| {
+        try L.Zpushbuffer(slice[0..index]);
+        try L.Zpushbuffer(slice[index + 1 ..]);
+    } else {
+        L.pushnil();
+        L.pushnil();
+    }
+    return 2;
+}
+
+fn lua_cutScalarLast(L: *VM.lua.State) !i32 {
+    const slice = try getReadableSlice(L, 1);
+    const scalar: u8 = @truncate(try L.Zcheckvalue(u32, 2, null));
+    if (std.mem.lastIndexOfScalar(u8, slice, scalar)) |index| {
+        try L.Zpushbuffer(slice[0..index]);
+        try L.Zpushbuffer(slice[index + 1 ..]);
+    } else {
+        L.pushnil();
+        L.pushnil();
+    }
     return 2;
 }
 
@@ -493,23 +565,29 @@ pub fn loadLib(L: *VM.lua.State) !void {
         .trim = lua_trim,
         .trimLeft = lua_trimLeft,
         .trimRight = lua_trimRight,
-        .indexOf = lua_indexOf,
-        .indexOfPos = lua_indexOfPos,
-        .lastIndexOf = lua_lastIndexOf,
-        .indexOfScalar = lua_indexOfScalar,
-        .indexOfScalarPos = lua_indexOfScalarPos,
-        .lastIndexOfScalar = lua_lastIndexOfScalar,
-        .indexOfAny = lua_indexOfAny,
-        .indexOfAnyPos = lua_indexOfAnyPos,
-        .lastIndexOfAny = lua_lastIndexOfAny,
-        .indexOfNone = lua_indexOfNone,
-        .indexOfNonePos = lua_indexOfNonePos,
-        .lastIndexOfNone = lua_lastIndexOfNone,
-        .indexOfDiff = lua_indexOfDiff,
-        .indexOfDiffPos = lua_indexOfDiffPos,
-        .indexOfMax = lua_indexOfMax,
-        .indexOfMin = lua_indexOfMin,
-        .indexOfMinMax = lua_indexOfMinMax,
+        .find = lua_find,
+        .findPos = lua_findPos,
+        .findLast = lua_findLast,
+        .findScalar = lua_findScalar,
+        .findScalarPos = lua_findScalarPos,
+        .findScalarLast = lua_findScalarLast,
+        .findAny = lua_findAny,
+        .findAnyPos = lua_findAnyPos,
+        .findAnyLast = lua_findAnyLast,
+        .findNone = lua_findNone,
+        .findNonePos = lua_findNonePos,
+        .findNoneLast = lua_findNoneLast,
+        .findDiff = lua_findDiff,
+        .findDiffPos = lua_findDiffPos,
+        .findMax = lua_findMax,
+        .findMin = lua_findMin,
+        .findMinMax = lua_findMinMax,
+        .cutPrefix = lua_cutPrefix,
+        .cutSuffix = lua_cutSuffix,
+        .cut = lua_cut,
+        .cutLast = lua_cutLast,
+        .cutScalar = lua_cutScalar,
+        .cutScalarLast = lua_cutScalarLast,
         .replaceScalar = lua_replaceScalar,
         .max = lua_max,
         .min = lua_min,
