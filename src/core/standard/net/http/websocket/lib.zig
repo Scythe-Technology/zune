@@ -16,6 +16,7 @@ const Response = @import("../response.zig");
 const WebSocket = @import("../websocket.zig");
 
 const TAG_NET_HTTP_WEBSOCKET = Zune.Tags.get("NET_HTTP_CLIENTWEBSOCKET").?;
+const TAG_CRYPTO_TLS_CERTBUNDLE = Zune.Tags.get("CRYPTO_TLS_CERTBUNDLE").?;
 
 const VM = luau.VM;
 
@@ -737,9 +738,12 @@ pub const UpgradeHandshake = struct {
                 L.pushvalue(-1);
                 _ = self.ref.push(L);
                 parser.push(L, false) catch |e| std.debug.panic("{}", .{e});
-                _ = L.pcall(2, 1, 0).check() catch {
-                    Zune.Runtime.Engine.logFnDef(L, 1);
-                    return .disarm;
+                _ = L.pcall(2, 1, 0).check() catch |err| {
+                    if (err == error.Runtime) {
+                        if (L.typeOf(-1) == .Function)
+                            Zune.Runtime.Engine.logFnDef(L, -1);
+                    }
+                    return self.safeResumeWithError(error.UpgradeFailed);
                 };
                 approved = L.toboolean(-1);
             }
@@ -1271,6 +1275,33 @@ pub fn lua_websocket(L: *VM.lua.State) !i32 {
     }
     L.pop(1);
 
+    var force_tls = false;
+    var host_copy: ?[]const u8 = null;
+    var ca_bundle: ?tls.config.cert.Bundle = null;
+
+    errdefer if (host_copy) |h| allocator.free(h);
+    errdefer if (ca_bundle) |*b| b.deinit(allocator);
+
+    if (LuaHelper.maybeKnownType(L.rawgetfield(2, "tls"))) |@"type"| {
+        if (@"type" != .Table)
+            return L.Zerror("expected field 'tls' to be a table");
+        force_tls = true;
+        if (try L.Zcheckfield(?[]const u8, -1, "host")) |h|
+            host_copy = try allocator.dupe(u8, h);
+        L.pop(1);
+        const ca_type = L.rawgetfield(-1, "ca");
+        if (!ca_type.isnoneornil()) {
+            if (ca_type != .Userdata or L.userdatatag(-1) != TAG_CRYPTO_TLS_CERTBUNDLE)
+                return L.Zerror("expected field 'tls.ca' to be a CertBundle");
+            ca_bundle = try @import("../../../crypto/tls.zig").cloneCertBundle(
+                allocator,
+                L.touserdatatagged(tls.config.cert.Bundle, -1, TAG_CRYPTO_TLS_CERTBUNDLE).?.*,
+            );
+        }
+        L.pop(1);
+    }
+    L.pop(1);
+
     var uri_buffer: [1024 * 2]u8 = undefined;
     var fixedBuffer = std.heap.FixedBufferAllocator.init(&uri_buffer);
 
@@ -1324,11 +1355,10 @@ pub fn lua_websocket(L: *VM.lua.State) !i32 {
 
     var tls_ctx: ?*TlsContext = null;
     errdefer if (tls_ctx) |ctx| allocator.destroy(ctx);
-    if (protocol == .tls) {
+    if (protocol == .tls or force_tls) {
         tls_ctx = try allocator.create(TlsContext);
-        const host_copy = try allocator.dupe(u8, host);
-        errdefer allocator.free(host_copy);
-        const ca_bundle = try tls.config.cert.fromSystem(allocator);
+        host_copy = host_copy orelse try allocator.dupe(u8, host);
+        ca_bundle = ca_bundle orelse try tls.config.cert.fromSystem(allocator);
         tls_ctx.?.* = .{
             .record = .{
                 .buffer = &tls_ctx.?.record_buffer,
@@ -1357,8 +1387,8 @@ pub fn lua_websocket(L: *VM.lua.State) !i32 {
             .connection = .{
                 .handshake = .{
                     .client = .init(.{
-                        .host = host_copy,
-                        .root_ca = ca_bundle,
+                        .host = host_copy.?,
+                        .root_ca = ca_bundle.?,
                         .cipher_suites = tls.config.cipher_suites.secure,
                         .key_log_callback = tls.config.key_log.callback,
                     }),

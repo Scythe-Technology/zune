@@ -1026,12 +1026,10 @@ pub fn start(
         // write buffer wouldn't be used anymore
         // so we can use it for parsing websocket frames
         self.buffers.out = .{ .reader = .{} };
-        self.socket.read(
+        self.stream_read(
             loop,
             &self.completion,
-            .{ .slice = &self.buffers.in },
-            Self,
-            self,
+            self.socket,
             ws_onRecv,
         );
     } else {
@@ -1182,7 +1180,7 @@ fn stream_read(
     }
 }
 
-fn stream_write(
+pub fn stream_write(
     self: *Self,
     loop: *xev.Loop,
     completion: *xev.Completion,
