@@ -340,4 +340,8 @@ describe("IO", function()
         );
         expect(((res:sub(1,start)):find(if (useColor) then "\x1B%[2m<table: 0x.+>" else "<table: 0x.+>"))).never.toBeNil();
     end)
+
+    test("StdOut write", function()
+        io.stdout:write("Hello from stdout\n");
+    end)
 end)
