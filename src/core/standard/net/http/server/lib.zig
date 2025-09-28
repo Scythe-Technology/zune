@@ -17,6 +17,7 @@ const VM = luau.VM;
 
 const TAG_NET_HTTP_SERVER = Zune.Tags.get("NET_HTTP_SERVER").?;
 const TAG_NET_HTTP_WEBSOCKET = Zune.Tags.get("NET_HTTP_WEBSOCKET").?;
+const TAG_CRYPTO_TLS_CERTKEYPAIR = Zune.Tags.get("CRYPTO_TLS_CERTKEYPAIR").?;
 
 /// The Zune HTTP server backend.
 const Self = @This();
@@ -90,9 +91,25 @@ state: State,
 ref: LuaHelper.Ref(void),
 callbacks: FnHandlers,
 scheduler: *Scheduler,
+tls: ?*TlsContext = null,
+
+const TlsContext = struct {
+    const tls = @import("tls");
+    keypair: tls.config.CertKeyPair,
+    server: tls.nonblock.Server,
+
+    pub fn deinit(self: *TlsContext, allocator: std.mem.Allocator) void {
+        self.server.opt.auth.?.deinit(allocator);
+        allocator.destroy(self);
+    }
+};
 
 fn __dtor(L: *VM.lua.State, self: *Self) void {
+    const allocator = self.arena.child_allocator;
     defer self.arena.deinit();
+
+    if (self.tls) |ctx|
+        ctx.deinit(allocator);
 
     self.callbacks.derefAll(L);
 }
@@ -170,6 +187,7 @@ pub fn onAccept(
 
     const node = self.state.free.pop() orelse unreachable;
     const client: *ClientContext = @fieldParentPtr("node", node);
+    const tls_context = client.tls;
     client.* = .{
         .socket = client_socket,
         .completion = .init(),
@@ -177,7 +195,40 @@ pub fn onAccept(
         .cancel_completion = .init(),
         .parser = .init(allocator, self.state.max_header_count),
         .server = self,
+        .tls = tls_context,
     };
+
+    if (tls_context) |context| {
+        context.* = .{
+            .record = .{
+                .buffer = &context.record_buffer,
+                .end = 0,
+                .seek = 0,
+                .vtable = &.{
+                    .stream = ClientContext.TlsContext.endingStream,
+                },
+            },
+            .cleartext = .{
+                .buffer = &context.cleartext_buffer,
+                .end = 0,
+                .seek = 0,
+                .vtable = &.{
+                    .stream = ClientContext.TlsContext.endingStream,
+                },
+            },
+            .ciphertext = .{
+                .buffer = &context.ciphertext_buffer,
+                .end = 0,
+                .seek = 0,
+                .vtable = &.{
+                    .stream = ClientContext.TlsContext.endingStream,
+                },
+            },
+            .connection = .{
+                .handshake = self.tls.?.server,
+            },
+        };
+    }
 
     client.start(loop, true);
 
@@ -349,6 +400,12 @@ pub fn expandFreeSize(self: *Self, amount: usize) !void {
     const allocator = self.arena.allocator();
     for (0..amount) |_| {
         const client = try allocator.create(ClientContext);
+        if (self.tls) |_| {
+            errdefer allocator.destroy(client);
+            client.tls = try allocator.create(ClientContext.TlsContext);
+        } else {
+            client.tls = null;
+        }
         self.state.free.append(&client.node);
     }
 }
@@ -369,6 +426,9 @@ pub fn lua_serve(L: *VM.lua.State) !i32 {
     var callbacks: FnHandlers = .{};
     errdefer callbacks.derefAll(L);
 
+    var tls: ?*TlsContext = null;
+    errdefer if (tls) |ctx| ctx.deinit(allocator);
+
     if (L.rawgetfield(1, "request") != .Function)
         return L.Zerror("invalid field 'request' (expected function)");
     callbacks.request = .init(L, -1, undefined);
@@ -380,6 +440,30 @@ pub fn lua_serve(L: *VM.lua.State) !i32 {
             return L.Zerror("expected field 'error' to be a function");
         callbacks.@"error" = .init(L, -1, undefined);
     }
+    L.pop(1);
+
+    const tls_type = L.rawgetfield(1, "tls");
+    if (!tls_type.isnoneornil()) {
+        if (tls_type != .Table)
+            return L.Zerror("expected field 'tls' to be a table");
+        if (L.rawgetfield(-1, "auth") != .Userdata or L.userdatatag(-1) != TAG_CRYPTO_TLS_CERTKEYPAIR)
+            return L.Zerror("expected field 'tls.auth' to be a CertKeyPair");
+
+        const context = try allocator.create(TlsContext);
+        errdefer allocator.destroy(context);
+        context.keypair = try @import("../../../crypto/tls.zig").cloneCertKeyPair(
+            allocator,
+            L.touserdatatagged(@import("tls").config.CertKeyPair, -1, TAG_CRYPTO_TLS_CERTKEYPAIR).?.*,
+        );
+
+        context.server = .init(.{
+            .auth = &context.keypair,
+        });
+
+        tls = context;
+        L.pop(1);
+    }
+    L.pop(1);
 
     const websocket_type = L.rawgetfield(1, "websocket");
     if (!websocket_type.isnoneornil()) {
@@ -470,6 +554,7 @@ pub fn lua_serve(L: *VM.lua.State) !i32 {
             .max_body_size = @min(serve_info.max_body_size orelse 1_048_576, LuaHelper.MAX_LUAU_SIZE),
             .max_connections = serve_info.max_connections orelse 1024,
         },
+        .tls = tls,
     };
 
     try self.expandFreeSize(@min(
