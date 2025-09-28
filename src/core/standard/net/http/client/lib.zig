@@ -714,7 +714,7 @@ pub fn lua_request(L: *VM.lua.State) !i32 {
         const tls_type = L.rawgetfield(2, "tls");
         if (!tls_type.isnoneornil()) {
             if (tls_type != .Table)
-                return L.Zerror("invalid tls (expected table)");
+                return L.Zerror("expected field 'tls' to be a table");
             force_tls = true;
             if (try L.Zcheckfield(?[]const u8, -1, "host")) |h|
                 host_copy = try allocator.dupe(u8, h);
@@ -722,7 +722,7 @@ pub fn lua_request(L: *VM.lua.State) !i32 {
             const ca_type = L.rawgetfield(-1, "ca");
             if (!ca_type.isnoneornil()) {
                 if (ca_type != .Userdata or L.userdatatag(-1) != TAG_CRYPTO_TLS_CERTBUNDLE)
-                    return L.Zerror("field 'tls.ca' must be a CertBundle");
+                    return L.Zerror("expected field 'tls.ca' to be a CertBundle");
                 ca_bundle = try @import("../../../crypto/tls.zig").cloneCertBundle(
                     allocator,
                     L.touserdatatagged(tls.config.cert.Bundle, -1, TAG_CRYPTO_TLS_CERTBUNDLE).?.*,
