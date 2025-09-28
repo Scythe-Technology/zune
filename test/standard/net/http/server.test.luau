@@ -11,7 +11,7 @@ local _, version, _ = string.match(_VERSION, "(zune) (%d+%.%d+%.%d+.*)+(%d+%.%d+
 assert(version and #version > 0, "No version");
 
 test("Basic", function()
-    local requests: {ServerRequest} = {};
+    local requests: {HttpServerRequest} = {};
     local server = net.http.serve({
         port = 8080,
         reuse_address = true,
@@ -64,8 +64,111 @@ test("Basic", function()
     expect(requests).toHaveLength(1);
 end)
 
+test("TLS", function()
+    if (zune.process.args[1] ~= "allow") then
+        print("Skipping TLS test");
+        return;
+    end
+
+    local requests: {HttpServerRequest} = {};
+    local server = net.http.serve({
+        port = 8080,
+        reuse_address = true,
+        tls = {
+            auth = zune.crypto.tls.keyPairFromFile("test/standard/net/cert.pem", "test/standard/net/key.pem")
+        },
+        request = function(req)
+            table.insert(requests, req);
+            return {
+                status_code = 200,
+                body = "Hello: " .. #requests,
+            }
+        end,
+    });
+    expect(server).toBe(expect.type("userdata"));
+
+    do
+        local res = net.http.request("https://localhost:8080", {
+            tls = {
+                host = "",
+                ca = zune.crypto.tls.bundleFromFile("test/standard/net/cert.pem"),
+            }
+        });
+        expect(res).toBe(expect.type("table"));
+        expect(res.ok).toBe(true);
+        expect(res.status_code).toBe(200);
+        expect(res.body).toBe("Hello: 1");
+        expect(res.headers).toBe(expect.type("table"));
+        expect(res.headers["content-length"]).toBe("8");
+        expect(res.status_reason).toBe("OK");
+
+        expect(requests).toHaveLength(1);
+
+        local request = requests[1];
+        expect(request).toBe(expect.type("table"));
+        expect(request.method).toBe("GET");
+        expect(request.path).toBe("/");
+        expect(request.headers).toBe(expect.type("table"));
+        expect(request.headers["host"]).toBe("localhost");
+        expect(request.headers["user-agent"]).toBe("zune/" .. version);
+    end
+
+    expect(function()
+        net.http.request("http://localhost:8080", {});
+    end).toThrow("ConnectionClosed");
+
+    local requestsMade = 1;
+    for _ = 1, 10 do
+        local res = net.http.request("http://localhost:8080", {
+            tls = {
+                host = "",
+                ca = zune.crypto.tls.bundleFromFile("test/standard/net/cert.pem"),
+            }
+        });
+        requestsMade += 1;
+
+        expect(res).toBe(expect.type("table"));
+        expect(res.ok).toBe(true);
+        expect(res.status_code).toBe(200);
+        expect(res.body).toBe("Hello: " .. requestsMade);
+        expect(res.headers).toBe(expect.type("table"));
+        expect(res.headers["content-length"]).toBe(tostring(7 + #tostring(requestsMade)));
+        expect(res.status_reason).toBe("OK");
+
+        expect(requests).toHaveLength(requestsMade);
+
+        local request = requests[requestsMade];
+        expect(request).toBe(expect.type("table"));
+        expect(request.method).toBe("GET");
+        expect(request.path).toBe("/");
+        expect(request.headers).toBe(expect.type("table"));
+        expect(request.headers["host"]).toBe("localhost");
+        expect(request.headers["user-agent"]).toBe("zune/" .. version);
+
+    end
+    
+    expect(function()
+        local _ = net.http.request("http://localhost:8085");
+    end).toThrow("ConnectionRefused");
+
+    expect(requests).toHaveLength(requestsMade);
+
+    expect(not server:isRunning()).toBe(false);
+    server:stop();
+    expect(not server:isRunning()).toBe(true);
+    server:stop();
+    expect(not server:isRunning()).toBe(true);
+    expect(requests);
+
+    expect(function()
+        local _ = net.http.request("https://localhost:8080");
+    end).toThrow("ConnectionRefused");
+
+    expect(requests).toHaveLength(requestsMade);
+end)
+
 test("Other method", function()
-    local requests: {ServerRequest} = {};
+    local requests: {HttpServerRequest} = {};
     local server = net.http.serve({
         port = 8080,
         reuse_address = true,
@@ -222,6 +325,88 @@ test("Long Term", function()
         expect(request.headers["host"]).toBe("localhost");
         expect(request.headers["user-agent"]).toBe("zune/" .. version);
 
+    end
+
+    expect(function()
+        local _ = net.http.request("http://localhost:8085");
+    end).toThrow("ConnectionRefused");
+
+    expect(requests).toHaveLength(requestsMade);
+
+    expect(not server:isRunning()).toBe(false);
+    server:stop();
+    expect(not server:isRunning()).toBe(true);
+    server:stop();
+    expect(not server:isRunning()).toBe(true);
+
+    expect(function()
+        local _ = net.http.request("http://localhost:8080");
+    end).toThrow("ConnectionRefused");
+
+    expect(requests).toHaveLength(requestsMade);
+end)
+
+test("Large Limited", function()
+    local requests = {};
+    local server = net.http.serve({
+        port = 8080,
+        reuse_address = true,
+        max_body_size = 4096,
+        request = function(req)
+            table.insert(requests, req);
+            return "Hello: " .. #requests;
+        end,
+        error = function(err)
+            print(`Server Error: {err}`);
+        end,
+    });
+    expect(server).toBe(expect.type("userdata"));
+
+    do
+        local body = string.rep("Hello World! ", 1000);
+        local res = net.http.request("http://localhost:8080", {
+            method = "POST",
+            body = body,
+        });
+        expect(res).toBe(expect.type("table"));
+        expect(res.ok).toBe(false);
+        expect(res.status_code).toBe(413);
+        expect(res.body).toBe("The content you provided exceeds the server's maximum allowed size.");
+        expect(res.headers).toBe(expect.type("table"));
+        expect(res.headers["content-length"]).toBe("67");
+        expect(res.status_reason).toBe("Payload Too Large");
+
+        expect(requests).toHaveLength(0);
+    end
+    
+    local requestsMade = 0;
+    for _ = 1, 10 do
+        local body = string.rep("Hello World! ", 100);
+        local res = net.http.request("http://localhost:8080", {
+            method = "POST",
+            body = body,
+        });
+        requestsMade += 1;
+
+        expect(res).toBe(expect.type("table"));
+        expect(res.ok).toBe(true);
+        expect(res.status_code).toBe(200);
+        expect(res.body).toBe("Hello: " .. requestsMade);
+        expect(res.headers).toBe(expect.type("table"));
+        expect(res.headers["content-length"]).toBe(tostring(7 + #tostring(requestsMade)));
+        expect(res.status_reason).toBe("OK");
+
+        expect(requests).toHaveLength(requestsMade);
+
+        local request = requests[requestsMade];
+        expect(request).toBe(expect.type("table"));
+        expect(request.method).toBe("POST");
+        expect(request.path).toBe("/");
+        expect(request.headers).toBe(expect.type("table"));
+        expect(request.headers["host"]).toBe("localhost");
+        expect(request.headers["user-agent"]).toBe("zune/" .. version);
+        expect(request.headers["content-length"]).toBe(tostring(#body));
+        expect(request.body).toBe(body);
     end
 
     expect(function()

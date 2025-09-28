@@ -108,9 +108,37 @@ parser: Request.Parser,
 node: LinkedList.Node = .{},
 state: State = .{},
 timeout: f64 = 0,
+tls: ?*TlsContext = null,
 
 websocket: WebSocketState = .{},
 buffers: Buffers = .{},
+
+pub const TlsContext = struct {
+    const tls = @import("tls");
+
+    record_buffer: [tls.max_ciphertext_record_len]u8 = undefined,
+    cleartext_buffer: [tls.max_ciphertext_record_len]u8 = undefined,
+    ciphertext_buffer: [tls.max_ciphertext_record_len]u8 = undefined,
+    record: std.Io.Reader,
+    cleartext: std.Io.Reader,
+    ciphertext: std.Io.Reader,
+    connection: union(enum) {
+        handshake: tls.nonblock.Server,
+        active: struct {
+            client: tls.nonblock.Connection,
+            write_buffer: []const u8 = undefined,
+            consumed: usize = 0,
+        },
+    },
+    stage: enum { nothing, handshake, completed } = .nothing,
+
+    pub fn endingStream(r: *std.Io.Reader, w: *std.Io.Writer, limit: std.Io.Limit) std.Io.Reader.StreamError!usize {
+        _ = r;
+        _ = w;
+        _ = limit;
+        return error.EndOfStream;
+    }
+};
 
 pub const WebSocketState = struct {
     active: bool = false,
@@ -230,6 +258,113 @@ pub fn ws_close(self: *Self, loop: *xev.Loop) void {
     } else self.close();
 }
 
+pub const Handshake = struct {
+    pub fn onRecvComplete(
+        ud: ?*Self,
+        l: *xev.Loop,
+        c: *xev.Completion,
+        tcp: xev.TCP,
+        _: xev.ReadBuffer,
+        r: xev.ReadError!usize,
+    ) xev.CallbackAction {
+        const self = ud orelse unreachable;
+        const ctx = self.tls.?;
+        const handshake = &ctx.connection.handshake;
+        const read = r catch |err| switch (err) {
+            error.Canceled => {
+                self.close();
+                return .disarm;
+            },
+            error.EOF, error.ConnectionResetByPeer => {
+                self.close();
+                return .disarm;
+            },
+            else => {
+                self.server.emitError(.raw_receive, err);
+                self.close();
+                return .disarm;
+            },
+        };
+
+        ctx.record.end += read;
+
+        const result = handshake.run(ctx.record.buffered(), ctx.ciphertext.buffer[ctx.ciphertext.end..]) catch |err| {
+            self.close();
+            self.server.emitError(.tls_handshake, err);
+            return .disarm;
+        };
+        ctx.ciphertext.end += result.send.len;
+        ctx.record.toss(result.recv_pos);
+        ctx.record.rebase(ctx.record.buffer.len) catch unreachable; // shouldn't fail
+        if (result.send.len > 0) {
+            tcp.write(
+                l,
+                c,
+                .{ .slice = ctx.ciphertext.buffered() },
+                Self,
+                self,
+                onSendComplete,
+            );
+            return .disarm;
+        } else {
+            if (handshake.done()) {
+                const cipher = handshake.cipher().?;
+                ctx.connection = .{ .active = .{ .client = .init(cipher) } };
+                self.start(l, false);
+            } else {
+                tcp.read(
+                    l,
+                    c,
+                    .{ .slice = ctx.record.buffer[ctx.record.end..] },
+                    Self,
+                    self,
+                    onRecvComplete,
+                );
+            }
+        }
+        return .disarm;
+    }
+
+    pub fn onSendComplete(
+        ud: ?*Self,
+        l: *xev.Loop,
+        c: *xev.Completion,
+        tcp: xev.TCP,
+        _: xev.WriteBuffer,
+        w: xev.WriteError!usize,
+    ) xev.CallbackAction {
+        const self = ud orelse unreachable;
+        const ctx = self.tls.?;
+        const written = w catch |err| switch (err) {
+            error.BrokenPipe, error.ConnectionResetByPeer => {
+                self.close();
+                return .disarm;
+            },
+            else => {
+                self.close();
+                self.server.emitError(.raw_send, err);
+                return .disarm;
+            },
+        };
+
+        ctx.ciphertext.toss(written);
+        if (ctx.ciphertext.bufferedLen() > 0) {
+            tcp.write(l, c, .{ .slice = ctx.ciphertext.buffered() }, Self, self, onSendComplete);
+            return .disarm;
+        }
+        ctx.ciphertext.rebase(ctx.ciphertext.buffer.len) catch unreachable; // shouldn't fail
+        tcp.read(
+            l,
+            c,
+            .{ .slice = ctx.record.buffer[ctx.record.end..] },
+            Self,
+            self,
+            onRecvComplete,
+        );
+        return .disarm;
+    }
+};
+
 pub fn onWrite(
     ud: ?*Self,
     loop: *xev.Loop,
@@ -327,12 +462,11 @@ pub fn writeAll(self: *Self, message: []const u8) void {
         self.buffers.out = .{ .dynamic = buffer };
         slice = buffer;
     }
-    self.socket.write(
+    self.stream_write(
         &self.server.scheduler.loop,
         &self.completion,
-        .{ .slice = slice },
-        Self,
-        self,
+        self.socket,
+        slice,
         onWrite,
     );
 }
@@ -892,22 +1026,256 @@ pub fn start(
         // write buffer wouldn't be used anymore
         // so we can use it for parsing websocket frames
         self.buffers.out = .{ .reader = .{} };
-        self.socket.read(
+        self.stream_read(
             loop,
             &self.completion,
-            .{ .slice = &self.buffers.in },
-            Self,
-            self,
+            self.socket,
             ws_onRecv,
         );
     } else {
-        self.socket.read(
+        if (self.tls) |ctx| {
+            switch (ctx.connection) {
+                .handshake => {
+                    self.socket.read(
+                        loop,
+                        &self.completion,
+                        .{ .slice = &ctx.record_buffer },
+                        Self,
+                        self,
+                        Handshake.onRecvComplete,
+                    );
+                    return;
+                },
+                .active => self.stream_read(
+                    loop,
+                    &self.completion,
+                    self.socket,
+                    onRecv,
+                ),
+            }
+            unreachable;
+        } else {
+            self.socket.read(
+                loop,
+                &self.completion,
+                .{ .slice = &self.buffers.in },
+                Self,
+                self,
+                onRecv,
+            );
+        }
+    }
+}
+
+fn stream_read(
+    self: *Self,
+    loop: *xev.Loop,
+    completion: *xev.Completion,
+    tcp: xev.TCP,
+    comptime callback: *const fn (
+        ?*Self,
+        *xev.Loop,
+        *xev.Completion,
+        xev.TCP,
+        xev.ReadBuffer,
+        xev.ReadError!usize,
+    ) xev.CallbackAction,
+) void {
+    if (self.tls) |ctx| {
+        if (ctx.cleartext.bufferedLen() > 0) {
+            const amount = ctx.cleartext.readSliceShort(&self.buffers.in) catch unreachable; // shouldn't fail, entirely buffered
+            ctx.cleartext.rebase(ctx.cleartext.buffer.len) catch unreachable; // shouldn't fail
+            switch (@call(.always_inline, callback, .{
+                self,
+                loop,
+                completion,
+                tcp,
+                xev.ReadBuffer{ .slice = &self.buffers.in },
+                amount,
+            })) {
+                .disarm => {},
+                .rearm => self.stream_read(
+                    loop,
+                    completion,
+                    tcp,
+                    callback,
+                ),
+            }
+            return;
+        }
+
+        tcp.read(
             loop,
-            &self.completion,
+            completion,
+            .{ .slice = ctx.record.buffer[ctx.record.end..] },
+            Self,
+            self,
+            struct {
+                fn inner(
+                    ud: ?*Self,
+                    l: *xev.Loop,
+                    c: *xev.Completion,
+                    inner_tcp: xev.TCP,
+                    _: xev.ReadBuffer,
+                    r: xev.ReadError!usize,
+                ) xev.CallbackAction {
+                    const inner_self = ud orelse unreachable;
+                    const inner_ctx = inner_self.tls orelse unreachable;
+                    const amt = r catch |err| return @call(.always_inline, callback, .{
+                        ud,
+                        l,
+                        c,
+                        inner_tcp,
+                        xev.ReadBuffer{ .slice = &inner_self.buffers.in },
+                        err,
+                    });
+                    inner_ctx.record.end += amt;
+                    const res = inner_ctx.connection.active.client.decrypt(inner_ctx.record.buffered(), inner_ctx.cleartext.buffer[inner_ctx.cleartext.end..]) catch {
+                        _ = @call(.always_inline, callback, .{
+                            ud,
+                            l,
+                            c,
+                            inner_tcp,
+                            xev.ReadBuffer{ .slice = &inner_self.buffers.in },
+                            error.Unexpected,
+                        });
+                        return .disarm;
+                    };
+                    inner_ctx.record.toss(res.ciphertext_pos);
+                    inner_ctx.record.rebase(inner_ctx.record.buffer.len) catch unreachable; // shouldn't fail
+                    inner_ctx.cleartext.end += res.cleartext.len;
+                    if (res.cleartext.len > 0) {
+                        const amount = inner_ctx.cleartext.readSliceShort(&inner_self.buffers.in) catch unreachable; // shouldn't fail;
+                        inner_ctx.cleartext.rebase(inner_ctx.cleartext.buffer.len) catch unreachable; // shouldn't fail
+                        switch (@call(.always_inline, callback, .{
+                            ud,
+                            l,
+                            c,
+                            inner_tcp,
+                            xev.ReadBuffer{ .slice = &inner_self.buffers.in },
+                            amount,
+                        })) {
+                            .disarm => {},
+                            .rearm => inner_self.stream_read(
+                                l,
+                                c,
+                                inner_tcp,
+                                callback,
+                            ),
+                        }
+                        return .disarm;
+                    }
+                    inner_tcp.read(
+                        l,
+                        c,
+                        .{ .slice = inner_ctx.record.buffer[inner_ctx.record.end..] },
+                        Self,
+                        inner_self,
+                        @This().inner,
+                    );
+                    return .disarm;
+                }
+            }.inner,
+        );
+    } else {
+        tcp.read(
+            loop,
+            completion,
             .{ .slice = &self.buffers.in },
             Self,
             self,
-            onRecv,
+            callback,
+        );
+    }
+}
+
+pub fn stream_write(
+    self: *Self,
+    loop: *xev.Loop,
+    completion: *xev.Completion,
+    tcp: xev.TCP,
+    buf: []const u8,
+    comptime callback: *const fn (
+        ?*Self,
+        *xev.Loop,
+        *xev.Completion,
+        xev.TCP,
+        xev.WriteBuffer,
+        xev.WriteError!usize,
+    ) xev.CallbackAction,
+) void {
+    if (self.tls) |ctx| {
+        const res = ctx.connection.active.client.encrypt(buf, ctx.ciphertext.buffer[ctx.ciphertext.end..]) catch {
+            _ = @call(.always_inline, callback, .{
+                self,
+                loop,
+                completion,
+                tcp,
+                xev.WriteBuffer{ .slice = buf },
+                error.Unexpected,
+            });
+            return;
+        };
+        ctx.connection.active.consumed = res.cleartext_pos;
+        ctx.connection.active.write_buffer = buf;
+        ctx.ciphertext.end += res.ciphertext.len;
+        tcp.write(
+            loop,
+            completion,
+            .{ .slice = ctx.ciphertext.buffered() },
+            Self,
+            self,
+            struct {
+                fn inner(
+                    ud: ?*Self,
+                    l: *xev.Loop,
+                    c: *xev.Completion,
+                    inner_tcp: xev.TCP,
+                    _: xev.WriteBuffer,
+                    w: xev.WriteError!usize,
+                ) xev.CallbackAction {
+                    const inner_self = ud orelse unreachable;
+                    const inner_ctx = inner_self.tls orelse unreachable;
+                    const ciphertext_written = w catch |err| return @call(.always_inline, callback, .{
+                        ud,
+                        l,
+                        c,
+                        inner_tcp,
+                        xev.WriteBuffer{ .slice = inner_ctx.connection.active.write_buffer },
+                        err,
+                    });
+                    inner_ctx.ciphertext.toss(ciphertext_written);
+                    inner_ctx.ciphertext.rebase(inner_ctx.ciphertext.buffer.len) catch unreachable; // shouldn't fail
+                    if (inner_ctx.ciphertext.end > 0) {
+                        inner_tcp.write(
+                            l,
+                            c,
+                            .{ .slice = inner_ctx.ciphertext.buffered() },
+                            Self,
+                            inner_self,
+                            @This().inner,
+                        );
+                        return .disarm;
+                    }
+                    return @call(.always_inline, callback, .{
+                        ud,
+                        l,
+                        c,
+                        inner_tcp,
+                        xev.WriteBuffer{ .slice = inner_ctx.connection.active.write_buffer },
+                        inner_ctx.connection.active.consumed,
+                    });
+                }
+            }.inner,
+        );
+    } else {
+        tcp.write(
+            loop,
+            completion,
+            .{ .slice = buf },
+            Self,
+            self,
+            callback,
         );
     }
 }

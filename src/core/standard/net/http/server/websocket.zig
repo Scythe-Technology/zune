@@ -60,17 +60,18 @@ pub const Message = struct {
 };
 
 pub fn onWrite(
-    ud: ?*Self,
+    ud: ?*ClientContext,
     loop: *xev.Loop,
     completion: *xev.Completion,
     socket: xev.TCP,
     b: xev.WriteBuffer,
     res: xev.WriteError!usize,
 ) xev.CallbackAction {
-    const self = ud orelse unreachable;
+    const client = ud orelse unreachable;
+    const self = client.websocket.ref.value;
 
-    if (self.client.state.stage == .closing) {
-        self.client.close();
+    if (client.state.stage == .closing) {
+        client.close();
         return .disarm;
     }
 
@@ -86,21 +87,20 @@ pub fn onWrite(
         if (message.opcode == .Close) {
             std.debug.assert(self.message_queue.len == 0);
 
-            self.client.websocket.active = false;
-            self.client.timeout = VM.lperf.clock() + @as(f64, 3);
+            client.websocket.active = false;
+            client.timeout = VM.lperf.clock() + @as(f64, 3);
 
-            self.client.server.reloadNode(.front, self.client, loop);
+            client.server.reloadNode(.front, client, loop);
             return .disarm;
         }
 
         self.flushMessages(loop);
     } else {
-        socket.write(
+        client.stream_write(
             loop,
             completion,
-            .{ .slice = remaining },
-            Self,
-            self,
+            socket,
+            remaining,
             onWrite,
         );
     }
@@ -115,12 +115,11 @@ pub fn flushMessages(self: *Self, loop: *xev.Loop) void {
     self.sending = true;
     const node = self.message_queue.first orelse unreachable;
     const message: *Message = @fieldParentPtr("node", node);
-    self.client.socket.write(
+    self.client.stream_write(
         loop,
         &self.completion,
-        .{ .slice = message.data },
-        Self,
-        self,
+        self.client.socket,
+        message.data,
         onWrite,
     );
 }

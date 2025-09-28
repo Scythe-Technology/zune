@@ -319,4 +319,101 @@ test("TLS", function()
     }));
 end)
 
+test("TLS Server", function()
+    if (not table.find(zune.process.args, "allow")) then
+        print(`Skip TLS test`);
+        return;
+    end
+    local server_events = {};
+    local server = net.http.serve({
+        port = 8080,
+        reuse_address = true,
+        tls = {
+            auth = zune.crypto.tls.keyPairFromFile("test/standard/net/cert.pem", "test/standard/net/key.pem")
+        },
+        request = function(req)
+            table.insert(server_events, `request`);
+            return "";
+        end,
+        websocket = {
+            upgrade = function(req)
+                table.insert(server_events, `upgrade`);
+                return true;
+            end,
+            open = function(ws)
+                table.insert(server_events, `open`);
+            end,
+            message = function(ws, message)
+                table.insert(server_events, `message: {message}`);
+                ws:send(`Echo: {message}`);
+                ws:close(1000);
+            end,
+            close = function(ws, code)
+                table.insert(server_events, `close: {code}`);
+            end,
+        },
+    });
+    expect(server).toBe(expect.type("userdata"));
+
+    testing.defer(function()
+        server:stop();
+    end)
+
+    local client_events = {};
+    local resume_thread: thread? = nil;
+    local socket = net.http.websocket("ws://localhost:8080", {
+        tls = {
+            host = "",
+            ca = zune.crypto.tls.bundleFromFile("test/standard/net/cert.pem"),
+        },
+        error = function(socket, scope, err)
+            table.insert(client_events, `error: {scope}, {err}`);
+        end,
+        message = function(socket, message)
+            table.insert(client_events, `message: {message}`);
+        end,
+        close = function(socket, closeCode)
+            table.insert(client_events, `close: {closeCode}`);
+            if (resume_thread) then
+                task.defer(resume_thread);
+            end
+        end,
+    });
+    expect(socket).toBe(expect.type("userdata"));
+    testing.defer(function()
+        socket:close();
+    end)
+
+    expect(socket).toBe(expect.type("userdata"));
+    expect(socket:isConnected()).toBe(true);
+
+    expect(server_events).toBe(expect.similar({
+        "upgrade",
+        "open",
+    }));
+    expect(client_events).toBe(expect.similar({}));
+
+    task.wait();
+    
+    socket:send("Test 1");
+
+    expect(socket:isConnected()).toBe(true);
+
+    resume_thread = coroutine.running();
+    coroutine.yield();
+
+    expect(socket:isConnected()).toBe(false);
+
+    expect(server_events).toBe(expect.similar({
+        "upgrade",
+        "open",
+        "message: Test 1",
+        "close: 1000",
+    }));
+    expect(client_events).toBe(expect.similar({
+        "message: Echo: Test 1",
+        "close: 1000",
+    }));
+end)
+
 return nil;
