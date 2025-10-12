@@ -421,7 +421,8 @@ const LuaWatch = struct {
     pub fn lua_stop(self: *LuaWatch, L: *VM.lua.State) !i32 {
         if (self.state.state.load(.acquire) != .Alive)
             return L.Zerror("watcher already stopped");
-        _ = self.state.state.cmpxchgStrong(.Alive, .Terminating, .release, .acquire);
+        _ = self.state.state.cmpxchgStrong(.Alive, .Terminating, .acq_rel, .acquire);
+        std.debug.assert(self.state.state.load(.acquire) == .Terminating);
         return 0;
     }
 
