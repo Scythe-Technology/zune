@@ -105,9 +105,8 @@ const Synchronization = struct {
     completed: LinkedList = .{},
     queue: LinkedList = .{},
     mutex: std.Thread.Mutex = .{},
-    queue_count: std.atomic.Value(usize) align(std.atomic.cache_line) = .init(0),
     notified: std.atomic.Value(bool) align(std.atomic.cache_line) = .init(false),
-    waiting: bool = false,
+    waiting: std.atomic.Value(bool) align(std.atomic.cache_line) = .init(false),
 
     pub const LinkedList = Lists.DoublyLinkedList;
 
@@ -129,14 +128,14 @@ const Synchronization = struct {
     }
 
     pub inline fn hasPending(self: *Synchronization) bool {
-        return self.waiting or // awaiting instances
+        return self.waiting.load(.acquire) or // awaiting instances
             self.notified.load(.acquire); // completed instances
     }
 
     pub fn notify(self: *Synchronization, scheduler: *Scheduler) void {
-        if (self.notified.load(.acquire))
+        if (self.notified.cmpxchgStrong(false, true, .acq_rel, .acquire) != null)
             return;
-        self.notified.store(true, .release);
+        std.debug.assert(self.notified.load(.acquire) == true);
         scheduler.async.notify() catch |err| std.debug.print("[Async Notify Error: {}]\n", .{err});
     }
 
@@ -147,16 +146,18 @@ const Synchronization = struct {
         _: xev.Dynamic.Async.WaitError!void,
     ) xev.Dynamic.CallbackAction {
         const self: *Synchronization = @alignCast(@fieldParentPtr("completion", completion));
-        if (self.queue_count.load(.acquire) > 0)
+        self.mutex.lock();
+        if (self.queue.len > 0)
             return .rearm;
-        self.waiting = false;
+        self.mutex.unlock();
+        self.waiting.store(false, .release);
         return .disarm;
     }
 
     pub fn wait(self: *Synchronization, scheduler: *Scheduler) void {
-        if (self.waiting)
+        if (self.waiting.cmpxchgStrong(false, true, .acq_rel, .acquire) != null)
             return;
-        self.waiting = true;
+        std.debug.assert(self.waiting.load(.acquire) == true);
         scheduler.async.wait(
             &scheduler.loop,
             &self.completion,
@@ -246,7 +247,7 @@ thread_pool: *xev.ThreadPool,
 now_clock: f64 = 0,
 
 running: bool = false,
-threadId: std.Thread.Id = 0,
+thread_id: std.Thread.Id = 0,
 
 sync: Synchronization,
 
@@ -391,20 +392,20 @@ pub fn cancelAsyncTask(
 
 /// Can be called from any thread
 pub fn synchronize(self: *Scheduler, data: anytype) void {
-    self.sync.mutex.lock();
-    defer self.sync.mutex.unlock();
     const Node = Synchronization.Node(@typeInfo(@TypeOf(data)).pointer.child);
     const ptr: *Node = @fieldParentPtr("data", data);
+    self.sync.mutex.lock();
+    defer self.sync.mutex.unlock();
     self.sync.queue.remove(&ptr.node);
     self.sync.completed.append(&ptr.node);
     self.sync.notify(self);
-    _ = self.sync.queue_count.fetchSub(1, .acq_rel);
 }
 
 pub fn asyncWaitForSync(self: *Scheduler, data: anytype) void {
-    _ = self.sync.queue_count.fetchAdd(1, .acq_rel);
     const Node = Synchronization.Node(@typeInfo(@TypeOf(data)).pointer.child);
     const ptr: *Node = @fieldParentPtr("data", data);
+    self.sync.mutex.lock();
+    defer self.sync.mutex.unlock();
     self.sync.queue.append(&ptr.node);
     self.sync.wait(self);
 }
@@ -511,13 +512,16 @@ inline fn processFrame(self: *Scheduler, comptime frame: FrameKind) void {
         },
         .Synchronize => {
             self.sync.mutex.lock();
-            defer self.sync.mutex.unlock();
+
+            var list: Synchronization.LinkedList = self.sync.completed;
+            self.sync.completed = .{};
 
             self.sync.notified.store(false, .release);
 
-            const SyncNode = Synchronization.Node(void);
+            self.sync.mutex.unlock();
 
-            while (self.sync.completed.popFirst()) |node| {
+            const SyncNode = Synchronization.Node(void);
+            while (list.popFirst()) |node| {
                 const sync: *SyncNode = @fieldParentPtr("node", node);
                 sync.callback(sync, self);
             }
@@ -585,7 +589,7 @@ inline fn processFrame(self: *Scheduler, comptime frame: FrameKind) void {
 
 pub fn run(self: *Scheduler, comptime mode: Zune.RunMode) void {
     std.debug.assert(!self.running);
-    self.threadId = std.Thread.getCurrentId();
+    self.thread_id = std.Thread.getCurrentId();
     self.running = true;
     var timer_completion: xev.Dynamic.Completion = .init();
     var timer_cancel_completion: xev.Dynamic.Completion = .init();
@@ -644,7 +648,7 @@ pub fn deinit(self: *Scheduler) void {
     switch (comptime builtin.os.tag) {
         .freebsd => {
             // TODO: Fix FreeBSD thread pool indefinitely blocking on deinit.
-            if (Zune.STATE.MAIN_THREAD_ID != self.threadId) {
+            if (Zune.STATE.MAIN_THREAD_ID != self.thread_id) {
                 // Attempt to clean up thread pool on sub thread scheduler.
                 self.thread_pool.deinit();
             } else {

@@ -21,11 +21,6 @@ pub fn PlatformSupported() bool {
 
 pub threadlocal var THREADS: Lists.DoublyLinkedList = .{};
 
-const ATOMIC_MODE: enum { atomic, lock } = switch (builtin.cpu.arch) {
-    .x86_64 => .atomic,
-    else => .lock,
-};
-
 pub const Sync = struct {
     node: Lists.DoublyLinkedList.Node = .{},
     scheduler: *Scheduler,
@@ -254,13 +249,11 @@ const LuaThread = struct {
 
     pub fn lua_start(self: *LuaThread, L: *VM.lua.State) !i32 {
         const runtime = self.runtime;
-        if (comptime ATOMIC_MODE == .lock) runtime.access_mutex.lock();
-        defer if (comptime ATOMIC_MODE == .lock) runtime.access_mutex.unlock();
-        if (runtime.status.load(.acquire) != .ready) {
+        if (runtime.status.cmpxchgStrong(.ready, .running, .acq_rel, .acquire) != null) {
             return L.Zerror("thread running or dead");
         }
 
-        runtime.status.store(.running, .release);
+        std.debug.assert(runtime.status.load(.acquire) == .running);
         runtime.thread = std.Thread.spawn(.{}, Runtime.entry, .{runtime}) catch |err| {
             runtime.status.store(.dead, .release);
             return L.Zerrorf("failed to start thread: {}", .{err});
@@ -376,8 +369,6 @@ const LuaThread = struct {
 
     pub fn lua_status(self: *LuaThread, L: *VM.lua.State) !i32 {
         const runtime = self.runtime;
-        if (comptime ATOMIC_MODE == .lock) runtime.access_mutex.lock();
-        defer if (comptime ATOMIC_MODE == .lock) runtime.access_mutex.unlock();
         try L.pushlstring(@tagName(runtime.status.load(.acquire)));
         return 1;
     }

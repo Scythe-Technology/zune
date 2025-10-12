@@ -19,7 +19,7 @@ jobs:
       - name: Setup Zig
         uses: mlugg/setup-zig@v2
         with:
-          version: 0.15.1
+          version: 0.15.2
           use-cache: false
 
       - name: Get Zune Version
@@ -82,7 +82,7 @@ jobs:
     - name: Setup Zig
       uses: mlugg/setup-zig@v2
       with:
-        version: 0.15.1
+        version: 0.15.2
         use-cache: false
 
     - name: Build

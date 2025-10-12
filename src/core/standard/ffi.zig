@@ -1942,7 +1942,7 @@ fn FFIPushPtrType(
 fn ffi_closure_inner(call_info: *const LuaClosure.CallInfo, extern_args: [*]?*anyopaque, ret: ?*anyopaque) callconv(.c) void {
     const scheduler = Scheduler.getScheduler(call_info.thread);
 
-    const main_thread = std.Thread.getCurrentId() == scheduler.threadId;
+    const main_thread = std.Thread.getCurrentId() == scheduler.thread_id;
 
     if (!main_thread)
         std.debug.panic("Cannot call FFI closure from non-main thread", .{});

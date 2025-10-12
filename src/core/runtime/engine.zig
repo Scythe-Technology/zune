@@ -202,7 +202,10 @@ pub fn logDetailedDef(L: *VM.lua.State, idx: i32) !void {
             defer allocaing.deinit();
 
             _ = reader.streamDelimiter(&allocaing.writer, '\n') catch |e| switch (e) {
-                error.EndOfStream => return printPreviewError(padded_string, source_line, "Line EOF", .{}),
+                error.EndOfStream => {
+                    if (allocaing.written().len == 0)
+                        return printPreviewError(padded_string, source_line, "Line EOF", .{});
+                },
                 else => return printPreviewError(padded_string, source_line, "Failed to read line: {t}", .{e}),
             };
 
@@ -400,7 +403,10 @@ pub fn logDetailedError(L: *VM.lua.State) !void {
             defer allocaing.deinit();
 
             _ = reader.streamDelimiter(&allocaing.writer, '\n') catch |e| switch (e) {
-                error.EndOfStream => break :blk printPreviewError(padded_string, current_line, "Line EOF", .{}),
+                error.EndOfStream => {
+                    if (allocaing.written().len == 0)
+                        break :blk printPreviewError(padded_string, current_line, "Line EOF", .{});
+                },
                 else => break :blk printPreviewError(padded_string, current_line, "Failed to read line: {t}", .{e}),
             };
 
