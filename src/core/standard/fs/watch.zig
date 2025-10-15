@@ -586,7 +586,7 @@ pub const FileSystemWatcher = struct {
         };
         var attr = std.os.windows.OBJECT_ATTRIBUTES{
             .Length = @sizeOf(std.os.windows.OBJECT_ATTRIBUTES),
-            .RootDirectory = self.dir.fd,
+            .RootDirectory = if (std.fs.path.isAbsoluteWindowsW(ptr)) null else self.dir.fd,
             .Attributes = 0,
             .ObjectName = &nt_name,
             .SecurityDescriptor = null,
