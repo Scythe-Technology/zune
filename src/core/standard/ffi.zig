@@ -1623,8 +1623,7 @@ fn generateStructTypeFromSymbol(writer: *std.Io.Writer, symbol: DataType, order:
     if (struct_info.field_len > 0) {
         var count: u8 = 0;
         for (struct_info.fields[0..struct_info.field_len]) |field_kind| {
-            if (field_kind == 0)
-                continue;
+            std.debug.assert(field_kind != 0);
             defer count += 1;
             const kind: DataType.Types = @enumFromInt(field_kind - 1);
             try DataTypes.generateCTypeName(kind, writer, 0, false);
