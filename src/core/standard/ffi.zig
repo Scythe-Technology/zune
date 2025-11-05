@@ -247,16 +247,19 @@ pub fn makeStruct(allocator: std.mem.Allocator, fields: []const DataType) !struc
             }
         }
     }
-    return .{ .{
-        .size = size,
-        .alignment = alignment,
-        .kind = .{
-            .@"struct" = .{
-                .fields = inherit,
-                .field_len = count,
+    return .{
+        .{
+            .size = size,
+            .alignment = alignment,
+            .kind = .{
+                .@"struct" = .{
+                    .fields = inherit,
+                    .field_len = count,
+                },
             },
         },
-    }, offsets };
+        offsets,
+    };
 }
 
 pub const LuaPointer = struct {
@@ -1617,7 +1620,6 @@ fn generateStructTypeFromSymbol(writer: *std.Io.Writer, symbol: DataType, order:
     else
         try writer.print("anon_{d} {{ ", .{order - 1});
 
-    var filled: usize = 0;
     if (struct_info.field_len > 0) {
         var count: u8 = 0;
         for (struct_info.fields[0..struct_info.field_len]) |field_kind| {
@@ -1627,11 +1629,9 @@ fn generateStructTypeFromSymbol(writer: *std.Io.Writer, symbol: DataType, order:
             const kind: DataType.Types = @enumFromInt(field_kind - 1);
             try DataTypes.generateCTypeName(kind, writer, 0, false);
             try writer.print(" _{d}; ", .{count});
-            filled += kind.size();
         }
-    }
-    if (filled < symbol.size) {
-        try writer.print("unsigned char _[{d}]; ", .{symbol.size - filled});
+    } else {
+        try writer.print("unsigned char _[{d}]; ", .{symbol.size});
     }
     try writer.print("}};\n", .{});
 }
