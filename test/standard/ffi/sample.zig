@@ -100,6 +100,18 @@ export fn new_vec3_32(x: f32, y: f32, z: f32) Vec3_32 {
     };
 }
 
+const SmallField = extern struct {
+    first: u32,
+    second: *allowzero anyopaque,
+};
+
+export fn get_small_field() SmallField {
+    return .{
+        .first = 67,
+        .second = @ptrFromInt(0),
+    };
+}
+
 export fn new_i32() *i32 {
     const ptr = std.heap.page_allocator.create(i32) catch @panic("allocation failed");
     ptr.* = 123;

@@ -621,6 +621,11 @@ describe("FFI", function()
             { second = ffi.types.vector3_32 },
         });
 
+        local small_field_struct = ffi.struct({
+            { first = ffi.types.u32 },
+            { second = ffi.types.pointer },
+        });
+
         local blank_defintion = {
             returns = ffi.types.void,
             args = {},
@@ -693,6 +698,10 @@ describe("FFI", function()
             returns = ffi.types.vector3_32,
             args = {ffi.types.float, ffi.types.float, ffi.types.float},
         };
+        local small_field_defintion = {
+            returns = small_field_struct,
+            args = {},
+        };
         local check_nullptr_defintion = {
             returns = ffi.types.u8,
             args = {ffi.types.pointer},
@@ -724,6 +733,8 @@ describe("FFI", function()
 
             new_vec2_32 = new_vec2_32_defintion,
             new_vec3_32 = new_vec3_32_defintion,
+
+            get_small_field = small_field_defintion,
 
             new_i32 = new_i32_defintion,
             free_i32 = free_i32_defintion,
@@ -1512,6 +1523,25 @@ describe("FFI", function()
                     expect(check_vec3_32(buf)).toBe(0);
                     expect(check_vec3_32(vec)).toBe(0);
                 end
+            end)
+        end)
+        
+        describe("Symbol<small_field get_small_field()>", function()
+            test("Library Fn", function()
+                local buf = lib.get_small_field();
+
+                expect(buffer.readu32(buf, 0)).toBe(67);
+                local ptr = ffi.ptrFromAddress(zune.mem.slice(buf, 4, 8));
+                expect(ptr == ffi.null).toBe(true);
+            end)
+            test("Dynamic Fn", function()
+                local get_small_field = ffi.fn(small_field_defintion, lib:getSymbol("get_small_field") or error("Symbol 'check_vec3_32' not found"));
+
+                local buf = get_small_field();
+
+                expect(buffer.readu32(buf, 0)).toBe(67);
+                local ptr = ffi.ptrFromAddress(zune.mem.slice(buf, 4, 8));
+                expect(ptr == ffi.null).toBe(true);
             end)
         end)
 
