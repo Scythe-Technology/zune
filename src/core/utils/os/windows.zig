@@ -81,6 +81,13 @@ pub fn OpenFile(self: fs.Dir, path: []const u8, opts: OpenFileOptions) fs.File.O
     return .{ .handle = handle };
 }
 
+pub extern "kernel32" fn ReOpenFile(
+    hOriginalFile: ?windows.HANDLE,
+    dwDesiredAccess: windows.DWORD,
+    dwShareMode: windows.DWORD,
+    dwFlagsAndAttributes: windows.DWORD,
+) callconv(.winapi) ?windows.HANDLE;
+
 // based on std.process.Child
 pub fn spawnWindows(self: *ChildProcess) ChildProcess.SpawnError!void {
     var saAttr = windows.SECURITY_ATTRIBUTES{
