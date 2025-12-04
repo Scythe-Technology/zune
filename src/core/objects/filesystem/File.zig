@@ -643,7 +643,7 @@ fn lua_seekFromEnd(self: *File, L: *VM.lua.State) !i32 {
         .File => {},
         .Tty => return error.NotSeekable,
     }
-    try self.file.seekFromEnd(@intFromFloat(@max(0, L.Loptnumber(2, 0))));
+    try self.file.seekFromEnd(@intFromFloat(L.Loptnumber(2, 0)));
     return 0;
 }
 
