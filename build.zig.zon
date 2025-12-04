@@ -1,6 +1,6 @@
 .{
     .name = .Zune,
-    .version = "0.5.1",
+    .version = "0.5.2",
     .minimum_zig_version = "0.15.0",
     .dependencies = .{
         .luau = .{
