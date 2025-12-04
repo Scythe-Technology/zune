@@ -499,6 +499,13 @@ pub const AsyncWriteContext = struct {
     }
 };
 
+inline fn getPos(self: *File) !u64 {
+    return switch (self.kind) {
+        .File => if (self.mode.canSeek()) try self.file.getPos() else 0,
+        .Tty => 0,
+    };
+}
+
 fn lua_write(self: *File, L: *VM.lua.State) !i32 {
     if (!self.mode.canWrite())
         return error.NotOpenForWriting;
@@ -513,12 +520,52 @@ fn lua_write(self: *File, L: *VM.lua.State) !i32 {
         else => {},
     }
 
-    const pos = switch (self.kind) {
-        .File => if (self.mode.canSeek()) try self.file.getPos() else 0,
-        .Tty => 0,
-    };
+    return File.AsyncWriteContext.queue(
+        L,
+        self.file,
+        data,
+        false,
+        try self.getPos(),
+        self.kind,
+        self.list,
+    );
+}
 
-    return File.AsyncWriteContext.queue(L, self.file, data, false, pos, self.kind, self.list);
+fn windows_pwriteAll(self: *File, data: []const u8, pos: u64) !void {
+    const file: std.fs.File = blk: {
+        if (!self.overlapped)
+            break :blk self.file;
+        var io_status_block: std.os.windows.IO_STATUS_BLOCK = undefined;
+        var access: std.os.windows.FILE_ACCESS_INFORMATION = undefined;
+        switch (std.os.windows.ntdll.NtQueryInformationFile(
+            self.file.handle,
+            &io_status_block,
+            &access,
+            @sizeOf(std.os.windows.FILE_ACCESS_INFORMATION),
+            .FileAccessInformation,
+        )) {
+            .SUCCESS => {},
+            .INVALID_PARAMETER => unreachable,
+            else => return error.Unexpected,
+        }
+        const handle = @import("../../utils/os/windows.zig").ReOpenFile(
+            self.file.handle,
+            access.AccessFlags,
+            if (self.mode.canRead())
+                std.os.windows.FILE_SHARE_WRITE | std.os.windows.FILE_SHARE_READ
+            else
+                std.os.windows.FILE_SHARE_WRITE,
+            0,
+        ) orelse return error.Unexpected;
+        if (handle == std.os.windows.INVALID_HANDLE_VALUE)
+            return error.Unexpected;
+
+        break :blk .{ .handle = handle };
+    };
+    defer if (self.overlapped) file.close();
+
+    defer if (self.overlapped and self.mode.canSeek()) self.file.seekTo(pos + data.len) catch {};
+    try file.pwriteAll(data, pos);
 }
 
 fn lua_writeSync(self: *File, L: *VM.lua.State) !i32 {
@@ -526,7 +573,10 @@ fn lua_writeSync(self: *File, L: *VM.lua.State) !i32 {
         return error.NotOpenForWriting;
     const data = try L.Zcheckvalue([]const u8, 2, null);
 
-    try self.file.writeAll(data);
+    switch (comptime builtin.os.tag) {
+        .windows => try self.windows_pwriteAll(data, try self.getPos()),
+        else => try self.file.writeAll(data),
+    }
 
     return 0;
 }
@@ -560,8 +610,12 @@ fn lua_appendSync(self: *File, L: *VM.lua.State) !i32 {
         return error.NotOpenForWriting;
     const string = try L.Zcheckvalue([]const u8, 2, null);
 
-    try self.file.seekFromEnd(0);
-    try self.file.writeAll(string);
+    if (self.mode.canSeek())
+        try self.file.seekFromEnd(0);
+    switch (comptime builtin.os.tag) {
+        .windows => try self.windows_pwriteAll(string, try self.getPos()),
+        else => try self.file.writeAll(string),
+    }
 
     return 0;
 }
@@ -571,7 +625,7 @@ fn lua_getSeekPosition(self: *File, L: *VM.lua.State) !i32 {
         .File => {},
         .Tty => return error.NotSeekable,
     }
-    L.pushnumber(@floatFromInt(try self.file.getPos()));
+    L.pushnumber(@floatFromInt(try self.getPos()));
     return 1;
 }
 
@@ -589,7 +643,7 @@ fn lua_seekFromEnd(self: *File, L: *VM.lua.State) !i32 {
         .File => {},
         .Tty => return error.NotSeekable,
     }
-    try self.file.seekFromEnd(@intFromFloat(@max(0, L.Loptnumber(2, 0))));
+    try self.file.seekFromEnd(@intFromFloat(L.Loptnumber(2, 0)));
     return 0;
 }
 
@@ -685,13 +739,79 @@ fn lua_readSync(self: *File, L: *VM.lua.State) !i32 {
 
     switch (self.kind) {
         .File => {
-            const data = try self.file.readToEndAlloc(allocator, @intCast(size));
-            defer allocator.free(data);
+            switch (comptime builtin.os.tag) {
+                .windows => {
+                    const pos = try self.getPos();
 
-            if (useBuffer)
-                try L.Zpushbuffer(data)
-            else
-                try L.pushlstring(data);
+                    const file: std.fs.File = blk: {
+                        if (!self.overlapped)
+                            break :blk self.file;
+                        var io_status_block: std.os.windows.IO_STATUS_BLOCK = undefined;
+                        var access: std.os.windows.FILE_ACCESS_INFORMATION = undefined;
+                        switch (std.os.windows.ntdll.NtQueryInformationFile(
+                            self.file.handle,
+                            &io_status_block,
+                            &access,
+                            @sizeOf(std.os.windows.FILE_ACCESS_INFORMATION),
+                            .FileAccessInformation,
+                        )) {
+                            .SUCCESS => {},
+                            .INVALID_PARAMETER => unreachable,
+                            else => return error.Unexpected,
+                        }
+                        const handle = @import("../../utils/os/windows.zig").ReOpenFile(
+                            self.file.handle,
+                            access.AccessFlags,
+                            if (self.mode.canWrite())
+                                std.os.windows.FILE_SHARE_READ | std.os.windows.FILE_SHARE_WRITE
+                            else
+                                std.os.windows.FILE_SHARE_READ,
+                            0,
+                        ) orelse return error.Unexpected;
+                        if (handle == std.os.windows.INVALID_HANDLE_VALUE)
+                            return error.Unexpected;
+
+                        break :blk .{ .handle = handle };
+                    };
+                    defer if (self.overlapped) file.close();
+
+                    var list = try std.ArrayList(u8).initCapacity(allocator, @min(size, 4096));
+                    defer list.deinit(allocator);
+
+                    var start_index: usize = 0;
+                    defer if (self.overlapped and self.mode.canSeek()) self.file.seekTo(pos + start_index) catch {};
+                    while (true) {
+                        list.expandToCapacity();
+                        const dest_slice = list.items[start_index..];
+                        const bytes_read = try file.preadAll(dest_slice, pos + start_index);
+                        start_index += bytes_read;
+
+                        if (start_index > size) {
+                            return error.StreamTooLong;
+                        }
+
+                        if (bytes_read != dest_slice.len) {
+                            list.shrinkAndFree(allocator, start_index);
+                            break;
+                        }
+
+                        try list.ensureTotalCapacity(allocator, start_index + 1);
+                    }
+                    if (useBuffer)
+                        try L.Zpushbuffer(list.items)
+                    else
+                        try L.pushlstring(list.items);
+                },
+                else => {
+                    const data = try self.file.readToEndAlloc(allocator, @intCast(size));
+                    defer allocator.free(data);
+
+                    if (useBuffer)
+                        try L.Zpushbuffer(data)
+                    else
+                        try L.pushlstring(data);
+                },
+            }
         },
         .Tty => blk: {
             var fds = [1]sysfd.context.pollfd{.{

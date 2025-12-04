@@ -437,28 +437,55 @@ describe("File Object/Handle", function()
     end)
     
     test("Create File", function()
-        local result = fs.createFile(path("sample.txt"));
-        expect(result).toBe(expect.type("userdata"));
+        do
+            local result = fs.createFile(path("sample.txt"));
+            expect(result).toBe(expect.type("userdata"));
 
-        expect(result:read()).toBe(""); -- Should have no data
+            expect(result:read()).toBe(""); -- Should have no data
 
-        expect(result:getSize()).toBe(0);
+            expect(result:getSize()).toBe(0);
 
-        result:write(textData); -- Write data
+            result:write(textData); -- Write data
 
-        expect(result:getSize()).toBe(#textData);
+            expect(result:getSize()).toBe(#textData);
 
-        result:seekFromEnd(-#textData); -- Go back to amount of textData
-        expect(result:getSize()).toBe(#textData); -- Confirm size
-        expect(result:read()).toBe(textData); -- Confirm data
+            result:seekFromEnd(-#textData); -- Go back to amount of textData
+            expect(result:getSize()).toBe(#textData); -- Confirm size
+            expect(result:read()).toBe(textData); -- Confirm data
 
-        result:sync(); -- Sync data to disk
+            result:sync(); -- Sync data to disk
 
-        result:close(); -- Close file (also syncs data)
+            result:close(); -- Close file (also syncs data)
 
-        expect(function()
-            result:read();
-        end).toThrow()
+            expect(function()
+                result:read();
+            end).toThrow()
+        end
+        do
+            local result = fs.createFile(path("sample2.txt"));
+            expect(result).toBe(expect.type("userdata"));
+
+            expect(result:readSync()).toBe(""); -- Should have no data
+
+            expect(result:getSize()).toBe(0);
+
+            result:writeSync(textData); -- Write data
+
+            expect(result:getSize()).toBe(#textData);
+
+            result:seekFromEnd(-#textData); -- Go back to amount of textData
+            
+            expect(result:getSize()).toBe(#textData); -- Confirm size
+            expect(result:readSync()).toBe(textData); -- Confirm data
+
+            result:sync(); -- Sync data to disk
+
+            result:close(); -- Close file (also syncs data)
+
+            expect(function()
+                result:readSync();
+            end).toThrow()
+        end
     end)
 
     test("Create File Execlusive", function()
@@ -470,55 +497,108 @@ describe("File Object/Handle", function()
     end)
 
     test("Open File Read Mode", function()
-        local result = fs.openFile(path("sample.txt"), {
-            mode = "r",
-        });
-        expect(result).toBe(expect.type("userdata"));
+        do
+            local result = fs.openFile(path("sample.txt"), {
+                mode = "r",
+            });
+            expect(result).toBe(expect.type("userdata"));
 
-        expect(result:getSize()).toBe(#textData);
-        expect(result:read()).toBe(textData);
-        result:seekTo(0);
-        local b = result:read(nil, true);
-        expect(b).toBe(expect.type("buffer"));
-        expect(buffer.tostring(b)).toBe(textData);
+            expect(result:getSize()).toBe(#textData);
+            expect(result:read()).toBe(textData);
+            result:seekTo(0);
+            local b = result:read(nil, true);
+            expect(b).toBe(expect.type("buffer"));
+            expect(buffer.tostring(b)).toBe(textData);
 
-        expect(function()
-            result:write("Some text");
-        end).toThrow();
+            expect(function()
+                result:write("Some text");
+            end).toThrow();
+        end
+        do
+            local result = fs.openFile(path("sample2.txt"), {
+                mode = "r",
+            });
+            expect(result).toBe(expect.type("userdata"));
+
+            expect(result:getSize()).toBe(#textData);
+            expect(result:readSync()).toBe(textData);
+            result:seekTo(0);
+            local b = result:readSync(nil, true);
+            expect(b).toBe(expect.type("buffer"));
+            expect(buffer.tostring(b)).toBe(textData);
+
+            expect(function()
+                result:write("Some text");
+            end).toThrow();
+        end
     end)
 
     test("Open File Write Mode", function()
-        local result = fs.openFile(path("sample.txt"), {
-            mode = "w",
-        });
-        expect(result).toBe(expect.type("userdata"));
+        do
+            local result = fs.openFile(path("sample.txt"), {
+                mode = "w",
+            });
+            expect(result).toBe(expect.type("userdata"));
 
-        expect(result:getSize()).toBe(#textData);
-        result:seekFromEnd();
-        result:write("Append text");
-        expect(result:getSize()).toBe(#textData + #("Append text"));
-        
-        expect(function()
-            result:read();
-        end).toThrow();
+            expect(result:getSize()).toBe(#textData);
+            result:seekFromEnd();
+            result:write("Append text");
+            expect(result:getSize()).toBe(#textData + #("Append text"));
+            
+            expect(function()
+                result:read();
+            end).toThrow();
 
-        result:close();
+            result:close();
+        end
+        do
+            local result = fs.openFile(path("sample2.txt"), {
+                mode = "w",
+            });
+            expect(result).toBe(expect.type("userdata"));
+
+            expect(result:getSize()).toBe(#textData);
+            result:seekFromEnd();
+            result:writeSync("Append text");
+            expect(result:getSize()).toBe(#textData + #("Append text"));
+            
+            expect(function()
+                result:readSync();
+            end).toThrow();
+
+            result:close();
+        end
     end)
 
     test("Open File Both Mode", function()
-        local result = fs.openFile(path("sample.txt"), {
-            mode = "rw",
-        });
-        expect(result).toBe(expect.type("userdata"));
+        do
+            local result = fs.openFile(path("sample.txt"), {
+                mode = "rw",
+            });
+            expect(result).toBe(expect.type("userdata"));
 
-        expect(result:read()).toBe(textData .. "Append text");
+            expect(result:read()).toBe(textData .. "Append text");
 
-        result:write("Some text");
+            result:write("Some text");
 
-        result:close();
+            result:close();
+        end
+        do
+            local result = fs.openFile(path("sample2.txt"), {
+                mode = "rw",
+            });
+            expect(result).toBe(expect.type("userdata"));
+
+            expect(result:readSync()).toBe(textData .. "Append text");
+
+            result:writeSync("Some text");
+
+            result:close();
+        end
     end)
 
     fs.deleteFile(path("sample.txt"));
+    fs.deleteFile(path("sample2.txt"));
 end)
 
 describe("Path", function()
