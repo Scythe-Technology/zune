@@ -14,6 +14,15 @@ describe("Toml", function()
         test("Test 2", function()
             expect(serde.toml.encode({f = {a = 1, b = 2, c = 3}})).toBe("[f]\na = 1\nc = 3\nb = 2\n");
         end)
+        test("Test 3", function()
+            expect(serde.toml.encode({f = {1,2,3}})).toBe("f = [1, 2, 3]\n");
+        end)
+        test("Test 4", function()
+            expect(serde.toml.encode({f = {{1},{2},{3}}})).toBe("f = [[1], [2], [3]]\n");
+        end)
+        test("Test 5", function()
+            expect(serde.toml.encode({f = {{a = 1},{a = 2},{a = 3}}})).toBe("f = [{a = 1}, {a = 2}, {a = 3}]\n");
+        end)
     end)
     describe("Decoding", function()
         test("Example", function()
