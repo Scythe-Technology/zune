@@ -722,7 +722,7 @@ test("Glob Match", function()
     expect(fs.path.globMatch("foo/bar/luau", "foo/bar/luau.txt")).toBeFalsy();
 end)
 
-test("Watch", function()
+local function watch()
     local changes = {};
     task.wait(0.5);
     local watcher = fs.watch(TEMP_DIR, function(path, events)
@@ -762,7 +762,7 @@ test("Watch", function()
         {path = "foo", events = {"created"}},
         {path = "foo", events = {"deleted"}},
     }));
-end)
+end
 
 test("Embedded", function()
     local contents = fs.embedFile("fs.test.luau");
