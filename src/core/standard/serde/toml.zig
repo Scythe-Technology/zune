@@ -207,14 +207,14 @@ fn encodeTable(L: *VM.lua.State, allocator: std.mem.Allocator, writer: *std.Io.W
             .String => {
                 const name = try createIndex(allocator, if (info.root) "" else info.keyName, key);
                 defer allocator.free(name);
+                if (i > 1 and !info.root)
+                    try writer.writeAll(", ");
                 try writer.writeAll(name);
                 try writer.writeAll(" = ");
                 const value = L.tostring(-1) orelse unreachable;
                 try escapeString(writer, value);
-                if (!info.root) {
-                    if (i > 1)
-                        try writer.writeAll(", ");
-                } else try writer.writeByte('\n');
+                if (info.root)
+                    try writer.writeByte('\n');
             },
             .Number => {
                 const num = L.Lchecknumber(-1);
@@ -222,19 +222,21 @@ fn encodeTable(L: *VM.lua.State, allocator: std.mem.Allocator, writer: *std.Io.W
                     return L.Zerror("invalid number value (cannot be inf or nan)");
                 const name = try createIndex(allocator, if (info.root) "" else info.keyName, key);
                 defer allocator.free(name);
+                if (i > 1 and !info.root)
+                    try writer.writeAll(", ");
                 try writer.writeAll(name);
                 try writer.writeAll(" = ");
                 const value = L.tostring(-1) orelse std.debug.panic("Number failed to convert to string\n", .{});
                 try writer.writeAll(value);
 
-                if (!info.root) {
-                    if (i > 1)
-                        try writer.writeAll(", ");
-                } else try writer.writeByte('\n');
+                if (info.root)
+                    try writer.writeByte('\n');
             },
             .Boolean => {
                 const name = try createIndex(allocator, if (info.root) "" else info.keyName, key);
                 defer allocator.free(name);
+                if (i > 1 and !info.root)
+                    try writer.writeAll(", ");
                 try writer.writeAll(name);
                 try writer.writeAll(" = ");
                 if (L.toboolean(-1))
@@ -242,10 +244,8 @@ fn encodeTable(L: *VM.lua.State, allocator: std.mem.Allocator, writer: *std.Io.W
                 else
                     try writer.writeAll("false");
 
-                if (!info.root) {
-                    if (i > 1)
-                        try writer.writeAll(", ");
-                } else try writer.writeByte('\n');
+                if (info.root)
+                    try writer.writeByte('\n');
             },
             .Table => {},
             else => |t| return L.Zerrorf("unsupported value type (got {s})", .{(VM.lapi.typename(t))}),
@@ -276,6 +276,8 @@ fn encodeTable(L: *VM.lua.State, allocator: std.mem.Allocator, writer: *std.Io.W
                 const tableSize = L.objlen(-1);
                 const j: i32 = L.rawiter(-1, 0);
                 if (tableSize > 0 or j < 0) {
+                    if (i > 1 and !info.root)
+                        try writer.writeAll(", ");
                     try writer.writeAll(name);
                     try writer.writeAll(" = ");
                     if (j >= 0) {
@@ -293,13 +295,14 @@ fn encodeTable(L: *VM.lua.State, allocator: std.mem.Allocator, writer: *std.Io.W
                         } else try writer.writeByte('\n');
                     } else {
                         try writer.writeAll("[]");
-                        if (!info.root) {
-                            try writer.writeAll(", ");
-                        } else try writer.writeByte('\n');
+                        if (info.root)
+                            try writer.writeByte('\n');
                     }
                 } else {
                     L.pop(2);
                     if (!info.root) {
+                        if (i > 1)
+                            try writer.writeAll(", ");
                         try writer.writeAll(name);
                         try writer.writeAll(" = {");
                         try encodeTable(L, allocator, writer, .{
@@ -309,9 +312,6 @@ fn encodeTable(L: *VM.lua.State, allocator: std.mem.Allocator, writer: *std.Io.W
                             .keyName = info.keyName,
                         });
                         try writer.writeByte('}');
-                        if (!info.root) {
-                            try writer.writeAll(", ");
-                        } else try writer.writeByte('\n');
                     } else {
                         var allocating: std.Io.Writer.Allocating = .init(allocator);
                         defer allocating.deinit();
