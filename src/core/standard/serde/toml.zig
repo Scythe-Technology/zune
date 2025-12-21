@@ -263,9 +263,6 @@ fn encodeTable(L: *VM.lua.State, allocator: std.mem.Allocator, writer: *std.Io.W
             .String, .Number, .Boolean => {},
             .Table => {
                 const key = L.tostring(-2).?;
-                const name = try createIndex(allocator, info.keyName, key);
-                defer allocator.free(name);
-
                 const tablePtr = L.topointer(-1).?;
 
                 if (info.tracked.contains(tablePtr))
@@ -278,6 +275,8 @@ fn encodeTable(L: *VM.lua.State, allocator: std.mem.Allocator, writer: *std.Io.W
                 if (tableSize > 0 or j < 0) {
                     if (i > 1 and !info.root)
                         try writer.writeAll(", ");
+                    const name = try createIndex(allocator, "", key);
+                    defer allocator.free(name);
                     try writer.writeAll(name);
                     try writer.writeAll(" = ");
                     if (j >= 0) {
@@ -299,6 +298,8 @@ fn encodeTable(L: *VM.lua.State, allocator: std.mem.Allocator, writer: *std.Io.W
                             try writer.writeByte('\n');
                     }
                 } else {
+                    const name = try createIndex(allocator, info.keyName, key);
+                    defer allocator.free(name);
                     L.pop(2);
                     if (!info.root) {
                         if (i > 1)
