@@ -226,7 +226,7 @@ describe("Aliases", function()
         expect(err).toBe("could not jump to alias \"test\"");
     end)
 
-    local HOME = zune.process.env.HOME
+    local HOME = zune.process.env.HOME or zune.process.env.USERPROFILE
     test("@Home", function()
         local ok, err = pcall(require, "@home");
         expect(ok).toBeFalsy();
