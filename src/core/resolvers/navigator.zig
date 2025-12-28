@@ -9,6 +9,7 @@ const PathType = enum {
     RelativeToCurrent,
     RelativeToParent,
     Aliased,
+    Home,
     Unsupported,
 
     pub fn get(path: []const u8) PathType {
@@ -24,6 +25,10 @@ const PathType = enum {
                 else => return .Unsupported,
             },
             '@' => return .Aliased,
+            '~' => switch (if (path.len == 1) return .Home else path[1]) {
+                '/', '\\' => return .Home,
+                else => return .Unsupported,
+            },
             else => return .Unsupported,
         }
     }
@@ -220,7 +225,7 @@ pub fn navigate(allocator: std.mem.Allocator, context: anytype, from: []const u8
         return error.PathTooLong;
 
     const path_type = PathType.get(path);
-    if (path_type == .Unsupported)
+    if (path_type == .Unsupported or path_type == .Home)
         return error.PathUnsupported;
 
     defer PATH_ALLOCATOR.reset();
@@ -289,7 +294,7 @@ pub fn navigate(allocator: std.mem.Allocator, context: anytype, from: []const u8
                 return error.PathTooLong;
 
             switch (PathType.get(alias_value)) {
-                .RelativeToCurrent, .RelativeToParent => {},
+                .RelativeToCurrent, .RelativeToParent, .Home => {},
                 .Aliased => {
                     if (out_err) |ptr_out|
                         ptr_out.* = try std.fmt.allocPrint(allocator, "alias \"@{s}\" cannot point to an aliased path (\"{s}\")", .{ alias_name, alias_value });
@@ -329,7 +334,7 @@ pub fn navigate(allocator: std.mem.Allocator, context: anytype, from: []const u8
                 section,
             );
         },
-        .Unsupported => unreachable,
+        .Unsupported, .Home => unreachable,
     }
 }
 

@@ -225,6 +225,19 @@ describe("Aliases", function()
         expect(ok).toBeFalsy();
         expect(err).toBe("could not jump to alias \"test\"");
     end)
+
+    local HOME = zune.process.env.HOME or zune.process.env.USERPROFILE
+    test("@Home", function()
+        local ok, err = pcall(require, "@home");
+        expect(ok).toBeFalsy();
+        expect(err).toBe(`module not found: "{HOME}"`);
+    end)
+
+     test("@Home_Sub", function()
+        local ok, err = pcall(require, "@home_sub");
+        expect(ok).toBeFalsy();
+        expect(err).toBe(`module not found: "{zune.fs.path.join(HOME, "sub_path")}"`);
+    end)
 end)
 
 describe("Require with Context", function()
