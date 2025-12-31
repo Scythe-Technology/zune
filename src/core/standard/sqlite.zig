@@ -249,10 +249,12 @@ const LuaDatabase = struct {
         const args = L.gettop();
         const ML = try L.newthread();
         L.xpush(ML, VM.lua.upvalueindex(2));
-        if (args > 0)
+        if (args > 0) {
+            try ML.rawcheckstack(args + 1);
             for (1..@intCast(args + 1)) |i| {
                 L.xpush(ML, @intCast(i));
-            };
+            }
+        }
 
         const status = Scheduler.resumeState(ML, L, @intCast(args)) catch |err| {
             ptr.db.exec("ROLLBACK", &.{}) catch |sql_err| switch (sql_err) {

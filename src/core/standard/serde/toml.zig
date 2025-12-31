@@ -94,6 +94,7 @@ fn createIndex(allocator: std.mem.Allocator, all: []const u8, key: []const u8) !
 }
 
 fn encodeArrayPartial(L: *VM.lua.State, allocator: std.mem.Allocator, arraySize: usize, writer: *std.Io.Writer, info: EncodeInfo) anyerror!void {
+    try L.rawcheckstack(4);
     var size: usize = 0;
     var i: i32 = L.rawiter(-1, 0);
     while (i >= 0) : (i = L.rawiter(-1, i)) {
@@ -196,6 +197,7 @@ fn encodeArrayPartial(L: *VM.lua.State, allocator: std.mem.Allocator, arraySize:
 }
 
 fn encodeTable(L: *VM.lua.State, allocator: std.mem.Allocator, writer: *std.Io.Writer, info: EncodeInfo) anyerror!void {
+    try L.rawcheckstack(4);
     var i: i32 = L.rawiter(-1, 0);
     while (i >= 0) : (i = L.rawiter(-1, i)) {
         switch (L.typeOf(-2)) {
@@ -366,6 +368,7 @@ const NEWLINE = [_]u8{ '\r', '\n' };
 fn decodeGenerateName(L: *VM.lua.State, name: []const u8, comptime includeLast: bool) !void {
     var last_pos: usize = 0;
     var p: usize = 0;
+    try L.rawcheckstack(3);
     while (p < name.len) switch (name[p]) {
         '"', '\'' => {
             const slice = name[last_pos..];
@@ -555,6 +558,8 @@ fn decodeArray(L: *VM.lua.State, string: []const u8, info: *DecodeInfo) !usize {
         return Error.MissingArray;
     try L.newtable();
 
+    try L.rawcheckstack(1);
+
     if (string[1] == ']')
         return 2;
 
@@ -603,6 +608,8 @@ fn decodeTable(L: *VM.lua.State, string: []const u8, info: *DecodeInfo) !usize {
         return Error.MissingTable;
 
     try L.newtable();
+
+    try L.rawcheckstack(2);
 
     if (string[1] == '}')
         return 2;

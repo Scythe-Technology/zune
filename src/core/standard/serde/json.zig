@@ -90,6 +90,8 @@ fn encode(
             try tracked.put(allocator, tablePtr, undefined);
             defer std.debug.assert(tracked.remove(tablePtr));
 
+            try L.rawcheckstack(2);
+
             const tableSize = L.objlen(-1);
             var i: i32 = L.rawiter(-1, 0);
             if (tableSize > 0 or i < 0) {

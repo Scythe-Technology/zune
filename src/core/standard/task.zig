@@ -55,6 +55,7 @@ fn lua_spawn(L: *VM.lua.State) !i32 {
     };
 
     if (args > 0) {
+        try thread.rawcheckstack(args);
         for (0..@intCast(args)) |i|
             L.xpush(thread, @intCast(i + 2));
     }
@@ -85,6 +86,7 @@ fn lua_defer(L: *VM.lua.State) !i32 {
     };
 
     if (args > 0) {
+        try thread.rawcheckstack(args);
         for (0..@intCast(args)) |i|
             L.xpush(thread, @intCast(i + 2));
     }
@@ -116,6 +118,7 @@ fn lua_delay(L: *VM.lua.State) !i32 {
     };
 
     if (args > 0) {
+        try thread.rawcheckstack(args);
         for (0..@intCast(args)) |i|
             L.xpush(thread, @intCast(i + 3));
     }

@@ -403,6 +403,7 @@ pub const Parser = struct {
     }
 
     pub fn push(self: *Parser, L: *VM.lua.State, buffer: bool) !void {
+        try L.rawcheckstack(4);
         try L.Zpushvalue(.{
             .ok = self.status_code >= 200 and self.status_code < 300,
             .status_code = self.status_code,

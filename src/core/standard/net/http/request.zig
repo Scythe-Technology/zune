@@ -549,6 +549,7 @@ pub const Parser = struct {
     }
 
     pub fn push(self: *Parser, L: *VM.lua.State) !void {
+        try L.rawcheckstack(4);
         try L.createtable(0, 2);
 
         try L.Zsetfield(-1, "method", @tagName(self.method));
