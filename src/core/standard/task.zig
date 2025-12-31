@@ -85,13 +85,13 @@ fn lua_defer(L: *VM.lua.State) !i32 {
         }
     };
 
+    try thread.rawcheckstack(args + 1);
     if (args > 0) {
-        try thread.rawcheckstack(args);
         for (0..@intCast(args)) |i|
             L.xpush(thread, @intCast(i + 2));
     }
 
-    scheduler.deferThread(thread, L, @intCast(args));
+    try scheduler.deferThread(thread, L, @intCast(args));
 
     return 1;
 }
