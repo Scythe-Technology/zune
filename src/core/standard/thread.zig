@@ -50,7 +50,11 @@ pub const Sync = struct {
         defer scheduler.freeSync(self);
         defer self.thread.deref();
 
-        _ = Scheduler.resumeState(self.thread.value, null, 0) catch {};
+        const L = self.thread.value;
+        if (L.status() != .Yield)
+            return;
+
+        _ = Scheduler.resumeState(L, null, 0) catch {};
     }
 };
 

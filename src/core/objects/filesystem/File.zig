@@ -118,6 +118,9 @@ pub const AsyncReadContext = struct {
         defer self.ref.deref();
         defer self.array.deinit(allocator);
 
+        if (L.status() != .Yield)
+            return .disarm;
+
         if (self.list) |l|
             l.remove(&self.completion);
 
@@ -363,6 +366,9 @@ pub const AsyncWriteContext = struct {
 
         defer allocator.free(self.data);
         defer self.ref.deref();
+
+        if (L.status() != .Yield)
+            return .disarm;
 
         if (self.list) |l|
             l.remove(&self.completion);

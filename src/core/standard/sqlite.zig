@@ -206,6 +206,8 @@ const LuaDatabase = struct {
         };
         const state = ctx.state.value;
         ptr.db.exec(command, &.{}) catch |err| {
+            if (state.status() != .Yield)
+                return;
             switch (err) {
                 error.OutOfMemory => state.pushstring(@errorName(err)) catch |e| std.debug.panic("{}", .{e}),
                 else => state.pushfstring("SQLite Error ({}): {s}", .{ err, ptr.db.getErrorMessage() }) catch |e| std.debug.panic("{}", .{e}),
@@ -213,6 +215,8 @@ const LuaDatabase = struct {
             _ = Scheduler.resumeStateError(state, null) catch {};
             return;
         };
+        if (state.status() != .Yield)
+            return;
         if (L.status() != .Ok) {
             L.xpush(state, 1);
             _ = Scheduler.resumeStateError(state, null) catch {};

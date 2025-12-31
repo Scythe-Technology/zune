@@ -202,6 +202,9 @@ const AsyncSendContext = struct {
         defer self.ref.deref();
         defer self.list.remove(&self.completion);
 
+        if (L.status() != .Yield)
+            return .disarm;
+
         L.pushlstring(@errorName(err)) catch |e| std.debug.panic("{}", .{e});
         _ = Scheduler.resumeStateError(L, null) catch {};
         return .disarm;
@@ -395,6 +398,9 @@ const AsyncRecvContext = struct {
         defer allocator.free(self.buffer);
         defer self.ref.deref();
         defer self.list.remove(&self.completion);
+
+        if (L.status() != .Yield)
+            return .disarm;
 
         L.pushlstring(@errorName(err)) catch |e| std.debug.panic("{}", .{e});
         _ = Scheduler.resumeStateError(L, null) catch {};
@@ -685,6 +691,9 @@ const AsyncAcceptContext = struct {
         defer self.list.remove(&self.completion);
         defer self.accepted_ref.deref(L);
 
+        if (L.status() != .Yield)
+            return .disarm;
+
         L.pushlstring(@errorName(err)) catch |e| std.debug.panic("{}", .{e});
         _ = Scheduler.resumeStateError(L, null) catch {};
         return .disarm;
@@ -857,6 +866,9 @@ const AsyncConnectContext = struct {
         defer allocator.destroy(self);
         defer self.ref.deref();
         defer self.list.remove(&self.completion);
+
+        if (L.status() != .Yield)
+            return .disarm;
 
         L.pushlstring(@errorName(err)) catch |e| std.debug.panic("{}", .{e});
         _ = Scheduler.resumeStateError(L, null) catch {};
