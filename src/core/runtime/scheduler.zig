@@ -148,9 +148,9 @@ const Synchronization = struct {
     ) xev.Dynamic.CallbackAction {
         const self: *Synchronization = @alignCast(@fieldParentPtr("completion", completion));
         self.mutex.lock();
+        defer self.mutex.unlock();
         if (self.queue.len > 0)
             return .rearm;
-        self.mutex.unlock();
         self.waiting.store(false, .release);
         return .disarm;
     }
