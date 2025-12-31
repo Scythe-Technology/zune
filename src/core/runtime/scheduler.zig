@@ -45,6 +45,7 @@ pub const ThreadRef = struct {
         const GL = L.mainthread();
         if (GL == L)
             return .{ .value = L, .ref = null };
+        L.rawcheckstack(1) catch |err| std.debug.panic("{}", .{err});
         if (L.pushthread()) {
             L.pop(1);
             return .{ .value = L, .ref = null };
@@ -147,9 +148,9 @@ const Synchronization = struct {
     ) xev.Dynamic.CallbackAction {
         const self: *Synchronization = @alignCast(@fieldParentPtr("completion", completion));
         self.mutex.lock();
+        defer self.mutex.unlock();
         if (self.queue.len > 0)
             return .rearm;
-        self.mutex.unlock();
         self.waiting.store(false, .release);
         return .disarm;
     }
@@ -274,8 +275,8 @@ pub fn init(allocator: std.mem.Allocator, L: *VM.lua.State) !Scheduler {
     };
 }
 
-pub fn deferThread(self: *Scheduler, thread: *VM.lua.State, from: ?*VM.lua.State, args: i32) void {
-    const ptr = self.allocator.create(DeferredThread) catch |err| std.debug.panic("Error: {}\n", .{err});
+pub fn deferThread(self: *Scheduler, thread: *VM.lua.State, from: ?*VM.lua.State, args: i32) !void {
+    const ptr = try self.allocator.create(DeferredThread);
     ptr.* = .{
         .from = from,
         .thread = ThreadRef.init(thread),

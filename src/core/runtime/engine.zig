@@ -519,7 +519,7 @@ pub fn runAsync(L: *VM.lua.State, sched: *Scheduler, comptime options: RunOption
     defer if (options.cleanUp) stateCleanUp();
     if (comptime Zune.corelib.thread.PlatformSupported())
         Zune.corelib.thread.THREADS = .{};
-    sched.deferThread(L, null, 0);
+    try sched.deferThread(L, null, 0);
     sched.run(options.mode);
     const threadlib = Zune.corelib.thread;
     if (comptime Zune.corelib.thread.PlatformSupported()) {

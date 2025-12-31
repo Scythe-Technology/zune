@@ -50,7 +50,11 @@ pub const Sync = struct {
         defer scheduler.freeSync(self);
         defer self.thread.deref();
 
-        _ = Scheduler.resumeState(self.thread.value, null, 0) catch {};
+        const L = self.thread.value;
+        if (L.status() != .Yield)
+            return;
+
+        _ = Scheduler.resumeState(L, null, 0) catch {};
     }
 };
 
@@ -85,6 +89,7 @@ pub const LuaValue = union(enum) {
                     else => nrec += 1,
                 };
                 try L.createtable(narray, nrec);
+                try L.rawcheckstack(2);
                 for (v.keys[0..v.len], v.values[0..v.len]) |key, value| {
                     try key.push(L);
                     try value.push(L);
@@ -135,10 +140,12 @@ pub const Transporter = struct {
             switch (self.value) {
                 .none => return 0,
                 .small => |v| {
+                    try L.rawcheckstack(1);
                     try v.push(L);
                     return 1;
                 },
                 .large => |v| {
+                    try L.rawcheckstack(v.len);
                     for (v.values[0..v.len]) |value|
                         try value.push(L);
                     return @intCast(v.len);
