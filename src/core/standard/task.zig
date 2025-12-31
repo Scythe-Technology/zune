@@ -54,6 +54,10 @@ fn lua_spawn(L: *VM.lua.State) !i32 {
         }
     };
 
+    if (thread.status() != .Yield and L.costatus(thread) != .Suspended) {
+        return L.Zerror("cannot resume non-suspended coroutine");
+    }
+
     if (args > 0) {
         try thread.rawcheckstack(args);
         for (0..@intCast(args)) |i|
@@ -84,6 +88,10 @@ fn lua_defer(L: *VM.lua.State) !i32 {
             break :th L.tothread(1) orelse return L.Zerror("thread failed");
         }
     };
+
+    if (thread.status() != .Yield and L.costatus(thread) != .Suspended) {
+        return L.Zerror("cannot resume non-suspended coroutine");
+    }
 
     try thread.rawcheckstack(args + 1);
     if (args > 0) {
@@ -116,6 +124,10 @@ fn lua_delay(L: *VM.lua.State) !i32 {
             break :th L.tothread(2) orelse return L.Zerror("thread failed");
         }
     };
+
+    if (thread.status() != .Yield and L.costatus(thread) != .Suspended) {
+        return L.Zerror("cannot resume non-suspended coroutine");
+    }
 
     if (args > 0) {
         try thread.rawcheckstack(args);
