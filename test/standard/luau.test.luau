@@ -198,6 +198,44 @@ describe("Load", function()
         expect(func()).toBe(nil);
     end)
 
+    test("Environment (3)", function()
+        local bCode = luau.compile("return require");
+        expect(buffer.tostring(bCode)).toBe("\x06\x03\x01\arequire\x00\x01\x01\x00\x00\x01\x02\x00\x04A\x00\x00\x00\f\x00\x01\x00\x00\x00\x00@\x16\x00\x02\x00\x02\x03\x01\x04\x00\x00\x00@\x00\x01\x00\x01\x18\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00");
+        local env = setmetatable({}, {});
+        local func = luau.load(bCode, {
+            chunk_name = "test",
+            env = env,
+        });
+        expect(func).toBe(expect.type("function"));
+        expect(getfenv()).never.toBe(env); -- make sure load didn't change the environment
+        expect(getfenv(func)).toBe(env); -- make sure the environment is the one we passed
+        expect(func()).toBe(nil);
+    end)
+
+    test("Environment (4)", function()
+        local bCode = luau.compile("return function() return require end");
+        expect(buffer.tostring(bCode)).toBe("\x06\x03\x01\arequire\x00\x02\x01\x00\x00\x00\x00\x00\x03\f\x00\x01\x00\x00\x00\x00@\x16\x00\x02\x00\x02\x03\x01\x04\x00\x00\x00@\x00\x01\x00\x01\x18\x00\x00\x00\x01\x00\x00\x00\x00\x01\x00\x00\x01\x02\x00\x03A\x00\x00\x00@\x00\x00\x00\x16\x00\x02\x00\x01\x06\x00\x01\x00\x01\x00\x01\x18\x00\x00\x00\x01\x00\x00\x00\x00\x01");
+        local indexed = nil
+        local env = setmetatable(
+            {},
+            {
+                __index = function(_, key)
+                    indexed = key
+                    return nil
+                end
+            }
+        );
+        local func = luau.load(bCode, {
+            chunk_name = "test",
+            env = env,
+        });
+        expect(func).toBe(expect.type("function"));
+        expect(getfenv()).never.toBe(env); -- make sure load didn't change the environment
+        expect(getfenv(func)).toBe(env); -- make sure the environment is the one we passed
+        expect(func()()).toBe(nil);
+        expect(indexed).toBe("require");
+    end)
+
     test("Literal", function()
         local func = luau.load(returnStringBytecode "Hello!");
         expect(func).toBe(expect.type("function"));

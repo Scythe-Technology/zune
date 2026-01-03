@@ -73,32 +73,34 @@ fn lua_compile(L: *VM.lua.State) !i32 {
 fn lua_load(L: *VM.lua.State) !i32 {
     const bytecode = try L.Zcheckvalue([]const u8, 1, null);
 
-    const Options = struct {
+    var use_code_gen = false;
+
+    if (try L.Zcheckvalue(?struct {
         native_code_gen: bool = false,
         chunk_name: [:0]const u8 = "(load)",
-    };
-    const opts: Options = try L.Zcheckvalue(?Options, 2, null) orelse .{};
-
-    var use_code_gen = opts.native_code_gen;
-
-    try L.load(opts.chunk_name, bytecode, 0);
+    }, 2, null)) |opts| jmp: {
+        use_code_gen = opts.native_code_gen;
+        switch (L.rawgetfield(2, "env")) {
+            .Table => {
+                // TODO: should allow env to have a metatable?
+                if (L.getmetatable(-1)) {
+                    use_code_gen = false; // dynamic env, disable codegen
+                    L.pop(1); // drop metatable
+                }
+                if (use_code_gen)
+                    L.setsafeenv(-1, true);
+                try L.load(opts.chunk_name, bytecode, -1);
+                break :jmp;
+            },
+            else => L.pop(1),
+        }
+        try L.load(opts.chunk_name, bytecode, 0);
+    } else {
+        try L.load("(load)", bytecode, 0);
+    }
 
     if (L.typeOf(-1) != .Function)
         return L.Zerror("luau error (bad load)");
-
-    if (L.typeOf(2) == .Table) {
-        if (L.rawgetfield(2, "env") == .Table) {
-            // TODO: should allow env to have a metatable?
-            if (L.getmetatable(-1)) {
-                use_code_gen = false; // dynamic env, disable codegen
-                L.pop(1); // drop metatable
-            }
-            if (use_code_gen)
-                L.setsafeenv(-1, true);
-            if (!L.setfenv(-2))
-                return L.Zerror("luau error (bad environment)");
-        } else L.pop(1);
-    }
 
     if (use_code_gen and luau.CodeGen.Supported() and Zune.STATE.LUAU_OPTIONS.JIT_ENABLED)
         luau.CodeGen.Compile(L, -1);
