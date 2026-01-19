@@ -64,7 +64,7 @@ fn lua_copy(L: *VM.lua.State) !i32 {
         isOutOfBounds(dst_offset, dst.len, len orelse 0))
         return L.Zerror("access out of bounds");
 
-    const new_len = src.len - src_offset;
+    const new_len = len orelse @min(src.len - src_offset, dst.len - dst_offset);
     const a = dst[dst_offset..][0..new_len];
     const b = src[src_offset..][0..new_len];
 

@@ -35,6 +35,24 @@ describe("Mem", function()
                 mem.copy(b, 3, "test", 0, 5);
             end).toThrow("access out of bounds");
         end
+        do
+            local b = buffer.fromstring("small");
+            mem.copy(b, 0, "test_large", 0, 5);
+            expect(mem.eql(b, "test_")).toBeTruthy();
+            expect(mem.eql(b, "test")).toBeFalsy();
+            expect(function()
+                mem.copy(b, 0, "test_large", 0, 10);
+            end).toThrow("access out of bounds");
+        end
+        do
+            local b = buffer.fromstring("small");
+            mem.copy(b, 0, "test_large", 0);
+            expect(mem.eql(b, "test_")).toBeTruthy();
+            expect(mem.eql(b, "test")).toBeFalsy();
+            expect(function()
+                mem.copy(b, 0, "test_large", 0, 10);
+            end).toThrow("access out of bounds");
+        end
     end)
     test("slice", function()
         local a = buffer.fromstring("test");
