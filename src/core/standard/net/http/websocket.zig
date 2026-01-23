@@ -205,7 +205,7 @@ pub fn Reader(comptime masked: bool, comptime staticSize: usize, comptime maxLen
                             consumed.* += consume;
                             var short: [2]u8 = undefined;
                             @memcpy(short[0..], size_slice[0..2]);
-                            break :blk @as(usize, @byteSwap(@as(u16, @bitCast(short))));
+                            break :blk @as(u64, @byteSwap(@as(u16, @bitCast(short))));
                         },
                         127 => blk: {
                             const slice = buf[consumed.*..];
@@ -221,7 +221,7 @@ pub fn Reader(comptime masked: bool, comptime staticSize: usize, comptime maxLen
                             const consume = 8 - self.written;
                             @memcpy(size_slice[self.written..8], slice[0..consume]); // full
                             consumed.* += consume;
-                            break :blk @as(usize, @byteSwap(@as(u64, @bitCast(size_slice))));
+                            break :blk @as(u64, @byteSwap(@as(u64, @bitCast(size_slice))));
                         },
                         else => self.header.len,
                     };
