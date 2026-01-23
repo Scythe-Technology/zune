@@ -129,15 +129,16 @@ describe("Require Many Value", function()
     end)
 
     test("Require Async Error", function()
-        local success, err = pcall(require, ("./generated/yielderror"));
-        expect(success).toBe(false);
+        local ok, err = pcall(require, ("./generated/yielderror"));
+        expect(ok).toBe(false);
         expect(err).toBe("requested module failed to load");
         task.wait(0.2);
     end)
     
     test("Require Blank", function()
-        local res = require(("./generated/blank"))::any;
-        expect(res).toBe(nil);
+        local ok, err = pcall(require, ("./generated/blank"));
+        expect(ok).toBe(false);
+        expect(err).toBe("module did not exactly return one value");
     end)
     
     test("Require TooMany", function()
