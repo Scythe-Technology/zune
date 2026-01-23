@@ -374,7 +374,7 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
                 entry.value_ptr.* = .@"error";
                 return L.Zerror("module must return one value");
             } else if (t == 0)
-                ML.pushnil();
+                return L.Zerror("module did not exactly return one value");
         },
         .Yield => {
             {
