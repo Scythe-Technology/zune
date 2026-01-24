@@ -3,15 +3,19 @@ const std = @import("std");
 pub const Command = struct {
     name: []const u8,
     execute: *const fn (allocator: std.mem.Allocator, args: []const []const u8) anyerror!void,
-    aliases: ?[]const []const u8 = null,
+    aliases: []const []const u8 = &.{},
+    description: ?[]const u8 = null,
+    template: ?[]const u8 = null,
+    category: Categroy = .General,
+
+    pub const Categroy = enum { General, Display };
 };
 
 pub fn initCommands(comptime commands: []const Command) std.StaticStringMap(Command) {
     var count = 0;
 
     for (commands) |command| {
-        if (command.aliases) |aliases|
-            count += aliases.len;
+        count += command.aliases.len;
         count += 1;
     }
 
@@ -21,11 +25,10 @@ pub fn initCommands(comptime commands: []const Command) std.StaticStringMap(Comm
     for (commands) |command| {
         list[i] = .{ command.name, command };
         i += 1;
-        if (command.aliases) |aliases|
-            for (aliases) |alias| {
-                list[i] = .{ alias, command };
-                i += 1;
-            };
+        for (command.aliases) |alias| {
+            list[i] = .{ alias, command };
+            i += 1;
+        }
     }
 
     return std.StaticStringMap(Command).initComptime(list);
@@ -33,11 +36,11 @@ pub fn initCommands(comptime commands: []const Command) std.StaticStringMap(Comm
 
 const Execution = @import("execution.zig");
 
-pub const CommandMap = initCommands(&.{
+pub const Commands: []const Command = &.{
     Execution.RunCmd,
     Execution.TestCmd,
-    Execution.EvalCmd,
     Execution.DebugCmd,
+    Execution.EvalCmd,
     @import("setup.zig").Command,
     @import("repl/lib.zig").Command,
     @import("init.zig").Command,
@@ -45,9 +48,10 @@ pub const CommandMap = initCommands(&.{
 
     @import("luau.zig").Command,
     @import("help.zig").Command,
-
     @import("info.zig").Command,
-});
+};
+
+pub const CommandMap = initCommands(Commands);
 
 test {
     _ = Execution;

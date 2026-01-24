@@ -404,4 +404,9 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
     }
 }
 
-pub const Command = command.Command{ .name = "setup", .execute = Execute };
+pub const Command = command.Command{
+    .name = "setup",
+    .execute = Execute,
+    .description = "Setup environment for luau-lsp with editor of your choice.",
+    .template = "[editor]",
+};
