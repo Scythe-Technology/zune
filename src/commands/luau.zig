@@ -77,4 +77,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
 pub const Command = command.Command{
     .name = "luau",
     .execute = Execute,
+    .description = "Display info from luau.",
+    .template = "[args...]",
+    .category = .Display,
 };

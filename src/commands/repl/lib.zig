@@ -296,4 +296,5 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
 pub const Command = command.Command{
     .name = "repl",
     .execute = Execute,
+    .description = "Start REPL session.",
 };
