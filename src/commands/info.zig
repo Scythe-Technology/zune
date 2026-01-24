@@ -51,4 +51,7 @@ pub const Command = command.Command{
         "--version",
         "version",
     },
+    .description = "Display runtime information.",
+    .template = "[all]",
+    .category = .Display,
 };

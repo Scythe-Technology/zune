@@ -465,6 +465,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
 pub const Command = command.Command{
     .name = "bundle",
     .execute = Execute,
+    .description = "Bundle lua/luau scripts, files with zune as standalone executable.",
 };
 
 fn OSPath(comptime path: []const u8) []const u8 {
