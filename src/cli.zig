@@ -8,7 +8,7 @@ const CommandMap = Commands.CommandMap;
 
 pub fn start(args: [][:0]u8) !void {
     if (args.len < 2) {
-        const command = CommandMap.get("help") orelse @panic("Help command missing.");
+        const command = comptime CommandMap.get("help") orelse unreachable;
         return command.execute(Zune.DEFAULT_ALLOCATOR, &.{});
     }
 
