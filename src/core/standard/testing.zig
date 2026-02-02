@@ -207,8 +207,8 @@ pub fn runTestAsync(L: *VM.lua.State, sched: *Scheduler) !TestResult {
 
     Engine.runAsync(L, sched, .{ .cleanUp = true, .mode = .Test }) catch {};
 
-    if (Zune.FEATURES.ffi and comptime Zune.corelib.ffi.PlatformSupported())
-        Zune.corelib.ffi.deinitCacheTable(L);
+    if (Zune.FEATURES.c and comptime Zune.corelib.c.PlatformSupported())
+        Zune.corelib.c.deinitCacheTable(L);
 
     return try finish_testing(L, start);
 }

@@ -49,7 +49,7 @@ const INIT_CONFIG_FILE =
     \\#require = true
     \\#random = true
     \\#thread = true
-    \\#ffi = true
+    \\#c = true
 ;
 
 fn Execute(_: std.mem.Allocator, args: []const []const u8) !void {

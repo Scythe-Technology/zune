@@ -23,10 +23,10 @@ const TagNames: []const []const u8 = &.{
     "RANDOM",
     // REGEX
     "REGEX_COMPILED",
-    // FFI
-    "FFI_LIBRARY",
-    "FFI_POINTER",
-    "FFI_DATATYPE",
+    // C
+    "C_LIBRARY",
+    "C_POINTER",
+    "C_DATATYPE",
     // SQLITE
     "SQLITE_DATABASE",
     "SQLITE_STATEMENT",

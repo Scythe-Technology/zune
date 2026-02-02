@@ -100,7 +100,7 @@ pub var FEATURES: struct {
     require: bool = true,
     random: bool = true,
     thread: bool = true,
-    ffi: bool = true,
+    c: bool = true,
 } = .{};
 
 pub const ZuneState = struct {
@@ -298,14 +298,14 @@ pub fn quitMsg(comptime format: []const u8, args: anytype) noreturn {
 
 pub fn initState(L: *VM.lua.State) !void {
     try Resolvers.Require.init(L);
-    if (FEATURES.ffi and comptime corelib.ffi.PlatformSupported())
-        try corelib.ffi.init(L);
+    if (FEATURES.c and comptime corelib.c.PlatformSupported())
+        try corelib.c.init(L);
 }
 
 pub fn deinitState(L: *VM.lua.State) void {
     Resolvers.Require.deinit(L);
-    if (FEATURES.ffi and comptime corelib.ffi.PlatformSupported())
-        corelib.ffi.deinit(L);
+    if (FEATURES.c and comptime corelib.c.PlatformSupported())
+        corelib.c.deinit(L);
 }
 
 pub fn openZune(L: *VM.lua.State, args: []const []const u8, flags: Flags) !void {
