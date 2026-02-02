@@ -181,7 +181,7 @@ pub fn build(b: *std.Build) !void {
         .name = "sample",
         .linkage = .dynamic,
         .root_module = b.createModule(.{
-            .root_source_file = b.path("test/standard/ffi/sample.zig"),
+            .root_source_file = b.path("test/standard/c/sample.zig"),
             .link_libc = false,
             .target = target,
             .optimize = .ReleaseSafe,

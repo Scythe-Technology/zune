@@ -4,4 +4,4 @@
 detailedError = true
 
 [features.builtins]
-ffi = true
+c = true

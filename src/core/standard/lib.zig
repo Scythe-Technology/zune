@@ -1,6 +1,6 @@
 pub const fs = @import("fs/lib.zig");
 pub const io = @import("io.zig");
-pub const ffi = @import("ffi.zig");
+pub const c = @import("c.zig");
 pub const mem = @import("mem.zig");
 pub const net = @import("net/lib.zig");
 pub const task = @import("task.zig");
@@ -29,7 +29,7 @@ test {
     _ = crypto;
     _ = regex;
     _ = time;
-    _ = ffi;
+    _ = c;
     _ = sqlite;
     _ = require;
     _ = random;
