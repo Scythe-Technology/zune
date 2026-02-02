@@ -152,7 +152,7 @@ pub const Features = packed struct(u16) {
     require: bool = true,
     random: bool = true,
     thread: bool = true,
-    ffi: bool = true,
+    c: bool = true,
     _: u1 = 0, // reserved bit
 
     pub fn write(writer: anytype, features: Features) !void {
