@@ -106,9 +106,11 @@ fn lua_writeFileAsync(L: *VM.lua.State) !i32 {
     const file: fs.File = switch (comptime builtin.os.tag) {
         .windows => try @import("../../utils/os/windows.zig").OpenFile(fs.cwd(), path, .{
             .accessMode = std.os.windows.GENERIC_READ | std.os.windows.GENERIC_WRITE,
-            .creationDisposition = std.os.windows.OPEN_ALWAYS,
+            .creationDisposition = std.os.windows.CREATE_ALWAYS,
         }),
-        else => try fs.cwd().createFile(path, .{}),
+        else => try fs.cwd().createFile(path, .{
+            .truncate = true,
+        }),
     };
     errdefer file.close();
 
@@ -118,7 +120,7 @@ fn lua_writeFileAsync(L: *VM.lua.State) !i32 {
 fn lua_writeFileSync(L: *VM.lua.State) !i32 {
     const path = L.Lcheckstring(1);
     const data = try L.Zcheckvalue([]const u8, 2, null);
-    try fs.cwd().writeFile(fs.Dir.WriteFileOptions{
+    try fs.cwd().writeFile(.{
         .sub_path = path,
         .data = data,
     });
