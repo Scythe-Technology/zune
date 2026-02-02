@@ -496,16 +496,28 @@ fn lua_set(L: *VM.lua.State) !i32 {
     return 0;
 }
 
+comptime {
+    std.debug.assert(@sizeOf(f32) == @sizeOf(u32));
+}
+
 fn lua_toVector2(L: *VM.lua.State) !i32 {
     const slice = try getReadableSlice(L, 1);
     const offset = try L.Zcheckvalue(?u32, 2, null) orelse 0;
 
-    if (isOutOfBounds(offset, slice.len, 2 * @sizeOf(f32)))
+    const F32_SIZE = @sizeOf(f32);
+
+    if (isOutOfBounds(offset, slice.len, 2 * F32_SIZE))
         return L.Zerror("access out of bounds");
 
-    const vec = @as([]const f32, @ptrCast(@alignCast(slice[offset..])))[0..2];
+    const x = std.mem.readVarInt(u32, slice[offset..][0..F32_SIZE], comptime builtin.cpu.arch.endian());
+    const y = std.mem.readVarInt(u32, slice[offset + F32_SIZE ..][0..F32_SIZE], comptime builtin.cpu.arch.endian());
 
-    L.pushvector(vec[0], vec[1], 0, null);
+    L.pushvector(
+        @as(f32, @bitCast(x)),
+        @as(f32, @bitCast(y)),
+        0,
+        null,
+    );
 
     return 1;
 }
@@ -514,12 +526,21 @@ fn lua_toVector3(L: *VM.lua.State) !i32 {
     const slice = try getReadableSlice(L, 1);
     const offset = try L.Zcheckvalue(?u32, 2, null) orelse 0;
 
-    if (isOutOfBounds(offset, slice.len, 3 * @sizeOf(f32)))
+    const F32_SIZE = @sizeOf(f32);
+
+    if (isOutOfBounds(offset, slice.len, 3 * F32_SIZE))
         return L.Zerror("access out of bounds");
 
-    const vec = @as([]const f32, @ptrCast(@alignCast(slice[offset..])))[0..3];
+    const x = std.mem.readVarInt(u32, slice[offset..][0..F32_SIZE], comptime builtin.cpu.arch.endian());
+    const y = std.mem.readVarInt(u32, slice[offset + F32_SIZE ..][0..F32_SIZE], comptime builtin.cpu.arch.endian());
+    const z = std.mem.readVarInt(u32, slice[offset + 2 * F32_SIZE ..][0..F32_SIZE], comptime builtin.cpu.arch.endian());
 
-    L.pushvector(vec[0], vec[1], vec[2], null);
+    L.pushvector(
+        @as(f32, @bitCast(x)),
+        @as(f32, @bitCast(y)),
+        @as(f32, @bitCast(z)),
+        null,
+    );
 
     return 1;
 }
@@ -528,12 +549,18 @@ fn lua_writeVector2(L: *VM.lua.State) !i32 {
     const slice = try getWritableSlice(L, 1);
     const offset = try L.Zcheckvalue(?u32, 2, null) orelse 0;
 
-    if (isOutOfBounds(offset, slice.len, 2 * @sizeOf(f32)))
+    const F32_SIZE = @sizeOf(f32);
+
+    if (isOutOfBounds(offset, slice.len, 2 * F32_SIZE))
         return L.Zerror("access out of bounds");
 
     const vec = L.tovector(3) orelse return L.Zerror("expected a vector");
 
-    @memcpy(@as([]f32, @ptrCast(@alignCast(slice[offset..])))[0..2], vec[0..2]);
+    const x: [F32_SIZE]u8 = @bitCast(vec[0]);
+    const y: [F32_SIZE]u8 = @bitCast(vec[1]);
+
+    @memcpy(slice[offset..][0..F32_SIZE], x[0..]);
+    @memcpy(slice[offset + F32_SIZE ..][0..F32_SIZE], y[0..]);
 
     return 1;
 }
@@ -542,12 +569,20 @@ fn lua_writeVector3(L: *VM.lua.State) !i32 {
     const slice = try getWritableSlice(L, 1);
     const offset = try L.Zcheckvalue(?u32, 2, null) orelse 0;
 
-    if (isOutOfBounds(offset, slice.len, 3 * @sizeOf(f32)))
+    const F32_SIZE = @sizeOf(f32);
+
+    if (isOutOfBounds(offset, slice.len, 3 * F32_SIZE))
         return L.Zerror("access out of bounds");
 
     const vec = L.tovector(3) orelse return L.Zerror("expected a vector");
 
-    @memcpy(@as([]f32, @ptrCast(@alignCast(slice[offset..])))[0..3], vec[0..3]);
+    const x: [F32_SIZE]u8 = @bitCast(vec[0]);
+    const y: [F32_SIZE]u8 = @bitCast(vec[1]);
+    const z: [F32_SIZE]u8 = @bitCast(vec[2]);
+
+    @memcpy(slice[offset..][0..F32_SIZE], x[0..]);
+    @memcpy(slice[offset + F32_SIZE ..][0..F32_SIZE], y[0..]);
+    @memcpy(slice[offset + 2 * F32_SIZE ..][0..F32_SIZE], z[0..]);
 
     return 1;
 }
