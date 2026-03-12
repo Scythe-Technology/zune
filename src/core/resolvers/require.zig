@@ -127,16 +127,18 @@ const RequireNavigatorContext = struct {
         if (Zune.STATE.CONFIG_CACHE.get(path)) |cached|
             return cached;
 
-        const contents = if (Zune.STATE.BUNDLE) |*bundle|
-            bundle.loadFileAlloc(allocator, path) catch |err| switch (err) {
-                error.FileNotFound => return error.NotPresent,
-                else => return err,
-            }
-        else
-            self.dir.readFileAlloc(allocator, path, std.math.maxInt(usize)) catch |err| switch (err) {
+        const contents = blk: {
+            if (comptime Zune.Resolvers.Bundle.PlatformSupported())
+                if (Zune.STATE.BUNDLE) |*bundle|
+                    break :blk bundle.loadFileAlloc(allocator, path) catch |err| switch (err) {
+                        error.FileNotFound => return error.NotPresent,
+                        else => return err,
+                    };
+            break :blk self.dir.readFileAlloc(allocator, path, std.math.maxInt(usize)) catch |err| switch (err) {
                 error.AccessDenied, error.FileNotFound => return error.NotPresent,
                 else => return err,
             };
+        };
         defer allocator.free(contents);
 
         var config = try Config.parse(Zune.DEFAULT_ALLOCATOR, contents, out_err);
@@ -356,7 +358,7 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
 
     switch (ML.resumethread(L, 0).check() catch |err| {
         Engine.logError(ML, err, false);
-        if (Zune.Runtime.Debugger.ACTIVE) {
+        if (comptime Zune.Runtime.Debugger.PlatformSupported() and Zune.Runtime.Debugger.ACTIVE) {
             @branchHint(.unpredictable);
             switch (err) {
                 error.Runtime => Zune.Runtime.Debugger.luau_panic(ML, -2),

@@ -396,47 +396,49 @@ pub fn main() !void {
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
 
-    if (try Resolvers.Bundle.get(allocator)) |b| {
-        STATE.BUNDLE = b;
+    if (comptime Resolvers.Bundle.PlatformSupported()) {
+        if (try Resolvers.Bundle.get(allocator)) |b| {
+            STATE.BUNDLE = b;
 
-        var L = try luau.init(&allocator);
-        defer L.deinit();
-        var scheduler = try Runtime.Scheduler.init(allocator, L);
-        defer scheduler.deinit();
+            var L = try luau.init(&allocator);
+            defer L.deinit();
+            var scheduler = try Runtime.Scheduler.init(allocator, L);
+            defer scheduler.deinit();
 
-        try initState(L);
-        defer deinitState(L);
+            try initState(L);
+            defer deinitState(L);
 
-        try Runtime.Scheduler.SCHEDULERS.append(DEFAULT_ALLOCATOR, &scheduler);
+            try Runtime.Scheduler.SCHEDULERS.append(DEFAULT_ALLOCATOR, &scheduler);
 
-        try Runtime.Engine.prepAsync(L, &scheduler);
-        try openZune(L, args, .{ .limbo = b.mode.limbo });
+            try Runtime.Engine.prepAsync(L, &scheduler);
+            try openZune(L, args, .{ .limbo = b.mode.limbo });
 
-        L.setsafeenv(VM.lua.GLOBALSINDEX, true);
+            L.setsafeenv(VM.lua.GLOBALSINDEX, true);
 
-        const ML = try L.newthread();
+            const ML = try L.newthread();
 
-        try ML.Lsandboxthread();
+            try ML.Lsandboxthread();
 
-        try Runtime.Engine.setLuaFileContext(ML, .{
-            .main = true,
-        });
+            try Runtime.Engine.setLuaFileContext(ML, .{
+                .main = true,
+            });
 
-        ML.setsafeenv(VM.lua.GLOBALSINDEX, true);
+            ML.setsafeenv(VM.lua.GLOBALSINDEX, true);
 
-        switch (b.mode.compiled) {
-            .debug => Runtime.Engine.loadModule(ML, b.entry.name, b.entry.data, null) catch |err| switch (err) {
-                error.Syntax => unreachable, // should not happen
-                else => return err,
-            },
-            .release => {
-                ML.load(b.entry.name, b.entry.data, 0) catch unreachable; // should not error
-                Runtime.Engine.loadNative(ML);
-            },
+            switch (b.mode.compiled) {
+                .debug => Runtime.Engine.loadModule(ML, b.entry.name, b.entry.data, null) catch |err| switch (err) {
+                    error.Syntax => unreachable, // should not happen
+                    else => return err,
+                },
+                .release => {
+                    ML.load(b.entry.name, b.entry.data, 0) catch unreachable; // should not error
+                    Runtime.Engine.loadNative(ML);
+                },
+            }
+
+            Runtime.Engine.runAsync(ML, &scheduler, .{ .cleanUp = true }) catch std.process.exit(1);
+            return;
         }
-
-        Runtime.Engine.runAsync(ML, &scheduler, .{ .cleanUp = true }) catch std.process.exit(1);
-        return;
     }
 
     try cli.start(args);

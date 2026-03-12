@@ -1,9 +1,36 @@
 const std = @import("std");
 const lz4 = @import("lz4");
 const zstd = @import("zstd");
+const builtin = @import("builtin");
 const lcompress = @import("lcompress");
 
 const Zune = @import("zune");
+
+pub fn PlatformSupported() bool {
+    return switch (comptime builtin.cpu.arch) {
+        // 64-bit architectures
+        .aarch64,
+        .aarch64_be,
+        .amdgcn,
+        .bpfel,
+        .bpfeb,
+        .loongarch64,
+        .mips64,
+        .mips64el,
+        .nvptx64,
+        .powerpc64,
+        .powerpc64le,
+        .riscv64,
+        .s390x,
+        .sparc64,
+        .spirv64,
+        .ve,
+        .wasm64,
+        .x86_64,
+        => true,
+        else => false,
+    };
+}
 
 pub const TAG = "\x5b\x4b\x1bBUNDLE\x1d\x4d\x5d";
 

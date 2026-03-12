@@ -91,6 +91,10 @@ const COMPRESSION_MAP = std.StaticStringMap(Bundle.Section.Compression).initComp
 });
 
 fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
+    if (comptime !Bundle.PlatformSupported()) {
+        Zune.debug.print("<red>error<clear>: platform not supported\n", .{});
+        std.process.exit(1);
+    }
     if (args.len < 1) {
         Zune.debug.print("<red>usage<clear>: bundle [...flags or files]\n", .{});
         return;

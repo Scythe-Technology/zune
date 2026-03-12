@@ -1,5 +1,6 @@
 const std = @import("std");
 const luau = @import("luau");
+const builtin = @import("builtin");
 
 const Zune = @import("zune");
 
@@ -33,7 +34,15 @@ pub fn SigInt() bool {
     return false;
 }
 
+fn PlatformSupported() bool {
+    return !builtin.cpu.arch.isWasm();
+}
+
 fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
+    if (comptime !PlatformSupported()) {
+        Zune.debug.print("<red>error<clear>: platform not supported\n", .{});
+        std.process.exit(1);
+    }
     REPL_STATE = 1;
 
     var history = try History.init(allocator, ".zune/.history");
