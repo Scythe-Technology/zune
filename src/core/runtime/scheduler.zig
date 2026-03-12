@@ -445,14 +445,16 @@ pub fn resumeState(state: *VM.lua.State, from: ?*VM.lua.State, args: i32) !VM.lu
     return switch (state.status()) {
         .Yield, .Ok => state.resumethread(from, args).check() catch |err| {
             Engine.logError(state, err, false);
-            if (comptime Zune.Runtime.Debugger.PlatformSupported() and Zune.Runtime.Debugger.ACTIVE) {
-                @branchHint(.unpredictable);
-                switch (err) {
-                    error.Runtime => Zune.Runtime.Debugger.luau_panic(state, -2),
-                    else => {},
+            if (comptime Zune.Runtime.Debugger.PlatformSupported()) {
+                if (Zune.Runtime.Debugger.ACTIVE) {
+                    @branchHint(.unpredictable);
+                    switch (err) {
+                        error.Runtime => Zune.Runtime.Debugger.luau_panic(state, -2),
+                        else => {},
+                    }
                 }
+                return err;
             }
-            return err;
         },
         inline else => |e| e.check(),
     };
@@ -462,14 +464,16 @@ pub fn resumeStateError(state: *VM.lua.State, from: ?*VM.lua.State) !VM.lua.Stat
     return switch (state.status()) {
         .Yield, .Ok => state.resumeerror(from).check() catch |err| {
             Engine.logError(state, err, false);
-            if (comptime Zune.Runtime.Debugger.PlatformSupported() and Zune.Runtime.Debugger.ACTIVE) {
-                @branchHint(.unpredictable);
-                switch (err) {
-                    error.Runtime => Zune.Runtime.Debugger.luau_panic(state, -2),
-                    else => {},
+            if (comptime Zune.Runtime.Debugger.PlatformSupported()) {
+                if (Zune.Runtime.Debugger.ACTIVE) {
+                    @branchHint(.unpredictable);
+                    switch (err) {
+                        error.Runtime => Zune.Runtime.Debugger.luau_panic(state, -2),
+                        else => {},
+                    }
                 }
+                return err;
             }
-            return err;
         },
         inline else => |e| e.check(),
     };
