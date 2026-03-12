@@ -46,7 +46,7 @@ describe("Compile", function()
 end)
 
 local function returnStringBytecode(str : string)
-    return `\x06\x03\x01{string.char(#str)}{str}\x00\x01\x01\x00\x00\x01\x02\x00\x03A\x00\x00\x00\x05\x00\x00\x00\x16\x00\x02\x00\x01\x03\x01\x00\x01\x00\x01\x18\x00\x00\x00\x01\x00\x00\x00\x00\x00`
+    return "\x06\x03\x01" .. string.char(#str) .. str .. "\x00\x01\x01\x00\x00\x01\x02\x00\x03A\x00\x00\x00\x05\x00\x00\x00\x16\x00\x02\x00\x01\x03\x01\x00\x01\x00\x01\x18\x00\x00\x00\x01\x00\x00\x00\x00\x00"
 end
 
 local function timeFunction(f: (...any) -> (...any))
@@ -480,6 +480,11 @@ describe("ParseExpr", function()
                     message = "Expected identifier when parsing expression, got 'local'",
                     span_start = vector.zero,
                     span_stop = vector.create(5, 0),
+                },
+                {
+                    message = "Expected end of file",
+                    span_start = vector.create(6, 0),
+                    span_stop = vector.create(7, 0),
                 }
             },
             root = {},
