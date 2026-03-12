@@ -383,9 +383,13 @@ fn lua_embedFile(L: *VM.lua.State) !i32 {
     const resolved_path = try std.fs.path.resolve(allocator, &.{ dirname, path });
     defer allocator.free(resolved_path);
 
-    if (Zune.STATE.BUNDLE) |*b| {
-        try L.Zpushbuffer(try b.loadFile(resolved_path));
-    } else {
+    blk: {
+        if (comptime Zune.Resolvers.Bundle.PlatformSupported()) {
+            if (Zune.STATE.BUNDLE) |*b| {
+                try L.Zpushbuffer(try b.loadFile(resolved_path));
+                break :blk;
+            }
+        }
         const contents = try fs.cwd().readFileAlloc(allocator, resolved_path, std.math.maxInt(usize));
         defer allocator.free(contents);
         try L.Zpushbuffer(contents);

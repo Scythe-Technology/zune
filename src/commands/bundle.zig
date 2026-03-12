@@ -482,6 +482,8 @@ fn OSPath(comptime path: []const u8) []const u8 {
 }
 
 test "cmdBundle" {
+    if (comptime !Bundle.PlatformSupported()) return error.SkipZigTest;
+
     const allocator = std.testing.allocator;
     var temporaryDir = std.testing.tmpDir(.{
         .access_sub_paths = true,
