@@ -64,6 +64,7 @@ fn lua_getHostName(L: *VM.lua.State) !i32 {
             try L.pushlstring(wtf8_name);
             return 1;
         },
+        .wasi, .emscripten => return error.UnsupportedPlatform,
         else => {},
     }
     var buf: [std.posix.HOST_NAME_MAX]u8 = undefined;

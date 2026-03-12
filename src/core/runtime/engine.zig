@@ -502,6 +502,8 @@ pub fn prepAsync(L: *VM.lua.State, sched: *Scheduler) !void {
 }
 
 pub fn stateCleanUp() void {
+    if (comptime !@import("../../commands/repl/Terminal.zig").SupportedPlatform())
+        return;
     if (Zune.corelib.io.TERMINAL) |*terminal| {
         if (terminal.stdout_istty and terminal.stdin_istty) {
             terminal.restoreSettings() catch Zune.debug.print("[Zune] Failed to restore terminal settings\n", .{});

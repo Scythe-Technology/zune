@@ -56,12 +56,12 @@ pub const MoveCursorAction = enum {
     Right,
 };
 
-fn AssertPlatform() !void {
-    switch (comptime builtin.os.tag) {
-        .linux, .windows, .macos => {},
-        .freebsd, .openbsd, .netbsd, .dragonfly => {},
-        else => return error.UnsupportedPlatform,
-    }
+pub fn SupportedPlatform() bool {
+    return switch (comptime builtin.os.tag) {
+        .linux, .windows, .macos => true,
+        .freebsd, .openbsd, .netbsd, .dragonfly => true,
+        else => false,
+    };
 }
 
 pub fn init(stdin_file: std.fs.File, stdout_file: std.fs.File) Terminal {
@@ -75,7 +75,7 @@ pub fn init(stdin_file: std.fs.File, stdout_file: std.fs.File) Terminal {
 }
 
 pub fn validateInteractive(self: *Terminal) !void {
-    comptime try AssertPlatform();
+    comptime std.debug.assert(SupportedPlatform());
     if (!self.stdin_istty)
         return std.posix.TIOCError.NotATerminal;
     if (!self.stdout_istty)
@@ -83,7 +83,7 @@ pub fn validateInteractive(self: *Terminal) !void {
 }
 
 pub fn getSize(self: *Terminal) !struct { u16, u16 } {
-    comptime try AssertPlatform();
+    comptime std.debug.assert(SupportedPlatform());
     if (!self.stdout_istty) return std.posix.TIOCError.NotATerminal;
     if (builtin.os.tag == .windows) {
         var buf: std.os.windows.CONSOLE_SCREEN_BUFFER_INFO = undefined;
@@ -101,7 +101,7 @@ pub fn getSize(self: *Terminal) !struct { u16, u16 } {
 }
 
 pub fn saveSettings(self: *Terminal) !void {
-    comptime try AssertPlatform();
+    comptime std.debug.assert(SupportedPlatform());
     switch (comptime builtin.os.tag) {
         .linux, .windows, .macos => {},
         .freebsd, .openbsd, .netbsd, .dragonfly => {},
@@ -194,7 +194,7 @@ pub fn restoreOutputMode(self: *Terminal) !void {
 }
 
 pub fn setRawMode(self: *Terminal) !void {
-    comptime try AssertPlatform();
+    comptime std.debug.assert(SupportedPlatform());
     if (!self.stdin_istty or !self.stdout_istty)
         return;
     try self.saveSettings();
@@ -240,7 +240,7 @@ pub fn setRawMode(self: *Terminal) !void {
 }
 
 pub fn setNormalMode(self: *Terminal) !void {
-    comptime try AssertPlatform();
+    comptime std.debug.assert(SupportedPlatform());
     if (!self.stdin_istty or !self.stdout_istty)
         return;
     try self.saveSettings();
@@ -286,7 +286,7 @@ pub fn setNormalMode(self: *Terminal) !void {
 }
 
 pub fn restoreSettings(self: *Terminal) !void {
-    comptime try AssertPlatform();
+    comptime std.debug.assert(SupportedPlatform());
     if (!self.stdin_istty or !self.stdout_istty)
         return;
     const settings = self.settings orelse return;
