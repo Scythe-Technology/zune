@@ -28,18 +28,24 @@ pub const LIB_NAME = "io";
 
 const LuaTerminal = struct {
     pub fn lua_enableRawMode(L: *VM.lua.State) !i32 {
+        if (comptime !Terminal.SupportedPlatform())
+            return error.UnsupportedPlatform;
         const term = &(TERMINAL orelse return L.Zerror("Terminal not initialized"));
         L.pushboolean(if (term.setRawMode()) true else |_| false);
         return 1;
     }
 
     pub fn lua_restoreMode(L: *VM.lua.State) !i32 {
+        if (comptime !Terminal.SupportedPlatform())
+            return error.UnsupportedPlatform;
         const term = &(TERMINAL orelse return L.Zerror("Terminal not initialized"));
         L.pushboolean(if (term.restoreSettings()) true else |_| false);
         return 1;
     }
 
     pub fn lua_getSize(L: *VM.lua.State) !i32 {
+        if (comptime !Terminal.SupportedPlatform())
+            return error.UnsupportedPlatform;
         const term = &(TERMINAL orelse return L.Zerror("Terminal not initialized"));
         const x, const y = term.getSize() catch |err| {
             if (err == error.NotATerminal) {
@@ -55,6 +61,8 @@ const LuaTerminal = struct {
     }
 
     pub fn lua_getCurrentMode(L: *VM.lua.State) !i32 {
+        if (comptime !Terminal.SupportedPlatform())
+            return error.UnsupportedPlatform;
         const term = &(TERMINAL orelse return L.Zerror("Terminal not initialized"));
         try switch (term.mode) {
             .Plain => L.pushstring("normal"),
@@ -633,15 +641,13 @@ pub fn loadLib(L: *VM.lua.State) !void {
     // Terminal
     TERMINAL = Terminal.init(stdin, stdout);
     {
-        try L.newtable();
-
-        try L.Zsetfieldfn(-1, "enableRawMode", LuaTerminal.lua_enableRawMode);
-        try L.Zsetfieldfn(-1, "restoreMode", LuaTerminal.lua_restoreMode);
-        try L.Zsetfieldfn(-1, "getSize", LuaTerminal.lua_getSize);
-        try L.Zsetfieldfn(-1, "getCurrentMode", LuaTerminal.lua_getCurrentMode);
-
-        try L.Zsetfield(-1, "isTTY", TERMINAL.?.stdin_istty and TERMINAL.?.stdout_istty);
-
+        try L.Zpushvalue(.{
+            .enableRawMode = LuaTerminal.lua_enableRawMode,
+            .restoreMode = LuaTerminal.lua_restoreMode,
+            .getSize = LuaTerminal.lua_getSize,
+            .getCurrentMode = LuaTerminal.lua_getCurrentMode,
+            .isTTY = TERMINAL.?.stdin_istty and TERMINAL.?.stdout_istty,
+        });
         L.setreadonly(-1, true);
     }
     try L.rawsetfield(-2, "terminal");
