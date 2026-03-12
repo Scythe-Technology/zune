@@ -2,7 +2,6 @@ const xev = @import("xev");
 const std = @import("std");
 const luau = @import("luau");
 const json = @import("json");
-const mimalloc = @import("mimalloc");
 const builtin = @import("builtin");
 
 pub const toml = @import("libraries/toml.zig");

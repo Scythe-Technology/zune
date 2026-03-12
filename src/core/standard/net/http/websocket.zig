@@ -150,7 +150,7 @@ pub fn Reader(comptime masked: bool, comptime staticSize: usize, comptime maxLen
         comptime {
             if (maxLength) |max|
                 switch (max) {
-                    .fast, .safe => |m| std.debug.assert(m >= staticSize),
+                    .fast, .safe => |m| std.debug.assert(m >= staticSize and m <= std.math.maxInt(usize)),
                 };
         }
 
@@ -236,6 +236,8 @@ pub fn Reader(comptime masked: bool, comptime staticSize: usize, comptime maxLen
                             },
                             else => {},
                         }
+                    } else if (self.size > std.math.maxInt(usize)) {
+                        return error.MessageTooLarge;
                     }
                     self.state = .data;
                     continue :next .data;
@@ -260,17 +262,18 @@ pub fn Reader(comptime masked: bool, comptime staticSize: usize, comptime maxLen
                         }
                     }
                     if (self.size <= StaticSize) {
-                        if (self.size > 0) {
+                        const size: usize = @intCast(self.size);
+                        if (size > 0) {
                             if (self.data != .static)
                                 self.data = .{ .static = undefined };
-                            if (slice.len + self.written < self.size) {
+                            if (slice.len + self.written < size) {
                                 @memcpy(self.data.static[self.written .. self.written + slice.len], slice[0..]);
                                 self.written += slice.len;
                                 consumed.* += slice.len;
                                 return false; // partial
                             }
-                            const consume = self.size - self.written;
-                            @memcpy(self.data.static[self.written..self.size], slice[0..consume]);
+                            const consume = size - self.written;
+                            @memcpy(self.data.static[self.written..size], slice[0..consume]);
                             consumed.* += consume;
                         }
                     } else {
@@ -291,23 +294,24 @@ pub fn Reader(comptime masked: bool, comptime staticSize: usize, comptime maxLen
                                 else => {},
                             }
                         }
+                        const size: usize = @intCast(self.size);
                         if (self.data != .allocated)
-                            self.data = .{ .allocated = try allocator.alloc(u8, self.size) };
+                            self.data = .{ .allocated = try allocator.alloc(u8, size) };
                         if (slice.len + self.written < self.size) {
                             @memcpy(self.data.allocated[self.written .. self.written + slice.len], slice[0..]);
                             consumed.* += slice.len;
                             self.written += slice.len;
                             return false; // partial
                         }
-                        const consume = self.size - self.written;
-                        @memcpy(self.data.allocated[self.written..self.size], slice[0..consume]);
+                        const consume = size - self.written;
+                        @memcpy(self.data.allocated[self.written..size], slice[0..consume]);
                         consumed.* += consume;
                     }
                     if (comptime masked) {
                         const mask = self.mask[0..];
                         const payload: []u8 = switch (self.data) {
-                            .allocated => self.data.allocated[0..self.size],
-                            .static => self.data.static[0..self.size],
+                            .allocated => self.data.allocated[0..@intCast(self.size)],
+                            .static => self.data.static[0..@intCast(self.size)],
                             .none => unreachable,
                         };
                         if (payload.len > 0)
@@ -323,8 +327,8 @@ pub fn Reader(comptime masked: bool, comptime staticSize: usize, comptime maxLen
 
         pub fn getData(self: *Self) []const u8 {
             return switch (self.data) {
-                .allocated => self.data.allocated[0..self.size],
-                .static => self.data.static[0..self.size],
+                .allocated => self.data.allocated[0..@intCast(self.size)],
+                .static => self.data.static[0..@intCast(self.size)],
                 .none => &[_]u8{},
             };
         }
