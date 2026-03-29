@@ -360,6 +360,8 @@ pub fn loadLib(L: *VM.lua.State) !void {
 }
 
 test {
+    if (comptime !PlatformSupported()) return error.SkipZigTest;
+
     _ = parse;
 }
 

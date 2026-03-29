@@ -215,7 +215,7 @@ pub const CompletionLinkedList = struct {
         tracker: if (builtin.mode == .Debug) ?*u8 else void = if (builtin.mode == .Debug) null else undefined,
 
         pub fn from(node: *Lists.DoublyLinkedList.Node) *Node {
-            return @fieldParentPtr("node", node);
+            return @alignCast(@fieldParentPtr("node", node));
         }
     };
 
@@ -445,14 +445,16 @@ pub fn resumeState(state: *VM.lua.State, from: ?*VM.lua.State, args: i32) !VM.lu
     return switch (state.status()) {
         .Yield, .Ok => state.resumethread(from, args).check() catch |err| {
             Engine.logError(state, err, false);
-            if (Zune.Runtime.Debugger.ACTIVE) {
-                @branchHint(.unpredictable);
-                switch (err) {
-                    error.Runtime => Zune.Runtime.Debugger.luau_panic(state, -2),
-                    else => {},
+            if (comptime Zune.Runtime.Debugger.PlatformSupported()) {
+                if (Zune.Runtime.Debugger.ACTIVE) {
+                    @branchHint(.unpredictable);
+                    switch (err) {
+                        error.Runtime => Zune.Runtime.Debugger.luau_panic(state, -2),
+                        else => {},
+                    }
                 }
+                return err;
             }
-            return err;
         },
         inline else => |e| e.check(),
     };
@@ -462,14 +464,16 @@ pub fn resumeStateError(state: *VM.lua.State, from: ?*VM.lua.State) !VM.lua.Stat
     return switch (state.status()) {
         .Yield, .Ok => state.resumeerror(from).check() catch |err| {
             Engine.logError(state, err, false);
-            if (Zune.Runtime.Debugger.ACTIVE) {
-                @branchHint(.unpredictable);
-                switch (err) {
-                    error.Runtime => Zune.Runtime.Debugger.luau_panic(state, -2),
-                    else => {},
+            if (comptime Zune.Runtime.Debugger.PlatformSupported()) {
+                if (Zune.Runtime.Debugger.ACTIVE) {
+                    @branchHint(.unpredictable);
+                    switch (err) {
+                        error.Runtime => Zune.Runtime.Debugger.luau_panic(state, -2),
+                        else => {},
+                    }
                 }
+                return err;
             }
-            return err;
         },
         inline else => |e| e.check(),
     };

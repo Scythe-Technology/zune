@@ -181,7 +181,7 @@ pub fn build(b: *std.Build) !void {
         .name = "sample",
         .linkage = .dynamic,
         .root_module = b.createModule(.{
-            .root_source_file = b.path("test/standard/ffi/sample.zig"),
+            .root_source_file = b.path("test/standard/c/sample.zig"),
             .link_libc = false,
             .target = target,
             .optimize = .ReleaseSafe,
@@ -242,7 +242,11 @@ fn buildZune(
         else => optimize,
     };
 
-    const dep_luau = b.dependency("luau", .{ .target = target, .optimize = optimize, .Analysis = false });
+    const dep_luau = b.dependency("luau", .{
+        .target = target,
+        .optimize = optimize,
+        .Analysis = false,
+    });
     const dep_xev = b.dependency("libxev", .{ .target = target, .optimize = optimize });
     const dep_tls = b.dependency("tls", .{ .target = target, .optimize = optimize });
     const dep_json = b.dependency("json", .{ .target = target, .optimize = optimize });

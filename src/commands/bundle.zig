@@ -91,6 +91,10 @@ const COMPRESSION_MAP = std.StaticStringMap(Bundle.Section.Compression).initComp
 });
 
 fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
+    if (comptime !Bundle.PlatformSupported()) {
+        Zune.debug.print("<red>error<clear>: platform not supported\n", .{});
+        std.process.exit(1);
+    }
     if (args.len < 1) {
         Zune.debug.print("<red>usage<clear>: bundle [...flags or files]\n", .{});
         return;
@@ -465,6 +469,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
 pub const Command = command.Command{
     .name = "bundle",
     .execute = Execute,
+    .description = "Bundle lua/luau scripts, files with zune as standalone executable.",
 };
 
 fn OSPath(comptime path: []const u8) []const u8 {
@@ -477,6 +482,8 @@ fn OSPath(comptime path: []const u8) []const u8 {
 }
 
 test "cmdBundle" {
+    if (comptime !Bundle.PlatformSupported()) return error.SkipZigTest;
+
     const allocator = std.testing.allocator;
     var temporaryDir = std.testing.tmpDir(.{
         .access_sub_paths = true,
