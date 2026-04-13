@@ -18,7 +18,7 @@ pub const MAX_LUAU_SIZE = 1073741824; // 1 GB
 pub const LIB_NAME = "mem";
 
 inline fn isOutOfBounds(offset: u32, len: usize, access: usize) bool {
-    return offset + access > len;
+    return access + offset > len;
 }
 
 fn getWritableSlice(L: *VM.lua.State, idx: i32) ![]u8 {
