@@ -5,7 +5,7 @@ const builtin = @import("builtin");
 
 const Zune = @import("zune");
 
-const Engine = Zune.Runtime.Engine;
+const Runtime = Zune.Runtime;
 
 const Lists = Zune.Utils.Lists;
 
@@ -441,40 +441,45 @@ pub fn freeSync(self: *Scheduler, data: anytype) void {
     ptr.free(ptr, self.allocator);
 }
 
+fn handleError(state: *VM.lua.State, err: anytype) anyerror {
+    Runtime.Debug.dumpErrorTrace(state, err, false);
+    if (comptime Zune.Runtime.Debugger.PlatformSupported()) {
+        if (Zune.Runtime.Debugger.ACTIVE) {
+            @branchHint(.unpredictable);
+            switch (err) {
+                error.Runtime => Zune.Runtime.Debugger.luau_panic(state, -2),
+                else => {},
+            }
+        }
+    }
+    return err;
+}
+
+pub threadlocal var RUNNING_STATE: ?*VM.lua.State = null;
+pub inline fn resumeStateFast(state: *VM.lua.State, from: ?*VM.lua.State, args: i32) !VM.lua.Status {
+    const last_running_state = RUNNING_STATE;
+    RUNNING_STATE = state;
+    defer RUNNING_STATE = last_running_state;
+    return state.resumethread(from, args).check() catch |err| handleError(state, err);
+}
+
 pub fn resumeState(state: *VM.lua.State, from: ?*VM.lua.State, args: i32) !VM.lua.Status {
     return switch (state.status()) {
-        .Yield, .Ok => state.resumethread(from, args).check() catch |err| {
-            Engine.logError(state, err, false);
-            if (comptime Zune.Runtime.Debugger.PlatformSupported()) {
-                if (Zune.Runtime.Debugger.ACTIVE) {
-                    @branchHint(.unpredictable);
-                    switch (err) {
-                        error.Runtime => Zune.Runtime.Debugger.luau_panic(state, -2),
-                        else => {},
-                    }
-                }
-                return err;
-            }
-        },
+        .Yield, .Ok => resumeStateFast(state, from, args),
         inline else => |e| e.check(),
     };
 }
 
+pub inline fn resumeStateErrorFast(state: *VM.lua.State, from: ?*VM.lua.State) !VM.lua.Status {
+    return state.resumeerror(from).check() catch |err| handleError(state, err);
+}
+
 pub fn resumeStateError(state: *VM.lua.State, from: ?*VM.lua.State) !VM.lua.Status {
+    const last_running_state = RUNNING_STATE;
+    RUNNING_STATE = state;
+    defer RUNNING_STATE = last_running_state;
     return switch (state.status()) {
-        .Yield, .Ok => state.resumeerror(from).check() catch |err| {
-            Engine.logError(state, err, false);
-            if (comptime Zune.Runtime.Debugger.PlatformSupported()) {
-                if (Zune.Runtime.Debugger.ACTIVE) {
-                    @branchHint(.unpredictable);
-                    switch (err) {
-                        error.Runtime => Zune.Runtime.Debugger.luau_panic(state, -2),
-                        else => {},
-                    }
-                }
-                return err;
-            }
-        },
+        .Yield, .Ok => resumeStateErrorFast(state, from),
         inline else => |e| e.check(),
     };
 }
