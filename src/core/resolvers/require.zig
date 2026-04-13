@@ -360,17 +360,7 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
         }
     }
 
-    switch (ML.resumethread(L, 0).check() catch |err| {
-        Engine.logError(ML, err, false);
-        if (comptime Zune.Runtime.Debugger.PlatformSupported()) {
-            if (Zune.Runtime.Debugger.ACTIVE) {
-                @branchHint(.unpredictable);
-                switch (err) {
-                    error.Runtime => Zune.Runtime.Debugger.luau_panic(ML, -2),
-                    else => {},
-                }
-            }
-        }
+    switch (Scheduler.resumeStateFast(ML, L, 0) catch {
         L.pop(1); // drop: thread
         entry = REQUIRE_MAP.getEntry(script_path) orelse unreachable;
         entry.value_ptr.* = .@"error";

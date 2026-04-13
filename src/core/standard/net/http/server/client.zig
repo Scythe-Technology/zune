@@ -6,7 +6,7 @@ const builtin = @import("builtin");
 
 const Zune = @import("zune");
 
-const Engine = Zune.Runtime.Engine;
+const Runtime = Zune.Runtime;
 const Scheduler = Zune.Runtime.Scheduler;
 
 const LuaHelper = Zune.Utils.LuaHelper;
@@ -640,7 +640,7 @@ pub fn ws_upgradeResumed(self: *Self, L: *VM.lua.State, _: *Scheduler) void {
         @branchHint(.unlikely);
         L.pushlstring("Upgrade must return a boolean") catch |e| std.debug.panic("{}", .{e});
         if (L.typeOf(-2) == .Function)
-            Engine.logFnDef(L, -2);
+            Runtime.Debug.dumpFunctionDefinition(L, -2);
         self.state.stage = .closing;
         self.writeAll(HTTP_500);
         return;
@@ -649,7 +649,7 @@ pub fn ws_upgradeResumed(self: *Self, L: *VM.lua.State, _: *Scheduler) void {
         L.pop(@intCast(top - 2));
         L.pushlstring("Upgrade returned too many values") catch |e| std.debug.panic("{}", .{e});
         if (L.typeOf(-2) == .Function)
-            Engine.logFnDef(L, -2);
+            Runtime.Debug.dumpFunctionDefinition(L, -2);
         self.state.stage = .closing;
         self.writeAll(HTTP_500);
         return;
@@ -661,7 +661,7 @@ pub fn ws_upgradeResumed(self: *Self, L: *VM.lua.State, _: *Scheduler) void {
             L.pop(1);
             L.pushlstring("Upgrade must return a boolean") catch |e| std.debug.panic("{}", .{e});
             if (L.typeOf(-2) == .Function)
-                Engine.logFnDef(L, -2);
+                Runtime.Debug.dumpFunctionDefinition(L, -2);
             self.state.stage = .closing;
             self.writeAll(HTTP_500);
             return;
@@ -821,7 +821,7 @@ pub fn requestResumed(self: *Self, L: *VM.lua.State, _: *Scheduler) void {
         L.pop(@intCast(top - 1));
         L.pushlstring("Request returned too many values") catch |e| std.debug.panic("{}", .{e});
         if (L.typeOf(-2) == .Function)
-            Engine.logFnDef(L, -2);
+            Runtime.Debug.dumpFunctionDefinition(L, -2);
         self.state.stage = .closing;
         self.writeAll(HTTP_500);
         return;
@@ -830,7 +830,7 @@ pub fn requestResumed(self: *Self, L: *VM.lua.State, _: *Scheduler) void {
     self.processResponse(allocator, L) catch |err| {
         if (err == error.Runtime) {
             if (L.typeOf(-2) == .Function)
-                Engine.logFnDef(L, -2);
+                Runtime.Debug.dumpFunctionDefinition(L, -2);
         }
         self.state.stage = .closing;
         self.writeAll(HTTP_500);
