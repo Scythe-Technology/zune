@@ -657,13 +657,9 @@ pub const LuaPointer = struct {
             } else {
                 const bytes: [:0]const u8 = std.mem.span(target[src_offset..]);
                 ptr.size = bytes.len;
-
                 break :blk bytes;
             }
         };
-
-        if (ptr.size == null)
-            ptr.size = bytes.len;
 
         const buf = try L.newbuffer(bytes.len + 1);
         @memcpy(buf[0..bytes.len], bytes);
