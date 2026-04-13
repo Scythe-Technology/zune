@@ -37,6 +37,8 @@ const Hash = std.crypto.hash.sha3.Sha3_256;
 threadlocal var TAGGED_FFI_POINTERS: std.StringArrayHashMapUnmanaged(bool) = undefined;
 threadlocal var CACHED_C_COMPILATON: std.StringHashMapUnmanaged(*CallableFunction) = undefined;
 
+pub threadlocal var CALLING_STATE: ?*VM.lua.State = null;
+
 pub const DataType = struct {
     size: usize,
     alignment: u29,
@@ -2192,6 +2194,8 @@ const FFIFunction = struct {
     pub const FFICallable = *align(8) const fn (lua_State: *anyopaque, fnPtr: *const anyopaque) callconv(.c) void;
 
     pub fn fn_inner(L: *VM.lua.State) !i32 {
+        CALLING_STATE = L;
+        defer CALLING_STATE = null;
         const allocator = luau.getallocator(L);
         const self = L.touserdata(FFIFunction, VM.lua.upvalueindex(1)) orelse unreachable;
 

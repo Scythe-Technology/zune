@@ -356,17 +356,7 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
         }
     }
 
-    switch (ML.resumethread(L, 0).check() catch |err| {
-        Engine.logError(ML, err, false);
-        if (comptime Zune.Runtime.Debugger.PlatformSupported()) {
-            if (Zune.Runtime.Debugger.ACTIVE) {
-                @branchHint(.unpredictable);
-                switch (err) {
-                    error.Runtime => Zune.Runtime.Debugger.luau_panic(ML, -2),
-                    else => {},
-                }
-            }
-        }
+    switch (Scheduler.resumeStateFast(ML, L, 0) catch {
         L.pop(1); // drop: thread
         entry.value_ptr.* = .@"error";
         return L.Zerror("requested module failed to load");

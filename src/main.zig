@@ -19,11 +19,16 @@ else if (!builtin.single_threaded)
 else
     std.heap.page_allocator;
 
+pub const options: std.Options = .{
+    .enable_segfault_handler = builtin.mode == .Debug,
+};
+
 pub const Runtime = struct {
     pub const Engine = @import("core/runtime/engine.zig");
     pub const Scheduler = @import("core/runtime/scheduler.zig");
     pub const Profiler = @import("core/runtime/profiler.zig");
     pub const Debugger = @import("core/runtime/debugger.zig");
+    pub const Debug = @import("core/runtime/debug.zig");
     test {
         _ = Engine;
         _ = Scheduler;
@@ -63,8 +68,8 @@ pub const Utils = struct {
 };
 
 pub const debug = struct {
-    pub const print = @import("core/utils/print.zig").print;
-    pub const writerPrint = @import("core/utils/print.zig").writerPrint;
+    pub const print = Runtime.Debug.print;
+    pub const writerPrint = Runtime.Debug.writerPrint;
 };
 
 pub const Tags = @import("tagged.zig").Tags;
@@ -143,6 +148,10 @@ pub fn init() !void {
     const allocator = DEFAULT_ALLOCATOR;
 
     STATE.ENV_MAP = try std.process.getEnvMap(allocator);
+
+    if (!options.enable_segfault_handler) {
+        @import("./core/runtime/crash.zig").init();
+    }
 
     switch (comptime builtin.os.tag) {
         .linux => {
@@ -457,7 +466,7 @@ fn shutdown() void {
             if (ML.pcall(0, 0, 0).check()) |_| {
                 L.pop(2); // drop: thread, function
                 return; // User will handle process close.
-            } else |err| Runtime.Engine.logError(ML, err, false);
+            } else |err| Runtime.Debug.dumpErrorTrace(ML, err, false);
             L.pop(1); // drop: thread
         }
         L.pop(1); // drop: ?function
