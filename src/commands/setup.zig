@@ -86,9 +86,9 @@ fn setup(editor: EditorKind, allocator: std.mem.Allocator, setupInfo: SetupInfo)
             var settings_object = settings_root.value.asObject();
 
             // Get Values of luau-lsp.require.mode and luau-lsp.require.directoryAliases
-            const definition_files = settings_object.get(LUAU_LSP_DEFINITION_FILES) orelse try settings_root.value.setWith(LUAU_LSP_DEFINITION_FILES, try settings_root.newArray());
+            const definition_files = settings_object.get(LUAU_LSP_DEFINITION_FILES) orelse try settings_root.value.setWith(LUAU_LSP_DEFINITION_FILES, try settings_root.newObject());
             const documentation_files = settings_object.get(LUAU_LSP_DOCUMENTATION_FILES) orelse try settings_root.value.setWith(LUAU_LSP_DOCUMENTATION_FILES, try settings_root.newArray());
-            var definition_files_array = definition_files.arrayOrNull() orelse Zune.quitMsg("{s} is not a valid Array", .{LUAU_LSP_DEFINITION_FILES});
+            var definition_files_object = definition_files.objectOrNull() orelse Zune.quitMsg("{s} is not a valid Object", .{LUAU_LSP_DEFINITION_FILES});
             var documentation_files_array = documentation_files.arrayOrNull() orelse Zune.quitMsg("{s} is not a valid Array", .{LUAU_LSP_DOCUMENTATION_FILES});
 
             for (luaudefs) |type_file| {
@@ -97,21 +97,13 @@ fn setup(editor: EditorKind, allocator: std.mem.Allocator, setupInfo: SetupInfo)
                     defer allocator.free(file_name);
                     const def_path = try std.fs.path.resolve(allocator, &.{ setupInfo.home, ".zune/typedefs/", file_name });
                     defer allocator.free(def_path);
-                    var exists = false;
-                    for (definition_files_array.items) |value| {
-                        if (value != .string)
-                            continue;
-                        const str = value.asString();
-                        if (std.mem.eql(u8, str, def_path)) {
-                            exists = true;
-                            break;
-                        }
-                    }
-                    if (exists)
+                    if (definition_files_object.contains("zune"))
                         continue;
-                    const defPath_copy = try settings_root.allocator.dupe(u8, def_path);
-                    errdefer allocator.free(defPath_copy);
-                    try definition_files_array.append(allocator, .{ .string = defPath_copy });
+                    const def_path_copy = try settings_root.allocator.dupe(u8, def_path);
+                    errdefer allocator.free(def_path_copy);
+                    const key = try settings_root.allocator.dupe(u8, "zune");
+                    errdefer allocator.free(key);
+                    try definition_files_object.put(key, .{ .string = def_path_copy });
                 }
                 if (type_file.docs) |_| {
                     const file_name = try std.mem.join(allocator, "", &.{ type_file.name, ".d.json" });
@@ -346,14 +338,6 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
     defer allocator.free(path);
 
     std.debug.print("Setting up zune in {s}\n", .{path});
-    {
-        const core_dir = try std.fs.path.resolve(allocator, &.{ path, "core" });
-        defer allocator.free(core_dir);
-        cwd.makePath(core_dir) catch |err| switch (err) {
-            error.PathAlreadyExists => {},
-            else => return err,
-        };
-    }
 
     {
         const global_dir = try std.fs.path.resolve(allocator, &.{ path, "global" });
