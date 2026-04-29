@@ -253,7 +253,7 @@
   },
   "@zune/globaltype/_zune_testing.expected": {
     "code_sample": "",
-    "documentation": "Expects a value to be true or non nil.\n\nSimilar to `assert(value)`\n\n\n**Parameters**\n- `value`: The value to expect.\n",
+    "documentation": "Expects the value to be a truthy value.\n\nSimilar to `assert(value)`\n\n\n**Parameters**\n- `value`: The value to expect.\n",
     "returns": [],
     "params": [
       {
@@ -10000,7 +10000,7 @@
   },
   "@zune/globaltype/ProcessChild.wait": {
     "code_sample": "",
-    "documentation": "Kills the process and yields until the process exits.\n\n**Throws**\n- Process Error\n",
+    "documentation": "Yields until the process exits.\n\n**Throws**\n- Process Error\n",
     "returns": [
       "@zune/globaltype/ProcessChild.wait/return/0"
     ],
@@ -10013,7 +10013,7 @@
   },
   "@zune/globaltype/ProcessChild.kill": {
     "code_sample": "",
-    "documentation": "Yields until the process exits.\n\n**Throws**\n- Process Error\n",
+    "documentation": "Kills the process and yields until the process exits.\n\n**Throws**\n- Process Error\n",
     "returns": [
       "@zune/globaltype/ProcessChild.kill/return/0"
     ],
