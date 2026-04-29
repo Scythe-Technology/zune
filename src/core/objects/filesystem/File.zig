@@ -588,10 +588,6 @@ fn lua_writeSync(self: *File, L: *VM.lua.State) !i32 {
 }
 
 fn lua_append(self: *File, L: *VM.lua.State) !i32 {
-    switch (self.kind) {
-        .File => {},
-        .Tty => return error.NotAppendable,
-    }
     if (!self.mode.canWrite())
         return error.NotOpenForWriting;
     const string = try L.Zcheckvalue([]const u8, 2, null);
@@ -608,10 +604,6 @@ fn lua_append(self: *File, L: *VM.lua.State) !i32 {
 }
 
 fn lua_appendSync(self: *File, L: *VM.lua.State) !i32 {
-    switch (self.kind) {
-        .File => {},
-        .Tty => return error.NotAppendable,
-    }
     if (!self.mode.canWrite())
         return error.NotOpenForWriting;
     const string = try L.Zcheckvalue([]const u8, 2, null);
