@@ -507,7 +507,7 @@ fn onRecv(
     loop: *xev.Loop,
     _: *xev.Completion,
     tcp: xev.TCP,
-    _: xev.ReadBuffer,
+    b: xev.ReadBuffer,
     res: xev.ReadError!usize,
 ) xev.CallbackAction {
     const self = ud orelse unreachable;
@@ -534,7 +534,7 @@ fn onRecv(
 
     var pos: usize = 0;
     while (true) {
-        const buf = self.read_buffer[pos..read];
+        const buf = b.slice[pos..read];
         if (buf.len == 0)
             return .rearm;
         var consumed: usize = 0;
@@ -673,15 +673,8 @@ pub fn onWrite(
     return .disarm;
 }
 
-fn startWebSocket(self: *Self, loop: *xev.Loop, tcp: xev.TCP) void {
+fn startWebSocket(self: *Self, loop: *xev.Loop, tcp: xev.TCP, remaining: []u8) void {
     self.state.stage = .active;
-
-    self.stream_read(
-        loop,
-        &self.recv_completion,
-        tcp,
-        onRecv,
-    );
 
     if (self.timer.started) {
         self.timer.can_handle = false;
@@ -699,10 +692,30 @@ fn startWebSocket(self: *Self, loop: *xev.Loop, tcp: xev.TCP) void {
     self.lua_ref.deref();
     self.lua_ref.value = GL;
 
-    if (L.status() != .Yield)
-        return;
-    _ = self.ref.push(L);
-    _ = Scheduler.resumeState(L, null, 1) catch {};
+    if (L.status() == .Yield) {
+        _ = self.ref.push(L);
+        _ = Scheduler.resumeState(L, null, 1) catch {};
+    }
+
+    jmp: {
+        if (remaining.len > 0)
+            switch (self.onRecv(
+                loop,
+                &self.recv_completion,
+                tcp,
+                .{ .slice = remaining },
+                remaining.len,
+            )) {
+                .disarm => break :jmp,
+                .rearm => {},
+            };
+        self.stream_read(
+            loop,
+            &self.recv_completion,
+            tcp,
+            onRecv,
+        );
+    }
 }
 
 pub const UpgradeHandshake = struct {
@@ -757,7 +770,7 @@ pub const UpgradeHandshake = struct {
                     break :blk;
                 @memset(&self.state.key, 0);
                 if (self.state.stage == .upgrading)
-                    self.startWebSocket(loop, tcp)
+                    self.startWebSocket(loop, tcp, read_slice[parser.pos..])
                 else
                     return self.safeResumeWithError(error.Timeout);
                 return .disarm;
