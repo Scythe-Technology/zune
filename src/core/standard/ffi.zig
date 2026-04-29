@@ -447,7 +447,7 @@ pub const LuaPointer = struct {
                     if (other.owner == .none or other.ptr == null)
                         return L.Zerror("unavailable address");
                     dest_bounds = other.size;
-                    break :blk @ptrCast(@alignCast(ptr.ptr));
+                    break :blk @ptrCast(@alignCast(other.ptr));
                 },
                 else => return L.Zerror("invalid type (expected buffer or userdata)"),
             }
@@ -487,7 +487,7 @@ pub const LuaPointer = struct {
                     if (other.owner == .none or other.ptr == null)
                         return L.Zerror("unavailable address");
                     src_bounds = other.size;
-                    break :blk @ptrCast(@alignCast(ptr.ptr));
+                    break :blk @ptrCast(@alignCast(other.ptr));
                 },
                 else => return L.Zerror("invalid type (expected buffer or userdata)"),
             }
@@ -641,11 +641,26 @@ pub const LuaPointer = struct {
     pub fn lua_span(ptr: *LuaPointer, L: *VM.lua.State) !i32 {
         if (ptr.owner == .none or ptr.ptr == null)
             return 0;
-        const src_offset: usize = @intCast(L.Loptinteger(2, 0));
+        const src_offset: usize = try L.Zcheckvalue(?u32, 2, null) orelse 0;
 
         const target: [*c]u8 = @ptrCast(@alignCast(ptr.ptr));
 
-        const bytes: [:0]const u8 = std.mem.span(target[src_offset..]);
+        const bytes = blk: {
+            if (ptr.size) |size| {
+                if (src_offset > size)
+                    return L.Zerror("offset out of bounds");
+                const index = std.mem.indexOfScalar(u8, target[src_offset..size], 0);
+                if (index) |i| {
+                    const bytes: []const u8 = target[src_offset .. src_offset + i];
+                    break :blk bytes;
+                } else break :blk &[0]u8{};
+            } else {
+                const bytes: [:0]const u8 = std.mem.span(target[src_offset..]);
+                ptr.size = bytes.len;
+
+                break :blk bytes;
+            }
+        };
 
         if (ptr.size == null)
             ptr.size = bytes.len;
@@ -2397,6 +2412,7 @@ fn lua_free(L: *VM.lua.State) !i32 {
         },
         .static => {
             ptr.owner = .none;
+            // allowed assuming the caller knows what they're doing
             if (ptr.size) |size| {
                 if (size > 0)
                     allocator.rawFree(
