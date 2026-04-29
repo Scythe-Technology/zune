@@ -245,7 +245,7 @@ test "url: unescape" {
     try std.testing.expectEqualStrings(expected, res3);
 }
 
-pub fn getRandom() std.Random.DefaultPrng {
+fn getRandom() std.Random.DefaultPrng {
     var seed: u64 = undefined;
     std.posix.getrandom(std.mem.asBytes(&seed)) catch std.debug.panic("getrandom failed\n", .{});
     return std.Random.DefaultPrng.init(seed);

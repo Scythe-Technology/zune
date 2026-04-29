@@ -13,10 +13,10 @@ const MethodMap = Zune.Utils.MethodMap;
 
 const VM = luau.VM;
 
-const TAG_FFI_POINTER = Zune.Tags.get("FFI_POINTER").?;
-const TAG_FFI_DATATYPE = Zune.Tags.get("FFI_DATATYPE").?;
+const TAG_FFI_POINTER = Zune.Tags.get("C_POINTER").?;
+const TAG_FFI_DATATYPE = Zune.Tags.get("C_DATATYPE").?;
 
-pub const LIB_NAME = "ffi";
+pub const LIB_NAME = "c";
 pub fn PlatformSupported() bool {
     return switch (comptime builtin.os.tag) {
         .macos => true,
@@ -36,6 +36,8 @@ const Hash = std.crypto.hash.sha3.Sha3_256;
 
 threadlocal var TAGGED_FFI_POINTERS: std.StringArrayHashMapUnmanaged(bool) = undefined;
 threadlocal var CACHED_C_COMPILATON: std.StringHashMapUnmanaged(*CallableFunction) = undefined;
+
+pub threadlocal var CALLING_STATE: ?*VM.lua.State = null;
 
 pub const DataType = struct {
     size: usize,
@@ -657,13 +659,9 @@ pub const LuaPointer = struct {
             } else {
                 const bytes: [:0]const u8 = std.mem.span(target[src_offset..]);
                 ptr.size = bytes.len;
-
                 break :blk bytes;
             }
         };
-
-        if (ptr.size == null)
-            ptr.size = bytes.len;
 
         const buf = try L.newbuffer(bytes.len + 1);
         @memcpy(buf[0..bytes.len], bytes);
@@ -1502,7 +1500,7 @@ fn getfunctionSymbol(allocator: std.mem.Allocator, L: *VM.lua.State, idx: i32) !
     var symbol: FunctionSymbol = undefined;
     _ = L.rawgetfield(idx, "returns");
     if (!isFFIType(L, -1))
-        return L.Zerror("function return type must be a valid ffi type");
+        return L.Zerror("function return type must be a valid c type");
     symbol.returns = try toFFIType(L, -1);
     L.pop(1); // drop: returns
 
@@ -1520,7 +1518,7 @@ fn getfunctionSymbol(allocator: std.mem.Allocator, L: *VM.lua.State, idx: i32) !
     while (try arr_iter.next()) |t| switch (t) {
         .Userdata => {
             if (!isFFIType(L, -1))
-                return L.Zerrorf("function arg type must be a valid ffi type (got {s})", .{VM.lapi.typename(L.typeOf(-1))});
+                return L.Zerrorf("function arg type must be a valid c type (got {s})", .{VM.lapi.typename(L.typeOf(-1))});
 
             const ffi_type = try toFFIType(L, -1);
             if (ffi_type.size == 0)
@@ -1560,7 +1558,7 @@ fn lua_struct(L: *VM.lua.State) !i32 {
             const name = L.tostring(-2) orelse unreachable;
 
             if (!isFFIType(L, -1))
-                return L.Zerror("struct field type must be a valid ffi type");
+                return L.Zerror("struct field type must be a valid c type");
 
             if (struct_map.contains(name))
                 return L.Zerrorf("struct field '{s}' already exists", .{name});
@@ -1964,7 +1962,7 @@ fn ffi_closure_inner(call_info: *const LuaClosure.CallInfo, extern_args: [*]?*an
     const args = extern_args[0..call_info.args];
 
     if (!(call_info.thread.checkstack(1) catch |e| std.debug.panic("{}", .{e})))
-        return std.debug.panic("Failed to grow stack for ffi closure", .{});
+        return std.debug.panic("Failed to grow stack for c closure", .{});
 
     const L = call_info.thread.newthread() catch |e| std.debug.panic("{}", .{e});
     defer call_info.thread.pop(1);
@@ -2196,6 +2194,8 @@ const FFIFunction = struct {
     pub const FFICallable = *align(8) const fn (lua_State: *anyopaque, fnPtr: *const anyopaque) callconv(.c) void;
 
     pub fn fn_inner(L: *VM.lua.State) !i32 {
+        CALLING_STATE = L;
+        defer CALLING_STATE = null;
         const allocator = luau.getallocator(L);
         const self = L.touserdata(FFIFunction, VM.lua.upvalueindex(1)) orelse unreachable;
 
@@ -2711,9 +2711,7 @@ pub fn loadLib(L: *VM.lua.State) !void {
 
     try L.Zsetfieldfn(-1, "getLuaState", lua_getLuaState);
 
-    try L.Zsetfield(-1, "c", .{
-        .compile = lua_compile,
-    });
+    try L.Zsetfieldfn(-1, "compile", lua_compile);
 
     try L.createtable(0, @intCast(@typeInfo(DataTypes.Types).@"struct".decls.len));
     inline for (@typeInfo(DataTypes.Types).@"struct".decls, 0..) |decl, i| {
@@ -2745,11 +2743,11 @@ pub fn loadLib(L: *VM.lua.State) !void {
     try LuaHelper.registerModule(L, LIB_NAME);
 }
 
-test "ffi" {
+test "c_native" {
     const TestRunner = @import("../utils/testrunner.zig");
 
     const testResult = try TestRunner.runTest(
-        TestRunner.newTestFile("standard/ffi/init.luau"),
+        TestRunner.newTestFile("standard/c/init.luau"),
         &.{},
         .{ .ref_leak_check = false },
     );

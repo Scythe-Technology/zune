@@ -3,7 +3,7 @@ const luau = @import("luau");
 
 const Zune = @import("zune");
 
-const Engine = Zune.Runtime.Engine;
+const Runtime = Zune.Runtime;
 const Scheduler = Zune.Runtime.Scheduler;
 
 const Fmt = Zune.Resolvers.Fmt;
@@ -205,10 +205,10 @@ pub fn finish_testing(L: *VM.lua.State, rawstart: f64) !TestResult {
 pub fn runTestAsync(L: *VM.lua.State, sched: *Scheduler) !TestResult {
     const start = VM.lperf.clock();
 
-    Engine.runAsync(L, sched, .{ .cleanUp = true, .mode = .Test }) catch {};
+    Runtime.Engine.runAsync(L, sched, .{ .cleanUp = true, .mode = .Test }) catch {};
 
-    if (Zune.FEATURES.ffi and comptime Zune.corelib.ffi.PlatformSupported())
-        Zune.corelib.ffi.deinitCacheTable(L);
+    if (Zune.FEATURES.c and comptime Zune.corelib.c.PlatformSupported())
+        Zune.corelib.c.deinitCacheTable(L);
 
     return try finish_testing(L, start);
 }
@@ -233,7 +233,7 @@ pub fn loadLib(L: *VM.lua.State, enabled: bool) !void {
             std.debug.panic("Error loading test framework: {}\n", .{err});
         _ = ML.pcall(0, 1, 0).check() catch |err| {
             Zune.debug.print("Error loading test framework (2): {}\n", .{err});
-            Engine.logError(ML, err, false);
+            Runtime.Debug.dumpErrorTrace(ML, err, false);
             std.debug.panic("Test Framework (2)\n", .{});
         };
         ML.xmove(L, 1);

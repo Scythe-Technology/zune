@@ -2,7 +2,6 @@ const xev = @import("xev");
 const std = @import("std");
 const luau = @import("luau");
 const json = @import("json");
-const mimalloc = @import("mimalloc");
 const builtin = @import("builtin");
 
 pub const toml = @import("libraries/toml.zig");
@@ -20,11 +19,16 @@ else if (!builtin.single_threaded)
 else
     std.heap.page_allocator;
 
+pub const options: std.Options = .{
+    .enable_segfault_handler = builtin.mode == .Debug,
+};
+
 pub const Runtime = struct {
     pub const Engine = @import("core/runtime/engine.zig");
     pub const Scheduler = @import("core/runtime/scheduler.zig");
     pub const Profiler = @import("core/runtime/profiler.zig");
     pub const Debugger = @import("core/runtime/debugger.zig");
+    pub const Debug = @import("core/runtime/debug.zig");
     test {
         _ = Engine;
         _ = Scheduler;
@@ -64,8 +68,8 @@ pub const Utils = struct {
 };
 
 pub const debug = struct {
-    pub const print = @import("core/utils/print.zig").print;
-    pub const writerPrint = @import("core/utils/print.zig").writerPrint;
+    pub const print = Runtime.Debug.print;
+    pub const writerPrint = Runtime.Debug.writerPrint;
 };
 
 pub const Tags = @import("tagged.zig").Tags;
@@ -100,7 +104,7 @@ pub var FEATURES: struct {
     require: bool = true,
     random: bool = true,
     thread: bool = true,
-    ffi: bool = true,
+    c: bool = true,
 } = .{};
 
 pub const ZuneState = struct {
@@ -144,6 +148,10 @@ pub fn init() !void {
     const allocator = DEFAULT_ALLOCATOR;
 
     STATE.ENV_MAP = try std.process.getEnvMap(allocator);
+
+    if (!options.enable_segfault_handler) {
+        @import("./core/runtime/crash.zig").init();
+    }
 
     switch (comptime builtin.os.tag) {
         .linux => {
@@ -298,14 +306,14 @@ pub fn quitMsg(comptime format: []const u8, args: anytype) noreturn {
 
 pub fn initState(L: *VM.lua.State) !void {
     try Resolvers.Require.init(L);
-    if (FEATURES.ffi and comptime corelib.ffi.PlatformSupported())
-        try corelib.ffi.init(L);
+    if (FEATURES.c and comptime corelib.c.PlatformSupported())
+        try corelib.c.init(L);
 }
 
 pub fn deinitState(L: *VM.lua.State) void {
     Resolvers.Require.deinit(L);
-    if (FEATURES.ffi and comptime corelib.ffi.PlatformSupported())
-        corelib.ffi.deinit(L);
+    if (FEATURES.c and comptime corelib.c.PlatformSupported())
+        corelib.c.deinit(L);
 }
 
 pub fn openZune(L: *VM.lua.State, args: []const []const u8, flags: Flags) !void {
@@ -396,47 +404,49 @@ pub fn main() !void {
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
 
-    if (try Resolvers.Bundle.get(allocator)) |b| {
-        STATE.BUNDLE = b;
+    if (comptime Resolvers.Bundle.PlatformSupported()) {
+        if (try Resolvers.Bundle.get(allocator)) |b| {
+            STATE.BUNDLE = b;
 
-        var L = try luau.init(&allocator);
-        defer L.deinit();
-        var scheduler = try Runtime.Scheduler.init(allocator, L);
-        defer scheduler.deinit();
+            var L = try luau.init(&allocator);
+            defer L.deinit();
+            var scheduler = try Runtime.Scheduler.init(allocator, L);
+            defer scheduler.deinit();
 
-        try initState(L);
-        defer deinitState(L);
+            try initState(L);
+            defer deinitState(L);
 
-        try Runtime.Scheduler.SCHEDULERS.append(DEFAULT_ALLOCATOR, &scheduler);
+            try Runtime.Scheduler.SCHEDULERS.append(DEFAULT_ALLOCATOR, &scheduler);
 
-        try Runtime.Engine.prepAsync(L, &scheduler);
-        try openZune(L, args, .{ .limbo = b.mode.limbo });
+            try Runtime.Engine.prepAsync(L, &scheduler);
+            try openZune(L, args, .{ .limbo = b.mode.limbo });
 
-        L.setsafeenv(VM.lua.GLOBALSINDEX, true);
+            L.setsafeenv(VM.lua.GLOBALSINDEX, true);
 
-        const ML = try L.newthread();
+            const ML = try L.newthread();
 
-        try ML.Lsandboxthread();
+            try ML.Lsandboxthread();
 
-        try Runtime.Engine.setLuaFileContext(ML, .{
-            .main = true,
-        });
+            try Runtime.Engine.setLuaFileContext(ML, .{
+                .main = true,
+            });
 
-        ML.setsafeenv(VM.lua.GLOBALSINDEX, true);
+            ML.setsafeenv(VM.lua.GLOBALSINDEX, true);
 
-        switch (b.mode.compiled) {
-            .debug => Runtime.Engine.loadModule(ML, b.entry.name, b.entry.data, null) catch |err| switch (err) {
-                error.Syntax => unreachable, // should not happen
-                else => return err,
-            },
-            .release => {
-                ML.load(b.entry.name, b.entry.data, 0) catch unreachable; // should not error
-                Runtime.Engine.loadNative(ML);
-            },
+            switch (b.mode.compiled) {
+                .debug => Runtime.Engine.loadModule(ML, b.entry.name, b.entry.data, null) catch |err| switch (err) {
+                    error.Syntax => unreachable, // should not happen
+                    else => return err,
+                },
+                .release => {
+                    ML.load(b.entry.name, b.entry.data, 0) catch unreachable; // should not error
+                    Runtime.Engine.loadNative(ML);
+                },
+            }
+
+            Runtime.Engine.runAsync(ML, &scheduler, .{ .cleanUp = true }) catch std.process.exit(1);
+            return;
         }
-
-        Runtime.Engine.runAsync(ML, &scheduler, .{ .cleanUp = true }) catch std.process.exit(1);
-        return;
     }
 
     try cli.start(args);
@@ -456,7 +466,7 @@ fn shutdown() void {
             if (ML.pcall(0, 0, 0).check()) |_| {
                 L.pop(2); // drop: thread, function
                 return; // User will handle process close.
-            } else |err| Runtime.Engine.logError(ML, err, false);
+            } else |err| Runtime.Debug.dumpErrorTrace(ML, err, false);
             L.pop(1); // drop: thread
         }
         L.pop(1); // drop: ?function
