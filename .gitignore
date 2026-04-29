@@ -1,6 +1,7 @@
 # Zig build artifacts
 .zig-cache/
 **/zig-out/
+zig-pkg/
 
 # macOs Directory
 **/.DS_Store
@@ -9,17 +10,7 @@
 **/**.luauc
 **/**.gz
 
-# Vscode
-.vscode/
-# Zed
-.zed/
-# Neovim
-.nvim.lua
-.nvimrc
-.nvim/
-# Emacs
-.dir-locals.el
 # Nix Environment
 shell.nix
-.direnv
-.envrc
+
+.*
