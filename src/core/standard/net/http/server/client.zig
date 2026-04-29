@@ -310,7 +310,7 @@ pub const Handshake = struct {
             if (handshake.done()) {
                 const cipher = handshake.cipher().?;
                 ctx.connection = .{ .active = .{ .client = .init(cipher) } };
-                self.start(l, false);
+                self.start(l, &.{}, false);
             } else {
                 tcp.read(
                     l,
@@ -425,12 +425,21 @@ pub fn onWrite(
                     L.pushvalue(-2);
                     _ = Scheduler.resumeState(L, null, 1) catch {};
                 }
+
+                const spill: []u8 = if (self.parser.spill) |s|
+                    allocator.dupe(u8, s) catch |e| std.debug.panic("{}", .{e})
+                else
+                    &.{};
                 self.parser.reset();
-                self.start(loop, false);
+                self.start(loop, spill, false);
                 return .disarm;
             } else if (self.parser.canKeepAlive()) {
+                const spill: []u8 = if (self.parser.spill) |s|
+                    allocator.dupe(u8, s) catch |e| std.debug.panic("{}", .{e})
+                else
+                    &.{};
                 self.parser.reset();
-                self.start(loop, false);
+                self.start(loop, spill, false);
                 return .disarm;
             }
         }
@@ -680,7 +689,7 @@ pub fn ws_onRecv(
     loop: *xev.Loop,
     _: *xev.Completion,
     _: xev.TCP,
-    _: xev.ReadBuffer,
+    b: xev.ReadBuffer,
     res: xev.ReadError!usize,
 ) xev.CallbackAction {
     const self = ud orelse unreachable;
@@ -710,7 +719,7 @@ pub fn ws_onRecv(
     var pos: usize = 0;
 
     while (true) {
-        const buf = self.buffers.in[pos..read];
+        const buf = b.slice[pos..read];
         if (buf.len == 0)
             return .rearm;
         var consumed: usize = 0;
@@ -834,7 +843,7 @@ pub fn onRecv(
     _: *xev.Loop,
     _: *xev.Completion,
     _: xev.TCP,
-    _: xev.ReadBuffer,
+    b: xev.ReadBuffer,
     res: xev.ReadError!usize,
 ) xev.CallbackAction {
     const self = ud orelse unreachable;
@@ -863,7 +872,7 @@ pub fn onRecv(
         else => {},
     }
 
-    if (self.parser.parse(self.buffers.in[0..read]) catch |err| {
+    if (self.parser.parse(b.slice[0..read]) catch |err| {
         self.state.stage = .closing;
         switch (err) {
             error.BodyTooBig => self.writeAll(HTTP_413),
@@ -992,28 +1001,13 @@ pub fn onRecv(
             std.debug.panic("unreachable", .{});
         }
         return .disarm;
-    } else {
-        // TODO: optimize body, when dynamic body is present, and parsing body, use entire body buffer
-        // switch (self.parser.stage) {
-        //     .body => {
-        //         socket.read(
-        //             loop,
-        //             completion,
-        //             .{ .slice = self.parser.body.?[self.] },
-        //             Self,
-        //             self,
-        //             onRecv,
-        //         );
-        //     },
-        //     else => {},
-        // }
-        return .rearm;
-    }
+    } else return .rearm;
 }
 
 pub fn start(
     self: *Self,
     loop: *xev.Loop,
+    remaining: []u8,
     comptime first: bool,
 ) void {
     self.state.stage = .receiving;
@@ -1026,12 +1020,27 @@ pub fn start(
         // write buffer wouldn't be used anymore
         // so we can use it for parsing websocket frames
         self.buffers.out = .{ .reader = .{} };
-        self.stream_read(
-            loop,
-            &self.completion,
-            self.socket,
-            ws_onRecv,
-        );
+        jmp: {
+            if (remaining.len > 0) {
+                defer self.parser.arena.child_allocator.free(remaining);
+                switch (self.ws_onRecv(
+                    loop,
+                    undefined,
+                    self.socket,
+                    .{ .slice = remaining },
+                    remaining.len,
+                )) {
+                    .disarm => break :jmp,
+                    .rearm => {},
+                }
+            }
+            self.stream_read(
+                loop,
+                &self.completion,
+                self.socket,
+                ws_onRecv,
+            );
+        }
     } else {
         if (self.tls) |ctx| {
             switch (ctx.connection) {
@@ -1046,15 +1055,42 @@ pub fn start(
                     );
                     return;
                 },
-                .active => self.stream_read(
-                    loop,
-                    &self.completion,
-                    self.socket,
-                    onRecv,
-                ),
+                .active => jmp: {
+                    if (remaining.len > 0) {
+                        defer self.parser.arena.child_allocator.free(remaining);
+                        switch (self.onRecv(
+                            loop,
+                            undefined,
+                            self.socket,
+                            .{ .slice = remaining },
+                            remaining.len,
+                        )) {
+                            .disarm => break :jmp,
+                            .rearm => {},
+                        }
+                    }
+                    self.stream_read(
+                        loop,
+                        &self.completion,
+                        self.socket,
+                        onRecv,
+                    );
+                },
             }
-            unreachable;
-        } else {
+        } else jmp: {
+            if (remaining.len > 0) {
+                defer self.parser.arena.child_allocator.free(remaining);
+                switch (self.onRecv(
+                    loop,
+                    undefined,
+                    self.socket,
+                    .{ .slice = remaining },
+                    remaining.len,
+                )) {
+                    .disarm => break :jmp,
+                    .rearm => {},
+                }
+            }
             self.socket.read(
                 loop,
                 &self.completion,

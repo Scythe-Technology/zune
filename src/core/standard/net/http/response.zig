@@ -43,6 +43,7 @@ pub const Parser = struct {
     buf: ?[]const u8 = null,
     left: ?[]const u8 = null,
     pos: usize = 0,
+    spill: ?[]const u8 = null,
 
     stage: Stage = .protocol,
     protocol: Protocol = .HTTP10,
@@ -78,8 +79,13 @@ pub const Parser = struct {
         self.body = null;
         self.url = null;
         self.protocol = .HTTP10;
-        if (self.left) |_| {
+        if (self.left) |left| {
+            self.arena.child_allocator.free(left);
             self.left = null;
+        }
+        if (self.spill) |s| {
+            self.arena.child_allocator.free(s);
+            self.spill = null;
         }
         if (!self.arena.reset(.retain_capacity)) {
             _ = self.arena.reset(.free_all);
@@ -94,6 +100,8 @@ pub const Parser = struct {
         self.headers.deinit(self.arena.child_allocator);
         if (self.left) |left|
             self.arena.child_allocator.free(left);
+        if (self.spill) |s|
+            self.arena.child_allocator.free(s);
     }
 
     pub fn parse(self: *Parser, buf: []const u8) !bool {
@@ -120,6 +128,13 @@ pub const Parser = struct {
             .body => continue :sw try self.parseBody(arena_allocator, input[self.pos..]) orelse break :sw,
             .done => {
                 self.stage = .done;
+                if (self.spill) |s| {
+                    allocator.free(s);
+                    self.spill = null;
+                }
+                const leftover = input[self.pos..];
+                if (leftover.len > 0)
+                    self.spill = try allocator.dupe(u8, leftover);
                 return true;
             },
         }

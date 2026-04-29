@@ -698,7 +698,8 @@ fn startWebSocket(self: *Self, loop: *xev.Loop, tcp: xev.TCP, remaining: []u8) v
     }
 
     jmp: {
-        if (remaining.len > 0)
+        if (remaining.len > 0) {
+            defer self.allocator.free(remaining);
             switch (self.onRecv(
                 loop,
                 &self.recv_completion,
@@ -708,7 +709,8 @@ fn startWebSocket(self: *Self, loop: *xev.Loop, tcp: xev.TCP, remaining: []u8) v
             )) {
                 .disarm => break :jmp,
                 .rearm => {},
-            };
+            }
+        }
         self.stream_read(
             loop,
             &self.recv_completion,
@@ -769,10 +771,13 @@ pub const UpgradeHandshake = struct {
                 if (parser.status_code != 101)
                     break :blk;
                 @memset(&self.state.key, 0);
-                if (self.state.stage == .upgrading)
-                    self.startWebSocket(loop, tcp, read_slice[parser.pos..])
-                else
-                    return self.safeResumeWithError(error.Timeout);
+                if (self.state.stage == .upgrading) {
+                    const spill: []u8 = if (parser.spill) |s|
+                        self.allocator.dupe(u8, s) catch |e| std.debug.panic("{}", .{e})
+                    else
+                        &.{};
+                    self.startWebSocket(loop, tcp, spill);
+                } else return self.safeResumeWithError(error.Timeout);
                 return .disarm;
             } else return self.safeResumeWithError(error.UpgradeRejected);
             return self.safeResumeWithError(error.UpgradeFailed);
