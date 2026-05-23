@@ -678,7 +678,6 @@ fn lua_watch(L: *VM.lua.State) !i32 {
 
     var watch = Watch.FileSystemWatcher.init(allocator, fs.cwd(), path);
     errdefer watch.deinit();
-    try watch.start();
 
     const state = try scheduler.createSync(WatchState, WatchState.complete);
     errdefer scheduler.freeSync(state);
@@ -686,6 +685,8 @@ fn lua_watch(L: *VM.lua.State) !i32 {
         .watcher = watch,
         .callback = .{ .ref = .{ .registry = ref }, .value = undefined },
     };
+
+    try state.watcher.start();
 
     const ptr = try L.newuserdatataggedwithmetatable(LuaWatch, TAG_FS_WATCHER);
     ptr.state = state;

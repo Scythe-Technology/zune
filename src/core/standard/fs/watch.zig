@@ -498,6 +498,8 @@ pub const FileSystemWatcher = struct {
                         break;
                 }
 
+                try self.backend.iocp.monitor();
+
                 return watch_info;
             } else {
                 return error.INVAL;
@@ -620,8 +622,6 @@ pub const FileSystemWatcher = struct {
 
         self.backend.iocp.handle = handle;
         self.backend.iocp.iocp = iocp;
-
-        try self.backend.iocp.monitor();
     }
 
     pub fn deinit(self: *FileSystemWatcher) void {
