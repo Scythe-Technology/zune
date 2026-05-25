@@ -821,12 +821,11 @@
     "documentation": "",
     "keys": {
       "protocols": "@zune/globaltype/HttpWebSocketOptions.protocols",
-      "tls": "@zune/globaltype/HttpWebSocketOptions.tls",
       "timeout": "@zune/globaltype/HttpWebSocketOptions.timeout",
       "accept": "@zune/globaltype/HttpWebSocketOptions.accept",
+      "tls": "@zune/globaltype/HttpWebSocketOptions.tls",
       "message": "@zune/globaltype/HttpWebSocketOptions.message",
       "close": "@zune/globaltype/HttpWebSocketOptions.close",
-      "open": "@zune/globaltype/HttpWebSocketOptions.open",
       "headers": "@zune/globaltype/HttpWebSocketOptions.headers"
     }
   },
@@ -841,10 +840,6 @@
   "@zune/globaltype/HttpWebSocketOptions.accept": {
     "code_sample": "",
     "documentation": "The function to call to accept the WebSocket connection."
-  },
-  "@zune/globaltype/HttpWebSocketOptions.open": {
-    "code_sample": "",
-    "documentation": "The function to call when the WebSocket connection is opened."
   },
   "@zune/globaltype/HttpWebSocketOptions.close": {
     "code_sample": "",
