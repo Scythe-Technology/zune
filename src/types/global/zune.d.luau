@@ -524,7 +524,8 @@ export type _zune_testing = {
 export type LuauCompileOptions = {
     debug_level: number?,
     optimization_level: number?,
-    coverage_level: number?, 
+    coverage_level: number?,
+    type_info_level: number?, 
 }
 export type LuauLoadOptions = {
     env: {
@@ -683,7 +684,7 @@ export type HttpServerResponse = {
 export type ServerWebSocketHandlers = {
     upgrade: ((request: HttpServerRequest) -> boolean)?,
     open: ((websocket: HttpWebSocket) -> ())?,
-    message: ((websocket: HttpWebSocket, message: string) -> ())?,
+    message: ((websocket: HttpWebSocket, message: string | buffer) -> ())?,
     close: ((websocket: HttpWebSocket, code: number) -> ())?, 
 }
 export type HttpServeOptions = {
@@ -734,8 +735,8 @@ export type HttpWebSocketOptions = {
     protocols: {string}?,
     timeout: number?,
     accept: ((socket: HttpWebSocket, request: HttpServerResponse) -> boolean)?,
-    close: ((socket: HttpWebSocket, close: number?) -> ())?,
-    message: ((socket: HttpWebSocket, message: string) -> ())?,
+    close: ((socket: HttpWebSocket, close: number) -> ())?,
+    message: ((socket: HttpWebSocket, message: string | buffer) -> ())?,
     tls: {
         host: string?,
         ca: TlsCertBundle?, 
@@ -1350,7 +1351,7 @@ export type CryptoTlsServerConfig = {
     auth: TlsCertKeyPair, 
 }
 export type _zune_crypto = {
-    createHash: (algorithm: CryptoHashAlgorithms, secret: string?) -> CryptoHash,
+    createHash: (algorithm: CryptoHashAlgorithms, secret: string | buffer?) -> CryptoHash,
     password: _zune_crypto_password,
     uuid: _zune_crypto_uuid,
     random: _zune_crypto_random,

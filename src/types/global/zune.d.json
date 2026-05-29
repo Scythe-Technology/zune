@@ -3437,6 +3437,7 @@
     "code_sample": "",
     "documentation": "",
     "keys": {
+      "type_info_level": "@zune/globaltype/LuauCompileOptions.type_info_level",
       "optimization_level": "@zune/globaltype/LuauCompileOptions.optimization_level",
       "coverage_level": "@zune/globaltype/LuauCompileOptions.coverage_level",
       "debug_level": "@zune/globaltype/LuauCompileOptions.debug_level"
@@ -3453,6 +3454,10 @@
   "@zune/globaltype/LuauCompileOptions.coverage_level": {
     "code_sample": "",
     "documentation": "The coverage level for the compilation."
+  },
+  "@zune/globaltype/LuauCompileOptions.type_info_level": {
+    "code_sample": "",
+    "documentation": "The type info level for the compilation."
   },
   "@zune/globaltype/_zune_crypto_aead": {
     "code_sample": "",
