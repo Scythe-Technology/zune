@@ -49,7 +49,7 @@ const INIT_CONFIG_FILE =
     \\#require = true
     \\#random = true
     \\#thread = true
-    \\#ffi = true
+    \\#c = true
 ;
 
 fn Execute(_: std.mem.Allocator, args: []const []const u8) !void {
@@ -140,4 +140,5 @@ fn Execute(_: std.mem.Allocator, args: []const []const u8) !void {
 pub const Command = command.Command{
     .name = "init",
     .execute = Execute,
+    .description = "Create initial files & configs for zune.",
 };

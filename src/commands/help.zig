@@ -5,28 +5,89 @@ const Zune = @import("zune");
 const command = @import("lib.zig");
 
 fn Execute(_: std.mem.Allocator, _: []const []const u8) !void {
-    Zune.debug.print("<bold><dim>Z<clear><bold>UNE<clear> - A luau runtime\n" ++
+    comptime var CONTENT: []const u8 = "<bold><dim>Z<clear><bold>UNE<clear> - A luau runtime\n" ++
         "\n" ++
         "<bold>usage:<clear> zune <dim><<command>> [...args]<clear>\n" ++
-        "\n" ++
-        "<bold>Commands:<clear>\n" ++
-        "  <bold><green>run      <clear><dim>./script.luau    <clear>Execute lua/luau file.\n" ++
-        "  <bold><green>test     <clear><dim>./test.luau      <clear>Run tests in lua/luau file, similar to run.\n" ++
-        "  <bold><green>debug    <clear><dim>./script.luau    <clear>Debug lua/luau file.\n" ++
-        "  <bold><green>setup    <clear><dim>[editor]         <clear>Setup environment for luau-lsp with editor of your choice.\n" ++
-        "  <bold><green>repl                      <clear>Start REPL session.\n" ++
-        "  <bold><green>init                      <clear>Create initial files & configs for zune.\n" ++
-        "  <bold><green>bundle                    <clear>Bundle lua/luau scripts, files with zune as standalone executable.\n" ++
-        "\n" ++
-        "  <bold><blue>luau     <clear><dim>[args...]        <clear>Display info from luau.\n" ++
-        "  <bold><blue>help                      <clear>Display help message.\n" ++
-        "  <bold><blue>info     <clear><dim>[all]        <clear><clear>Display runtime information.\n" ++
-        "\n" ++
-        "<bold>Flags:<clear>\n" ++
-        "  -e, --eval     <clear><dim>[luau]     <clear>Evaluate luau code.\n" ++
-        "  -V, --version             <clear>Display runtime information.\n" ++
-        "  -h, --help                <clear>Display help message.\n" ++
-        "", .{});
+        "\n";
+    comptime {
+        var flag_size: usize = 0;
+        var padding_len: usize = 0;
+        for (command.Commands) |cmd| {
+            padding_len = @max(cmd.name.len + (if (cmd.template) |t| t.len else 0), padding_len);
+            var compact_name: []const u8 = "";
+            for (cmd.aliases) |alias| {
+                if (std.mem.startsWith(u8, alias, "-")) {
+                    if (compact_name.len != 0) {
+                        compact_name = compact_name ++ ", ";
+                    }
+                    compact_name = compact_name ++ alias;
+                }
+            }
+            padding_len = @max(compact_name.len + (if (cmd.template) |t| t.len else 0), padding_len);
+            for (cmd.aliases) |alias| {
+                if (std.mem.startsWith(u8, alias, "-")) {
+                    flag_size += 1;
+                    break;
+                }
+            }
+        }
+        var flags: [flag_size]command.Command = undefined;
+
+        CONTENT = CONTENT ++ "<bold>Commands:<clear>\n";
+        var cmd_index: usize = 0;
+        var current_category: command.Command.Categroy = .General;
+        for (command.Commands) |cmd| {
+            if (current_category != cmd.category) {
+                current_category = cmd.category;
+                if (current_category == .Display) {
+                    CONTENT = CONTENT ++ "\n";
+                }
+            }
+            const pre_padding = " " ** (@divFloor(padding_len, 2) + 4 - cmd.name.len);
+            const post_padding = " " ** (@divFloor(padding_len, 2) + 6 - (if (cmd.template) |t| t.len else 0));
+            CONTENT = CONTENT ++
+                "  <bold>" ++
+                (switch (current_category) {
+                    .General => "<green>",
+                    .Display => "<blue>",
+                }) ++
+                cmd.name ++ pre_padding ++ "<clear><dim>" ++
+                (if (cmd.template) |t| t else "") ++
+                post_padding ++
+                "<clear>" ++ (if (cmd.description) |desc| " " ++ desc ++ "\n" else "\n");
+            // ++ padding ++ "  <clear><dim>" ++ padding ++ "    <clear>" ++ (cmd.description orelse "") ++ "\n";
+            for (cmd.aliases) |alias| {
+                if (std.mem.startsWith(u8, alias, "-")) {
+                    flags[cmd_index] = cmd;
+                    cmd_index += 1;
+                    break;
+                }
+            }
+        }
+
+        CONTENT = CONTENT ++ "\n<bold>Flags:<clear>\n";
+        for (flags) |cmd| {
+            var compact_name: []const u8 = "";
+            for (cmd.aliases) |alias| {
+                if (std.mem.startsWith(u8, alias, "-")) {
+                    if (compact_name.len != 0) {
+                        compact_name = compact_name ++ ", ";
+                    }
+                    compact_name = compact_name ++ alias;
+                }
+            }
+            const pre_padding = " " ** (@divFloor(padding_len, 2) + 4 - compact_name.len);
+            const post_padding = " " ** (@divFloor(padding_len, 2) + 6 - (if (cmd.template) |t| t.len else 0));
+            CONTENT = CONTENT ++
+                "  " ++
+                compact_name ++ pre_padding ++ "<clear><dim>" ++
+                (if (cmd.template) |t| t else "") ++
+                post_padding ++
+                "<clear>" ++ (if (cmd.description) |desc| " " ++ desc ++ "\n" else "\n");
+        }
+    }
+
+    Zune.debug.print(CONTENT, .{});
 }
 
 pub const Command = command.Command{
@@ -35,4 +96,6 @@ pub const Command = command.Command{
     .aliases = &.{
         "-h", "--help",
     },
+    .description = "Display help message.",
+    .category = .Display,
 };

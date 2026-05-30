@@ -603,10 +603,31 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
     Debugger.DebuggerExit();
 }
 
-pub const RunCmd = command.Command{ .name = "run", .execute = cmdRun };
-pub const TestCmd = command.Command{ .name = "test", .execute = cmdTest };
-pub const EvalCmd = command.Command{ .name = "--eval", .execute = cmdEval, .aliases = &.{"-e"} };
-pub const DebugCmd = command.Command{ .name = "debug", .execute = cmdDebug };
+pub const RunCmd = command.Command{
+    .name = "run",
+    .execute = cmdRun,
+    .description = "Execute lua/luau file.",
+    .template = "./script.luau",
+};
+pub const TestCmd = command.Command{
+    .name = "test",
+    .execute = cmdTest,
+    .description = "Run tests in lua/luau file, similar to run.",
+    .template = "./test.luau",
+};
+pub const EvalCmd = command.Command{
+    .name = "eval",
+    .execute = cmdEval,
+    .aliases = &.{ "-e", "--eval" },
+    .description = "Evaluate lua/luau code snippet.",
+    .template = "print(\"zune\")",
+};
+pub const DebugCmd = command.Command{
+    .name = "debug",
+    .execute = cmdDebug,
+    .description = "Debug lua/luau file.",
+    .template = "./script.luau",
+};
 
 test cmdRun {
     const allocator = std.testing.allocator;

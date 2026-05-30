@@ -756,7 +756,7 @@ pub const UpgradeHandshake = struct {
                 _ = L.pcall(2, 1, 0).check() catch |err| {
                     if (err == error.Runtime) {
                         if (L.typeOf(-1) == .Function)
-                            Zune.Runtime.Engine.logFnDef(L, -1);
+                            Zune.Runtime.Debug.dumpFunctionDefinition(L, -1);
                     }
                     return self.safeResumeWithError(error.UpgradeFailed);
                 };
