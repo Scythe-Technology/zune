@@ -41,13 +41,13 @@ fn compressRecursive(b: *std.Build, exe: *std.Build.Step.Compile, step: *std.Bui
     }
 }
 
-fn getPackageVersion(b: *std.Build) ![]const u8 {
+fn getPackageVersion(b: *std.Build) !std.SemanticVersion {
     var tree = try std.zig.Ast.parse(b.allocator, @embedFile("build.zig.zon"), .zon);
     defer tree.deinit(b.allocator);
     const version = tree.tokenSlice(tree.nodes.items(.main_token)[2]);
     if (version.len < 3)
         @panic("Version length too short");
-    return try b.allocator.dupe(u8, version[1 .. version.len - 1]);
+    return std.SemanticVersion.parse(version[1 .. version.len - 1]);
 }
 
 fn buildLegacyCompress(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) !void {
@@ -79,7 +79,7 @@ fn prebuild(b: *std.Build, step: *std.Build.Step) !void {
             .use_llvm = true,
         });
 
-        bytecode_builder.root_module.addImport("luau", dep_luau.module("luau"));
+        bytecode_builder.root_module.addImport("luau", dep_luau.module("root"));
 
         const testing_framework_run = compileFile(
             b,
@@ -122,45 +122,110 @@ pub fn build(b: *std.Build) !void {
     const release_ver = b.option(bool, "release-ver", "Set release version") orelse false;
     const use_llvm = b.option(bool, "llvm", "Use llvm");
 
+    const packed_optimize = switch (optimize) {
+        .ReleaseFast => .ReleaseSmall,
+        else => optimize,
+    };
+
+    const dep_luau = b.dependency("luau", .{
+        .target = target,
+        .optimize = optimize,
+        .Analysis = false,
+    });
+    const dep_xev = b.dependency("libxev", .{ .target = target, .optimize = optimize });
+    const dep_tls = b.dependency("tls", .{ .target = target, .optimize = optimize });
+    const dep_json = b.dependency("json", .{ .target = target, .optimize = optimize });
+    const dep_yaml = b.dependency("yaml", .{ .target = target, .optimize = optimize });
+    const dep_toml = b.dependency("toml", .{ .target = target, .optimize = optimize });
+    const dep_datetime = b.dependency("datetime", .{ .target = target, .optimize = optimize });
+    const dep_lz4 = b.dependency("lz4", .{ .target = target, .optimize = packed_optimize });
+    const dep_brotli = b.dependency("brotli", .{ .target = target, .optimize = packed_optimize });
+    const dep_zstd = b.dependency("zstd", .{ .target = target, .optimize = packed_optimize });
+    const dep_pcre2 = b.dependency("pcre2", .{ .target = target, .optimize = packed_optimize });
+    const dep_tinycc = b.dependency("tinycc", .{ .target = target, .optimize = packed_optimize, .CONFIG_TCC_BACKTRACE = false, .no_fail = true });
+    const dep_sqlite = b.dependency("sqlite", .{
+        .target = target,
+        .optimize = packed_optimize,
+        .SQLITE_ENABLE_RTREE = true,
+        .SQLITE_ENABLE_FTS3 = true,
+        .SQLITE_ENABLE_FTS5 = true,
+        .SQLITE_ENABLE_COLUMN_METADATA = true,
+        .SQLITE_MAX_VARIABLE_NUMBER = 200000,
+        .SQLITE_ENABLE_MATH_FUNCTIONS = true,
+        .SQLITE_ENABLE_FTS3_PARENTHESIS = true,
+    });
+
     const prebuild_step = b.step("prebuild", "Setup project for build");
+
+    prebuild_step.dependOn(&dep_tinycc.builder.top_level_steps.get("config-tcc").?.step);
 
     try buildLegacyCompress(b, target, optimize);
 
     try prebuild(b, prebuild_step);
 
-    var version = try getPackageVersion(b);
-    if (!release_ver) {
-        const hash = b.run(&.{ "git", "rev-parse", "--short", "HEAD" });
+    const version = try getPackageVersion(b);
+    const commit_hash: ?[]const u8 = if (!release_ver) blk: {
+        const hash = b.run(&.{ "git", "rev-parse", "HEAD" });
         const trimmed = std.mem.trim(u8, hash, "\r\n ");
-        version = try std.mem.concat(b.allocator, u8, &.{ version, "-dev", ".", trimmed });
-    }
+        break :blk if (trimmed.len == 0) null else trimmed;
+    } else null;
 
     const zune_info = b.addOptions();
-    zune_info.addOption([]const u8, "version", version);
+    zune_info.addOption(std.SemanticVersion, "version", version);
+    zune_info.addOption(?[]const u8, "commit_hash", commit_hash);
+
+    const mod_zune = b.createModule(.{
+        .root_source_file = b.path("src/main.zig"),
+        .target = target,
+        .optimize = optimize,
+        .strip = switch (optimize) {
+            .Debug, .ReleaseSafe => null,
+            .ReleaseFast, .ReleaseSmall => true,
+        },
+    });
+
+    mod_zune.addImport("zune", mod_zune);
+
+    mod_zune.addOptions("zune-info", zune_info);
+
+    mod_zune.addImport("luau", dep_luau.module("root"));
+    mod_zune.addImport("xev", dep_xev.module("xev"));
+    mod_zune.addImport("tls", dep_tls.module("tls"));
+    mod_zune.addImport("yaml", dep_yaml.module("yaml"));
+    mod_zune.addImport("lz4", dep_lz4.module("lz4"));
+    mod_zune.addImport("brotli", dep_brotli.module("brotli"));
+    mod_zune.addImport("zstd", dep_zstd.module("zig-zstd"));
+    mod_zune.addImport("json", dep_json.module("json"));
+    mod_zune.addImport("regex", dep_pcre2.module("zpcre2"));
+    mod_zune.addImport("datetime", dep_datetime.module("zdt"));
+    mod_zune.addImport("toml", dep_toml.module("tomlz"));
+    mod_zune.addImport("sqlite", dep_sqlite.module("z-sqlite"));
+    switch (target.result.os.tag) {
+        .windows => switch (target.result.cpu.arch) {
+            .aarch64 => {},
+            else => mod_zune.addImport("tinycc", dep_tinycc.module("root")),
+        },
+        else => switch (target.result.cpu.arch) {
+            .x86_64, .aarch64, .riscv64 => mod_zune.addImport("tinycc", dep_tinycc.module("root")),
+            else => {},
+        },
+    }
+    mod_zune.addImport("lcompress", b.modules.get("legacy-compress").?);
 
     const exe = b.addExecutable(.{
         .name = "zune",
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/main.zig"),
-            .target = target,
-            .optimize = optimize,
-            .strip = switch (optimize) {
-                .Debug, .ReleaseSafe => null,
-                .ReleaseFast, .ReleaseSmall => true,
-            },
-        }),
+        .root_module = mod_zune,
         .use_llvm = use_llvm,
+        .use_lld = true,
     });
 
-    exe.step.dependOn(prebuild_step);
+    exe.lto = switch (optimize) {
+        .Debug => null,
+        .ReleaseSmall => .thin,
+        else => .full,
+    };
 
-    buildZune(
-        b,
-        target,
-        optimize,
-        exe.root_module,
-        zune_info,
-    );
+    exe.step.dependOn(prebuild_step);
 
     if (no_bin) {
         b.getInstallStep().dependOn(&exe.step);
@@ -200,24 +265,11 @@ pub fn build(b: *std.Build) !void {
             .mode = .simple,
             .path = b.path("test/runner.zig"),
         },
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/main.zig"),
-            .target = target,
-            .optimize = optimize,
-        }),
+        .root_module = mod_zune,
         .use_llvm = use_llvm,
     });
 
     exe_unit_tests.step.dependOn(prebuild_step);
-
-    buildZune(
-        b,
-        target,
-        optimize,
-        exe_unit_tests.root_module,
-        zune_info,
-    );
-
     exe_unit_tests.step.dependOn(&install_sample_dylib.step);
 
     const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
@@ -227,75 +279,12 @@ pub fn build(b: *std.Build) !void {
 
     const version_step = b.step("version", "Get build version");
 
-    version_step.dependOn(&b.addSystemCommand(&.{ "echo", version }).step);
-}
-
-fn buildZune(
-    b: *std.Build,
-    target: std.Build.ResolvedTarget,
-    optimize: std.builtin.OptimizeMode,
-    module: *std.Build.Module,
-    zune_info: *std.Build.Step.Options,
-) void {
-    const packed_optimize = switch (optimize) {
-        .ReleaseFast => .ReleaseSmall,
-        else => optimize,
-    };
-
-    const dep_luau = b.dependency("luau", .{
-        .target = target,
-        .optimize = optimize,
-        .Analysis = false,
-    });
-    const dep_xev = b.dependency("libxev", .{ .target = target, .optimize = optimize });
-    const dep_tls = b.dependency("tls", .{ .target = target, .optimize = optimize });
-    const dep_json = b.dependency("json", .{ .target = target, .optimize = optimize });
-    const dep_yaml = b.dependency("yaml", .{ .target = target, .optimize = optimize });
-    const dep_toml = b.dependency("toml", .{ .target = target, .optimize = optimize });
-    const dep_datetime = b.dependency("datetime", .{ .target = target, .optimize = optimize });
-    const dep_lz4 = b.dependency("lz4", .{ .target = target, .optimize = packed_optimize });
-    const dep_brotli = b.dependency("brotli", .{ .target = target, .optimize = packed_optimize });
-    const dep_zstd = b.dependency("zstd", .{ .target = target, .optimize = packed_optimize });
-    const dep_pcre2 = b.dependency("pcre2", .{ .target = target, .optimize = packed_optimize });
-    const dep_tinycc = b.dependency("tinycc", .{ .target = target, .optimize = packed_optimize, .CONFIG_TCC_BACKTRACE = false, .no_fail = true });
-    const dep_sqlite = b.dependency("sqlite", .{
-        .target = target,
-        .optimize = packed_optimize,
-        .SQLITE_ENABLE_RTREE = true,
-        .SQLITE_ENABLE_FTS3 = true,
-        .SQLITE_ENABLE_FTS5 = true,
-        .SQLITE_ENABLE_COLUMN_METADATA = true,
-        .SQLITE_MAX_VARIABLE_NUMBER = 200000,
-        .SQLITE_ENABLE_MATH_FUNCTIONS = true,
-        .SQLITE_ENABLE_FTS3_PARENTHESIS = true,
+    const version_str = b.fmt("{d}.{d}.{d}{s}", .{
+        version.major,
+        version.minor,
+        version.patch,
+        if (commit_hash) |hash| b.fmt("-dev.{s}", .{hash[0..7]}) else "",
     });
 
-    module.addImport("zune", module);
-
-    module.addOptions("zune-info", zune_info);
-
-    module.addImport("luau", dep_luau.module("luau"));
-    module.addImport("xev", dep_xev.module("xev"));
-    module.addImport("tls", dep_tls.module("tls"));
-    module.addImport("yaml", dep_yaml.module("yaml"));
-    module.addImport("lz4", dep_lz4.module("lz4"));
-    module.addImport("brotli", dep_brotli.module("brotli"));
-    module.addImport("zstd", dep_zstd.module("zig-zstd"));
-    module.addImport("json", dep_json.module("json"));
-    module.addImport("regex", dep_pcre2.module("zpcre2"));
-    module.addImport("datetime", dep_datetime.module("zdt"));
-    module.addImport("toml", dep_toml.module("tomlz"));
-    module.addImport("sqlite", dep_sqlite.module("z-sqlite"));
-    switch (target.result.os.tag) {
-        .windows => switch (target.result.cpu.arch) {
-            .aarch64 => {},
-            else => module.addImport("tinycc", dep_tinycc.module("tinycc")),
-        },
-        else => switch (target.result.cpu.arch) {
-            .x86_64, .aarch64, .riscv64 => module.addImport("tinycc", dep_tinycc.module("tinycc")),
-            else => {},
-        },
-    }
-
-    module.addImport("lcompress", b.modules.get("legacy-compress").?);
+    version_step.dependOn(&b.addSystemCommand(&.{ "echo", version_str }).step);
 }
