@@ -183,7 +183,7 @@ export type FileStat = {
 } | {
     kind: "none", 
 }
-declare class FileHandle
+declare extern type FileHandle with
     read: 
         & ((self: FileHandle, amount: number?, bytes: nil) -> string)
         & ((self: FileHandle, amount: number?, bytes: false) -> string)
@@ -211,7 +211,7 @@ declare class FileHandle
         & ((self: FileHandle, enabled: boolean) -> ())
     close: (self: FileHandle) -> () 
 end
-declare class FileWatcher
+declare extern type FileWatcher with
     stop: (self: FileWatcher) -> () 
 end
 export type FileCreateOptions = {
@@ -319,7 +319,7 @@ export type _zune_mem = {
     writeVector3: (dest: MemWritableSlice, offset: number?, vec: vector) -> (), 
 }
 --[[ thread ]]
-declare class Thread
+declare extern type Thread with
     start: (self: Thread) -> ()
     join: (self: Thread) -> ()
     status: (self: Thread) -> "ready" | "running" | "dead"
@@ -360,7 +360,7 @@ export type _zune_time_date = {
 export type _zune_time_instant = {
     now: () -> buffer, 
 }
-declare class DateTime
+declare extern type DateTime with
     timestamp: number
     timestamp_millis: number
     toLocalTime: (self: DateTime) -> TimeDictionary
@@ -397,7 +397,7 @@ export type ProcessRunResult<T> = ProcessResult & {
 export type _zune_process_env = {
     [string]: string
 }
-declare class ProcessChild
+declare extern type ProcessChild with
     pid: number
     stdin: FileHandle?
     stdout: FileHandle?
@@ -427,7 +427,7 @@ export type RegexMatch = {
     string: string,
     index: number, 
 }
-declare class Regex
+declare extern type Regex with
     match: (self: Regex, input: string | buffer) -> {RegexMatch}?
     search: (self: Regex, input: string | buffer) -> {RegexMatch}?
     captures: (self: Regex, input: string | buffer, global: boolean?) -> {{RegexMatch}}
@@ -441,7 +441,7 @@ export type _zune_regex = {
     create: (pattern: string | buffer, flags: string?) -> Regex, 
 }
 --[[ random ]]
-declare class Random
+declare extern type Random with
     nextNumber: 
         & ((self: Random) -> number)
         & ((self: Random, min: number, max: number) -> number)
@@ -633,7 +633,7 @@ export type _zune_platform = {
     getHostName: () -> string, 
 }
 --[[ net ]]
-declare class NetworkSocket
+declare extern type NetworkSocket with
     send: (self: NetworkSocket, data: string | buffer, offset: number?) -> number
     sendMsg: (self: NetworkSocket, port: number, address: string, data: string | buffer, offset: number?) -> number
     recv: (self: NetworkSocket, max_size: number?) -> buffer
@@ -647,12 +647,12 @@ declare class NetworkSocket
     close: (self: NetworkSocket) -> ()
     isOpen: (self: NetworkSocket) -> boolean 
 end
-declare class HttpServer
+declare extern type HttpServer with
     stop: (self: HttpServer) -> ()
     getPort: (self: HttpServer) -> number
     isRunning: (self: HttpServer) -> boolean 
 end
-declare class HttpWebSocket
+declare extern type HttpWebSocket with
     send: (self: HttpWebSocket, message: string | buffer) -> ()
     close: (self: HttpWebSocket, code: number?) -> ()
     isConnected: (self: HttpWebSocket) -> boolean 
@@ -964,26 +964,26 @@ export type FFILibrary = {
     getSymbol: (self: FFILibrary, symbol: string) -> FFIPointer?,
     [string]: (...any) -> any, 
 }
-declare class FFICompiled
+declare extern type FFICompiled with
     getSymbol: (self: FFICompiled, symbol: string) -> FFIPointer?
     listSymbols: (self: FFICompiled) -> {string} 
 end
-declare class FFIDataType
+declare extern type FFIDataType with
     size: (self: FFIDataType) -> number
     alignment: (self: FFIDataType) -> number
     array: (self: FFIDataType, count: number) -> FFIArrayType 
 end
-declare class FFIVectorType extends FFIDataType
+declare extern type FFIVectorType extends FFIDataType with
     offset: (self: FFIVectorType, index: number) -> number 
 end
-declare class FFIStructureType extends FFIDataType
+declare extern type FFIStructureType extends FFIDataType with
     offset: (self: FFIStructureType, field: string) -> number
     new: (self: FFIStructureType, fields: {[string]: buffer | number | FFIPointer | vector}) -> buffer 
 end
-declare class FFIArrayType extends FFIVectorType
+declare extern type FFIArrayType extends FFIVectorType with
     new: (self: FFIArrayType, values: {[number]: buffer | number | FFIPointer | vector}) -> buffer 
 end
-declare class FFIPointerType extends FFIDataType
+declare extern type FFIPointerType extends FFIDataType with
     tag: (self: FFIPointerType) -> number
     newTag: (self: FFIPointerType, tag: string | buffer) -> FFIPointerType 
 end
@@ -992,7 +992,7 @@ export type FFIFunctionDefinition = {
     returns: FFIAnyDataType,
     args: {FFIAnyDataType}
 }
-declare class FFIPointer
+declare extern type FFIPointer with
     release: (self: FFIPointer) -> FFIPointer
     retain: (self: FFIPointer) -> FFIPointer
     tag: 
@@ -1082,7 +1082,7 @@ export type _zune_ffi = {
     dlopen: (path: string, functions: {[string]: FFIFunctionDefinition}) -> FFILibrary, 
 }
 --[[ io ]]
-declare class IoReadable
+declare extern type IoReadable with
     read: 
         & ((self: IoReadable, amount: number?, bytes: nil) -> buffer)
         & ((self: IoReadable, amount: number?, bytes: true) -> buffer)
@@ -1097,7 +1097,7 @@ declare class IoReadable
     readf32: (self: IoReadable) -> number
     readf64: (self: IoReadable) -> number 
 end
-declare class IoWritable
+declare extern type IoWritable with
     write: (self: IoWritable, data: string | buffer) -> ()
     writeu8: (self: IoWritable, value: number) -> ()
     writeu16: (self: IoWritable, value: number) -> ()
@@ -1108,7 +1108,7 @@ declare class IoWritable
     writef32: (self: IoWritable, value: number) -> ()
     writef64: (self: IoWritable, value: number) -> () 
 end
-declare class BufferStream
+declare extern type BufferStream with
     read: 
         & ((self: BufferStream, amount: number?, bytes: nil) -> buffer)
         & ((self: BufferStream, amount: number?, bytes: true) -> buffer)
@@ -1123,7 +1123,7 @@ declare class BufferStream
     writer: (self: BufferStream) -> IoWritable
     reader: (self: BufferStream) -> IoReadable 
 end
-declare class BufferSink
+declare extern type BufferSink with
     len: number
     closed: boolean
     flush: 
@@ -1157,7 +1157,7 @@ export type _zune_io = {
 }
 --[[ crypto ]]
 type Input = string | buffer
-declare class CryptoHash
+declare extern type CryptoHash with
     digest: 
         & ((self: CryptoHash) -> buffer)
         & ((self: CryptoHash, encoding: "binary") -> buffer)
@@ -1166,10 +1166,10 @@ declare class CryptoHash
     update: (self: CryptoHash, value: string | buffer) -> ()
     copy: (self: CryptoHash) -> CryptoHash 
 end
-declare class TlsCertBundle
+declare extern type TlsCertBundle with
 
 end
-declare class TlsCertKeyPair
+declare extern type TlsCertKeyPair with
 
 end
 export type CryptoHashAlgorithms = 
@@ -1371,7 +1371,7 @@ export type SQLite3Result = {
     last_insert_row_id: number,
     changes: number, 
 }
-declare class SQLite3Statement
+declare extern type SQLite3Statement with
     run: (self: SQLite3Statement, args: SQLite3Values?) -> SQLite3Result
     get: (self: SQLite3Statement, args: SQLite3Values?) -> SQLite3Values?
     all: (self: SQLite3Statement, args: SQLite3Values?) -> {SQLite3Values}
@@ -1379,7 +1379,7 @@ declare class SQLite3Statement
 end
 type TransactionKind = "deferred" | "immediate" | "exclusive"
 type TransactionFn = <A...,  R...>(self: SQLite3Database, callback: ((A...) ->  R...), kind: TransactionKind?) -> ((A...) ->  R...)
-declare class SQLite3Database
+declare extern type SQLite3Database with
     transaction: TransactionFn
     query: (self: SQLite3Database, query: string | buffer) -> SQLite3Statement
     exec: (self: SQLite3Database, query: string | buffer, args: SQLite3Values?) -> SQLite3Result
