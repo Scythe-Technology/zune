@@ -28,3 +28,8 @@ For more information on the future of zune, check out the milestones
 
 ## Contributing
 Read [CONTRIBUTING.md](https://github.com/Scythe-Technology/zune/blob/master/CONTRIBUTING.md).
+
+---
+
+[**Luau**](https://luau.org) is a trademark of Roblox Corporation.
+ZUNE is an independent project and is not affiliated with or endorsed by Roblox or the Luau team.
