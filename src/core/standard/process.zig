@@ -251,7 +251,8 @@ const ProcessAsyncRunContext = struct {
 
     pub fn resumeResult(self: *ProcessAsyncRunContext) !void {
         const L = self.ref.value;
-        defer self.cleanup(luau.getallocator(L));
+        const scheduler = Scheduler.fromState(L);
+        defer self.cleanup(scheduler.allocator);
 
         if (L.status() != .Yield)
             return;
@@ -328,8 +329,8 @@ const ProcessAsyncRunContext = struct {
             self.stdout.?.close();
             return .disarm;
         }
-
-        const allocator = luau.getallocator(self.ref.value);
+        const scheduler = Scheduler.fromState(self.ref.value);
+        const allocator = scheduler.allocator;
 
         const free_space = LuaHelper.MAX_LUAU_SIZE - self.stdout_writer.items.len;
         const buffer = self.stdout_read_buffer[0..@min(bytes, free_space)];
@@ -365,7 +366,8 @@ const ProcessAsyncRunContext = struct {
             return .disarm;
         }
 
-        const allocator = luau.getallocator(self.ref.value);
+        const scheduler = Scheduler.fromState(self.ref.value);
+        const allocator = scheduler.allocator;
 
         const free_space = LuaHelper.MAX_LUAU_SIZE - self.stderr_writer.items.len;
         const buffer = self.stderr_read_buffer[0..@min(bytes, free_space)];
