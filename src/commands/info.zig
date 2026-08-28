@@ -11,7 +11,7 @@ const command = @import("lib.zig");
 const zune_info = @import("zune-info");
 
 fn Execute(_: std.mem.Allocator, args: []const []const u8) !void {
-    Zune.debug.print("<bold>version<clear>:  {s}\n", .{zune_info.version});
+    Zune.debug.print("<bold>version<clear>:  {s}\n", .{Zune.VERSION_STR});
     Zune.debug.print("<bold>luau<clear>:     {d}.{d}\n", .{ LUAU_VERSION.major, LUAU_VERSION.minor });
     Zune.debug.print("<bold>async<clear>:    <green>{t}<clear>\n", .{xev.backend});
     Zune.debug.print("<bold>platform<clear>: {t}-{t}-{t}\n", .{ builtin.cpu.arch, builtin.os.tag, builtin.abi });
