@@ -682,7 +682,7 @@ fn lua_read(self: *File, L: *VM.lua.State) !i32 {
             const sync = try scheduler.createSync(AsyncReadContext.Thread, AsyncReadContext.Thread.complete);
             errdefer scheduler.freeSync(sync);
 
-            var array: std.ArrayList(u8) = try .initCapacity(luau.getallocator(L), @min(size, LuaHelper.MAX_LUAU_SIZE));
+            var array: std.ArrayList(u8) = try .initCapacity(scheduler.allocator, @min(size, LuaHelper.MAX_LUAU_SIZE));
 
             array.expandToCapacity();
 

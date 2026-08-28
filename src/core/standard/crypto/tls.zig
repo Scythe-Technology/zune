@@ -209,11 +209,11 @@ pub fn lua_setupServer(L: *VM.lua.State) !i32 {
 }
 
 pub fn certbundle_dtor(L: *VM.lua.State, self: *tls.config.cert.Bundle) void {
-    self.deinit(luau.getallocator(L));
+    self.deinit(Scheduler.fromState(L).allocator);
 }
 
 pub fn certkeypair_dtor(L: *VM.lua.State, self: *tls.config.CertKeyPair) void {
-    self.deinit(luau.getallocator(L));
+    self.deinit(Scheduler.fromState(L).allocator);
 }
 
 pub fn load(L: *VM.lua.State) void {
