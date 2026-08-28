@@ -95,38 +95,25 @@ fn cmdRun(allocator: std.mem.Allocator, args: []const []const u8) !void {
                         else => unreachable,
                     };
                     Zune.STATE.LUAU_OPTIONS.OPTIMIZATION_LEVEL = level;
-                } else {
-                    Zune.debug.print("<red>error<clear>: invalid optimization level, usage: -O<<N>>\n", .{});
-                    std.process.exit(1);
-                },
-                'g' => {
-                    if (flag.len == 3 and flag[2] >= '0' and flag[2] <= '2') {
-                        const level: u2 = switch (flag[2]) {
-                            '0' => 0,
-                            '1' => 1,
-                            '2' => 2,
-                            else => unreachable,
-                        };
-                        Zune.STATE.LUAU_OPTIONS.DEBUG_LEVEL = level;
-                    } else {
-                        Zune.debug.print("<red>error<clear>: invalid debug level, usage: -g<<N>>\n", .{});
-                        std.process.exit(1);
-                    }
-                },
-                'c' => {
-                    if (flag.len == 3 and flag[2] >= '0' and flag[2] <= '2') {
-                        const level: u2 = switch (flag[2]) {
-                            '0' => 0,
-                            '1' => 1,
-                            '2' => 2,
-                            else => unreachable,
-                        };
-                        Zune.STATE.LUAU_OPTIONS.COVERAGE_LEVEL = level;
-                    } else {
-                        Zune.debug.print("<red>error<clear>: invalid coverage level, usage: -c<<N>>\n", .{});
-                        std.process.exit(1);
-                    }
-                },
+                } else Zune.quitMsg("<red>error<clear>: invalid optimization level, usage: -O<<N>>\n", .{}),
+                'g' => if (flag.len == 3 and flag[2] >= '0' and flag[2] <= '2') {
+                    const level: u2 = switch (flag[2]) {
+                        '0' => 0,
+                        '1' => 1,
+                        '2' => 2,
+                        else => unreachable,
+                    };
+                    Zune.STATE.LUAU_OPTIONS.DEBUG_LEVEL = level;
+                } else Zune.quitMsg("<red>error<clear>: invalid debug level, usage: -g<<N>>\n", .{}),
+                'c' => if (flag.len == 3 and flag[2] >= '0' and flag[2] <= '2') {
+                    const level: u2 = switch (flag[2]) {
+                        '0' => 0,
+                        '1' => 1,
+                        '2' => 2,
+                        else => unreachable,
+                    };
+                    Zune.STATE.LUAU_OPTIONS.COVERAGE_LEVEL = level;
+                } else Zune.quitMsg("<red>error<clear>: invalid coverage level, usage: -c<<N>>\n", .{}),
                 '-' => if (std.mem.startsWith(u8, flag, "--profile")) {
                     PROFILER = 10000;
                     if (flag.len > 10 and flag[9] == '=') {
@@ -144,10 +131,7 @@ fn cmdRun(allocator: std.mem.Allocator, args: []const []const u8) !void {
                 } else if (std.mem.eql(u8, flag, "--no-fmt")) {
                     Zune.STATE.FORMAT.ENABLED = false;
                 } else continue :sw 0,
-                else => {
-                    Zune.debug.print("<red>error<clear>: unknown flag '{s}'\n", .{flag});
-                    std.process.exit(1);
-                },
+                else => Zune.quitMsg("<red>error<clear>: unknown flag '{s}'\n", .{flag}),
             },
             else => unreachable,
         }
@@ -157,18 +141,12 @@ fn cmdRun(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     const file_src_path, const file_content = if (Zune.STATE.WORKSPACE.scripts.get(run_args[0])) |defined|
         getFile(allocator, .Other, dir, defined) catch |err| switch (err) {
-            error.FileNotFound => {
-                Zune.debug.print("<red>error<clear>: file not found '{s}'\n", .{defined});
-                std.process.exit(1);
-            },
+            error.FileNotFound => Zune.quitMsg("<red>error<clear>: file not found '{s}'\n", .{defined}),
             else => return err,
         }
     else
         getFile(allocator, .Run, dir, run_args[0]) catch |err| switch (err) {
-            error.FileNotFound => {
-                Zune.debug.print("<red>error<clear>: file not found '{s}'\n", .{run_args[0]});
-                std.process.exit(1);
-            },
+            error.FileNotFound => Zune.quitMsg("<red>error<clear>: file not found '{s}'\n", .{run_args[0]}),
             else => return err,
         };
     defer allocator.free(file_src_path);
@@ -200,10 +178,7 @@ fn cmdRun(allocator: std.mem.Allocator, args: []const []const u8) !void {
     ML.setsafeenv(VM.lua.GLOBALSINDEX, true);
 
     Engine.loadModule(ML, file_src_path, file_content, null) catch |err| switch (err) {
-        error.Syntax => {
-            std.debug.print("SyntaxError: {s}\n", .{ML.tostring(-1) orelse "UnknownError"});
-            std.process.exit(1);
-        },
+        error.Syntax => Zune.quitMsg("<red>syntax error<clear>: {s}\n", .{ML.tostring(-1) orelse "unknown"}),
         else => return err,
     };
 
@@ -242,38 +217,25 @@ fn cmdTest(allocator: std.mem.Allocator, args: []const []const u8) !void {
                         else => unreachable,
                     };
                     Zune.STATE.LUAU_OPTIONS.OPTIMIZATION_LEVEL = level;
-                } else {
-                    Zune.debug.print("<red>error<clear>: invalid optimization level, usage: -O<<N>>\n", .{});
-                    std.process.exit(1);
-                },
-                'g' => {
-                    if (flag.len == 3 and flag[2] >= '0' and flag[2] <= '2') {
-                        const level: u2 = switch (flag[2]) {
-                            '0' => 0,
-                            '1' => 1,
-                            '2' => 2,
-                            else => unreachable,
-                        };
-                        Zune.STATE.LUAU_OPTIONS.DEBUG_LEVEL = level;
-                    } else {
-                        Zune.debug.print("<red>error<clear>: invalid debug level, usage: -g<<N>>\n", .{});
-                        std.process.exit(1);
-                    }
-                },
-                'c' => {
-                    if (flag.len == 3 and flag[2] >= '0' and flag[2] <= '2') {
-                        const level: u2 = switch (flag[2]) {
-                            '0' => 0,
-                            '1' => 1,
-                            '2' => 2,
-                            else => unreachable,
-                        };
-                        Zune.STATE.LUAU_OPTIONS.COVERAGE_LEVEL = level;
-                    } else {
-                        Zune.debug.print("<red>error<clear>: invalid coverage level, usage: -c<<N>>\n", .{});
-                        std.process.exit(1);
-                    }
-                },
+                } else Zune.quitMsg("<red>error<clear>: invalid optimization level, usage: -O<<N>>\n", .{}),
+                'g' => if (flag.len == 3 and flag[2] >= '0' and flag[2] <= '2') {
+                    const level: u2 = switch (flag[2]) {
+                        '0' => 0,
+                        '1' => 1,
+                        '2' => 2,
+                        else => unreachable,
+                    };
+                    Zune.STATE.LUAU_OPTIONS.DEBUG_LEVEL = level;
+                } else Zune.quitMsg("<red>error<clear>: invalid debug level, usage: -g<<N>>\n", .{}),
+                'c' => if (flag.len == 3 and flag[2] >= '0' and flag[2] <= '2') {
+                    const level: u2 = switch (flag[2]) {
+                        '0' => 0,
+                        '1' => 1,
+                        '2' => 2,
+                        else => unreachable,
+                    };
+                    Zune.STATE.LUAU_OPTIONS.COVERAGE_LEVEL = level;
+                } else Zune.quitMsg("<red>error<clear>: invalid coverage level, usage: -c<<N>>\n", .{}),
                 '-' => if (std.mem.eql(u8, flag, "--native")) {
                     Zune.STATE.LUAU_OPTIONS.CODEGEN = true;
                 } else if (std.mem.eql(u8, flag, "--no-native")) {
@@ -285,10 +247,7 @@ fn cmdTest(allocator: std.mem.Allocator, args: []const []const u8) !void {
                 } else if (std.mem.eql(u8, flag, "--no-fmt")) {
                     Zune.STATE.FORMAT.ENABLED = false;
                 } else continue :sw 0,
-                else => {
-                    Zune.debug.print("<red>error<clear>: unknown flag '{s}'\n", .{flag});
-                    std.process.exit(1);
-                },
+                else => Zune.quitMsg("<red>error<clear>: unknown flag '{s}'\n", .{flag}),
             },
             else => unreachable,
         }
@@ -298,18 +257,12 @@ fn cmdTest(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     const file_src_path, const file_content = if (Zune.STATE.WORKSPACE.scripts.get(run_args[0])) |defined|
         getFile(allocator, .Other, dir, defined) catch |err| switch (err) {
-            error.FileNotFound => {
-                Zune.debug.print("<red>error<clear>: file not found '{s}'\n", .{defined});
-                std.process.exit(1);
-            },
+            error.FileNotFound => Zune.quitMsg("<red>error<clear>: file not found '{s}'\n", .{defined}),
             else => return err,
         }
     else
         getFile(allocator, .Test, dir, run_args[0]) catch |err| switch (err) {
-            error.FileNotFound => {
-                Zune.debug.print("<red>error<clear>: file not found '{s}'\n", .{run_args[0]});
-                std.process.exit(1);
-            },
+            error.FileNotFound => Zune.quitMsg("<red>error<clear>: file not found '{s}'\n", .{run_args[0]}),
             else => return err,
         };
     defer allocator.free(file_src_path);
@@ -356,10 +309,7 @@ fn cmdTest(allocator: std.mem.Allocator, args: []const []const u8) !void {
     ML.setsafeenv(VM.lua.GLOBALSINDEX, true);
 
     Engine.loadModule(ML, file_src_path, file_content, null) catch |err| switch (err) {
-        error.Syntax => {
-            std.debug.print("SyntaxError: {s}\n", .{ML.tostring(-1) orelse "UnknownError"});
-            std.process.exit(1);
-        },
+        error.Syntax => Zune.quitMsg("<red>syntax error<clear>: {s}\n", .{ML.tostring(-1) orelse "unknown"}),
         else => return err,
     };
 
@@ -376,8 +326,7 @@ fn cmdTest(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
 fn cmdEval(allocator: std.mem.Allocator, args: []const []const u8) !void {
     if (args.len < 1) {
-        Zune.debug.print("<red>usage<clear>: eval <<luau>>\n", .{});
-        std.process.exit(1);
+        Zune.quitMsg("<red>usage<clear>: eval <<luau>>\n", .{});
     }
 
     Zune.loadConfiguration(std.fs.cwd());
@@ -410,10 +359,7 @@ fn cmdEval(allocator: std.mem.Allocator, args: []const []const u8) !void {
     ML.setsafeenv(VM.lua.GLOBALSINDEX, true);
 
     Engine.loadModule(ML, "@EVAL", file_content, null) catch |err| switch (err) {
-        error.Syntax => {
-            std.debug.print("SyntaxError: {s}\n", .{ML.tostring(-1) orelse "UnknownError"});
-            std.process.exit(1);
-        },
+        error.Syntax => Zune.quitMsg("<red>syntax error<clear>: {s}\n", .{ML.tostring(-1) orelse "unknown"}),
         else => return err,
     };
 
@@ -422,8 +368,7 @@ fn cmdEval(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
 fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
     if (comptime !Debugger.PlatformSupported()) {
-        Zune.debug.print("<red>error<clear>: platform not supported\n", .{});
-        std.process.exit(1);
+        Zune.quitMsg("<red>error<clear>: platform not supported\n", .{});
     }
     var history = try History.init(allocator, ".zune/.debug_history");
     errdefer history.deinit();
@@ -433,10 +378,8 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     const run_args, const flags = splitArgs(args);
 
-    if (run_args.len < 1) {
-        Zune.debug.print("<red>usage<clear>: debug [OPTIONS] <<luau file>>\n", .{});
-        std.process.exit(1);
-    }
+    if (run_args.len < 1)
+        Zune.quitMsg("<red>usage<clear>: debug [OPTIONS] <<luau file>>\n", .{});
 
     Zune.STATE.RUN_MODE = .Debug;
 
@@ -459,24 +402,16 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
                         else => unreachable,
                     };
                     Zune.STATE.LUAU_OPTIONS.OPTIMIZATION_LEVEL = level;
-                } else {
-                    Zune.debug.print("<red>error<clear>: invalid optimization level, usage: -O<<N>>\n", .{});
-                    std.process.exit(1);
-                },
-                'c' => {
-                    if (flag.len == 3 and flag[2] >= '0' and flag[2] <= '2') {
-                        const level: u2 = switch (flag[2]) {
-                            '0' => 0,
-                            '1' => 1,
-                            '2' => 2,
-                            else => unreachable,
-                        };
-                        Zune.STATE.LUAU_OPTIONS.COVERAGE_LEVEL = level;
-                    } else {
-                        Zune.debug.print("<red>error<clear>: invalid coverage level, usage: -c<<N>>\n", .{});
-                        std.process.exit(1);
-                    }
-                },
+                } else Zune.quitMsg("<red>error<clear>: invalid optimization level, usage: -O<<N>>\n", .{}),
+                'c' => if (flag.len == 3 and flag[2] >= '0' and flag[2] <= '2') {
+                    const level: u2 = switch (flag[2]) {
+                        '0' => 0,
+                        '1' => 1,
+                        '2' => 2,
+                        else => unreachable,
+                    };
+                    Zune.STATE.LUAU_OPTIONS.COVERAGE_LEVEL = level;
+                } else Zune.quitMsg("<red>error<clear>: invalid coverage level, usage: -c<<N>>\n", .{}),
                 '-' => if (std.mem.eql(u8, flag, "--once")) {
                     ALWAYS_DEBUG = false;
                 } else if (std.mem.eql(u8, flag, "--limbo")) {
@@ -485,16 +420,11 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
                     Zune.STATE.FORMAT.ENABLED = false;
                 } else if (std.mem.startsWith(u8, flag, "--ipc-port=")) {
                     const port = flag[11..];
-                    if (port.len == 0) {
-                        Zune.debug.print("<red>error<clear>: invalid port number\n", .{});
-                        std.process.exit(1);
-                    }
+                    if (port.len == 0)
+                        Zune.quitMsg("<red>error<clear>: invalid port number\n", .{});
                     IPC_PORT = try std.fmt.parseInt(u16, port, 10);
                 } else continue :sw 0,
-                else => {
-                    Zune.debug.print("<red>error<clear>: unknown flag '{s}'\n", .{flag});
-                    std.process.exit(1);
-                },
+                else => Zune.quitMsg("<red>error<clear>: unknown flag '{s}'\n", .{flag}),
             },
             else => unreachable,
         }
@@ -508,10 +438,7 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
     const module = run_args[0];
 
     const file_src_path, const file_content = getFile(allocator, .Other, dir, module) catch |err| switch (err) {
-        error.FileNotFound => {
-            Zune.debug.print("<red>error<clear>: file not found '{s}'\n", .{module});
-            std.process.exit(1);
-        },
+        error.FileNotFound => Zune.quitMsg("<red>error<clear>: file not found '{s}'\n", .{module}),
         else => return err,
     };
     defer allocator.free(file_src_path);
@@ -524,7 +451,7 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
         Debugger.COMM = .{
             .stream = try std.net.tcpConnectToAddress(address),
         };
-        try Debugger.COMM.stream.writeAll("zune/" ++ Zune.info.version ++ "\n");
+        try Debugger.COMM.stream.writeAll("zune/" ++ Zune.VERSION_STR ++ "\n");
         try Debugger.COMM.stream.writeAll(std.fmt.comptimePrint("luau/{d}.{d}\n", .{ luau.LUAU_VERSION.major, luau.LUAU_VERSION.minor }));
     } else {
         Debugger.COMM = .{
@@ -585,10 +512,7 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
         ML.setsafeenv(VM.lua.GLOBALSINDEX, true);
 
         Engine.loadModule(ML, file_src_path, file_content, null) catch |err| switch (err) {
-            error.Syntax => {
-                std.debug.print("SyntaxError: {s}\n", .{ML.tostring(-1) orelse "UnknownError"});
-                std.process.exit(1);
-            },
+            error.Syntax => Zune.quitMsg("<red>syntax error<clear>: {s}\n", .{ML.tostring(-1) orelse "unknown"}),
             else => return err,
         };
 
