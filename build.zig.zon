@@ -55,6 +55,10 @@
             .url = "git+https://github.com/Scythe-Technology/tls.zig#c5b2ef01b4900a41b9aaa2db863ca829419a2936",
             .hash = "tls-0.1.0-ER2e0tNIBQBsCrX_2e-QTHCdzCts_3JAUQx-yCgF6UeE",
         },
+        .mimalloc = .{
+            .url = "git+https://github.com/Scythe-Technology/zig-mimalloc#4ab0002af5ba338e438d6e457847528dca5622f1",
+            .hash = "zig_mimalloc-0.0.0-uUokzstPAAA-O83q4Aq-wGalWYNyz51YJMreekI_QWQk",
+        },
     },
     .paths = .{""},
     .fingerprint = 0x1168499f6fd62c8d,
