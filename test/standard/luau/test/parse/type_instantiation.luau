@@ -107,6 +107,8 @@ local res = f<<number, string>>()
                     },
                 },
                 name = {
+                    is_exported = false,
+                    is_const = false,
                     name = {
                         trailing_trivia = {},
                         text = "f",
@@ -149,6 +151,8 @@ local res = f<<number, string>>()
                 variables = {
                     {
                         node = {
+                            is_exported = false,
+                            is_const = false,
                             name = {
                                 trailing_trivia = {},
                                 text = "f1",
@@ -183,6 +187,8 @@ local res = f<<number, string>>()
                                     position = vector.create(11, 2),
                                 },
                                 local_node = {
+                                    is_exported = false,
+                                    is_const = false,
                                     name = {
                                         trailing_trivia = {},
                                         text = "f",
@@ -296,6 +302,8 @@ local res = f<<number, string>>()
                 variables = {
                     {
                         node = {
+                            is_exported = false,
+                            is_const = false,
                             name = {
                                 trailing_trivia = {},
                                 text = "f2",
@@ -330,6 +338,8 @@ local res = f<<number, string>>()
                                     position = vector.create(11, 3),
                                 },
                                 local_node = {
+                                    is_exported = false,
+                                    is_const = false,
                                     name = {
                                         trailing_trivia = {},
                                         text = "f",
@@ -411,6 +421,8 @@ local res = f<<number, string>>()
                 variables = {
                     {
                         node = {
+                            is_exported = false,
+                            is_const = false,
                             name = {
                                 trailing_trivia = {},
                                 text = "res",
@@ -449,6 +461,8 @@ local res = f<<number, string>>()
                                         position = vector.create(12, 4),
                                     },
                                     local_node = {
+                                        is_exported = false,
+                                        is_const = false,
                                         name = {
                                             trailing_trivia = {},
                                             text = "f",
@@ -580,6 +594,4 @@ local res = f<<number, string>>()
         tag = "block",
     },
     hotcomments = {},
-}, {
-    LuauExplicitTypeInstantiationSyntax = true
-}]]
+}, {}]]

@@ -49,6 +49,8 @@ local general = {
                 variables = {
                     {
                         node = {
+                            is_exported = false,
+                            is_const = false,
                             name = {
                                 trailing_trivia = {},
                                 text = "list",
@@ -354,6 +356,8 @@ local general = {
                 variables = {
                     {
                         node = {
+                            is_exported = false,
+                            is_const = false,
                             name = {
                                 trailing_trivia = {},
                                 text = "dict",
@@ -624,6 +628,8 @@ local general = {
                 variables = {
                     {
                         node = {
+                            is_exported = false,
+                            is_const = false,
                             name = {
                                 trailing_trivia = {},
                                 text = "mixed",
@@ -983,6 +989,8 @@ local general = {
                 variables = {
                     {
                         node = {
+                            is_exported = false,
+                            is_const = false,
                             name = {
                                 trailing_trivia = {},
                                 text = "general",

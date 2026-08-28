@@ -223,13 +223,14 @@ const AstSerializer = struct {
                 try self.serializeToken(local.location.begin, std.mem.span(local.name.value), null);
                 try self.L.rawsetfield(-2, "name");
 
-                if (local.annotation != null) {
+                try self.L.Zsetfield(-1, "is_const", local.isConst);
+                try self.L.Zsetfield(-1, "is_exported", local.isExported);
+
+                if (local.annotation) |annotation| {
                     std.debug.assert(colonPosition != null);
                     try self.serializeToken(colonPosition.?, ":", null);
                     try self.L.rawsetfield(-2, "colon");
-                }
 
-                if (local.annotation) |annotation| {
                     try annotation.visit(self);
                     try self.L.rawsetfield(-2, "annotation");
                 }
@@ -260,8 +261,8 @@ const AstSerializer = struct {
                 try self.serializeToken(item.key.?.location.begin, value.slice(), null);
                 try self.L.rawsetfield(-2, "key");
 
-                std.debug.assert(cstNode.equalsPosition.has);
-                try self.serializeToken(cstNode.equalsPosition.to().?, "=", null);
+                std.debug.assert(cstNode.equalsPosition.hasValue());
+                try self.serializeToken(cstNode.equalsPosition, "=", null);
                 try self.L.rawsetfield(-2, "equals");
 
                 _ = try self.visitExpr(item.value);
@@ -271,27 +272,27 @@ const AstSerializer = struct {
                 try self.L.createtable(0, 7);
                 try self.L.Zsetfield(-1, "kind", "general");
 
-                std.debug.assert(cstNode.indexerOpenPosition.has);
-                try self.serializeToken(cstNode.indexerOpenPosition.to().?, "[", null);
+                std.debug.assert(cstNode.indexerOpenPosition.hasValue());
+                try self.serializeToken(cstNode.indexerOpenPosition, "[", null);
                 try self.L.rawsetfield(-2, "indexer_open");
 
                 _ = try self.visitExpr(item.key.?);
                 try self.L.rawsetfield(-2, "key");
 
-                std.debug.assert(cstNode.indexerClosePosition.has);
-                try self.serializeToken(cstNode.indexerClosePosition.to().?, "]", null);
+                std.debug.assert(cstNode.indexerClosePosition.hasValue());
+                try self.serializeToken(cstNode.indexerClosePosition, "]", null);
                 try self.L.rawsetfield(-2, "indexer_close");
 
-                std.debug.assert(cstNode.equalsPosition.has);
-                try self.serializeToken(cstNode.equalsPosition.to().?, "=", null);
+                std.debug.assert(cstNode.equalsPosition.hasValue());
+                try self.serializeToken(cstNode.equalsPosition, "=", null);
                 try self.L.rawsetfield(-2, "equals");
 
                 _ = try self.visitExpr(item.value);
                 try self.L.rawsetfield(-2, "value");
             },
         }
-        if (cstNode.separator.has) {
-            try self.serializeToken(cstNode.separatorPosition.value, if (cstNode.separator.value == .comma) "," else ";", null);
+        if (cstNode.separator != .missing) {
+            try self.serializeToken(cstNode.separatorPosition, if (cstNode.separator == .comma) "," else ";", null);
             try self.L.rawsetfield(-2, "separator");
         }
     }
@@ -506,6 +507,7 @@ const AstSerializer = struct {
                 .Checked => if (attr.args.size > 0) "checked" else "@checked",
                 .Native => if (attr.args.size > 0) "native" else "@native",
                 .Deprecated => if (attr.args.size > 0) "deprecated" else "@deprecated",
+                .DebugNoinline => if (attr.args.size > 0) "debug_noinline" else "@debug_noinline",
                 .Unknown => @panic("unreachable"), // parse error?
             }, null);
             try self.L.rawsetfield(-2, "type");
@@ -655,9 +657,19 @@ const AstSerializer = struct {
         try self.L.Zsetfield(-1, "value", node.value);
         return false;
     }
+    pub fn visitExprConstantInteger(self: *@This(), node: *Ast.ExprConstantInteger) !bool {
+        const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.expr_constant_integer).?;
+
+        try self.serializeToken(node.location.begin, cstNode.value.slice(), 4);
+        try self.L.Zsetfield(-1, "tag", "number");
+        try setSpanLocation(self.L, node.location, "span");
+
+        try self.L.Zsetfield(-1, "value", node.value);
+
+        return false;
+    }
     pub fn visitExprConstantString(self: *@This(), node: *Ast.ExprConstantString) !bool {
-        // TODO: fix class index issues
-        const cstNode: *Cst.ExprConstantString = @ptrCast(self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.expr_constant_number).?);
+        const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.expr_constant_string).?;
 
         try self.serializeToken(node.location.begin, cstNode.sourceString.slice(), 5);
         try self.L.Zsetfield(-1, "tag", "string");
@@ -718,8 +730,8 @@ const AstSerializer = struct {
         try node.func.visit(self);
         try self.L.rawsetfield(-2, "func");
 
-        if (cstNode.openParens.to()) |parens| {
-            try self.serializeToken(parens, "(", null);
+        if (cstNode.openParens.hasValue()) {
+            try self.serializeToken(cstNode.openParens, "(", null);
             try self.L.rawsetfield(-2, "open_parens");
         }
 
@@ -735,8 +747,8 @@ const AstSerializer = struct {
 
         try setSpanLocation(self.L, node.argLocation, "arg_span");
 
-        if (cstNode.closeParens.to()) |parens| {
-            try self.serializeToken(parens, ")", null);
+        if (cstNode.closeParens.hasValue()) {
+            try self.serializeToken(cstNode.closeParens, ")", null);
             try self.L.rawsetfield(-2, "close_parens");
         }
         return false;
@@ -1239,8 +1251,16 @@ const AstSerializer = struct {
         try self.L.Zsetfield(-1, "tag", "local");
         try setSpanLocation(self.L, node.location, "span");
 
-        try self.serializeToken(node.location.begin, "local", null);
-        try self.L.rawsetfield(-2, "local_keyword");
+        if (node.isExported) {
+            try self.serializeToken(node.location.begin, "export", null);
+            try self.L.rawsetfield(-2, "exported_keyword");
+        }
+        try self.serializeToken(
+            if (node.isExported) node.keywordLocation.value.begin else node.location.begin,
+            if (node.isConst) "const" else "local",
+            null,
+        );
+        try self.L.rawsetfield(-2, if (node.isConst) "const_keyword" else "local_keyword");
 
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.stat_local).?;
         try self.serializePunctuatedLocal(node.vars, cstNode.varsCommaPositions.slice(), ",", cstNode.varsAnnotationColonPositions);
@@ -1282,8 +1302,8 @@ const AstSerializer = struct {
         try node.to.visit(self);
         try self.L.rawsetfield(-2, "to");
 
-        if (cstNode.stepCommaPosition.to()) |stepCommaPosition| {
-            try self.serializeToken(stepCommaPosition, ",", null);
+        if (cstNode.stepCommaPosition.hasValue()) {
+            try self.serializeToken(cstNode.stepCommaPosition, ",", null);
             try self.L.rawsetfield(-2, "step_comma");
         }
 
@@ -1410,8 +1430,13 @@ const AstSerializer = struct {
 
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.stat_local_function).?;
 
-        try self.serializeToken(cstNode.localKeywordPosition, "local", null);
-        try self.L.rawsetfield(-2, "local_keyword");
+        if (node.isConst) {
+            try self.serializeToken(cstNode.localKeywordPosition, "const", null);
+            try self.L.rawsetfield(-2, "const_keyword");
+        } else {
+            try self.serializeToken(cstNode.localKeywordPosition, "local", null);
+            try self.L.rawsetfield(-2, "local_keyword");
+        }
 
         try self.serializeToken(cstNode.functionKeywordPosition, "function", null);
         try self.L.rawsetfield(-2, "function_keyword");
@@ -1503,6 +1528,11 @@ const AstSerializer = struct {
         _ = node;
         return false;
     }
+    pub fn visitStatClass(self: *@This(), node: *Ast.StatClass) !bool {
+        _ = self;
+        _ = node;
+        return false;
+    }
     pub fn visitStatDeclareExternType(self: *@This(), node: *Ast.StatDeclareExternType) !bool {
         _ = self;
         _ = node;
@@ -1543,8 +1573,8 @@ const AstSerializer = struct {
             try self.L.rawsetfield(-2, "prefix");
 
             std.debug.assert(cstNode != null);
-            std.debug.assert(cstNode.?.prefixPointPosition.has);
-            try self.serializeToken(cstNode.?.prefixPointPosition.value, ".", null);
+            std.debug.assert(cstNode.?.prefixPointPosition.hasValue());
+            try self.serializeToken(cstNode.?.prefixPointPosition, ".", null);
             try self.L.rawsetfield(-2, "prefix_point");
         }
 
@@ -1632,8 +1662,8 @@ const AstSerializer = struct {
                 try node.indexer.?.resultType.visit(self);
                 try self.L.rawsetfield(-2, "value");
 
-                if (item.separator.to()) |separator| {
-                    try self.serializeToken(item.separatorPosition.to().?, if (separator == .comma) "," else ";", null);
+                if (item.separator != .missing) {
+                    try self.serializeToken(item.separatorPosition, if (item.separator == .comma) "," else ";", null);
                     try self.L.rawsetfield(-2, "separator");
                 }
             } else {
@@ -1677,8 +1707,8 @@ const AstSerializer = struct {
                 try prop.?[i].type.visit(self);
                 try self.L.rawsetfield(-2, "value");
 
-                if (item.separator.to()) |separator| {
-                    try self.serializeToken(item.separatorPosition.to().?, if (separator == .comma) "," else ";", null);
+                if (item.separator != .missing) {
+                    try self.serializeToken(item.separatorPosition, if (item.separator == .comma) "," else ";", null);
                     try self.L.rawsetfield(-2, "separator");
                 }
             }
@@ -1733,8 +1763,8 @@ const AstSerializer = struct {
                     try self.L.rawsetfield(-2, "name");
                 }
 
-                if (i < cstNode.argumentNameColonPositions.size and cstNode.argumentNameColonPositions.data.?[i].has) {
-                    try self.serializeToken(cstNode.argumentNameColonPositions.data.?[i].value, ":", null);
+                if (i < cstNode.argumentNameColonPositions.size and cstNode.argumentNameColonPositions.data.?[i].hasValue()) {
+                    try self.serializeToken(cstNode.argumentNameColonPositions.data.?[i], ":", null);
                     try self.L.rawsetfield(-2, "colon");
                 }
 
@@ -1797,8 +1827,8 @@ const AstSerializer = struct {
         try self.L.Zsetfield(-1, "tag", "union");
         try setSpanLocation(self.L, node.location, "span");
 
-        if (cstNode.leadingPosition.to()) |leadingPosition| {
-            try self.serializeToken(leadingPosition, "|", null);
+        if (cstNode.leadingPosition.hasValue()) {
+            try self.serializeToken(cstNode.leadingPosition, "|", null);
             try self.L.rawsetfield(-2, "leading");
         }
 
@@ -1838,8 +1868,8 @@ const AstSerializer = struct {
         try self.L.Zsetfield(-1, "tag", "intersection");
         try setSpanLocation(self.L, node.location, "span");
 
-        if (cstNode.leadingPosition.to()) |leadingPosition| {
-            try self.serializeToken(leadingPosition, "&", null);
+        if (cstNode.leadingPosition.hasValue()) {
+            try self.serializeToken(cstNode.leadingPosition, "&", null);
             try self.L.rawsetfield(-2, "leading");
         }
 
@@ -1888,7 +1918,8 @@ const AstSerializer = struct {
 
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.type_pack_explicit).?;
 
-        if (cstNode.hasParentheses) {
+        const hasParentheses = cstNode.openParenthesesPosition.hasValue() and cstNode.closeParenthesesPosition.hasValue();
+        if (hasParentheses) {
             try self.serializeToken(cstNode.openParenthesesPosition, "(", null);
             try self.L.rawsetfield(-2, "open_parens");
         }
@@ -1901,7 +1932,7 @@ const AstSerializer = struct {
             try self.L.rawsetfield(-2, "tail_type");
         }
 
-        if (cstNode.hasParentheses) {
+        if (hasParentheses) {
             try self.serializeToken(cstNode.closeParenthesesPosition, ")", null);
             try self.L.rawsetfield(-2, "close_parens");
         }
@@ -1975,7 +2006,7 @@ const AstSerializer = struct {
         try self.L.rawsetfield(-2, "name");
 
         if (node.defaultValue) |defaultValue| {
-            try self.serializeToken(cstNode.defaultEqualsPosition.value, "=", null);
+            try self.serializeToken(cstNode.defaultEqualsPosition, "=", null);
             try self.L.rawsetfield(-2, "equals");
 
             try defaultValue.visit(self);
@@ -1998,7 +2029,7 @@ const AstSerializer = struct {
         try self.L.rawsetfield(-2, "ellipsis");
 
         if (node.defaultValue) |defaultValue| {
-            try self.serializeToken(cstNode.defaultEqualsPosition.value, "=", null);
+            try self.serializeToken(cstNode.defaultEqualsPosition, "=", null);
             try self.L.rawsetfield(-2, "equals");
 
             try defaultValue.visit(self);
@@ -2212,7 +2243,7 @@ const FFlag = struct {
                 .dynamic = fflag.dynamic,
             });
             return 1;
-        } else return error.UnknownFlag;
+        } else return L.Zerrorf("unknown fflag '{s}'", .{name});
     }
 
     fn lua_set(L: *VM.lua.State) !i32 {
