@@ -4,6 +4,8 @@ const pcre2 = @import("regex");
 
 const Zune = @import("zune");
 
+const Scheduler = Zune.Runtime.Scheduler;
+
 const LuaHelper = Zune.Utils.LuaHelper;
 const MethodMap = Zune.Utils.MethodMap;
 
@@ -17,7 +19,7 @@ const LuaRegex = struct {
     code: *pcre2.Code,
 
     pub fn match(self: *LuaRegex, L: *VM.lua.State) !i32 {
-        const allocator = luau.getallocator(L);
+        const allocator = Scheduler.fromState(L).allocator;
 
         const input = try L.Zcheckvalue([]const u8, 2, null);
         if (try self.code.match(allocator, input)) |m| {
@@ -42,7 +44,7 @@ const LuaRegex = struct {
     }
 
     pub fn search(self: *LuaRegex, L: *VM.lua.State) !i32 {
-        const allocator = luau.getallocator(L);
+        const allocator = Scheduler.fromState(L).allocator;
 
         const input = try L.Zcheckvalue([]const u8, 2, null);
         if (try self.code.search(allocator, input)) |m| {
@@ -67,7 +69,7 @@ const LuaRegex = struct {
     }
 
     pub fn captures(self: *LuaRegex, L: *VM.lua.State) !i32 {
-        const allocator = luau.getallocator(L);
+        const allocator = Scheduler.fromState(L).allocator;
 
         const input = try L.Zcheckvalue([]const u8, 2, null);
         const global = L.Loptboolean(3, false);
@@ -102,7 +104,7 @@ const LuaRegex = struct {
     }
 
     pub fn split(self: *LuaRegex, L: *VM.lua.State) !i32 {
-        const allocator = luau.getallocator(L);
+        const allocator = Scheduler.fromState(L).allocator;
 
         const input = try L.Zcheckvalue([]const u8, 2, null);
         const global = L.Loptboolean(3, false);
@@ -148,7 +150,7 @@ const LuaRegex = struct {
     }
 
     pub fn format(self: *LuaRegex, L: *VM.lua.State) !i32 {
-        const allocator = luau.getallocator(L);
+        const allocator = Scheduler.fromState(L).allocator;
 
         const input = try L.Zcheckvalue([:0]const u8, 2, null);
         const fmt = try L.Zcheckvalue([:0]const u8, 3, null);
@@ -159,7 +161,7 @@ const LuaRegex = struct {
     }
 
     pub fn replace(self: *LuaRegex, L: *VM.lua.State) !i32 {
-        const allocator = luau.getallocator(L);
+        const allocator = Scheduler.fromState(L).allocator;
 
         const input = try L.Zcheckvalue([:0]const u8, 2, null);
         const fmt = try L.Zcheckvalue([:0]const u8, 3, null);
@@ -170,7 +172,7 @@ const LuaRegex = struct {
     }
 
     pub fn replaceAll(self: *LuaRegex, L: *VM.lua.State) !i32 {
-        const allocator = luau.getallocator(L);
+        const allocator = Scheduler.fromState(L).allocator;
 
         const input = try L.Zcheckvalue([:0]const u8, 2, null);
         const fmt = try L.Zcheckvalue([:0]const u8, 3, null);

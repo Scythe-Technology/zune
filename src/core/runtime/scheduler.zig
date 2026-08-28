@@ -254,14 +254,14 @@ sync: Synchronization,
 
 frame: FrameKind = .None,
 
-pub fn init(allocator: std.mem.Allocator, L: *VM.lua.State) !Scheduler {
+pub fn init(allocator: std.mem.Allocator) !Scheduler {
     const max_threads = std.Thread.getCpuCount() catch 1;
     const io_pool = try allocator.create(xev.ThreadPool);
     errdefer allocator.destroy(io_pool);
     io_pool.* = .init(max_threads);
 
     return .{
-        .global = L,
+        .global = undefined,
         .allocator = allocator,
         .thread_pool = io_pool,
         .loop = try xev.Dynamic.Loop.init(.{
@@ -275,11 +275,16 @@ pub fn init(allocator: std.mem.Allocator, L: *VM.lua.State) !Scheduler {
     };
 }
 
+pub fn setup(self: *Scheduler, L: *VM.lua.State) void {
+    L.global.mainthread.userdata = @ptrCast(@alignCast(self));
+    self.global = L;
+}
+
 pub fn deferThread(self: *Scheduler, thread: *VM.lua.State, from: ?*VM.lua.State, args: i32) !void {
     const ptr = try self.allocator.create(DeferredThread);
     ptr.* = .{
         .from = from,
-        .thread = ThreadRef.init(thread),
+        .thread = .init(thread),
         .args = args,
         .node = .{},
     };
@@ -298,7 +303,7 @@ pub fn sleepThread(
     const wake = start + time + if (time == 0 and self.frame == .Sleeping) @as(f64, 0.0001) else @as(f64, 0);
 
     self.sleeping.add(.{
-        .thread = ThreadRef.init(thread),
+        .thread = .init(thread),
         .from = from,
         .start = start,
         .wake = wake,
@@ -334,7 +339,7 @@ pub fn awaitResult(
 
     self.awaits.append(self.allocator, .{
         .data = @ptrCast(data),
-        .state = ThreadRef.init(L),
+        .state = .init(L),
         .resumeFn = resumeFn,
         .virtualDtor = virtualDtor,
         .priority = priority orelse .User,
@@ -680,15 +685,6 @@ pub fn deinit(self: *Scheduler) void {
     self.async.deinit();
 }
 
-pub fn getScheduler(L: anytype) *Scheduler {
-    if (@TypeOf(L) == *VM.lua.State) {
-        const GL = L.mainthread();
-        const scheduler = GL.getthreaddata(*Scheduler);
-        return scheduler;
-    } else if (@TypeOf(L) == ThreadRef) {
-        const state, _ = L;
-        const GL = state.mainthread();
-        const scheduler = GL.getthreaddata(*Scheduler);
-        return scheduler;
-    } else @compileError("Invalid type for getScheduler");
+pub fn fromState(L: *VM.lua.State) *Scheduler {
+    return @ptrCast(@alignCast(L.global.mainthread.userdata));
 }

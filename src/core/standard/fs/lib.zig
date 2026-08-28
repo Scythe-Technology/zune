@@ -64,7 +64,7 @@ fn lua_readFileAsync(L: *VM.lua.State) !i32 {
 }
 
 fn lua_readFileSync(L: *VM.lua.State) !i32 {
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
     const path = L.Lcheckstring(1);
     const useBuffer = L.Loptboolean(2, false);
     const data = try fs.cwd().readFileAlloc(allocator, path, LuaHelper.MAX_LUAU_SIZE);
@@ -235,7 +235,7 @@ fn lua_metadata(L: *VM.lua.State) !i32 {
         else => return error.UnsupportedPlatform,
     }
     const path = L.Lcheckstring(1);
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
     const buf = try allocator.alloc(u8, 4096);
     defer allocator.free(buf);
     const cwd = std.fs.cwd();
@@ -346,7 +346,7 @@ fn lua_symlink(L: *VM.lua.State) !i32 {
     const toPath = L.Lcheckstring(2);
     const cwd = std.fs.cwd();
 
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
 
     const fullPath = try cwd.realpathAlloc(allocator, fromPath);
     defer allocator.free(fullPath);
@@ -363,7 +363,7 @@ fn lua_symlink(L: *VM.lua.State) !i32 {
 }
 
 fn lua_embedFile(L: *VM.lua.State) !i32 {
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
     const path = L.Lcheckstring(1);
     var ar: VM.lua.Debug = .{ .ssbuf = undefined };
     {
@@ -665,11 +665,11 @@ fn lua_watch(L: *VM.lua.State) !i32 {
         .freebsd, .openbsd, .netbsd, .dragonfly => {},
         else => return error.UnsupportedPlatform,
     }
-    const scheduler = Scheduler.getScheduler(L);
+    const scheduler = Scheduler.fromState(L);
     const path = L.Lcheckstring(1);
     try L.Zchecktype(2, .Function);
 
-    const allocator = luau.getallocator(L);
+    const allocator = scheduler.allocator;
 
     const ref = try L.ref(2) orelse unreachable;
     errdefer L.unref(ref);
@@ -706,7 +706,7 @@ fn lua_watch(L: *VM.lua.State) !i32 {
 
 const Path = struct {
     pub fn lua_join(L: *VM.lua.State) !i32 {
-        const allocator = luau.getallocator(L);
+        const allocator = Scheduler.fromState(L).allocator;
         const top = L.gettop();
         if (top == 0)
             return 0;
@@ -726,7 +726,7 @@ const Path = struct {
     }
 
     pub fn lua_relative(L: *VM.lua.State) !i32 {
-        const allocator = luau.getallocator(L);
+        const allocator = Scheduler.fromState(L).allocator;
         const from = try L.Zcheckvalue([:0]const u8, 1, null);
         const to = try L.Zcheckvalue([:0]const u8, 2, null);
 
@@ -739,7 +739,7 @@ const Path = struct {
     }
 
     pub fn lua_resolve(L: *VM.lua.State) !i32 {
-        const allocator = luau.getallocator(L);
+        const allocator = Scheduler.fromState(L).allocator;
         const top = L.gettop();
         if (top == 0)
             return 0;

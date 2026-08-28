@@ -519,7 +519,7 @@ fn safeResumeWithError(
     self: *Self,
     err: anyerror,
 ) xev.CallbackAction {
-    const scheduler = Scheduler.getScheduler(self.lua_ref.value);
+    const scheduler = Scheduler.fromState(self.lua_ref.value);
     if (self.timer.started) {
         self.state.@"error" = err;
         self.state.stage = .closed;
@@ -624,7 +624,7 @@ fn onConnectComplete(
 }
 
 fn connectAddress(self: *Self, addr: std.net.Address) !void {
-    const scheduler = Scheduler.getScheduler(self.lua_ref.value);
+    const scheduler = Scheduler.fromState(self.lua_ref.value);
     const socket = try @import("../../lib.zig").createSocket(
         addr.any.family,
         std.posix.SOCK.STREAM | std.posix.SOCK.CLOEXEC | std.posix.SOCK.NONBLOCK,
@@ -678,8 +678,8 @@ pub fn validateUri(uri: std.Uri, arena: std.mem.Allocator) !struct { std.http.Cl
 pub fn lua_request(L: *VM.lua.State) !i32 {
     if (!L.isyieldable())
         return L.Zyielderror();
-    const allocator = luau.getallocator(L);
-    const scheduler = Scheduler.getScheduler(L);
+    const scheduler = Scheduler.fromState(L);
+    const allocator = scheduler.allocator;
 
     const uri_string = try L.Zcheckvalue([:0]const u8, 1, null);
 

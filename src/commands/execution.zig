@@ -69,6 +69,7 @@ fn splitArgs(args: []const []const u8) struct { []const []const u8, ?[]const []c
 }
 
 fn cmdRun(allocator: std.mem.Allocator, args: []const []const u8) !void {
+    @branchHint(.likely);
     const run_args, const flags = splitArgs(args);
 
     if (run_args.len < 1) {
@@ -152,17 +153,19 @@ fn cmdRun(allocator: std.mem.Allocator, args: []const []const u8) !void {
     defer allocator.free(file_src_path);
     defer allocator.free(file_content);
 
-    var L = try luau.init(&allocator);
+    var L = try luau.VM.lstate.Lnewstate();
     defer L.deinit();
-    var scheduler = try Scheduler.init(allocator, L);
+    var scheduler = try Scheduler.init(allocator);
     defer scheduler.deinit();
 
-    try Zune.initState(L);
-    defer Zune.deinitState(L);
+    scheduler.setup(L);
+
+    try Zune.initState(L, allocator);
+    defer Zune.deinitState(L, allocator);
 
     try Scheduler.SCHEDULERS.append(Zune.DEFAULT_ALLOCATOR, &scheduler);
 
-    try Engine.prepAsync(L, &scheduler);
+    try Engine.prep(L);
     try Zune.openZune(L, run_args, LOAD_FLAGS);
 
     L.setsafeenv(VM.lua.GLOBALSINDEX, true);
@@ -283,17 +286,19 @@ fn cmdTest(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     const gpa_allocator = gpa.allocator();
 
-    var L = try luau.init(&gpa_allocator);
+    var L = try luau.VM.lstate.Lnewstate();
     defer L.deinit();
-    var scheduler = try Scheduler.init(gpa_allocator, L);
+    var scheduler = try Scheduler.init(gpa_allocator);
     defer scheduler.deinit();
 
-    try Zune.initState(L);
-    defer Zune.deinitState(L);
+    scheduler.setup(L);
+
+    try Zune.initState(L, gpa_allocator);
+    defer Zune.deinitState(L, gpa_allocator);
 
     try Scheduler.SCHEDULERS.append(Zune.DEFAULT_ALLOCATOR, &scheduler);
 
-    try Engine.prepAsync(L, &scheduler);
+    try Engine.prep(L);
     try Zune.openZune(L, args, LOAD_FLAGS);
 
     L.setsafeenv(VM.lua.GLOBALSINDEX, true);
@@ -333,17 +338,19 @@ fn cmdEval(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     const file_content = args[0];
 
-    var L = try luau.init(&allocator);
+    var L = try luau.VM.lstate.Lnewstate();
     defer L.deinit();
-    var scheduler = try Scheduler.init(allocator, L);
+    var scheduler = try Scheduler.init(allocator);
     defer scheduler.deinit();
 
-    try Zune.initState(L);
-    defer Zune.deinitState(L);
+    scheduler.setup(L);
+
+    try Zune.initState(L, allocator);
+    defer Zune.deinitState(L, allocator);
 
     try Scheduler.SCHEDULERS.append(Zune.DEFAULT_ALLOCATOR, &scheduler);
 
-    try Engine.prepAsync(L, &scheduler);
+    try Engine.prep(L);
     try Zune.openZune(L, args, .{});
 
     L.setsafeenv(VM.lua.GLOBALSINDEX, true);
@@ -468,16 +475,18 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
         Debugger.reloadBreakpoints();
 
-        var L = try luau.init(&allocator);
+        var L = try luau.VM.lstate.Lnewstate();
         defer L.deinit();
 
         L.singlestep(true);
 
-        var scheduler = try Scheduler.init(allocator, L);
+        var scheduler = try Scheduler.init(allocator);
         defer scheduler.deinit();
 
-        try Zune.initState(L);
-        defer Zune.deinitState(L);
+        scheduler.setup(L);
+
+        try Zune.initState(L, allocator);
+        defer Zune.deinitState(L, allocator);
 
         try Scheduler.SCHEDULERS.append(Zune.DEFAULT_ALLOCATOR, &scheduler);
 
@@ -487,7 +496,7 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
         callbacks.*.debugstep = Debugger.debugstep;
         callbacks.*.debugprotectederror = Debugger.debugprotectederror;
 
-        try Engine.prepAsync(L, &scheduler);
+        try Engine.prep(L);
         try Zune.openZune(L, run_args, LOAD_FLAGS);
 
         L.setsafeenv(VM.lua.GLOBALSINDEX, true);

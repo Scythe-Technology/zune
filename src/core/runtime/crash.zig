@@ -6,6 +6,8 @@ const Zune = @import("zune");
 
 const Runtime = Zune.Runtime;
 
+const Scheduler = Runtime.Scheduler;
+
 const VM = luau.VM;
 
 const SegfaultCase = enum {
@@ -21,7 +23,7 @@ const SegfaultCase = enum {
 };
 
 fn dumpLuauStackTrace(L: *VM.lua.State, stderr: *std.Io.Writer) !void {
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
 
     var list = try Runtime.Debug.getStackTrace(L, allocator);
     defer list.deinit(allocator);

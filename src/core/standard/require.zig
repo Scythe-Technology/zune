@@ -4,6 +4,8 @@ const json = @import("json");
 
 const Zune = @import("zune");
 
+const Scheduler = Zune.Runtime.Scheduler;
+
 const LuaHelper = Zune.Utils.LuaHelper;
 
 const VM = luau.VM;
@@ -30,7 +32,7 @@ const LuaContext = struct {
 };
 
 fn lua_navigate(L: *VM.lua.State) !i32 {
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
 
     const path = try L.Zcheckvalue([]const u8, 1, null);
     const from = try L.Zcheckvalue(?[]const u8, 2, null);

@@ -2,6 +2,10 @@ const std = @import("std");
 const luau = @import("luau");
 const builtin = @import("builtin");
 
+const Zune = @import("zune");
+
+const Scheduler = Zune.Runtime.Scheduler;
+
 const VM = luau.VM;
 
 var active = false;
@@ -98,7 +102,7 @@ fn loop() void {
 pub fn start(L: *VM.lua.State, freq: u64) !void {
     if (comptime builtin.single_threaded)
         return error.UnsupportedPlatform;
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
 
     active = true;
     frequency = freq;

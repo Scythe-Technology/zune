@@ -284,7 +284,7 @@ pub const LuaPointer = struct {
     };
 
     pub fn allocBlockPtr(L: *VM.lua.State, size: usize, alignment: std.mem.Alignment) !*LuaPointer {
-        const allocator = luau.getallocator(L);
+        const allocator = Scheduler.fromState(L).allocator;
 
         const mem: [*]u8 = blk: {
             const bytes = allocator.rawAlloc(@max(size, 1), alignment, @returnAddress()) orelse return std.mem.Allocator.Error.OutOfMemory;
@@ -709,7 +709,7 @@ pub const LuaPointer = struct {
         try L.Zchecktype(1, .Userdata);
         const ptr = value(L, 1) orelse return error.Failed;
 
-        const allocator = luau.getallocator(L);
+        const allocator = Scheduler.fromState(L).allocator;
 
         const str = try std.fmt.allocPrint(allocator, "<pointer: 0x{x}>", .{@as(usize, @intFromPtr(ptr.ptr))});
         defer allocator.free(str);
@@ -725,7 +725,7 @@ pub const LuaPointer = struct {
         switch (ptr.type) {
             .allocated => {
                 const size = @max(ptr.size orelse 8, 1);
-                const allocator = luau.getallocator(L);
+                const allocator = Scheduler.fromState(L).allocator;
                 ptr.owner = .none;
                 allocator.rawFree(
                     @as([*]u8, @ptrCast(@alignCast(ptr.ptr)))[0..size],
@@ -1536,7 +1536,7 @@ fn getfunctionSymbol(allocator: std.mem.Allocator, L: *VM.lua.State, idx: i32) !
 fn lua_struct(L: *VM.lua.State) !i32 {
     try L.Zchecktype(1, .Table);
 
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
 
     var struct_map = std.StringArrayHashMap(DataType).init(allocator);
     errdefer struct_map.deinit();
@@ -1794,7 +1794,7 @@ fn dynamicLoadImport(writer: *std.Io.Writer, state: *tinycc.TCCState, returns: D
 fn lua_dlopen(L: *VM.lua.State) !i32 {
     const path = try L.Zcheckvalue([]const u8, 1, null);
 
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
 
     try L.Zchecktype(2, .Table);
 
@@ -1952,7 +1952,7 @@ fn FFIPushPtrType(
 }
 
 fn ffi_closure_inner(call_info: *const LuaClosure.CallInfo, extern_args: [*]?*anyopaque, ret: ?*anyopaque) callconv(.c) void {
-    const scheduler = Scheduler.getScheduler(call_info.thread);
+    const scheduler = Scheduler.fromState(call_info.thread);
 
     const main_thread = std.Thread.getCurrentId() == scheduler.thread_id;
 
@@ -2068,7 +2068,7 @@ fn lua_closure(L: *VM.lua.State) !i32 {
     try L.Zchecktype(1, .Table);
     try L.Zchecktype(2, .Function);
 
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
 
     const symbol = try getfunctionSymbol(allocator, L, 1);
     var handled = false;
@@ -2196,7 +2196,7 @@ const FFIFunction = struct {
     pub fn fn_inner(L: *VM.lua.State) !i32 {
         CALLING_STATE = L;
         defer CALLING_STATE = null;
-        const allocator = luau.getallocator(L);
+        const allocator = Scheduler.fromState(L).allocator;
         const self = L.touserdata(FFIFunction, VM.lua.upvalueindex(1)) orelse unreachable;
 
         if (self.lib) |lib|
@@ -2304,7 +2304,7 @@ fn lua_fn(L: *VM.lua.State) !i32 {
     }
     const ptr: *anyopaque = src.ptr orelse return L.Zerror("unavailable address");
 
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
 
     const symbol = try getfunctionSymbol(allocator, L, 1);
     defer allocator.free(symbol.args);
@@ -2395,7 +2395,7 @@ fn lua_free(L: *VM.lua.State) !i32 {
     const ptr = LuaPointer.value(L, 1) orelse return L.Zerror("invalid pointer");
     if (ptr.owner == .none)
         return L.Zerror("Double free");
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
     if (ptr.local_ref) |ref| {
         L.unref(ref);
         ptr.local_ref = null;
@@ -2502,7 +2502,7 @@ const LuaCompiled = struct {
 };
 
 fn lua_compile(L: *VM.lua.State) !i32 {
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
     const source_code = L.Lcheckstring(1);
 
     const state = try tinycc.new();

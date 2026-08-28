@@ -4,10 +4,12 @@ const zstd = @import("zstd");
 
 const Zune = @import("zune");
 
+const Scheduler = Zune.Runtime.Scheduler;
+
 const VM = luau.VM;
 
 pub fn lua_compress(L: *VM.lua.State) !i32 {
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
 
     const is_buffer = L.typeOf(1) == .Buffer;
 
@@ -44,7 +46,7 @@ pub fn lua_compress(L: *VM.lua.State) !i32 {
 }
 
 pub fn lua_decompress(L: *VM.lua.State) !i32 {
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
 
     const is_buffer = L.typeOf(1) == .Buffer;
 

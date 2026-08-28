@@ -3,6 +3,8 @@ const luau = @import("luau");
 
 const Zune = @import("zune");
 
+const Scheduler = Zune.Runtime.Scheduler;
+
 const VM = luau.VM;
 
 fn tostring(allocator: std.mem.Allocator, L: *VM.lua.State, idx: i32) !?[]const u8 {
@@ -60,7 +62,7 @@ pub fn printValue(
     map: ?*std.AutoArrayHashMap(usize, bool),
     max_depth: usize,
 ) anyerror!void {
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
     if (depth > max_depth) {
         try writer.print("{s}", .{"{...}"});
         return;
@@ -205,7 +207,7 @@ fn writeBuffer(L: *VM.lua.State, allocator: std.mem.Allocator, writer: *std.Io.W
 
 pub fn args(L: *VM.lua.State) !i32 {
     const top = L.gettop();
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
     if (top == 0) {
         try L.pushlstring("");
         return 1;
@@ -224,7 +226,7 @@ pub fn args(L: *VM.lua.State) !i32 {
 
 pub fn print(L: *VM.lua.State) !i32 {
     const top = L.gettop();
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
     if (top == 0) {
         std.debug.print("\n", .{});
         return 0;

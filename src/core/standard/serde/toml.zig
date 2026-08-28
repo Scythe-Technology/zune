@@ -1,6 +1,10 @@
 const std = @import("std");
 const luau = @import("luau");
 
+const Zune = @import("zune");
+
+const Scheduler = Zune.Runtime.Scheduler;
+
 const Parser = @import("../../utils/parser.zig");
 
 const json = @import("json.zig");
@@ -456,7 +460,7 @@ fn decodeString(L: *VM.lua.State, string: []const u8, comptime multi: bool, info
     const delim = string[0];
     const literal = delim == '\'';
 
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
 
     var buf: std.ArrayList(u8) = .empty;
     defer buf.deinit(allocator);
@@ -811,7 +815,7 @@ fn decode(L: *VM.lua.State, string: []const u8, info: *DecodeInfo) !void {
 
 pub fn lua_encode(L: *VM.lua.State) !i32 {
     try L.Zchecktype(1, .Table);
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
 
     if (L.gettop() != 1)
         L.settop(1);

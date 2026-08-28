@@ -38,7 +38,7 @@ fn freeRefTrace(allocator: std.mem.Allocator, index: usize) void {
 }
 
 fn stepCheckLeakedReferences(L: *VM.lua.State) void {
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
 
     L.pushvalue(VM.lua.REGISTRYINDEX);
 
@@ -58,7 +58,7 @@ fn testing_checkLeakedReferences(L: *VM.lua.State) !i32 {
     if (!REF_LEAK_CHECK)
         return 0;
     const scope = L.Lcheckstring(1);
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
 
     L.pushvalue(VM.lua.REGISTRYINDEX);
 
@@ -86,7 +86,7 @@ fn testing_checkLeakedReferences(L: *VM.lua.State) !i32 {
 }
 
 fn testing_droptasks(L: *VM.lua.State) i32 {
-    const scheduler = Scheduler.getScheduler(L);
+    const scheduler = Scheduler.fromState(L);
 
     var awaitsSize = scheduler.awaits.items.len;
     while (awaitsSize > 0) {
@@ -130,7 +130,7 @@ pub const TestResult = struct {
 };
 
 pub fn finish_testing(L: *VM.lua.State, rawstart: f64) !TestResult {
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
     const end = VM.lperf.clock();
 
     _ = try L.Lfindtable(VM.lua.REGISTRYINDEX, "_LIBS", 1);

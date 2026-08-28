@@ -224,8 +224,8 @@ pub const Runtime = struct {
         jmp: {
             Scheduler.SCHEDULERS.append(Zune.DEFAULT_ALLOCATOR, &self.scheduler) catch break :jmp;
 
-            Zune.initState(self.L) catch break :jmp;
-            defer Zune.deinitState(self.L);
+            Zune.initState(self.L, self.scheduler.allocator) catch break :jmp;
+            defer Zune.deinitState(self.L, self.scheduler.allocator);
 
             Zune.Runtime.Engine.runAsync(ML, &self.scheduler, .{ .cleanUp = false }) catch {};
         }
@@ -336,7 +336,7 @@ const LuaThread = struct {
         } else {
             if (!L.isyieldable())
                 return L.Zyielderror();
-            const scheduler = Scheduler.getScheduler(L);
+            const scheduler = Scheduler.fromState(L);
             const sync = try scheduler.createSync(Sync, Sync.receiveComplete);
             sync.* = .{
                 .scheduler = scheduler,
@@ -359,7 +359,7 @@ const LuaThread = struct {
         }
         if (!L.isyieldable())
             return L.Zyielderror();
-        const scheduler = Scheduler.getScheduler(L);
+        const scheduler = Scheduler.fromState(L);
 
         const state = try scheduler.createSync(Sync, Sync.joinComplete);
         state.* = .{
@@ -476,7 +476,7 @@ fn createThread(allocator: std.mem.Allocator, L: *VM.lua.State) !*VM.lua.State {
     const runtime = try allocator.create(Runtime);
     errdefer allocator.destroy(runtime);
     runtime.* = .{
-        .L = undefined,
+        .L = try luau.VM.lstate.Lnewstate(),
         .scheduler = .{
             .allocator = allocator,
             .thread_pool = undefined,
@@ -489,18 +489,19 @@ fn createThread(allocator: std.mem.Allocator, L: *VM.lua.State) !*VM.lua.State {
         },
         .transporter = .{ .allocator = allocator },
     };
-    runtime.L = try luau.init(&runtime.scheduler.allocator);
     errdefer runtime.L.close();
 
     runtime.L.pushlightuserdata(@ptrCast(runtime));
     try runtime.L.rawsetfield(VM.lua.REGISTRYINDEX, "_THREAD_RUNTIME");
 
-    runtime.scheduler = try .init(allocator, runtime.L);
+    runtime.scheduler = try .init(allocator);
+
+    runtime.scheduler.setup(runtime.L);
 
     const self = try L.newuserdatataggedwithmetatable(LuaThread, TAG_THREAD);
     self.* = .{ .runtime = runtime };
 
-    try Zune.Runtime.Engine.prepAsync(runtime.L, &runtime.scheduler);
+    try Zune.Runtime.Engine.prep(runtime.L);
     try Zune.openZune(runtime.L, &.{}, .{});
 
     runtime.L.setsafeenv(VM.lua.GLOBALSINDEX, true);
@@ -515,7 +516,7 @@ fn createThread(allocator: std.mem.Allocator, L: *VM.lua.State) !*VM.lua.State {
 }
 
 fn lua_fromModule(L: *VM.lua.State) !i32 {
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
 
     const moduleName = try L.Zcheckvalue([:0]const u8, 1, null);
 
@@ -581,7 +582,7 @@ fn lua_fromModule(L: *VM.lua.State) !i32 {
 }
 
 fn lua_fromBytecode(L: *VM.lua.State) !i32 {
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
 
     const bytecode = try L.Zcheckvalue([]const u8, 1, null);
 
@@ -627,7 +628,7 @@ fn lua_selfReceive(L: *VM.lua.State) !i32 {
     } else {
         if (!L.isyieldable())
             return L.Zyielderror();
-        const scheduler = Scheduler.getScheduler(L);
+        const scheduler = Scheduler.fromState(L);
         const sync = try scheduler.createSync(Sync, Sync.receiveComplete);
         sync.* = .{
             .scheduler = scheduler,

@@ -2,6 +2,10 @@ const std = @import("std");
 const luau = @import("luau");
 const json = @import("json");
 
+const Zune = @import("zune");
+
+const Scheduler = Zune.Runtime.Scheduler;
+
 const VM = luau.VM;
 
 var NULL_PTR: ?*const anyopaque = null;
@@ -195,7 +199,7 @@ fn encode(
 pub fn LuaEncoder(comptime json_kind: JsonKind) fn (L: *VM.lua.State) anyerror!i32 {
     return struct {
         fn inner(L: *VM.lua.State) anyerror!i32 {
-            const allocator = luau.getallocator(L);
+            const allocator = Scheduler.fromState(L).allocator;
 
             var kind = json.JsonIndent.NO_LINE;
 
@@ -291,7 +295,7 @@ pub fn LuaDecoder(comptime json_kind: JsonKind) fn (L: *VM.lua.State) anyerror!i
                 L.pop(1);
             }
 
-            const allocator = luau.getallocator(L);
+            const allocator = Scheduler.fromState(L).allocator;
 
             var root = try switch (json_kind) {
                 .JSON => json.parse(allocator, string),
