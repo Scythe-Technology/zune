@@ -126,18 +126,28 @@ pub fn build(b: *std.Build) !void {
         .ReleaseFast => .ReleaseSmall,
         else => optimize,
     };
+    const fast_optimize = switch (optimize) {
+        .ReleaseSmall => .ReleaseFast,
+        else => optimize,
+    };
 
     const dep_luau = b.dependency("luau", .{
         .target = target,
-        .optimize = optimize,
-        .Analysis = false,
+        .optimize = fast_optimize,
+        .Analysis = true,
     });
-    const dep_xev = b.dependency("libxev", .{ .target = target, .optimize = optimize });
-    const dep_tls = b.dependency("tls", .{ .target = target, .optimize = optimize });
-    const dep_json = b.dependency("json", .{ .target = target, .optimize = optimize });
-    const dep_yaml = b.dependency("yaml", .{ .target = target, .optimize = optimize });
-    const dep_toml = b.dependency("toml", .{ .target = target, .optimize = optimize });
-    const dep_datetime = b.dependency("datetime", .{ .target = target, .optimize = optimize });
+    const dep_xev = b.dependency("libxev", .{ .target = target, .optimize = fast_optimize });
+    const dep_mimalloc = b.dependency("mimalloc", .{
+        .target = target,
+        .optimize = optimize,
+        .allow_thp = 0,
+        .mi_override = false,
+    });
+    const dep_tls = b.dependency("tls", .{ .target = target, .optimize = fast_optimize });
+    const dep_json = b.dependency("json", .{ .target = target, .optimize = fast_optimize });
+    const dep_yaml = b.dependency("yaml", .{ .target = target, .optimize = fast_optimize });
+    const dep_toml = b.dependency("toml", .{ .target = target, .optimize = fast_optimize });
+    const dep_datetime = b.dependency("datetime", .{ .target = target, .optimize = packed_optimize });
     const dep_lz4 = b.dependency("lz4", .{ .target = target, .optimize = packed_optimize });
     const dep_brotli = b.dependency("brotli", .{ .target = target, .optimize = packed_optimize });
     const dep_zstd = b.dependency("zstd", .{ .target = target, .optimize = packed_optimize });
@@ -190,6 +200,7 @@ pub fn build(b: *std.Build) !void {
 
     mod_zune.addImport("luau", dep_luau.module("root"));
     mod_zune.addImport("xev", dep_xev.module("xev"));
+    mod_zune.addImport("mimalloc", dep_mimalloc.module("root"));
     mod_zune.addImport("tls", dep_tls.module("tls"));
     mod_zune.addImport("yaml", dep_yaml.module("yaml"));
     mod_zune.addImport("lz4", dep_lz4.module("lz4"));
@@ -224,6 +235,10 @@ pub fn build(b: *std.Build) !void {
         .ReleaseSmall => .thin,
         else => .full,
     };
+
+    exe.link_function_sections = true;
+    exe.link_data_sections = true;
+    exe.link_gc_sections = true;
 
     exe.step.dependOn(prebuild_step);
 

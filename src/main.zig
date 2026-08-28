@@ -12,12 +12,9 @@ pub const cli = @import("cli.zig");
 pub const corelib = @import("core/standard/lib.zig");
 pub const objects = @import("core/objects/lib.zig");
 
-pub const DEFAULT_ALLOCATOR = if (builtin.link_libc)
-    std.heap.c_allocator
-else if (!builtin.single_threaded)
-    std.heap.smp_allocator
-else
-    std.heap.page_allocator;
+const mimalloc = @import("mimalloc");
+
+pub const DEFAULT_ALLOCATOR = mimalloc.basic_allocator;
 
 pub const options: std.Options = .{
     .enable_segfault_handler = builtin.mode == .Debug,
