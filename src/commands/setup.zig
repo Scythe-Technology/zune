@@ -325,19 +325,19 @@ fn setup(editor: EditorKind, allocator: std.mem.Allocator, setupInfo: SetupInfo)
     std.debug.print("Saved configuration to '{s}'\n", .{settings_file_path});
 }
 
-const USAGE = "usage: setup <nvim | zed | vscode | emacs>\n";
+const OPTIONS = "<nvim | zed | vscode | emacs>";
 fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
     var envMap = try std.process.getEnvMap(allocator);
     defer envMap.deinit();
 
     const cwd = std.fs.cwd();
 
-    const HOME = file.getHomeDir(envMap) orelse Zune.quitMsg("Failed to setup, $HOME/$USERPROFILE variable not found", .{});
+    const HOME = file.getHomeDir(envMap) orelse Zune.quitMsg("<red>error<clear>: failed to setup, $HOME/$USERPROFILE variable not found", .{});
 
     const path = try std.fs.path.resolve(allocator, &.{ HOME, ".zune/typedefs" });
     defer allocator.free(path);
 
-    std.debug.print("Setting up zune in {s}\n", .{path});
+    std.debug.print("setting up zune in {s}\n", .{path});
 
     {
         const global_dir = try std.fs.path.resolve(allocator, &.{ path, "global" });
@@ -389,18 +389,17 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
     if (args.len > 0) {
         var out: [6]u8 = undefined;
         if (args[0].len > out.len) {
-            std.debug.print("unknown editor configuration (input too large)\n", .{});
-            return;
+            Zune.quitMsg("<red>error<clear>: unknown editor configuration (input too large)\n", .{});
         }
         if (SetupMap.get(std.ascii.lowerString(&out, args[0]))) |editor| {
             try setup(editor, allocator, .{
                 .cwd = cwd,
                 .home = HOME,
             });
-        } else std.debug.print(USAGE, .{});
+        } else Zune.quitMsg("<red>usage<clear>: setup {s}\n", .{OPTIONS});
     } else {
-        std.debug.print("Setup complete, configuration: <none>\n", .{});
-        std.debug.print("  For editor configuration -> {s}", .{USAGE});
+        std.debug.print("setup complete, configuration: <none>\n", .{});
+        std.debug.print("  For editor configuration -> setup {s}", .{OPTIONS});
     }
 }
 
