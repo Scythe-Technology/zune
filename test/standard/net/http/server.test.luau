@@ -7,8 +7,11 @@ local describe = testing.describe;
 local expect = testing.expect;
 local test = testing.test;
 
-local _, version, _ = string.match(_VERSION, "(zune) (%d+%.%d+%.%d+.*)+(%d+%.%d+)");
+local _, version, version_luau = string.match(_VERSION, "(zune) (%d+%.%d+%.%d+.*)%+(%d+%.%d+)");
 assert(version and #version > 0, "No version");
+assert(version_luau and #version_luau > 0, "No Luau version");
+
+local CLIENT_AGENT = `zune/{version}`;
 
 test("Basic", function()
     local requests: {HttpServerRequest} = {};
@@ -42,7 +45,7 @@ test("Basic", function()
     expect(request.path).toBe("/");
     expect(request.headers).toBe(expect.type("table"));
     expect(request.headers["host"]).toBe("localhost");
-    expect(request.headers["user-agent"]).toBe("zune/" .. version);
+    expect(request.headers["user-agent"]).toBe(CLIENT_AGENT);
     
     expect(function()
         local _ = net.http.request("http://localhost:8085");
@@ -110,7 +113,7 @@ test("TLS", function()
         expect(request.path).toBe("/");
         expect(request.headers).toBe(expect.type("table"));
         expect(request.headers["host"]).toBe("localhost");
-        expect(request.headers["user-agent"]).toBe("zune/" .. version);
+        expect(request.headers["user-agent"]).toBe(CLIENT_AGENT);
     end
 
     expect(function()
@@ -143,7 +146,7 @@ test("TLS", function()
         expect(request.path).toBe("/");
         expect(request.headers).toBe(expect.type("table"));
         expect(request.headers["host"]).toBe("localhost");
-        expect(request.headers["user-agent"]).toBe("zune/" .. version);
+        expect(request.headers["user-agent"]).toBe(CLIENT_AGENT);
 
     end
     
@@ -208,7 +211,7 @@ test("Other method", function()
     expect(request.path).toBe("/");
     expect(request.headers).toBe(expect.type("table"));
     expect(request.headers["host"]).toBe("localhost");
-    expect(request.headers["user-agent"]).toBe("zune/" .. version);
+    expect(request.headers["user-agent"]).toBe(CLIENT_AGENT);
     expect(request.headers["content-type"]).toBe("text/plain");
     expect(request.headers["content-length"]).toBe("4");
     expect(request.body).toBe("test");
@@ -246,7 +249,7 @@ test("Basic Table Buffer", function()
     expect(request.path).toBe("/");
     expect(request.headers).toBe(expect.type("table"));
     expect(request.headers["host"]).toBe("localhost");
-    expect(request.headers["user-agent"]).toBe("zune/" .. version);
+    expect(request.headers["user-agent"]).toBe(CLIENT_AGENT);
 
     expect(not server:isRunning()).toBe(false);
     server:stop();
@@ -282,7 +285,7 @@ test("Basic Buffer", function()
     expect(request.path).toBe("/");
     expect(request.headers).toBe(expect.type("table"));
     expect(request.headers["host"]).toBe("localhost");
-    expect(request.headers["user-agent"]).toBe("zune/" .. version);
+    expect(request.headers["user-agent"]).toBe(CLIENT_AGENT);
 
     expect(not server:isRunning()).toBe(false);
     server:stop();
@@ -323,7 +326,7 @@ test("Long Term", function()
         expect(request.path).toBe("/");
         expect(request.headers).toBe(expect.type("table"));
         expect(request.headers["host"]).toBe("localhost");
-        expect(request.headers["user-agent"]).toBe("zune/" .. version);
+        expect(request.headers["user-agent"]).toBe(CLIENT_AGENT);
 
     end
 
@@ -404,7 +407,7 @@ test("Large Limited", function()
         expect(request.path).toBe("/");
         expect(request.headers).toBe(expect.type("table"));
         expect(request.headers["host"]).toBe("localhost");
-        expect(request.headers["user-agent"]).toBe("zune/" .. version);
+        expect(request.headers["user-agent"]).toBe(CLIENT_AGENT);
         expect(request.headers["content-length"]).toBe(tostring(#body));
         expect(request.body).toBe(body);
     end
@@ -464,7 +467,7 @@ test("Short Capacity", function()
             expect(request.path).toBe("/");
             expect(request.headers).toBe(expect.type("table"));
             expect(request.headers["host"]).toBe("localhost");
-            expect(request.headers["user-agent"]).toBe("zune/" .. version);
+            expect(request.headers["user-agent"]).toBe(CLIENT_AGENT);
         end)
     end
 
