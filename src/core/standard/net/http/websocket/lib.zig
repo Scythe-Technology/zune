@@ -20,7 +20,7 @@ const TAG_CRYPTO_TLS_CERTBUNDLE = Zune.Tags.get("CRYPTO_TLS_CERTBUNDLE").?;
 
 const VM = luau.VM;
 
-const ZUNE_CLIENT_HEADER = "zune/" ++ Zune.info.version;
+const ZUNE_CLIENT_HEADER = "zune/" ++ Zune.VERSION_STR;
 
 const Self = @This();
 

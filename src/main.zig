@@ -84,7 +84,18 @@ pub const Flags = struct {
     limbo: bool = false,
 };
 
-pub const VERSION = "zune " ++ info.version ++ "+" ++ std.fmt.comptimePrint("{d}.{d}", .{ luau.LUAU_VERSION.major, luau.LUAU_VERSION.minor });
+pub const VERSION_STR = std.fmt.comptimePrint("{d}.{d}.{d}{s}", .{
+    info.version.major,
+    info.version.minor,
+    info.version.patch,
+    if (info.commit_hash) |hash| std.fmt.comptimePrint("-dev.{s}", .{hash[0..7]}) else "",
+});
+
+pub const VERSION_FULL_STR = std.fmt.comptimePrint("{s}+{d}.{d}", .{
+    VERSION_STR,
+    luau.LUAU_VERSION.major,
+    luau.LUAU_VERSION.minor,
+});
 
 pub var FEATURES: struct {
     fs: bool = true,
@@ -333,7 +344,7 @@ pub fn openZune(L: *VM.lua.State, args: []const []const u8, flags: Flags) !void 
         try L.rawsetglobal("print");
     }
 
-    try L.Zsetglobal("_VERSION", VERSION);
+    try L.Zsetglobal("_VERSION", std.fmt.comptimePrint("zune {s}", .{VERSION_FULL_STR}));
 
     if (!flags.limbo) {
         inline for (@typeInfo(corelib).@"struct".decls) |decl| {
