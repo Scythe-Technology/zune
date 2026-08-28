@@ -412,8 +412,8 @@ pub fn expandFreeSize(self: *Self, amount: usize) !void {
 }
 
 pub fn lua_serve(L: *VM.lua.State) !i32 {
-    const allocator = luau.getallocator(L);
-    const scheduler = Scheduler.getScheduler(L);
+    const scheduler = Scheduler.fromState(L);
+    const allocator = scheduler.allocator;
 
     const serve_info = try L.Zcheckvalue(struct {
         port: u16,

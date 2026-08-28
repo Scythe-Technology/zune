@@ -2,6 +2,10 @@ const std = @import("std");
 const yaml = @import("yaml");
 const luau = @import("luau");
 
+const Zune = @import("zune");
+
+const Scheduler = Zune.Runtime.Scheduler;
+
 const VM = luau.VM;
 
 const json = @import("json.zig");
@@ -95,7 +99,7 @@ fn encodeValue(L: *VM.lua.State, allocator: std.mem.Allocator, tracked: *std.Aut
 }
 
 pub fn lua_encode(L: *VM.lua.State) !i32 {
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
 
     if (L.gettop() != 1)
         L.settop(1);
@@ -161,7 +165,7 @@ fn decodeMap(L: *VM.lua.State, map: yaml.Yaml.Map) anyerror!void {
 }
 
 pub fn lua_decode(L: *VM.lua.State) !i32 {
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
     const string = try L.Zcheckvalue([]const u8, 1, null);
     if (string.len == 0) {
         L.pushnil();

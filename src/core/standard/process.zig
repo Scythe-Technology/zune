@@ -387,8 +387,8 @@ fn lua_run(L: *VM.lua.State) !i32 {
         return error.UnsupportedPlatform;
     if (!L.isyieldable())
         return L.Zyielderror();
-    const scheduler = Scheduler.getScheduler(L);
-    const allocator = luau.getallocator(L);
+    const scheduler = Scheduler.fromState(L);
+    const allocator = scheduler.allocator;
 
     var options = try ProcessOptions.init(L, allocator);
     defer options.deinit(allocator);
@@ -476,7 +476,7 @@ fn lua_run(L: *VM.lua.State) !i32 {
 fn lua_create(L: *VM.lua.State) !i32 {
     if (comptime !std.process.can_spawn)
         return error.UnsupportedPlatform;
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
 
     var options = try ProcessOptions.init(L, allocator);
     defer options.deinit(allocator);
@@ -537,7 +537,7 @@ fn decodeString(L: *VM.lua.State, slice: []const u8) !usize {
         return 2;
     }
 
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
 
     var allocating: std.Io.Writer.Allocating = .init(allocator);
     defer allocating.deinit();
@@ -639,7 +639,7 @@ fn loadEnvironment(L: *VM.lua.State, allocator: std.mem.Allocator, file: []const
 }
 
 fn lua_loadEnv(L: *VM.lua.State) !i32 {
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
     try L.newtable();
 
     var iterator = Zune.STATE.ENV_MAP.iterator();
@@ -692,7 +692,7 @@ fn lua_onsignal(L: *VM.lua.State) !i32 {
 }
 
 fn lua_cwd(L: *VM.lua.State) !i32 {
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
     const path = try std.fs.cwd().realpathAlloc(allocator, ".");
     defer allocator.free(path);
     try L.pushlstring(path);

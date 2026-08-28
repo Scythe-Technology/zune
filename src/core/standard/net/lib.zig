@@ -43,7 +43,7 @@ fn lua_createSocket(L: *VM.lua.State) !i32 {
 }
 
 fn lua_getAddressList(L: *VM.lua.State) !i32 {
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
     const name = L.Lcheckstring(1);
     const port = L.Lcheckunsigned(2);
     if (port > std.math.maxInt(u16))

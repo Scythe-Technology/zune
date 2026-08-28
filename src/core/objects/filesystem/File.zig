@@ -108,7 +108,7 @@ pub const AsyncReadContext = struct {
         completion: *xev.Completion,
         file: xev.File,
     ) xev.CallbackAction {
-        const allocator = luau.getallocator(L);
+        const allocator = scheduler.allocator;
         if (self.auto_close) {
             self.auto_close = false;
             file.close(&scheduler.loop, completion, This, self, close_complete);
@@ -157,7 +157,7 @@ pub const AsyncReadContext = struct {
     ) xev.CallbackAction {
         const self = ud orelse unreachable;
         const L = self.ref.value;
-        const scheduler = Scheduler.getScheduler(L);
+        const scheduler = Scheduler.fromState(L);
 
         c catch |err| {
             if (self.err == null)
@@ -177,9 +177,9 @@ pub const AsyncReadContext = struct {
     ) xev.CallbackAction {
         const self = ud orelse unreachable;
         const L = self.ref.value;
-        const allocator = luau.getallocator(L);
+        const scheduler = Scheduler.fromState(L);
+        const allocator = scheduler.allocator;
 
-        const scheduler = Scheduler.getScheduler(L);
         if (L.status() != .Yield)
             return self.cleanup(L, scheduler, completion, file);
 
@@ -239,8 +239,8 @@ pub const AsyncReadContext = struct {
     ) !i32 {
         if (!L.isyieldable())
             return L.Zyielderror();
-        const allocator = luau.getallocator(L);
-        const scheduler = Scheduler.getScheduler(L);
+        const scheduler = Scheduler.fromState(L);
+        const allocator = scheduler.allocator;
 
         const file = xev.File.init(f) catch unreachable;
 
@@ -297,7 +297,7 @@ pub const AsyncReadContext = struct {
 
             const f = self.file;
             const L = self.async.ref.value;
-            const scheduler = Scheduler.getScheduler(L);
+            const scheduler = Scheduler.fromState(L);
 
             defer scheduler.synchronize(self);
 
@@ -310,7 +310,7 @@ pub const AsyncReadContext = struct {
 
         pub fn complete(self: *Thread, scheduler: *Scheduler) void {
             const L = self.async.ref.value;
-            const allocator = luau.getallocator(L);
+            const allocator = scheduler.allocator;
 
             defer scheduler.freeSync(self);
             defer self.async.ref.deref();
@@ -361,7 +361,7 @@ pub const AsyncWriteContext = struct {
             file.close(&scheduler.loop, completion, This, self, close_complete);
             return .disarm;
         }
-        const allocator = luau.getallocator(L);
+        const allocator = scheduler.allocator;
         defer allocator.destroy(self);
 
         defer allocator.free(self.data);
@@ -389,7 +389,7 @@ pub const AsyncWriteContext = struct {
     ) xev.CallbackAction {
         const self = ud orelse unreachable;
         const L = self.ref.value;
-        const scheduler = Scheduler.getScheduler(L);
+        const scheduler = Scheduler.fromState(L);
 
         c catch |err| {
             if (self.err == null)
@@ -410,7 +410,7 @@ pub const AsyncWriteContext = struct {
         const self = ud orelse unreachable;
 
         const L = self.ref.value;
-        const scheduler = Scheduler.getScheduler(L);
+        const scheduler = Scheduler.fromState(L);
 
         if (L.status() != .Yield)
             return self.cleanup(L, scheduler, completion, file);
@@ -460,8 +460,8 @@ pub const AsyncWriteContext = struct {
     ) !i32 {
         if (!L.isyieldable())
             return L.Zyielderror();
-        const scheduler = Scheduler.getScheduler(L);
-        const allocator = luau.getallocator(L);
+        const scheduler = Scheduler.fromState(L);
+        const allocator = scheduler.allocator;
 
         const copy = try allocator.dupe(u8, data);
         errdefer allocator.free(copy);
@@ -678,7 +678,7 @@ fn lua_read(self: *File, L: *VM.lua.State) !i32 {
 
     switch (comptime builtin.os.tag) {
         .windows => if (self.kind == .Tty and !self.overlapped) {
-            const scheduler = Scheduler.getScheduler(L);
+            const scheduler = Scheduler.fromState(L);
             const sync = try scheduler.createSync(AsyncReadContext.Thread, AsyncReadContext.Thread.complete);
             errdefer scheduler.freeSync(sync);
 
@@ -723,7 +723,7 @@ fn lua_read(self: *File, L: *VM.lua.State) !i32 {
 fn lua_readSync(self: *File, L: *VM.lua.State) !i32 {
     if (!self.mode.canRead())
         return error.NotOpenForReading;
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
     const size = L.Loptunsigned(2, LuaHelper.MAX_LUAU_SIZE);
     const useBuffer = L.Loptboolean(3, false);
 
@@ -950,7 +950,7 @@ pub const AsyncCloseContext = struct {
     ) xev.CallbackAction {
         const self = ud orelse unreachable;
         const L = self.ref.value;
-        const allocator = luau.getallocator(L);
+        const allocator = Scheduler.fromState(L).allocator;
 
         defer allocator.destroy(self);
         defer self.ref.deref();
@@ -970,8 +970,8 @@ fn lua_close(self: *File, L: *VM.lua.State) !i32 {
         if (!L.isyieldable())
             return L.Zyielderror();
         self.mode = .closed;
-        const allocator = luau.getallocator(L);
-        const scheduler = Scheduler.getScheduler(L);
+        const scheduler = Scheduler.fromState(L);
+        const allocator = scheduler.allocator;
         const file = xev.File.init(self.file) catch unreachable;
 
         const ctx = try allocator.create(AsyncCloseContext);
@@ -1028,7 +1028,7 @@ const __index = MethodMap.CreateStaticIndexMap(File, TAG_FS_FILE, .{
 });
 
 pub fn __dtor(L: *VM.lua.State, self: *File) void {
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
     if (self.mode.isOpen() and self.mode.close)
         self.file.close();
     self.list.deinit(allocator);
@@ -1046,7 +1046,7 @@ pub inline fn load(L: *VM.lua.State) !void {
 }
 
 pub fn push(L: *VM.lua.State, file: std.fs.File, kind: FileKind, mode: OpenMode) !*File {
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
     const self = try L.newuserdatataggedwithmetatable(File, TAG_FS_FILE);
     const list = try allocator.create(Scheduler.CompletionLinkedList);
     list.* = .init(allocator);

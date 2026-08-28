@@ -5,6 +5,8 @@ const builtin = @import("builtin");
 
 const Zune = @import("zune");
 
+const Scheduler = Zune.Runtime.Scheduler;
+
 const Fmt = Zune.Resolvers.Fmt;
 
 const LuaHelper = Zune.Utils.LuaHelper;
@@ -535,7 +537,7 @@ const BufferStream = struct {
 };
 
 pub fn lua_createBufferSink(L: *VM.lua.State) !i32 {
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
 
     const Options = struct {
         limit: u32 = mem.MAX_LUAU_SIZE,

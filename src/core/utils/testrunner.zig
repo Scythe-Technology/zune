@@ -32,17 +32,19 @@ pub fn runTest(comptime testFile: TestFile, args: []const []const u8, comptime o
 
     try Zune.init();
 
-    var L = try luau.init(&allocator);
+    var L = try luau.VM.lstate.Lnewstate();
     defer L.deinit();
 
     if (!options.std_out)
         try L.Zsetfield(VM.lua.GLOBALSINDEX, "_testing_stdOut", false);
 
-    var scheduler = try Scheduler.init(allocator, L);
+    var scheduler = try Scheduler.init(allocator);
     defer scheduler.deinit();
 
-    try Zune.initState(L);
-    defer Zune.deinitState(L);
+    scheduler.setup(L);
+
+    try Zune.initState(L, allocator);
+    defer Zune.deinitState(L, allocator);
 
     var temporaryDir = std.testing.tmpDir(.{
         .access_sub_paths = true,
@@ -71,7 +73,7 @@ pub fn runTest(comptime testFile: TestFile, args: []const []const u8, comptime o
     Zune.loadConfiguration(dir);
 
     const current_top = L.gettop();
-    try Engine.prepAsync(L, &scheduler);
+    try Engine.prep(L);
     try Zune.openZune(L, args, .{});
 
     L.setsafeenv(VM.lua.GLOBALSINDEX, true);

@@ -167,7 +167,7 @@ const AsyncSendContext = struct {
         const self = ud orelse unreachable;
         const L = self.ref.value;
 
-        const allocator = luau.getallocator(L);
+        const allocator = Scheduler.fromState(L).allocator;
 
         defer allocator.destroy(self);
         defer allocator.free(self.buffer);
@@ -195,7 +195,7 @@ const AsyncSendContext = struct {
     ) xev.CallbackAction {
         const L = self.ref.value;
 
-        const allocator = luau.getallocator(L);
+        const allocator = Scheduler.fromState(L).allocator;
 
         defer allocator.destroy(self);
         defer allocator.free(self.buffer);
@@ -318,7 +318,7 @@ const AsyncSendMsgContext = struct {
         const self = ud orelse unreachable;
         const L = self.ref.value;
 
-        const allocator = luau.getallocator(L);
+        const allocator = Scheduler.fromState(L).allocator;
 
         defer allocator.destroy(self);
         defer allocator.free(self.buffer);
@@ -363,7 +363,7 @@ const AsyncRecvContext = struct {
         const self = ud orelse unreachable;
         const L = self.ref.value;
 
-        const allocator = luau.getallocator(L);
+        const allocator = Scheduler.fromState(L).allocator;
 
         defer allocator.destroy(self);
         defer allocator.free(self.buffer);
@@ -392,7 +392,7 @@ const AsyncRecvContext = struct {
     ) xev.CallbackAction {
         const L = self.ref.value;
 
-        const allocator = luau.getallocator(L);
+        const allocator = Scheduler.fromState(L).allocator;
 
         defer allocator.destroy(self);
         defer allocator.free(self.buffer);
@@ -534,7 +534,7 @@ const AsyncRecvMsgContext = struct {
         const self = ud orelse unreachable;
         const L = self.ref.value;
 
-        const allocator = luau.getallocator(L);
+        const allocator = Scheduler.fromState(L).allocator;
 
         defer allocator.destroy(self);
         defer allocator.free(self.buffer);
@@ -584,8 +584,8 @@ const AsyncAcceptContext = struct {
         const self = ud orelse unreachable;
         const L = self.ref.value;
 
-        const scheduler = Scheduler.getScheduler(L);
-        const allocator = luau.getallocator(L);
+        const scheduler = Scheduler.fromState(L);
+        const allocator = scheduler.allocator;
 
         jmp: {
             if (L.status() != .Yield)
@@ -684,7 +684,7 @@ const AsyncAcceptContext = struct {
     ) xev.CallbackAction {
         const L = self.ref.value;
 
-        const allocator = luau.getallocator(L);
+        const allocator = Scheduler.fromState(L).allocator;
 
         defer allocator.destroy(self);
         defer self.ref.deref();
@@ -735,7 +735,7 @@ const AsyncAcceptContext = struct {
                 return .disarm;
             } else {
                 if (handshake.server.done()) {
-                    const allocator = luau.getallocator(L);
+                    const allocator = Scheduler.fromState(L).allocator;
                     const cipher = handshake.server.cipher().?;
                     handshake.deinit(allocator);
                     ctx.connection = .{ .active = .{ .tls = .init(cipher) } };
@@ -821,7 +821,7 @@ const AsyncConnectContext = struct {
         const self = ud orelse unreachable;
         const L = self.ref.value;
 
-        const allocator = luau.getallocator(L);
+        const allocator = Scheduler.fromState(L).allocator;
 
         jmp: {
             if (L.status() != .Yield)
@@ -861,7 +861,7 @@ const AsyncConnectContext = struct {
     ) xev.CallbackAction {
         const L = self.ref.value;
 
-        const allocator = luau.getallocator(L);
+        const allocator = Scheduler.fromState(L).allocator;
 
         defer allocator.destroy(self);
         defer self.ref.deref();
@@ -954,7 +954,7 @@ const AsyncConnectContext = struct {
             }
             ctx.ciphertext.rebase(ctx.ciphertext.buffer.len) catch unreachable; // shouldn't fail
             if (handshake.client.done()) {
-                const allocator = luau.getallocator(L);
+                const allocator = Scheduler.fromState(L).allocator;
 
                 const cipher = handshake.client.cipher().?;
                 handshake.deinit(allocator);
@@ -986,8 +986,8 @@ const AsyncConnectContext = struct {
 fn lua_send(self: *Socket, L: *VM.lua.State) !i32 {
     if (!L.isyieldable())
         return L.Zyielderror();
-    const allocator = luau.getallocator(L);
-    const scheduler = Scheduler.getScheduler(L);
+    const scheduler = Scheduler.fromState(L);
+    const allocator = scheduler.allocator;
     const buf = try L.Zcheckvalue([]const u8, 2, null);
     const offset = L.Loptunsigned(3, 0);
 
@@ -1031,8 +1031,8 @@ fn lua_sendMsg(self: *Socket, L: *VM.lua.State) !i32 {
         return L.Zerror("unsupported with tls");
     if (!L.isyieldable())
         return L.Zyielderror();
-    const allocator = luau.getallocator(L);
-    const scheduler = Scheduler.getScheduler(L);
+    const scheduler = Scheduler.fromState(L);
+    const allocator = scheduler.allocator;
     const port = L.Lcheckunsigned(2);
     if (port > std.math.maxInt(u16))
         return L.Zerror("port out of range");
@@ -1079,8 +1079,8 @@ fn lua_sendMsg(self: *Socket, L: *VM.lua.State) !i32 {
 fn lua_recv(self: *Socket, L: *VM.lua.State) !i32 {
     if (!L.isyieldable())
         return L.Zyielderror();
-    const allocator = luau.getallocator(L);
-    const scheduler = Scheduler.getScheduler(L);
+    const scheduler = Scheduler.fromState(L);
+    const allocator = scheduler.allocator;
     const size = L.Loptinteger(2, 8192);
     if (size > LuaHelper.MAX_LUAU_SIZE)
         return L.Zerror("too large");
@@ -1121,8 +1121,8 @@ fn lua_recvMsg(self: *Socket, L: *VM.lua.State) !i32 {
         return L.Zerror("unsupported with tls");
     if (!L.isyieldable())
         return L.Zyielderror();
-    const allocator = luau.getallocator(L);
-    const scheduler = Scheduler.getScheduler(L);
+    const scheduler = Scheduler.fromState(L);
+    const allocator = scheduler.allocator;
     const size = L.Loptinteger(2, 8192);
     if (size > LuaHelper.MAX_LUAU_SIZE)
         return L.Zerror("too large");
@@ -1158,8 +1158,8 @@ fn lua_recvMsg(self: *Socket, L: *VM.lua.State) !i32 {
 fn lua_accept(self: *Socket, L: *VM.lua.State) !i32 {
     if (!L.isyieldable())
         return L.Zyielderror();
-    const allocator = luau.getallocator(L);
-    const scheduler = Scheduler.getScheduler(L);
+    const scheduler = Scheduler.fromState(L);
+    const allocator = scheduler.allocator;
 
     const ptr = try allocator.create(AsyncAcceptContext);
 
@@ -1186,8 +1186,8 @@ fn lua_accept(self: *Socket, L: *VM.lua.State) !i32 {
 fn lua_connect(self: *Socket, L: *VM.lua.State) !i32 {
     if (!L.isyieldable())
         return L.Zyielderror();
-    const allocator = luau.getallocator(L);
-    const scheduler = Scheduler.getScheduler(L);
+    const scheduler = Scheduler.fromState(L);
+    const allocator = scheduler.allocator;
 
     switch (self.tls) {
         .none => {},
@@ -1300,7 +1300,7 @@ pub const AsyncCloseContext = struct {
         const self = ud orelse unreachable;
         const L = self.ref.value;
 
-        const allocator = luau.getallocator(L);
+        const allocator = Scheduler.fromState(L).allocator;
 
         defer allocator.destroy(self);
         defer self.ref.deref();
@@ -1318,8 +1318,8 @@ fn lua_close(self: *Socket, L: *VM.lua.State) !i32 {
         self.open = .closed;
         if (!L.isyieldable())
             return L.Zyielderror();
-        const allocator = luau.getallocator(L);
-        const scheduler = Scheduler.getScheduler(L);
+        const scheduler = Scheduler.fromState(L);
+        const allocator = scheduler.allocator;
         const socket = xev.TCP.initFd(self.socket);
 
         const ptr = try allocator.create(AsyncCloseContext);
@@ -1390,7 +1390,7 @@ const __index = MethodMap.CreateStaticIndexMap(Socket, TAG_NET_SOCKET, .{
 });
 
 pub fn __dtor(L: *VM.lua.State, self: *Socket) void {
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
     if (self.open != .closed)
         closesocket(self.socket);
     self.tls.deinit(allocator);
@@ -1409,7 +1409,7 @@ pub inline fn load(L: *VM.lua.State) !void {
 }
 
 pub fn push(L: *VM.lua.State, value: std.posix.socket_t, open: OpenCase) !*Socket {
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
     const self = try L.newuserdatataggedwithmetatable(Socket, TAG_NET_SOCKET);
     const list = try allocator.create(Scheduler.CompletionLinkedList);
     list.* = .init(allocator);

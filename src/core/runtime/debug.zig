@@ -3,6 +3,8 @@ const luau = @import("luau");
 
 const Zune = @import("zune");
 
+const Scheduler = Zune.Runtime.Scheduler;
+
 const VM = luau.VM;
 
 const ColorMap = std.StaticStringMap([]const u8).initComptime(.{
@@ -278,7 +280,7 @@ pub fn dumpStackTrace(writer: *std.Io.Writer, trace: []const StackInfo, ref_leve
 }
 
 pub fn dumpDefinitionTrace(L: *VM.lua.State, idx: i32) !void {
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
 
     std.debug.assert(idx < 0);
     std.debug.assert(L.typeOf(idx) == .Function);
@@ -420,7 +422,7 @@ pub fn getStackTrace(L: *VM.lua.State, allocator: std.mem.Allocator) !std.ArrayL
 }
 
 pub fn dumpErrorStackTrace(L: *VM.lua.State) !void {
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
 
     var list: std.ArrayList(StackInfo) = try getStackTrace(L, allocator);
     defer list.deinit(allocator);

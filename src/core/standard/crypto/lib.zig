@@ -209,7 +209,7 @@ const LuaCryptoHasher = struct {
                             try L.pushlstring(&hex);
                         },
                         .base64 => {
-                            const allocator = luau.getallocator(L);
+                            const allocator = Scheduler.fromState(L).allocator;
                             const base64_buf = try allocator.alloc(u8, std.base64.standard.Encoder.calcSize(buf.len));
                             defer allocator.free(base64_buf);
                             try L.pushlstring(std.base64.standard.Encoder.encode(base64_buf, &buf));
@@ -227,7 +227,7 @@ const LuaCryptoHasher = struct {
     fn lua_copy(self: *LuaCryptoHasher, L: *VM.lua.State) !i32 {
         if (self.extra != null and self.used)
             return L.Zerror("hasher already used");
-        const allocator = luau.getallocator(L);
+        const allocator = Scheduler.fromState(L).allocator;
 
         const hasher = try L.newuserdatataggedwithmetatable(LuaCryptoHasher, TAG_CRYPTO_HASHER);
 
@@ -255,7 +255,7 @@ const LuaCryptoHasher = struct {
     });
 
     pub fn __dtor(L: *VM.lua.State, self: *LuaCryptoHasher) void {
-        const allocator = luau.getallocator(L);
+        const allocator = Scheduler.fromState(L).allocator;
 
         allocator.rawFree(self.state, .fromByteUnits(self.algorithm.alignment()), @returnAddress());
         if (self.extra) |e|
@@ -264,7 +264,7 @@ const LuaCryptoHasher = struct {
 };
 
 fn lua_createHash(L: *VM.lua.State) !i32 {
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
 
     const name = try L.Zcheckvalue([:0]const u8, 1, null);
     const secret = try L.Zcheckvalue(?[:0]const u8, 2, null);

@@ -69,7 +69,7 @@ const LuaStatement = struct {
         try L.Zchecktype(1, .Userdata);
         const ptr = L.touserdatatagged(LuaStatement, 1, TAG_SQLITE_STATEMENT) orelse return L.Zerror("invalid userdata");
         const namecall = L.namecallstr() orelse return 0;
-        const allocator = luau.getallocator(L);
+        const allocator = Scheduler.fromState(L).allocator;
         // TODO: prob should switch to static string map
         if (std.mem.eql(u8, namecall, "all")) {
             if (ptr.closed)
@@ -154,7 +154,7 @@ const LuaStatement = struct {
     pub fn close(ptr: *LuaStatement, L: *VM.lua.State) void {
         if (ptr.closed)
             return;
-        const allocator = luau.getallocator(L);
+        const allocator = Scheduler.fromState(L).allocator;
         defer ptr.statement.deinit(allocator);
         ptr.closed = true;
         if (ptr.ref) |ref| {
@@ -228,7 +228,7 @@ const LuaDatabase = struct {
     }
 
     pub fn transactionResumedDtor(ctx: *Transaction, L: *VM.lua.State, _: *Scheduler) void {
-        const allocator = luau.getallocator(L);
+        const allocator = Scheduler.fromState(L).allocator;
         defer allocator.destroy(ctx);
         defer ctx.state.deref();
     }
@@ -236,7 +236,7 @@ const LuaDatabase = struct {
     pub fn lua_utransaction(L: *VM.lua.State) !i32 {
         if (!L.isyieldable())
             return L.Zyielderror();
-        const scheduler = Scheduler.getScheduler(L);
+        const scheduler = Scheduler.fromState(L);
 
         const ptr = L.touserdatatagged(LuaDatabase, VM.lua.upvalueindex(1), TAG_SQLITE_DATABASE) orelse unreachable;
         const kind: TransactionKind = @enumFromInt(L.tointeger(VM.lua.upvalueindex(3)) orelse unreachable);
@@ -275,7 +275,7 @@ const LuaDatabase = struct {
         };
 
         if (status == .Yield) {
-            const allocator = luau.getallocator(L);
+            const allocator = Scheduler.fromState(L).allocator;
             const data = try allocator.create(Transaction);
             data.* = .{
                 .ptr = ptr,
@@ -297,7 +297,7 @@ const LuaDatabase = struct {
     pub fn lua_query(self: *LuaDatabase, L: *VM.lua.State) !i32 {
         if (self.closed)
             return L.Zerror("database closed");
-        const allocator = luau.getallocator(L);
+        const allocator = Scheduler.fromState(L).allocator;
         const query = try L.Zcheckvalue([]const u8, 2, null);
         try self.statements.ensureTotalCapacity(allocator, self.statements.items.len + 1);
         const statement = self.db.prepare(query) catch |err| switch (err) {
@@ -320,7 +320,7 @@ const LuaDatabase = struct {
     pub fn lua_exec(self: *LuaDatabase, L: *VM.lua.State) !i32 {
         if (self.closed)
             return L.Zerror("database closed");
-        const allocator = luau.getallocator(L);
+        const allocator = Scheduler.fromState(L).allocator;
 
         const query = try L.Zcheckvalue([]const u8, 2, null);
 
@@ -385,7 +385,7 @@ const LuaDatabase = struct {
         if (ptr.closed)
             return;
         ptr.closed = true;
-        const allocator = luau.getallocator(L);
+        const allocator = Scheduler.fromState(L).allocator;
         defer ptr.statements.deinit(allocator);
         try L.rawcheckstack(2);
         if (ptr.statements.items.len > 0) {
@@ -409,7 +409,7 @@ const LuaDatabase = struct {
 };
 
 fn sqlite_open(L: *VM.lua.State) !i32 {
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
     var db: sqlite.Database = undefined;
     if (L.tolstring(1)) |path| {
         db = if (std.mem.eql(u8, path, ":MEMORY:") or std.mem.eql(u8, path, ":memory:"))

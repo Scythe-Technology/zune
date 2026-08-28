@@ -4,6 +4,8 @@ const json = @import("json");
 
 const Zune = @import("zune");
 
+const Scheduler = Zune.Runtime.Scheduler;
+
 const LuaHelper = Zune.Utils.LuaHelper;
 
 const SerdeJson = @import("./serde/json.zig");
@@ -51,7 +53,7 @@ fn lua_compile(L: *VM.lua.State) !i32 {
         // compileOpts.vector_type = opts.vector_type orelse compileOpts.vector_type;
     }
 
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
     const bytecode = try luau.compile(allocator, source, compileOpts);
     defer allocator.free(bytecode);
 
@@ -2007,7 +2009,7 @@ const AstSerializer = struct {
 };
 
 fn lua_parse(L: *VM.lua.State) !i32 {
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
     const source = try L.Zcheckvalue([]const u8, 1, null);
 
     const lallocator = luau.Ast.Allocator.init();
@@ -2111,7 +2113,7 @@ fn lua_parse(L: *VM.lua.State) !i32 {
 }
 
 fn lua_parseExpr(L: *VM.lua.State) !i32 {
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
     const source = try L.Zcheckvalue([]const u8, 1, null);
 
     const lallocator = luau.Ast.Allocator.init();

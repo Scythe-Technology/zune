@@ -15,14 +15,14 @@ pub const LIB_NAME = "task";
 fn lua_wait(L: *VM.lua.State) !i32 {
     if (!L.isyieldable())
         return L.Zerror("attempt to yield across metamethod/C-call boundary");
-    const scheduler = Scheduler.getScheduler(L);
+    const scheduler = Scheduler.fromState(L);
     const time = L.tonumber(1) orelse 0;
     scheduler.sleepThread(L, null, time, 0, true);
     return L.yield(0) catch unreachable; // error is only when context is not yieldable and OOM
 }
 
 fn lua_cancel(L: *VM.lua.State) !i32 {
-    const scheduler = Scheduler.getScheduler(L);
+    const scheduler = Scheduler.fromState(L);
     try L.Zchecktype(1, .Thread);
     const thread = L.tothread(1) orelse return L.Zerror("expected thread");
     scheduler.cancelThread(thread);
@@ -70,7 +70,7 @@ fn lua_spawn(L: *VM.lua.State) !i32 {
 }
 
 fn lua_defer(L: *VM.lua.State) !i32 {
-    const scheduler = Scheduler.getScheduler(L);
+    const scheduler = Scheduler.fromState(L);
     const fnType = L.typeOf(1);
     if (fnType != .Function and fnType != .Thread)
         return L.Zerror("expected function or thread");
@@ -105,7 +105,7 @@ fn lua_defer(L: *VM.lua.State) !i32 {
 }
 
 fn lua_delay(L: *VM.lua.State) !i32 {
-    const scheduler = Scheduler.getScheduler(L);
+    const scheduler = Scheduler.fromState(L);
     const time = L.Lchecknumber(1);
     const fnType = L.typeOf(2);
     if (fnType != .Function and fnType != .Thread)
@@ -141,7 +141,7 @@ fn lua_delay(L: *VM.lua.State) !i32 {
 }
 
 fn lua_count(L: *VM.lua.State) !i32 {
-    const scheduler = Scheduler.getScheduler(L);
+    const scheduler = Scheduler.fromState(L);
     const kind = L.tolstring(1) orelse {
         var total: usize = 0;
         total += scheduler.sleeping.items.len;

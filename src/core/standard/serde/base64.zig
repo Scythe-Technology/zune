@@ -2,12 +2,16 @@ const std = @import("std");
 const yaml = @import("yaml");
 const luau = @import("luau");
 
+const Zune = @import("zune");
+
+const Scheduler = Zune.Runtime.Scheduler;
+
 const VM = luau.VM;
 
 pub fn lua_encode(L: *VM.lua.State) !i32 {
     const string = try L.Zcheckvalue([]const u8, 1, null);
 
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
 
     const out = try allocator.alloc(u8, std.base64.standard.Encoder.calcSize(string.len));
     defer allocator.free(out);
@@ -25,7 +29,7 @@ pub fn lua_encode(L: *VM.lua.State) !i32 {
 pub fn lua_decode(L: *VM.lua.State) !i32 {
     const string = try L.Zcheckvalue([]const u8, 1, null);
 
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
 
     const out = try allocator.alloc(u8, try std.base64.standard.Decoder.calcSizeForSlice(string));
     defer allocator.free(out);

@@ -235,8 +235,8 @@ pub fn checkSearchResult(
 }
 
 pub fn zune_require(L: *VM.lua.State) !i32 {
-    const allocator = luau.getallocator(L);
-    const scheduler = Scheduler.getScheduler(L);
+    const scheduler = Scheduler.fromState(L);
+    const allocator = scheduler.allocator;
 
     const moduleName = L.Lcheckstring(1);
 
@@ -408,16 +408,12 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-pub fn init(L: *VM.lua.State) !void {
-    const allocator = luau.getallocator(L);
-
+pub fn init(allocator: std.mem.Allocator) !void {
     REQUIRE_MAP = .empty;
     Navigator.PATH_ALLOCATOR = .init(try allocator.alloc(u8, (std.fs.max_path_bytes * 4) + 32));
 }
 
-pub fn deinit(L: *VM.lua.State) void {
-    const allocator = luau.getallocator(L);
-
+pub fn deinit(allocator: std.mem.Allocator) void {
     allocator.free(Navigator.PATH_ALLOCATOR.buffer);
 
     var iter = REQUIRE_MAP.iterator();

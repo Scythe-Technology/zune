@@ -860,7 +860,7 @@ fn safeResumeWithError(
     self: *Self,
     err: anyerror,
 ) xev.CallbackAction {
-    const scheduler = Scheduler.getScheduler(self.lua_ref.value);
+    const scheduler = Scheduler.fromState(self.lua_ref.value);
     if (self.timer.started) {
         self.state.@"error" = err;
         self.state.stage = .closed;
@@ -987,7 +987,7 @@ fn onConnectComplete(
 }
 
 fn connectAddress(self: *Self, addr: std.net.Address) !void {
-    const scheduler = Scheduler.getScheduler(self.lua_ref.value);
+    const scheduler = Scheduler.fromState(self.lua_ref.value);
     const socket = try @import("../../lib.zig").createSocket(
         addr.any.family,
         std.posix.SOCK.STREAM | std.posix.SOCK.CLOEXEC | std.posix.SOCK.NONBLOCK,
@@ -1071,7 +1071,7 @@ pub fn sendCloseFrame(self: *Self, loop: *xev.Loop, code: u16) void {
 fn lua_send(self: *Self, L: *VM.lua.State) !i32 {
     if (self.state.closed != .none)
         return error.Closed;
-    const scheduler = Scheduler.getScheduler(L);
+    const scheduler = Scheduler.fromState(L);
 
     const message = try L.Zcheckvalue([]const u8, 2, null);
 
@@ -1106,7 +1106,7 @@ fn lua_close(self: *Self, L: *VM.lua.State) !i32 {
         else => {},
     }
 
-    const scheduler = Scheduler.getScheduler(L);
+    const scheduler = Scheduler.fromState(L);
 
     self.sendCloseFrame(&scheduler.loop, code);
 
@@ -1174,8 +1174,8 @@ pub fn generateKey(encoded: []u8) void {
 pub fn lua_websocket(L: *VM.lua.State) !i32 {
     if (!L.isyieldable())
         return L.Zyielderror();
-    const allocator = luau.getallocator(L);
-    const scheduler = Scheduler.getScheduler(L);
+    const scheduler = Scheduler.fromState(L);
+    const allocator = scheduler.allocator;
 
     const uri_string = try L.Zcheckvalue([:0]const u8, 1, null);
 

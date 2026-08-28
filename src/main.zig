@@ -312,14 +312,14 @@ pub fn quitMsg(comptime format: []const u8, args: anytype) noreturn {
     std.process.exit(1);
 }
 
-pub fn initState(L: *VM.lua.State) !void {
-    try Resolvers.Require.init(L);
+pub fn initState(L: *VM.lua.State, allocator: std.mem.Allocator) !void {
+    try Resolvers.Require.init(allocator);
     if (FEATURES.c and comptime corelib.c.PlatformSupported())
         try corelib.c.init(L);
 }
 
-pub fn deinitState(L: *VM.lua.State) void {
-    Resolvers.Require.deinit(L);
+pub fn deinitState(L: *VM.lua.State, allocator: std.mem.Allocator) void {
+    Resolvers.Require.deinit(allocator);
     if (FEATURES.c and comptime corelib.c.PlatformSupported())
         corelib.c.deinit(L);
 }
@@ -416,17 +416,19 @@ pub fn main() !void {
         if (try Resolvers.Bundle.get(allocator)) |b| {
             STATE.BUNDLE = b;
 
-            var L = try luau.init(&allocator);
+            var L = try luau.VM.lstate.Lnewstate();
             defer L.deinit();
-            var scheduler = try Runtime.Scheduler.init(allocator, L);
+            var scheduler = try Runtime.Scheduler.init(allocator);
             defer scheduler.deinit();
 
-            try initState(L);
-            defer deinitState(L);
+            scheduler.setup(L);
+
+            try initState(L, allocator);
+            defer deinitState(L, allocator);
 
             try Runtime.Scheduler.SCHEDULERS.append(DEFAULT_ALLOCATOR, &scheduler);
 
-            try Runtime.Engine.prepAsync(L, &scheduler);
+            try Runtime.Engine.prep(L);
             try openZune(L, args, .{ .limbo = b.mode.limbo });
 
             L.setsafeenv(VM.lua.GLOBALSINDEX, true);

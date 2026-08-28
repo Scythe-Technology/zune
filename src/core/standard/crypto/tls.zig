@@ -4,6 +4,8 @@ const tls = @import("tls");
 
 const Zune = @import("zune");
 
+const Scheduler = Zune.Runtime.Scheduler;
+
 const LuaHelper = Zune.Utils.LuaHelper;
 
 const Socket = @import("../../objects/network/Socket.zig");
@@ -57,7 +59,7 @@ pub fn cloneCertKeyPair(allocator: std.mem.Allocator, pair: tls.config.CertKeyPa
 }
 
 pub fn lua_bundleFromSystem(L: *VM.lua.State) !i32 {
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
 
     const self = try L.newuserdatatagged(tls.config.cert.Bundle, TAG_CRYPTO_TLS_CERTBUNDLE);
 
@@ -67,7 +69,7 @@ pub fn lua_bundleFromSystem(L: *VM.lua.State) !i32 {
 }
 
 pub fn lua_bundleFromFile(L: *VM.lua.State) !i32 {
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
 
     const path = try L.Zcheckvalue([]const u8, 1, null);
     const dir = std.fs.cwd();
@@ -80,7 +82,7 @@ pub fn lua_bundleFromFile(L: *VM.lua.State) !i32 {
 }
 
 pub fn lua_keyPairFromFile(L: *VM.lua.State) !i32 {
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
 
     const cert_path = try L.Zcheckvalue([]const u8, 1, null);
     const key_path = try L.Zcheckvalue([]const u8, 2, null);
@@ -113,7 +115,7 @@ pub fn lua_setupClient(L: *VM.lua.State) !i32 {
     if (L.rawgetfield(2, "ca") != .Userdata or L.userdatatag(-1) != TAG_CRYPTO_TLS_CERTBUNDLE)
         return L.Zerror("argument #2 field 'ca' must be a CertBundle");
 
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
 
     const ca_bundle = try cloneCertBundle(allocator, L.touserdatatagged(tls.config.cert.Bundle, -1, TAG_CRYPTO_TLS_CERTBUNDLE).?.*);
     L.pop(1);
@@ -185,7 +187,7 @@ pub fn lua_setupServer(L: *VM.lua.State) !i32 {
     if (L.rawgetfield(2, "auth") != .Userdata or L.userdatatag(-1) != TAG_CRYPTO_TLS_CERTKEYPAIR)
         return L.Zerror("argument #2 field 'ca' must be a CertBundle");
 
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
 
     var ca_keypair = try cloneCertKeyPair(allocator, L.touserdatatagged(tls.config.CertKeyPair, -1, TAG_CRYPTO_TLS_CERTKEYPAIR).?.*);
     errdefer ca_keypair.deinit(allocator);

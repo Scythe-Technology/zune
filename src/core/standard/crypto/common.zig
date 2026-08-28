@@ -1,12 +1,16 @@
 const std = @import("std");
 const luau = @import("luau");
 
+const Zune = @import("zune");
+
+const Scheduler = Zune.Runtime.Scheduler;
+
 const VM = luau.VM;
 
 pub fn lua_genEncryptFn(comptime algorithm: anytype) VM.zapi.LuaZigFn(anyerror!i32) {
     return struct {
         fn encrypt(L: *VM.lua.State) !i32 {
-            const allocator = luau.getallocator(L);
+            const allocator = Scheduler.fromState(L).allocator;
 
             const msg = try L.Zcheckvalue([]const u8, 1, null);
             const key = try L.Zcheckvalue([]const u8, 2, null);
@@ -48,7 +52,7 @@ pub fn lua_genEncryptFn(comptime algorithm: anytype) VM.zapi.LuaZigFn(anyerror!i
 pub fn lua_genDecryptFn(comptime algorithm: anytype) VM.zapi.LuaZigFn(anyerror!i32) {
     return struct {
         fn decrypt(L: *VM.lua.State) !i32 {
-            const allocator = luau.getallocator(L);
+            const allocator = Scheduler.fromState(L).allocator;
 
             const cipher = try L.Zcheckvalue([]const u8, 1, null);
             const tag = try L.Zcheckvalue([]const u8, 2, null);

@@ -1184,7 +1184,7 @@ fn readStreamInput(reader: *std.Io.Reader, allocator: std.mem.Allocator) !std.Io
 }
 
 fn promptSocket(stream: std.net.Stream, L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c.lua_Debug) !void {
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
 
     var read_buf: [128]u8 = undefined;
     var stream_reader = stream.reader(&read_buf);
@@ -1473,7 +1473,7 @@ pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c
         .stream => |s| return try promptSocket(s, L, kind, debug_info),
     };
 
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
 
     const terminal = &(Zune.corelib.io.TERMINAL orelse std.debug.panic("Terminal not initialized", .{}));
     const history = HISTORY orelse std.debug.panic("History not initialized", .{});

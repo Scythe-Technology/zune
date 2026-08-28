@@ -141,7 +141,7 @@ pub fn sendFrame(self: *Self, loop: *xev.Loop, dataframe: WebSocket.DataFrame) !
 pub fn lua_send(self: *Self, L: *VM.lua.State) !i32 {
     if (self.closed)
         return error.Closed;
-    const scheduler = Scheduler.getScheduler(L);
+    const scheduler = Scheduler.fromState(L);
 
     const message = try L.Zcheckvalue([]const u8, 2, null);
 
@@ -206,7 +206,7 @@ pub fn lua_close(self: *Self, L: *VM.lua.State) !i32 {
         else => {},
     }
 
-    const scheduler = Scheduler.getScheduler(L);
+    const scheduler = Scheduler.fromState(L);
 
     try self.sendCloseFrame(&scheduler.loop, code);
 

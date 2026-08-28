@@ -62,14 +62,6 @@ pub fn prep(L: *VM.lua.State) !void {
     try L.Lopenlibs();
 }
 
-pub fn prepAsync(L: *VM.lua.State, sched: *Scheduler) !void {
-    const GL = L.mainthread();
-
-    GL.setthreaddata(*Scheduler, sched);
-
-    try prep(L);
-}
-
 pub fn stateCleanUp() void {
     if (comptime !@import("../../commands/repl/Terminal.zig").SupportedPlatform())
         return;
@@ -114,8 +106,7 @@ pub fn run(L: *VM.lua.State) !void {
 }
 
 test "Run Basic" {
-    const allocator = std.testing.allocator;
-    const L = try luau.init(&allocator);
+    const L = try luau.VM.lstate.Lnewstate();
     defer L.deinit();
     if (luau.CodeGen.Supported())
         luau.CodeGen.Create(L);
@@ -125,8 +116,7 @@ test "Run Basic" {
 }
 
 test "Run Basic Syntax Error" {
-    const allocator = std.testing.allocator;
-    const L = try luau.init(&allocator);
+    const L = try luau.VM.lstate.Lnewstate();
     defer L.deinit();
     if (luau.CodeGen.Supported())
         luau.CodeGen.Create(L);

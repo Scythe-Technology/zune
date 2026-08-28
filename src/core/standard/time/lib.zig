@@ -5,6 +5,8 @@ const builtin = @import("builtin");
 
 const Zune = @import("zune");
 
+const Scheduler = Zune.Runtime.Scheduler;
+
 const LuaHelper = Zune.Utils.LuaHelper;
 const MethodMap = Zune.Utils.MethodMap;
 
@@ -52,7 +54,7 @@ pub const LuaDatetime = struct {
     }
 
     fn lua_toLocalTime(self: *LuaDatetime, L: *VM.lua.State) !i32 {
-        const allocator = luau.getallocator(L);
+        const allocator = Scheduler.fromState(L).allocator;
 
         const datetime = self.datetime;
         var tz = try time.Timezone.tzLocal(allocator);
@@ -97,7 +99,7 @@ pub const LuaDatetime = struct {
     }
 
     fn lua_formatLocalTime(self: *LuaDatetime, L: *VM.lua.State) !i32 {
-        const allocator = luau.getallocator(L);
+        const allocator = Scheduler.fromState(L).allocator;
 
         const datetime = self.datetime;
         const format_str = L.Lcheckstring(2);
@@ -120,7 +122,7 @@ pub const LuaDatetime = struct {
     }
 
     fn lua_formatUniversalTime(self: *LuaDatetime, L: *VM.lua.State) !i32 {
-        const allocator = luau.getallocator(L);
+        const allocator = Scheduler.fromState(L).allocator;
 
         const datetime = self.datetime;
         const format_str = L.Lcheckstring(2);
@@ -236,7 +238,7 @@ fn lua_fromLocalTime(L: *VM.lua.State) !i32 {
     const second = L.Loptinteger(6, 0);
     const millisecond = L.Loptinteger(7, 0);
 
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
 
     const self = try L.newuserdatataggedwithmetatable(LuaDatetime, TAG_DATETIME);
     self.timezone = try time.Timezone.tzLocal(allocator);
@@ -269,7 +271,7 @@ fn lua_fromIsoDate(L: *VM.lua.State) !i32 {
 }
 
 fn lua_parse(L: *VM.lua.State) !i32 {
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator;
     const date_string = L.Lcheckstring(1);
 
     const self = try L.newuserdatataggedwithmetatable(LuaDatetime, TAG_DATETIME);
