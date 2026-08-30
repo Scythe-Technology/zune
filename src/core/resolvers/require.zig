@@ -311,9 +311,13 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
 
     const module_src: [:0]u8 = module_src_buf[0 .. 1 + script_path.len + file.ext.len :0];
 
-    const entry = blk: {
+    var entry: @TypeOf(REQUIRE_MAP).Entry = blk: {
         errdefer allocator.free(script_path);
-        break :blk try REQUIRE_MAP.getOrPut(Zune.DEFAULT_ALLOCATOR, script_path);
+        const result = try REQUIRE_MAP.getOrPut(Zune.DEFAULT_ALLOCATOR, script_path);
+        break :blk .{
+            .key_ptr = result.key_ptr,
+            .value_ptr = result.value_ptr,
+        };
     };
 
     entry.value_ptr.* = .loading;
@@ -364,6 +368,7 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
             }
         }
         L.pop(1); // drop: thread
+        entry = REQUIRE_MAP.getEntry(script_path) orelse unreachable;
         entry.value_ptr.* = .@"error";
         return L.Zerror("requested module failed to load");
     }) {
@@ -394,6 +399,7 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
                     .state = Scheduler.ThreadRef.init(L),
                 });
 
+            entry = REQUIRE_MAP.getEntry(script_path) orelse unreachable;
             entry.value_ptr.* = .{ .yielded = list };
 
             if (!L.isyieldable())
@@ -409,7 +415,10 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
         _ = REQUIRE_MAP.remove(script_path);
         L.pushvalue(-1);
         try L.rawsetfield(-4, script_path); // SET: _MODULES[moduleName] = module
-    } else entry.value_ptr.* = .loaded;
+    } else {
+        entry = REQUIRE_MAP.getEntry(script_path) orelse unreachable;
+        entry.value_ptr.* = .loaded;
+    }
 
     return 1;
 }
