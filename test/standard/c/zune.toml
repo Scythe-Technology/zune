@@ -1,7 +1,7 @@
 # test configuration
 
-[runtime.debug]
-detailedError = true
+[runtime]
+use_detailed_error = true
 
-[features.builtins]
+[runtime.features]
 c = true
