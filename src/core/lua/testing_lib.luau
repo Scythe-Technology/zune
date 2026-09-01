@@ -2,13 +2,9 @@
 local io = zune.io;
 local task = zune.task;
 
-local GLOBAL = getfenv();
+local STEPCHECK_REFERENCES = getfenv().stepcheck_references :: (scope: string) -> ();
 
-local DECLARE_SAFEENV = GLOBAL.declare_safeEnv :: () -> ();
-local SCHEDULER_DROPTASKS = GLOBAL.scheduler_droptasks :: () -> ();
-local STEPCHECK_REFERENCES = GLOBAL.stepcheck_references :: (scope: string) -> ();
-
-DECLARE_SAFEENV();
+local testing_env = getfenv();
 
 type TestInfo = {
     Name: string?,
@@ -135,8 +131,7 @@ local function runTest(fn: () -> (), info: TestInfo)
                 if (l < 0) then
                     continue;
                 end
-                local env = getfenv(f);
-                if (env == GLOBAL) then
+                if (getfenv(f) == testing_env) then
                     continue;
                 end
                 local copy = {
@@ -197,60 +192,12 @@ local function runTest(fn: () -> (), info: TestInfo)
 
     STEPCHECK_REFERENCES(` -- {scope}`);
 
-    local test_root = #TEST_STACK == 1;
     local type = if (ok) then "PASS" else "FAIL";
     local color = if (ok) then GREEN else RED;
-    local leaked = test_root and task.count() > 0;
-
-    if (ok) then
-        if (leaked) then
-            color = YELLOW;
-            type = "WARN";
-        end
-    end
 
     print(`{color}{BOLD}{type}{RESET}{scope} {DIM}[{timeLength}ms]{RESET}`);
 
-    if (ok) then
-        if (leaked) then
-            print(` {DIM}|{RESET}{YELLOW} Test Running Tasks Timedout (Possible Leak){RESET}`);
-            print(` {DIM}|    This message is just a warning, but should be noted, that the test has active tasks{RESET}`);
-            print(` {DIM}|    in the scheduler for more than {timout} seconds.{RESET}`);
-            print(` {DIM}|{RESET}`);
-            local s, d, w, t = task.count("sdwt");
-            local show = {};
-            if (s > 0) then
-                print(` {DIM}|    "Sleeping" - (zune luau),{RESET}`);
-                print(` {DIM}|      Active luau task, usually means there is a running task created by luau or zune.{RESET}`);
-                print(` {DIM}|      Caused when a sleeping task is still in queue.{RESET}`);
-                table.insert(show, `Sleeping Tasks: {YELLOW}{s}{RESET}`);
-            end
-            if (d > 0) then
-                print(` {DIM}|    "Deferred" - (zune luau),{RESET}`);
-                print(` {DIM}|      Active luau task, usually means there is a running task created by luau or zune.{RESET}`);
-                print(` {DIM}|      Caused when a deferred task is still in queue.{RESET}`);
-                table.insert(show, `Deferred Tasks: {YELLOW}{d}{RESET}`);
-            end
-            if (w > 0) then
-                print(` {DIM}|    "Awaiting" - (zune backend),{RESET}`);
-                print(` {DIM}|      Active zune awaiting task, usually means there is a running task created by the zune backend.{RESET}`);
-                print(` {DIM}|      Caused by a the zune backend waiting for a response from luau{RESET}`);
-                table.insert(show, `Awaiting Tasks: {YELLOW}{w}{RESET}`);
-            end
-            if (t > 0) then
-                print(` {DIM}|    "Internal" - (zune backend){RESET}`);
-                print(` {DIM}|      Active zune core task, usually means there is a running task created by the zune backend.{RESET}`);
-                print(` {DIM}|      Caused by undisposed backend tasks.{RESET}`);
-                table.insert(show, `Internal Tasks: {YELLOW}{t}{RESET}`);
-            end
-            print(` {DIM}|`);
-            print(` {DIM}|    If this is a bug, please report it!{RESET}`);
-            print(` {DIM}|{RESET}    {BLUE}All tasks has been dropped{RESET}`);
-            for _, v in show do
-                print(` {DIM}|{RESET}  {v}`);
-            end
-        end
-    else
+    if (not ok) then
         testing._failed += 1;
         print(`{RED}error{RESET}: {err}{RESET}`);
 
@@ -290,12 +237,6 @@ local function runTest(fn: () -> (), info: TestInfo)
             printPreviewLine(lines, v.line + 1, bigLineLen, true);
         end
     end
-
-    if (leaked) then
-        SCHEDULER_DROPTASKS();
-    end
-
-    DECLARE_SAFEENV();
 end
 
 function testing.describe(

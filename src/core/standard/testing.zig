@@ -85,40 +85,6 @@ fn testing_checkLeakedReferences(L: *VM.lua.State) !i32 {
     return 0;
 }
 
-fn testing_droptasks(L: *VM.lua.State) i32 {
-    const scheduler = Scheduler.fromState(L);
-
-    var awaitsSize = scheduler.awaits.items.len;
-    while (awaitsSize > 0) {
-        awaitsSize -= 1;
-        const awaiting = scheduler.awaits.items[awaitsSize];
-        if (awaiting.priority == .Internal)
-            continue;
-        _ = scheduler.awaits.orderedRemove(awaitsSize);
-        awaiting.virtualDtor(awaiting.data, awaiting.state.value, scheduler);
-    }
-
-    var sleepingSize = scheduler.sleeping.items.len;
-    while (sleepingSize > 0) {
-        sleepingSize -= 1;
-        var slept = scheduler.sleeping.pop() orelse break;
-        slept.thread.deref();
-    }
-
-    while (scheduler.deferred.pop()) |node| {
-        const deferred = Scheduler.DeferredThread.fromNode(node);
-        defer scheduler.allocator.destroy(deferred);
-        deferred.thread.deref();
-    }
-
-    return 0;
-}
-
-fn testing_declareSafeEnv(L: *VM.lua.State) i32 {
-    L.setsafeenv(VM.lua.GLOBALSINDEX, true);
-    return 0;
-}
-
 fn empty(L: *VM.lua.State) i32 {
     _ = L;
     return 0;
@@ -224,10 +190,10 @@ pub fn loadLib(L: *VM.lua.State, enabled: bool) !void {
             try ML.Zsetfieldfn(VM.lua.GLOBALSINDEX, "print", empty);
         } else try ML.Zsetfieldfn(VM.lua.GLOBALSINDEX, "print", testing_debug);
         L.pop(1);
-        try ML.Zsetfieldfn(VM.lua.GLOBALSINDEX, "declare_safeEnv", testing_declareSafeEnv);
         try ML.Zsetfieldfn(VM.lua.GLOBALSINDEX, "stepcheck_references", testing_checkLeakedReferences);
-        try ML.Zsetfieldfn(VM.lua.GLOBALSINDEX, "scheduler_droptasks", testing_droptasks);
         try ML.Zsetfield(VM.lua.GLOBALSINDEX, "_FILE", false);
+
+        ML.setsafeenv(VM.lua.GLOBALSINDEX, true);
 
         ML.load("test_framework", test_lib_bytecode, 0) catch |err|
             std.debug.panic("Error loading test framework: {}\n", .{err});
