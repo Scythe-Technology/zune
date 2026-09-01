@@ -190,8 +190,8 @@ pub const Features = packed struct(u16) {
     }
 
     comptime {
-        std.debug.assert(@typeInfo(@TypeOf(Zune.FEATURES)).@"struct".fields.len == @typeInfo(Features).@"struct".fields.len - 1);
-        for (@typeInfo(@TypeOf(Zune.FEATURES)).@"struct".fields) |field| {
+        std.debug.assert(@typeInfo(@TypeOf(Zune.State.options.runtime.features)).@"struct".fields.len == @typeInfo(Features).@"struct".fields.len - 1);
+        for (@typeInfo(@TypeOf(Zune.State.options.runtime.features)).@"struct".fields) |field| {
             std.debug.assert(@hasField(Features, field.name));
         }
     }
@@ -220,7 +220,7 @@ pub const PackedState = packed struct(u40) {
     const Luau = packed struct(u6) {
         debug_level: u2 = 2,
         optimization_level: u2 = 1,
-        codegen: bool = true,
+        default_ncg: bool = true,
         jit_enabled: bool = true,
     };
 
@@ -232,7 +232,7 @@ pub const PackedState = packed struct(u40) {
 pub const Map = struct {
     allocator: std.mem.Allocator,
     mode: PackedState.Mode,
-    map: std.StringHashMapUnmanaged(Section),
+    map: std.hash_map.StringHashMapUnmanaged(Section),
     entry: struct {
         name: [:0]const u8,
         data: Section.Script,
@@ -381,20 +381,20 @@ pub fn loadBundle(allocator: std.mem.Allocator, exe_header: ExeHeader, bundle: [
         map.putAssumeCapacity(name, section);
     }
 
-    Zune.STATE.LUAU_OPTIONS.JIT_ENABLED = state.luau.jit_enabled;
-    Zune.STATE.LUAU_OPTIONS.CODEGEN = state.luau.codegen;
-    Zune.STATE.LUAU_OPTIONS.DEBUG_LEVEL = state.luau.debug_level;
-    Zune.STATE.LUAU_OPTIONS.OPTIMIZATION_LEVEL = state.luau.optimization_level;
+    Zune.State.options.runtime.luau.jit_enabled = state.luau.jit_enabled;
+    Zune.State.options.runtime.luau.default_ncg = state.luau.default_ncg;
+    Zune.State.options.runtime.luau.debug_level = state.luau.debug_level;
+    Zune.State.options.runtime.luau.optimization_level = state.luau.optimization_level;
 
-    Zune.STATE.FORMAT.ENABLED = state.format.enabled;
-    Zune.STATE.FORMAT.USE_COLOR = state.format.use_color;
-    Zune.STATE.FORMAT.TABLE_ADDRESS = state.format.table_address;
-    Zune.STATE.FORMAT.RECURSIVE_TABLE = state.format.recursive_table;
-    Zune.STATE.FORMAT.MAX_DEPTH = state.format.max_depth;
-    Zune.STATE.FORMAT.BUFFER_MAX_DISPLAY = state.format.buffer_max_display;
+    Zune.State.options.format.enabled = state.format.enabled;
+    Zune.State.options.format.use_color = state.format.use_color;
+    Zune.State.options.format.table_address = state.format.table_address;
+    Zune.State.options.format.recursive_table = state.format.recursive_table;
+    Zune.State.options.format.max_depth = state.format.max_depth;
+    Zune.State.options.format.buffer_max_display = state.format.buffer_max_display;
 
-    inline for (@typeInfo(@TypeOf(Zune.FEATURES)).@"struct".fields) |field| {
-        @field(Zune.FEATURES, field.name) = @field(features, field.name);
+    inline for (@typeInfo(@TypeOf(Zune.State.options.runtime.features)).@"struct".fields) |field| {
+        @field(Zune.State.options.runtime.features, field.name) = @field(features, field.name);
     }
 
     return .{

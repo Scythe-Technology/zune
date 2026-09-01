@@ -18,8 +18,8 @@ fn lua_compile(L: *VM.lua.State) !i32 {
     const source = try L.Zcheckvalue([]const u8, 1, null);
 
     var compileOpts = luau.CompileOptions{
-        .debugLevel = Zune.STATE.LUAU_OPTIONS.DEBUG_LEVEL,
-        .optimizationLevel = Zune.STATE.LUAU_OPTIONS.OPTIMIZATION_LEVEL,
+        .debugLevel = Zune.State.options.runtime.luau.debug_level,
+        .optimizationLevel = Zune.State.options.runtime.luau.optimization_level,
     };
 
     if (try L.Zcheckvalue(?struct {
@@ -104,7 +104,7 @@ fn lua_load(L: *VM.lua.State) !i32 {
     if (L.typeOf(-1) != .Function)
         return L.Zerror("luau error (bad load)");
 
-    if (use_code_gen and luau.CodeGen.Supported() and Zune.STATE.LUAU_OPTIONS.JIT_ENABLED)
+    if (use_code_gen and luau.CodeGen.Supported() and Zune.State.options.runtime.luau.jit_enabled)
         luau.CodeGen.Compile(L, -1);
 
     return 1;

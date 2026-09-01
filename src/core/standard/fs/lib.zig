@@ -385,7 +385,7 @@ fn lua_embedFile(L: *VM.lua.State) !i32 {
 
     blk: {
         if (comptime Zune.Resolvers.Bundle.PlatformSupported()) {
-            if (Zune.STATE.BUNDLE) |*b| {
+            if (Zune.State.bundle) |*b| {
                 try L.Zpushbuffer(try b.loadFile(resolved_path));
                 break :blk;
             }
@@ -399,7 +399,7 @@ fn lua_embedFile(L: *VM.lua.State) !i32 {
 }
 fn listEmbedded(L: *VM.lua.State, comptime kind: enum { script, file }) !i32 {
     try L.createtable(0, 0);
-    if (Zune.STATE.BUNDLE) |b| {
+    if (Zune.State.bundle) |b| {
         var iter = b.map.iterator();
         var count: i32 = 1;
         while (iter.next()) |entry| {
@@ -730,7 +730,7 @@ const Path = struct {
         const from = try L.Zcheckvalue([:0]const u8, 1, null);
         const to = try L.Zcheckvalue([:0]const u8, 2, null);
 
-        const resolved = try fs.path.relative(allocator, "", &Zune.STATE.ENV_MAP, from, to);
+        const resolved = try fs.path.relative(allocator, "", &Zune.State.env_map, from, to);
         defer allocator.free(resolved);
 
         try L.pushlstring(resolved);

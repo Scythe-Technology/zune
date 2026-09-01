@@ -534,7 +534,7 @@ fn lua_fromModule(L: *VM.lua.State) !i32 {
     @memcpy(module_src_buf[1..][0..script_path.len], script_path);
 
     const input_buf = module_src_buf[1..][0 .. script_path.len + Zune.Resolvers.File.LARGEST_EXTENSION.len];
-    const search_result = (if (Zune.STATE.BUNDLE) |*b|
+    const search_result = (if (Zune.State.bundle) |*b|
         Zune.Resolvers.File.searchLuauFileBundle(input_buf, b, script_path)
     else
         Zune.Resolvers.File.searchLuauFile(input_buf, cwd, script_path)) catch |err| switch (err) {
@@ -572,7 +572,7 @@ fn lua_fromModule(L: *VM.lua.State) !i32 {
 
     ML.setsafeenv(VM.lua.GLOBALSINDEX, true);
 
-    if (Zune.STATE.BUNDLE == null or Zune.STATE.BUNDLE.?.mode.compiled == .debug) {
+    if (Zune.State.bundle == null or Zune.State.bundle.?.mode.compiled == .debug) {
         @branchHint(.likely);
         Zune.Runtime.Engine.loadModule(ML, module_src, file_content, null) catch |err| switch (err) {
             error.Syntax => return L.Zerror(ML.tostring(-1) orelse "UnknownError"),
@@ -607,7 +607,7 @@ fn lua_fromBytecode(L: *VM.lua.State) !i32 {
         return L.Zerrorf("load error: {s}", .{ML.tostring(-1) orelse "unknown error"});
     };
 
-    if (luau.CodeGen.Supported() and Zune.STATE.LUAU_OPTIONS.CODEGEN and Zune.STATE.LUAU_OPTIONS.JIT_ENABLED and opts.native_code_gen)
+    if (luau.CodeGen.Supported() and Zune.State.options.runtime.luau.default_ncg and Zune.State.options.runtime.luau.jit_enabled and opts.native_code_gen)
         luau.CodeGen.Compile(ML, -1);
 
     return 1;

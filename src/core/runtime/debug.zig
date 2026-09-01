@@ -115,7 +115,7 @@ pub fn print(comptime fmt: []const u8, args: anytype) void {
     const stderr = std.debug.lockStderr(&buffer);
     defer std.debug.unlockStderr();
 
-    if (Zune.STATE.FORMAT.USE_COLOR == true and std.mem.eql(u8, Zune.STATE.ENV_MAP.get("NO_COLOR") orelse "0", "0")) {
+    if (Zune.State.options.format.use_color == true and std.mem.eql(u8, Zune.State.env_map.get("NO_COLOR") orelse "0", "0")) {
         const color_format = comptime ColorFormat(fmt, true);
         nosuspend stderr.file_writer.interface.print(color_format, args) catch return;
     } else {
@@ -125,7 +125,7 @@ pub fn print(comptime fmt: []const u8, args: anytype) void {
 }
 
 pub fn writerPrint(writer: *std.Io.Writer, comptime fmt: []const u8, args: anytype) !void {
-    if (Zune.STATE.FORMAT.USE_COLOR == true and std.mem.eql(u8, Zune.STATE.ENV_MAP.get("NO_COLOR") orelse "0", "0")) {
+    if (Zune.State.options.format.use_color == true and std.mem.eql(u8, Zune.State.env_map.get("NO_COLOR") orelse "0", "0")) {
         const color_format = comptime ColorFormat(fmt, true);
         try writer.print(color_format, args);
     } else {
@@ -170,7 +170,7 @@ pub fn dumpStackInfo(writer: *std.Io.Writer, padded_string: []u8, info: StackInf
     var fixed_reader: std.Io.Reader = undefined;
     var reader: *std.Io.Reader = undefined;
 
-    if (Zune.STATE.BUNDLE) |b| {
+    if (Zune.State.bundle) |b| {
         const script = b.loadScript(src[1..]) catch |e| {
             return writeFullPreviewError(writer, padded_string, current_line, "Failed to open source file: {t}", .{e});
         };
@@ -183,7 +183,7 @@ pub fn dumpStackInfo(writer: *std.Io.Writer, padded_string: []u8, info: StackInf
         file_reader = file.reader(Zune.io(), &buffer);
         reader = &file_reader.interface;
     }
-    defer if (Zune.STATE.BUNDLE == null) file.close(Zune.io());
+    defer if (Zune.State.bundle == null) file.close(Zune.io());
 
     if (current_line > 1) for (0..@intCast(current_line - 1)) |_| {
         while (true) {
@@ -367,7 +367,7 @@ pub fn dumpDefinitionTrace(L: *VM.lua.State, idx: i32) !void {
 
         print("<red>error<clear>: {s}\n", .{err_msg});
 
-        if (Zune.STATE.BUNDLE) |b|
+        if (Zune.State.bundle) |b|
             if (b.mode.compiled == .release)
                 return;
 
@@ -458,7 +458,7 @@ pub fn dumpErrorStackTrace(L: *VM.lua.State) !void {
 
     if (list.items.len < 1) {
         print("<green>error<clear>: {s}\n", .{err_msg});
-        if (Zune.STATE.BUNDLE) |b|
+        if (Zune.State.bundle) |b|
             if (b.mode.compiled == .release)
                 return;
         print("{s}\n", .{L.debugtrace()});
@@ -468,7 +468,7 @@ pub fn dumpErrorStackTrace(L: *VM.lua.State) !void {
     if (!try L.checkstack(5)) {
         print("Failed to show detailed error: StackOverflow\n", .{});
         print("<green>error<clear>: {s}\n", .{err_msg});
-        if (Zune.STATE.BUNDLE) |b|
+        if (Zune.State.bundle) |b|
             if (b.mode.compiled == .release)
                 return;
         print("{s}\n", .{L.debugtrace()});
@@ -506,7 +506,7 @@ pub fn dumpErrorStackTrace(L: *VM.lua.State) !void {
 
     try writerPrint(&stderr.file_writer.interface, "<red>error<clear>: {s}\n", .{err_msg});
 
-    if (Zune.STATE.BUNDLE) |b|
+    if (Zune.State.bundle) |b|
         if (b.mode.compiled == .release)
             return;
 
@@ -516,7 +516,7 @@ pub fn dumpErrorStackTrace(L: *VM.lua.State) !void {
 pub fn dumpErrorTrace(L: *VM.lua.State, err: anyerror, forceDetailed: bool) void {
     switch (err) {
         error.Runtime => {
-            if (Zune.STATE.USE_DETAILED_ERROR or forceDetailed) {
+            if (Zune.State.options.runtime.use_detailed_error or forceDetailed) {
                 dumpErrorStackTrace(L) catch |e| std.debug.panic("{}", .{e});
             } else {
                 switch (L.typeOf(-1)) {

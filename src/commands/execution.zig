@@ -28,9 +28,9 @@ fn getFile(allocator: std.mem.Allocator, comptime from: enum { Run, Test, Other 
         maybe_content = try stdin_reader.interface.allocRemaining(allocator, .unlimited);
         maybe_src = try allocator.dupeZ(u8, "@STDIN");
     } else {
-        const path = try File.resolve(allocator, Zune.STATE.ENV_MAP, switch (comptime from) {
-            .Run => if (Zune.STATE.WORKSPACE.run_path) |path| &.{ path, input } else &.{input},
-            .Test => if (Zune.STATE.WORKSPACE.test_path) |path| &.{ path, input } else &.{input},
+        const path = try File.resolve(allocator, Zune.State.env_map, switch (comptime from) {
+            .Run => if (Zune.State.options.workspace.run_path) |path| &.{ path, input } else &.{input},
+            .Test => if (Zune.State.options.workspace.test_path) |path| &.{ path, input } else &.{input},
             else => &.{input},
         });
         defer allocator.free(path);
@@ -77,7 +77,7 @@ fn cmdRun(allocator: std.mem.Allocator, args: []const []const u8) !void {
     if (run_args.len < 1)
         Zune.quitMsg("<red>usage<clear>: run [OPTIONS] <<luau file>>\n", .{});
 
-    Zune.STATE.RUN_MODE = .Run;
+    Zune.State.run_mode = .Run;
 
     Zune.loadConfiguration(std.Io.Dir.cwd());
 
@@ -95,7 +95,7 @@ fn cmdRun(allocator: std.mem.Allocator, args: []const []const u8) !void {
                         '2' => 2,
                         else => unreachable,
                     };
-                    Zune.STATE.LUAU_OPTIONS.OPTIMIZATION_LEVEL = level;
+                    Zune.State.options.runtime.luau.optimization_level = level;
                 } else Zune.quitMsg("<red>error<clear>: invalid optimization level, usage: -O<<N>>\n", .{}),
                 'g' => if (flag.len == 3 and flag[2] >= '0' and flag[2] <= '2') {
                     const level: u2 = switch (flag[2]) {
@@ -104,7 +104,7 @@ fn cmdRun(allocator: std.mem.Allocator, args: []const []const u8) !void {
                         '2' => 2,
                         else => unreachable,
                     };
-                    Zune.STATE.LUAU_OPTIONS.DEBUG_LEVEL = level;
+                    Zune.State.options.runtime.luau.debug_level = level;
                 } else Zune.quitMsg("<red>error<clear>: invalid debug level, usage: -g<<N>>\n", .{}),
                 'c' => if (flag.len == 3 and flag[2] >= '0' and flag[2] <= '2') {
                     const level: u2 = switch (flag[2]) {
@@ -113,7 +113,7 @@ fn cmdRun(allocator: std.mem.Allocator, args: []const []const u8) !void {
                         '2' => 2,
                         else => unreachable,
                     };
-                    Zune.STATE.LUAU_OPTIONS.COVERAGE_LEVEL = level;
+                    Zune.State.options.runtime.luau.coverage_level = level;
                 } else Zune.quitMsg("<red>error<clear>: invalid coverage level, usage: -c<<N>>\n", .{}),
                 '-' => if (std.mem.startsWith(u8, flag, "--profile")) {
                     PROFILER = 10000;
@@ -122,15 +122,15 @@ fn cmdRun(allocator: std.mem.Allocator, args: []const []const u8) !void {
                         PROFILER = level;
                     }
                 } else if (std.mem.eql(u8, flag, "--native")) {
-                    Zune.STATE.LUAU_OPTIONS.CODEGEN = true;
+                    Zune.State.options.runtime.luau.default_ncg = true;
                 } else if (std.mem.eql(u8, flag, "--no-native")) {
-                    Zune.STATE.LUAU_OPTIONS.CODEGEN = false;
+                    Zune.State.options.runtime.luau.default_ncg = false;
                 } else if (std.mem.eql(u8, flag, "--no-jit")) {
-                    Zune.STATE.LUAU_OPTIONS.JIT_ENABLED = false;
+                    Zune.State.options.runtime.luau.jit_enabled = false;
                 } else if (std.mem.eql(u8, flag, "--limbo")) {
                     LOAD_FLAGS.limbo = true;
                 } else if (std.mem.eql(u8, flag, "--no-fmt")) {
-                    Zune.STATE.FORMAT.ENABLED = false;
+                    Zune.State.options.format.enabled = false;
                 } else continue :sw 0,
                 else => Zune.quitMsg("<red>error<clear>: unknown flag '{s}'\n", .{flag}),
             },
@@ -140,7 +140,7 @@ fn cmdRun(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     const dir = std.Io.Dir.cwd();
 
-    const file_src_path, const file_content = if (Zune.STATE.WORKSPACE.scripts.get(run_args[0])) |defined|
+    const file_src_path, const file_content = if (Zune.State.options.workspace.scripts.get(run_args[0])) |defined|
         getFile(allocator, .Other, dir, defined) catch |err| switch (err) {
             error.FileNotFound => Zune.quitMsg("<red>error<clear>: file not found '{s}'\n", .{defined}),
             else => return err,
@@ -201,7 +201,7 @@ fn cmdTest(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     Zune.loadConfiguration(std.Io.Dir.cwd());
 
-    Zune.STATE.RUN_MODE = .Test;
+    Zune.State.run_mode = .Test;
 
     var LOAD_FLAGS: Zune.Flags = .{};
     if (flags) |f| for (f) |flag| {
@@ -216,7 +216,7 @@ fn cmdTest(allocator: std.mem.Allocator, args: []const []const u8) !void {
                         '2' => 2,
                         else => unreachable,
                     };
-                    Zune.STATE.LUAU_OPTIONS.OPTIMIZATION_LEVEL = level;
+                    Zune.State.options.runtime.luau.optimization_level = level;
                 } else Zune.quitMsg("<red>error<clear>: invalid optimization level, usage: -O<<N>>\n", .{}),
                 'g' => if (flag.len == 3 and flag[2] >= '0' and flag[2] <= '2') {
                     const level: u2 = switch (flag[2]) {
@@ -225,7 +225,7 @@ fn cmdTest(allocator: std.mem.Allocator, args: []const []const u8) !void {
                         '2' => 2,
                         else => unreachable,
                     };
-                    Zune.STATE.LUAU_OPTIONS.DEBUG_LEVEL = level;
+                    Zune.State.options.runtime.luau.debug_level = level;
                 } else Zune.quitMsg("<red>error<clear>: invalid debug level, usage: -g<<N>>\n", .{}),
                 'c' => if (flag.len == 3 and flag[2] >= '0' and flag[2] <= '2') {
                     const level: u2 = switch (flag[2]) {
@@ -234,18 +234,18 @@ fn cmdTest(allocator: std.mem.Allocator, args: []const []const u8) !void {
                         '2' => 2,
                         else => unreachable,
                     };
-                    Zune.STATE.LUAU_OPTIONS.COVERAGE_LEVEL = level;
+                    Zune.State.options.runtime.luau.coverage_level = level;
                 } else Zune.quitMsg("<red>error<clear>: invalid coverage level, usage: -c<<N>>\n", .{}),
                 '-' => if (std.mem.eql(u8, flag, "--native")) {
-                    Zune.STATE.LUAU_OPTIONS.CODEGEN = true;
+                    Zune.State.options.runtime.luau.default_ncg = true;
                 } else if (std.mem.eql(u8, flag, "--no-native")) {
-                    Zune.STATE.LUAU_OPTIONS.CODEGEN = false;
+                    Zune.State.options.runtime.luau.default_ncg = false;
                 } else if (std.mem.eql(u8, flag, "--no-jit")) {
-                    Zune.STATE.LUAU_OPTIONS.JIT_ENABLED = false;
+                    Zune.State.options.runtime.luau.jit_enabled = false;
                 } else if (std.mem.eql(u8, flag, "--limbo")) {
                     LOAD_FLAGS.limbo = true;
                 } else if (std.mem.eql(u8, flag, "--no-fmt")) {
-                    Zune.STATE.FORMAT.ENABLED = false;
+                    Zune.State.options.format.enabled = false;
                 } else continue :sw 0,
                 else => Zune.quitMsg("<red>error<clear>: unknown flag '{s}'\n", .{flag}),
             },
@@ -255,7 +255,7 @@ fn cmdTest(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     const dir = std.Io.Dir.cwd();
 
-    const file_src_path, const file_content = if (Zune.STATE.WORKSPACE.scripts.get(run_args[0])) |defined|
+    const file_src_path, const file_content = if (Zune.State.options.workspace.scripts.get(run_args[0])) |defined|
         getFile(allocator, .Other, dir, defined) catch |err| switch (err) {
             error.FileNotFound => Zune.quitMsg("<red>error<clear>: file not found '{s}'\n", .{defined}),
             else => return err,
@@ -383,7 +383,7 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
     if (run_args.len < 1)
         Zune.quitMsg("<red>usage<clear>: debug [OPTIONS] <<luau file>>\n", .{});
 
-    Zune.STATE.RUN_MODE = .Debug;
+    Zune.State.run_mode = .Debug;
 
     Zune.loadConfiguration(std.Io.Dir.cwd());
 
@@ -403,7 +403,7 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
                         '2' => 2,
                         else => unreachable,
                     };
-                    Zune.STATE.LUAU_OPTIONS.OPTIMIZATION_LEVEL = level;
+                    Zune.State.options.luau.optimization_level = level;
                 } else Zune.quitMsg("<red>error<clear>: invalid optimization level, usage: -O<<N>>\n", .{}),
                 'c' => if (flag.len == 3 and flag[2] >= '0' and flag[2] <= '2') {
                     const level: u2 = switch (flag[2]) {
@@ -412,14 +412,14 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
                         '2' => 2,
                         else => unreachable,
                     };
-                    Zune.STATE.LUAU_OPTIONS.COVERAGE_LEVEL = level;
+                    Zune.State.options.luau.coverage_level = level;
                 } else Zune.quitMsg("<red>error<clear>: invalid coverage level, usage: -c<<N>>\n", .{}),
                 '-' => if (std.mem.eql(u8, flag, "--once")) {
                     ALWAYS_DEBUG = false;
                 } else if (std.mem.eql(u8, flag, "--limbo")) {
                     LOAD_FLAGS.limbo = true;
                 } else if (std.mem.eql(u8, flag, "--no-fmt")) {
-                    Zune.STATE.FORMAT.ENABLED = false;
+                    Zune.State.options.format.enabled = false;
                 } else if (std.mem.startsWith(u8, flag, "--ipc-port=")) {
                     const port = flag[11..];
                     if (port.len == 0)
@@ -432,9 +432,9 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
         }
     };
 
-    Zune.STATE.LUAU_OPTIONS.DEBUG_LEVEL = 2;
-    Zune.STATE.LUAU_OPTIONS.CODEGEN = false;
-    Zune.STATE.LUAU_OPTIONS.JIT_ENABLED = false;
+    Zune.State.options.luau.debug_level = 2;
+    Zune.State.options.luau.default_ncg = false;
+    Zune.State.options.luau.jit_enabled = false;
 
     const dir = std.Io.Dir.cwd();
     const module = run_args[0];

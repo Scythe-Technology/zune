@@ -78,7 +78,7 @@ fn testing_checkLeakedReferences(L: *VM.lua.State) !i32 {
         const scope_copy = try allocator.dupe(u8, scope);
 
         var allocating: std.Io.Writer.Allocating = .init(allocator);
-        try Fmt.writeIdx(allocator, L, &allocating.writer, @intCast(L.gettop()), Zune.STATE.FORMAT.MAX_DEPTH);
+        try Fmt.writeIdx(allocator, L, &allocating.writer, @intCast(L.gettop()), Zune.State.options.format.max_depth);
 
         try REF_LEAKED_SOURCE.put(store_index, .{ .scope = scope_copy, .value = try allocating.toOwnedSlice() });
     }
@@ -207,7 +207,7 @@ pub fn runTestAsync(L: *VM.lua.State, sched: *Scheduler) !TestResult {
 
     Runtime.Engine.runAsync(L, sched, .{ .cleanUp = true, .mode = .Test }) catch {};
 
-    if (Zune.FEATURES.c and comptime Zune.corelib.c.PlatformSupported())
+    if (Zune.State.options.runtime.features.c and comptime Zune.corelib.c.PlatformSupported())
         Zune.corelib.c.deinitCacheTable(L);
 
     return try finish_testing(L, start);

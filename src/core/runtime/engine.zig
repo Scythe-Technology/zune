@@ -9,9 +9,9 @@ const VM = luau.VM;
 
 pub inline fn loadAndCompileModule(L: *VM.lua.State, moduleName: [:0]const u8, content: []const u8, cOpts: ?luau.CompileOptions) !void {
     const compileOptions = cOpts orelse luau.CompileOptions{
-        .debugLevel = Zune.STATE.LUAU_OPTIONS.DEBUG_LEVEL,
-        .optimizationLevel = Zune.STATE.LUAU_OPTIONS.OPTIMIZATION_LEVEL,
-        .coverageLevel = Zune.STATE.LUAU_OPTIONS.COVERAGE_LEVEL,
+        .debugLevel = Zune.State.options.runtime.luau.debug_level,
+        .optimizationLevel = Zune.State.options.runtime.luau.optimization_level,
+        .coverageLevel = Zune.State.options.runtime.luau.coverage_level,
         .typeInfoLevel = 1,
     };
 
@@ -19,7 +19,7 @@ pub inline fn loadAndCompileModule(L: *VM.lua.State, moduleName: [:0]const u8, c
 }
 
 pub fn loadNative(L: *VM.lua.State) void {
-    if (luau.CodeGen.Supported() and Zune.STATE.LUAU_OPTIONS.CODEGEN and Zune.STATE.LUAU_OPTIONS.JIT_ENABLED)
+    if (luau.CodeGen.Supported() and Zune.State.options.runtime.luau.default_ncg and Zune.State.options.runtime.luau.jit_enabled)
         luau.CodeGen.Compile(L, -1);
 }
 
@@ -56,7 +56,7 @@ pub fn checkStatus(L: *VM.lua.State) !VM.lua.Status {
 }
 
 pub fn prep(L: *VM.lua.State) !void {
-    if (luau.CodeGen.Supported() and Zune.STATE.LUAU_OPTIONS.JIT_ENABLED)
+    if (luau.CodeGen.Supported() and Zune.State.options.runtime.luau.jit_enabled)
         luau.CodeGen.Create(L);
 
     try L.Lopenlibs();

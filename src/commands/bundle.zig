@@ -109,14 +109,14 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
         const file = try std.Io.Dir.cwd().openFile(Zune.io(), path, .{ .mode = .read_only });
         defer file.close(Zune.io());
 
-        const last_color = Zune.STATE.FORMAT.USE_COLOR;
+        const last_color = Zune.State.options.format.use_color;
 
         const map = Bundle.getFromFile(allocator, file) catch |err| switch (err) {
             error.CorruptBundle => Zune.quitMsg("<red>error<clear>: '{s}' is not a valid zune bundle (corrupt)\n", .{path}),
             else => return err,
         } orelse Zune.quitMsg("<red>error<clear>: '{s}' is not a valid zune bundle\n", .{path});
 
-        Zune.STATE.FORMAT.USE_COLOR = last_color;
+        Zune.State.options.format.use_color = last_color;
 
         Zune.debug.print("<bold>bundled size<clear>: {d}\n", .{map.allocated.len});
         Zune.debug.print("<bold>build mode<clear>:   <green>{t}<clear>\n", .{map.mode.compiled});
@@ -127,7 +127,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
         return;
     }
 
-    var home_dir = File.getHomeDir(Zune.STATE.ENV_MAP) orelse "";
+    var home_dir = File.getHomeDir(Zune.State.env_map) orelse "";
 
     var dir = try std.Io.Dir.cwd().openDir(Zune.io(), ".", .{ .iterate = true });
     defer dir.close(Zune.io());
@@ -168,7 +168,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
                             '2' => 2,
                             else => unreachable,
                         };
-                        Zune.STATE.LUAU_OPTIONS.OPTIMIZATION_LEVEL = level;
+                        Zune.State.options.runtime.luau.optimization_level = level;
                     } else Zune.quitMsg("<red>error<clear>: invalid optimization level, usage: -O<<N>>\n", .{}),
                     'g' => {
                         if (flag.len == 3 and flag[2] >= '0' and flag[2] <= '2') {
@@ -178,7 +178,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
                                 '2' => 2,
                                 else => unreachable,
                             };
-                            Zune.STATE.LUAU_OPTIONS.DEBUG_LEVEL = level;
+                            Zune.State.options.runtime.luau.debug_level = level;
                         } else Zune.quitMsg("<red>error<clear>: invalid debug level, usage: -g<<N>>\n", .{});
                     },
                     'f' => if (std.mem.eql(u8, arg, "-f")) {
@@ -190,15 +190,15 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
                         backet_kind = .script;
                     } else continue :sw 0,
                     '-' => if (std.mem.eql(u8, flag, "--native")) {
-                        Zune.STATE.LUAU_OPTIONS.CODEGEN = true;
+                        Zune.State.options.runtime.luau.default_ncg = true;
                     } else if (std.mem.eql(u8, flag, "--no-native")) {
-                        Zune.STATE.LUAU_OPTIONS.CODEGEN = false;
+                        Zune.State.options.runtime.luau.default_ncg = false;
                     } else if (std.mem.eql(u8, flag, "--no-jit")) {
-                        Zune.STATE.LUAU_OPTIONS.JIT_ENABLED = false;
+                        Zune.State.options.runtime.luau.jit_enabled = false;
                     } else if (std.mem.eql(u8, flag, "--limbo")) {
                         LOAD_FLAGS.limbo = true;
                     } else if (std.mem.eql(u8, flag, "--no-fmt")) {
-                        Zune.STATE.FORMAT.ENABLED = false;
+                        Zune.State.options.format.enabled = false;
                     } else if (std.mem.eql(u8, flag, "--release")) {
                         BUILD_MODE = .release;
                     } else if (std.mem.eql(u8, flag, "--debug")) {
@@ -285,24 +285,24 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
             .limbo = LOAD_FLAGS.limbo,
         },
         .format = .{
-            .enabled = Zune.STATE.FORMAT.ENABLED,
-            .use_color = Zune.STATE.FORMAT.USE_COLOR,
-            .max_depth = Zune.STATE.FORMAT.MAX_DEPTH,
-            .table_address = Zune.STATE.FORMAT.TABLE_ADDRESS,
-            .recursive_table = Zune.STATE.FORMAT.RECURSIVE_TABLE,
-            .buffer_max_display = Zune.STATE.FORMAT.BUFFER_MAX_DISPLAY,
+            .enabled = Zune.State.options.format.enabled,
+            .use_color = Zune.State.options.format.use_color,
+            .max_depth = Zune.State.options.format.max_depth,
+            .table_address = Zune.State.options.format.table_address,
+            .recursive_table = Zune.State.options.format.recursive_table,
+            .buffer_max_display = Zune.State.options.format.buffer_max_display,
         },
         .luau = .{
-            .codegen = Zune.STATE.LUAU_OPTIONS.CODEGEN,
-            .jit_enabled = Zune.STATE.LUAU_OPTIONS.JIT_ENABLED,
-            .optimization_level = Zune.STATE.LUAU_OPTIONS.OPTIMIZATION_LEVEL,
-            .debug_level = Zune.STATE.LUAU_OPTIONS.DEBUG_LEVEL,
+            .default_ncg = Zune.State.options.runtime.luau.default_ncg,
+            .jit_enabled = Zune.State.options.runtime.luau.jit_enabled,
+            .optimization_level = Zune.State.options.runtime.luau.optimization_level,
+            .debug_level = Zune.State.options.runtime.luau.debug_level,
         },
     });
 
     var features: Bundle.Features = .{};
-    inline for (@typeInfo(@TypeOf(Zune.FEATURES)).@"struct".fields) |field|
-        @field(features, field.name) = @field(Zune.FEATURES, field.name);
+    inline for (@typeInfo(@TypeOf(Zune.State.options.runtime.features)).@"struct".fields) |field|
+        @field(features, field.name) = @field(Zune.State.options.runtime.features, field.name);
 
     try Bundle.Features.write(writer, features);
 
@@ -327,8 +327,8 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
         };
         defer allocator.free(script_contents);
         const bytecode = try luau.Compiler.luacode.compile(allocator, script_contents, .{
-            .optimizationLevel = Zune.STATE.LUAU_OPTIONS.OPTIMIZATION_LEVEL,
-            .debugLevel = Zune.STATE.LUAU_OPTIONS.DEBUG_LEVEL,
+            .optimizationLevel = Zune.State.options.runtime.luau.optimization_level,
+            .debugLevel = Zune.State.options.runtime.luau.debug_level,
         });
         defer allocator.free(bytecode);
         if (bytecode[0] == 0)

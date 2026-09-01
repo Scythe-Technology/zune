@@ -633,7 +633,7 @@ fn lua_loadEnv(L: *VM.lua.State) !i32 {
     const allocator = Scheduler.fromState(L).allocator;
     try L.newtable();
 
-    var iterator = Zune.STATE.ENV_MAP.iterator();
+    var iterator = Zune.State.env_map.iterator();
     while (iterator.next()) |entry| {
         const zkey = try allocator.dupeZ(u8, entry.key_ptr.*);
         defer allocator.free(zkey);
@@ -641,7 +641,7 @@ fn lua_loadEnv(L: *VM.lua.State) !i32 {
     }
 
     try loadEnvironment(L, allocator, ".env");
-    if (Zune.STATE.ENV_MAP.get("LUAU_ENV")) |value| {
+    if (Zune.State.env_map.get("LUAU_ENV")) |value| {
         if (std.mem.eql(u8, value, "PRODUCTION")) {
             try loadEnvironment(L, allocator, ".env.production");
         } else if (std.mem.eql(u8, value, "DEVELOPMENT")) {
@@ -660,7 +660,7 @@ fn lua_onsignal(L: *VM.lua.State) !i32 {
     try L.Zchecktype(2, .Function);
 
     if (std.mem.eql(u8, sig, "INT")) {
-        if (Zune.STATE.MAIN_THREAD_ID != std.Thread.getCurrentId())
+        if (Zune.State.main_thread_id != std.Thread.getCurrentId())
             return L.Zerror("SIGINT handler can only be set in the main thread");
         const GL = L.mainthread();
         if (GL != L)

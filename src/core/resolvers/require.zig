@@ -124,12 +124,12 @@ const RequireNavigatorContext = struct {
     pub fn getConfig(self: *This, path: []const u8, out_err: ?*?[]const u8) !Config {
         const allocator = self.allocator;
 
-        if (Zune.STATE.CONFIG_CACHE.get(path)) |cached|
+        if (Zune.State.config_cache.get(path)) |cached|
             return cached;
 
         const contents = blk: {
             if (comptime Zune.Resolvers.Bundle.PlatformSupported())
-                if (Zune.STATE.BUNDLE) |*bundle|
+                if (Zune.State.bundle) |*bundle|
                     break :blk bundle.loadFileAlloc(allocator, path) catch |err| switch (err) {
                         error.FileNotFound => return error.NotPresent,
                         else => return err,
@@ -147,7 +147,7 @@ const RequireNavigatorContext = struct {
         const copy = try Zune.DEFAULT_ALLOCATOR.dupe(u8, path);
         errdefer Zune.DEFAULT_ALLOCATOR.free(copy);
 
-        try Zune.STATE.CONFIG_CACHE.put(Zune.DEFAULT_ALLOCATOR, copy, config);
+        try Zune.State.config_cache.put(Zune.DEFAULT_ALLOCATOR, copy, config);
 
         return config;
     }
@@ -155,7 +155,7 @@ const RequireNavigatorContext = struct {
         // the config is stored in cache.
     }
     pub fn resolvePathAlloc(_: *This, allocator: std.mem.Allocator, from: []const u8, to: []const u8) ![]u8 {
-        return try Zune.Resolvers.File.resolveBundled(allocator, Zune.STATE.ENV_MAP, &.{ from, to }, Zune.STATE.BUNDLE);
+        return try Zune.Resolvers.File.resolveBundled(allocator, Zune.State.env_map, &.{ from, to }, Zune.State.bundle);
     }
 };
 
@@ -290,7 +290,7 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
         @memcpy(module_src_buf[1..][0..script_path.len], script_path);
 
         const input_buf = module_src_buf[1..][0 .. script_path.len + File.LARGEST_EXTENSION.len];
-        const result = (if (Zune.STATE.BUNDLE) |*bundle|
+        const result = (if (Zune.State.bundle) |*bundle|
             File.searchLuauFileBundle(input_buf, bundle, script_path)
         else
             File.searchLuauFile(input_buf, cwd, script_path)) catch |err| switch (err) {
@@ -348,7 +348,7 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
 
         ML.setsafeenv(VM.lua.GLOBALSINDEX, true);
 
-        if (Zune.STATE.BUNDLE == null or Zune.STATE.BUNDLE.?.mode.compiled == .debug) {
+        if (Zune.State.bundle == null or Zune.State.bundle.?.mode.compiled == .debug) {
             @branchHint(.likely);
             Engine.loadModule(ML, module_src, file_content, null) catch |err| switch (err) {
                 error.Syntax => {

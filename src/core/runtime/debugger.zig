@@ -648,7 +648,7 @@ fn promptOpLocals(L: *VM.lua.State, allocator: std.mem.Allocator, locals_args: [
 
                             const writer = &allocating.writer;
 
-                            try Fmt.writeIdx(allocator, L, writer, @intCast(L.gettop()), Zune.STATE.FORMAT.MAX_DEPTH);
+                            try Fmt.writeIdx(allocator, L, writer, @intCast(L.gettop()), Zune.State.options.format.max_depth);
                             var iter = std.mem.splitScalar(u8, allocating.written(), '\n');
                             printResult(" | Value: {s}\n", .{iter.first()});
                             while (iter.next()) |line|
@@ -799,7 +799,7 @@ fn promptOpParams(L: *VM.lua.State, allocator: std.mem.Allocator, params_args: [
 
                             const writer = &allocating.writer;
 
-                            try Fmt.writeIdx(allocator, L, writer, @intCast(L.gettop()), Zune.STATE.FORMAT.MAX_DEPTH);
+                            try Fmt.writeIdx(allocator, L, writer, @intCast(L.gettop()), Zune.State.options.format.max_depth);
                             var iter = std.mem.splitScalar(u8, allocating.written(), '\n');
                             printResult(" | Value: {s}\n", .{iter.first()});
                             while (iter.next()) |line|
@@ -933,7 +933,7 @@ fn promptOpUpvalues(L: *VM.lua.State, allocator: std.mem.Allocator, params_args:
 
                             const writer = &allocating.writer;
 
-                            try Fmt.writeIdx(allocator, L, writer, @intCast(L.gettop()), Zune.STATE.FORMAT.MAX_DEPTH);
+                            try Fmt.writeIdx(allocator, L, writer, @intCast(L.gettop()), Zune.State.options.format.max_depth);
                             var iter = std.mem.splitScalar(u8, allocating.written(), '\n');
                             printResult(" | Value: {s}\n", .{iter.first()});
                             while (iter.next()) |line|
@@ -1075,7 +1075,7 @@ fn promptOpGlobals(L: *VM.lua.State, allocator: std.mem.Allocator, globals_args:
 
                         const writer = &allocating.writer;
 
-                        try Fmt.writeIdx(allocator, L, writer, @intCast(L.gettop()), Zune.STATE.FORMAT.MAX_DEPTH);
+                        try Fmt.writeIdx(allocator, L, writer, @intCast(L.gettop()), Zune.State.options.format.max_depth);
                         var iter = std.mem.splitScalar(u8, allocating.written(), '\n');
                         printResult(" | Value: {s}\n", .{iter.first()});
                         while (iter.next()) |line|
