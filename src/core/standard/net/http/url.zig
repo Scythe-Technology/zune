@@ -247,8 +247,8 @@ test "url: unescape" {
 
 fn getRandom() std.Random.DefaultPrng {
     var seed: u64 = undefined;
-    std.posix.getrandom(std.mem.asBytes(&seed)) catch std.debug.panic("getrandom failed\n", .{});
-    return std.Random.DefaultPrng.init(seed);
+    std.testing.io.random(std.mem.asBytes(&seed));
+    return .init(seed);
 }
 
 test "url: isValid" {

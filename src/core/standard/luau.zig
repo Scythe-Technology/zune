@@ -307,7 +307,7 @@ const AstSerializer = struct {
         text: []const u8,
     };
 
-    fn extractWhitespace(self: *@This(), results: *std.ArrayListUnmanaged(Trivia), newPos: Location.Position) !void {
+    fn extractWhitespace(self: *@This(), results: *std.ArrayList(Trivia), newPos: Location.Position) !void {
         std.debug.assert(self.current_position.lessThan(newPos));
         std.debug.assert(self.current_position.line < self.line_offsets.len);
         std.debug.assert(newPos.line < self.line_offsets.len);
@@ -343,7 +343,7 @@ const AstSerializer = struct {
         if (self.current_position.eq(newPos))
             return &.{};
 
-        var results: std.ArrayListUnmanaged(Trivia) = .empty;
+        var results: std.ArrayList(Trivia) = .empty;
         errdefer results.deinit(self.allocator);
         const span: Location = .{ .begin = self.current_position, .end = newPos };
         for (self.comment_locations) |comment| {

@@ -101,7 +101,7 @@ fn testing_droptasks(L: *VM.lua.State) i32 {
     var sleepingSize = scheduler.sleeping.items.len;
     while (sleepingSize > 0) {
         sleepingSize -= 1;
-        var slept = scheduler.sleeping.remove();
+        var slept = scheduler.sleeping.pop() orelse break;
         slept.thread.deref();
     }
 

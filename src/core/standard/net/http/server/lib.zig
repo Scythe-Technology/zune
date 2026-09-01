@@ -13,6 +13,8 @@ const LuaHelper = Zune.Utils.LuaHelper;
 const MethodMap = Zune.Utils.MethodMap;
 const Lists = Zune.Utils.Lists;
 
+const sysfd = @import("../../../../utils/sysfd.zig");
+
 const VM = luau.VM;
 
 const TAG_NET_HTTP_SERVER = Zune.Tags.get("NET_HTTP_SERVER").?;
@@ -117,7 +119,7 @@ fn __dtor(L: *VM.lua.State, self: *Self) void {
 
 pub fn emitError(
     self: *Self,
-    comptime scope: @Type(.enum_literal),
+    comptime scope: @EnumLiteral(),
     err: anytype,
 ) void {
     if (!self.callbacks.@"error".hasRef())
@@ -460,6 +462,14 @@ pub fn lua_serve(L: *VM.lua.State) !i32 {
         );
 
         context.server = .init(.{
+            .rng = blk: {
+                const Rng = struct {
+                    var src: std.Random.IoSource = .{ .io = undefined };
+                };
+                Rng.src.io = Zune.io();
+                break :blk Rng.src.interface();
+            },
+            .now = std.Io.Clock.now(.real, Zune.io()),
             .auth = &context.keypair,
         });
 
@@ -505,14 +515,14 @@ pub fn lua_serve(L: *VM.lua.State) !i32 {
 
     const address_str = serve_info.address orelse "127.0.0.1";
 
-    var address = try std.net.Address.parseIp4(address_str, serve_info.port);
+    var address = try std.Io.net.IpAddress.parseIp4(address_str, serve_info.port);
 
     const socket = try @import("../../lib.zig").createSocket(
         std.posix.AF.INET,
         std.posix.SOCK.STREAM | std.posix.SOCK.CLOEXEC | std.posix.SOCK.NONBLOCK,
         std.posix.IPPROTO.TCP,
     );
-    errdefer std.posix.close(socket);
+    errdefer sysfd.closeSocket(socket);
 
     if (serve_info.reuse_address orelse false) {
         try std.posix.setsockopt(
@@ -521,7 +531,7 @@ pub fn lua_serve(L: *VM.lua.State) !i32 {
             std.posix.SO.REUSEADDR,
             &std.mem.toBytes(@as(c_int, 1)),
         );
-        if (@hasDecl(std.posix.SO, "REUSEPORT") and address.any.family != std.posix.AF.UNIX) {
+        if (@hasDecl(std.posix.SO, "REUSEPORT")) {
             try std.posix.setsockopt(
                 socket,
                 std.posix.SOL.SOCKET,
@@ -530,10 +540,8 @@ pub fn lua_serve(L: *VM.lua.State) !i32 {
             );
         }
     }
-    var socklen = address.getOsSockLen();
-    try std.posix.bind(socket, &address.any, socklen);
-    try std.posix.listen(socket, serve_info.backlog orelse 128);
-    try std.posix.getsockname(socket, &address.any, &socklen);
+    try sysfd.bindIp(socket, address);
+    try sysfd.listen(socket, serve_info.backlog orelse 128);
 
     const final_port = address.getPort();
 

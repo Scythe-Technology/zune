@@ -6,7 +6,7 @@ const Commands = @import("commands/lib.zig");
 
 const CommandMap = Commands.CommandMap;
 
-pub fn start(args: [][:0]u8) !void {
+pub fn start(args: []const [:0]const u8) !void {
     if (args.len < 2) {
         const command = comptime CommandMap.get("help") orelse unreachable;
         return command.execute(Zune.DEFAULT_ALLOCATOR, &.{});
@@ -15,8 +15,7 @@ pub fn start(args: [][:0]u8) !void {
     if (CommandMap.get(args[1])) |command|
         return command.execute(Zune.DEFAULT_ALLOCATOR, args[2..]);
 
-    std.debug.print("unknown command, try 'help' or '-h'\n", .{});
-    std.process.exit(1);
+    Zune.quitMsg("<red>error<clear>: unknown command, try 'help' or '-h'\n", .{});
 }
 
 test {

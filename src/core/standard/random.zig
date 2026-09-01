@@ -108,7 +108,8 @@ const LuaRandom = struct {
 
 fn defaultSeed(L: *VM.lua.State) u64 {
     var default_seed: u64 = @intFromPtr(L);
-    default_seed ^= @as(u64, @bitCast(std.time.timestamp()));
+    const ns = std.Io.Clock.now(.real, Zune.io()).nanoseconds;
+    default_seed ^= @as(u64, @truncate(@as(u96, @bitCast(ns))));
     default_seed ^= @intFromFloat(VM.lperf.clock());
     return default_seed;
 }

@@ -66,7 +66,7 @@ fn encodeValue(L: *VM.lua.State, allocator: std.mem.Allocator, tracked: *std.Aut
                 }
                 return yaml.Yaml.Value{ .list = list };
             } else {
-                var map = std.StringArrayHashMapUnmanaged(yaml.Yaml.Value){};
+                var map = std.array_hash_map.String(yaml.Yaml.Value){};
                 errdefer map.deinit(allocator);
                 while (i >= 0) : (i = L.rawiter(-1, i)) {
                     switch (L.typeOf(-2)) {

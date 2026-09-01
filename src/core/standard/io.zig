@@ -282,7 +282,7 @@ const Stream = struct {
 
 const BufferSink = struct {
     alloc: std.mem.Allocator,
-    buf: std.ArrayListUnmanaged(u8),
+    buf: std.ArrayList(u8),
     limit: u32 = mem.MAX_LUAU_SIZE,
     closed: bool = false,
 
@@ -553,7 +553,7 @@ pub fn lua_createBufferSink(L: *VM.lua.State) !i32 {
     if (opts.size > opts.limit)
         return L.Zerror("size cannot be larger than limit");
 
-    const array_list: std.ArrayListUnmanaged(u8) = if (opts.size > 0) try .initCapacity(allocator, opts.size) else .empty;
+    const array_list: std.ArrayList(u8) = if (opts.size > 0) try .initCapacity(allocator, opts.size) else .empty;
 
     const self = try L.newuserdatataggedwithmetatable(BufferSink, TAG_IO_BUFFERSINK);
 
@@ -618,9 +618,9 @@ pub fn loadLib(L: *VM.lua.State) !void {
     }
     try L.createtable(0, 15);
 
-    const stdin = std.fs.File.stdin();
-    const stdout = std.fs.File.stdout();
-    const stderr = std.fs.File.stderr();
+    const stdin = std.Io.File.stdin();
+    const stdout = std.Io.File.stdout();
+    const stderr = std.Io.File.stderr();
 
     // StdIn
     const stdin_ud = File.push(L, stdin, .Tty, .readable(.none)) catch |err| std.debug.panic("{}", .{err});

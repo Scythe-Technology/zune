@@ -57,7 +57,7 @@ pub const LuaDatetime = struct {
         const allocator = Scheduler.fromState(L).allocator;
 
         const datetime = self.datetime;
-        var tz = try time.Timezone.tzLocal(allocator);
+        var tz = try time.Timezone.tzLocal(Zune.io(), allocator);
         defer tz.deinit();
         const date = if (datetime.isNaive())
             try datetime.tzLocalize(.{ .tz = &time.Timezone.UTC })
@@ -103,7 +103,7 @@ pub const LuaDatetime = struct {
 
         const datetime = self.datetime;
         const format_str = L.Lcheckstring(2);
-        var tz = try time.Timezone.tzLocal(allocator);
+        var tz = try time.Timezone.tzLocal(Zune.io(), allocator);
         defer tz.deinit();
         const date = if (datetime.isNaive())
             try datetime.tzLocalize(.{ .tz = &time.Timezone.UTC })
@@ -176,7 +176,7 @@ pub const LuaDatetime = struct {
 fn lua_now(L: *VM.lua.State) !i32 {
     const self = try L.newuserdatataggedwithmetatable(LuaDatetime, TAG_DATETIME);
     self.* = .{
-        .datetime = try time.Datetime.now(null),
+        .datetime = try time.Datetime.now(Zune.io(), null),
         .timezone = null,
     };
     return 1;
@@ -241,7 +241,7 @@ fn lua_fromLocalTime(L: *VM.lua.State) !i32 {
     const allocator = Scheduler.fromState(L).allocator;
 
     const self = try L.newuserdatataggedwithmetatable(LuaDatetime, TAG_DATETIME);
-    self.timezone = try time.Timezone.tzLocal(allocator);
+    self.timezone = try time.Timezone.tzLocal(Zune.io(), allocator);
     errdefer {
         self.timezone.?.deinit();
         self.timezone = null;
@@ -281,49 +281,27 @@ fn lua_parse(L: *VM.lua.State) !i32 {
 }
 
 fn lua_instant_now(L: *VM.lua.State) !i32 {
-    const now = try std.time.Instant.now();
+    const now_ts = std.Io.Clock.now(.awake, Zune.io());
     const bytes = try L.newbuffer(12);
-    switch (comptime builtin.os.tag) {
-        .windows => {
-            const qpc = now.timestamp;
-            const qpf = std.os.windows.QueryPerformanceFrequency();
-
-            // 10Mhz (1 qpc tick every 100ns) is a common enough QPF value that we can optimize on it.
-            // https://github.com/microsoft/STL/blob/785143a0c73f030238ef618890fd4d6ae2b3a3a0/stl/inc/chrono#L694-L701
-            const common_qpf = 10_000_000;
-            if (qpf == common_qpf) {
-                const ns = qpc * (std.time.ns_per_s / common_qpf);
-                const float_bytes: [8]u8 = @bitCast(@as(f64, @floatFromInt(ns / std.time.ns_per_s)));
-                @memcpy(bytes[0..8], &float_bytes);
-                const int_bytes: [4]u8 = @bitCast(@as(u32, @intCast(ns % std.time.ns_per_s)));
-                @memcpy(bytes[8..12], &int_bytes);
-            } else {
-                const scale = @as(u64, std.time.ns_per_s << 32) / @as(u32, @intCast(qpf));
-                const since = @as(u96, qpc) * scale;
-                const result = since >> 32;
-                const float_bytes: [8]u8 = @bitCast(@as(f64, @floatFromInt(result / std.time.ns_per_s)));
-                @memcpy(bytes[0..8], &float_bytes);
-                const int_bytes: [4]u8 = @bitCast(@as(u32, @intCast(result % std.time.ns_per_s)));
-                @memcpy(bytes[8..12], &int_bytes);
-            }
-        },
-        else => {
-            const float_bytes: [8]u8 = @bitCast(@as(f64, @floatFromInt(now.timestamp.sec)));
-            @memcpy(bytes[0..8], &float_bytes);
-            const int_bytes: [4]u8 = @bitCast(@as(u32, @intCast(now.timestamp.nsec)));
-            @memcpy(bytes[8..12], &int_bytes);
-        },
-    }
+    const ns = now_ts.nanoseconds;
+    const sec: i64 = @intCast(@divTrunc(ns, std.time.ns_per_s));
+    const nsec: u32 = @intCast(@mod(ns, std.time.ns_per_s));
+    const float_bytes: [8]u8 = @bitCast(@as(f64, @floatFromInt(sec)));
+    @memcpy(bytes[0..8], &float_bytes);
+    const int_bytes: [4]u8 = @bitCast(nsec);
+    @memcpy(bytes[8..12], &int_bytes);
     return 1;
 }
 
 fn lua_timestamp(L: *VM.lua.State) !i32 {
-    L.pushnumber(@floatFromInt(std.time.timestamp()));
+    const ns = std.Io.Clock.now(.real, Zune.io()).nanoseconds;
+    L.pushnumber(@floatFromInt(@divTrunc(ns, std.time.ns_per_s)));
     return 1;
 }
 
 fn lua_timestampMillis(L: *VM.lua.State) !i32 {
-    L.pushnumber(@floatFromInt(std.time.milliTimestamp()));
+    const ns = std.Io.Clock.now(.real, Zune.io()).nanoseconds;
+    L.pushnumber(@floatFromInt(@divTrunc(ns, std.time.ns_per_ms)));
     return 1;
 }
 

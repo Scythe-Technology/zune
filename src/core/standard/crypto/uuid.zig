@@ -1,6 +1,8 @@
 const std = @import("std");
 const luau = @import("luau");
 
+const Zune = @import("zune");
+
 const VM = luau.VM;
 
 const UUID = u128;
@@ -17,8 +19,16 @@ fn format(uuid: UUID, buf: []u8) void {
     }) catch unreachable;
 }
 
+fn csprng() std.Random {
+    const S = struct {
+        var src: std.Random.IoSource = .{ .io = undefined };
+    };
+    S.src.io = Zune.io();
+    return S.src.interface();
+}
+
 pub fn lua_v4(L: *VM.lua.State) !i32 {
-    var uuid: u128 = std.crypto.random.int(UUID);
+    var uuid: u128 = csprng().int(UUID);
 
     uuid &= 0xFFFFFFFFFFFFFF3FFF0FFFFFFFFFFFFF;
     uuid |= 0x00000000000000800040000000000000;
@@ -33,9 +43,11 @@ pub fn lua_v4(L: *VM.lua.State) !i32 {
 }
 
 pub fn lua_v7(L: *VM.lua.State) !i32 {
-    const ms = @as(u48, @truncate(@as(u64, @intCast(std.time.milliTimestamp())) & 0xFFFFFFFFFFFF));
+    const io = Zune.io();
+    const ns = std.Io.Clock.now(.real, io).nanoseconds;
+    const ms = @as(u48, @truncate(@as(u64, @intCast(@divTrunc(ns, std.time.ns_per_ms))) & 0xFFFFFFFFFFFF));
 
-    var uuid: UUID = @as(UUID, @intCast(std.crypto.random.int(u80))) << 48;
+    var uuid: UUID = @as(UUID, @intCast(csprng().int(u80))) << 48;
 
     uuid |= @as(UUID, @intCast(@byteSwap(ms)));
     uuid &= 0xFFFFFFFFFFFFFF3FFF0FFFFFFFFFFFFF;

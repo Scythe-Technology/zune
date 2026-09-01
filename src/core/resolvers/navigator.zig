@@ -367,7 +367,7 @@ fn navigateTestError(allocator: std.mem.Allocator, context: anytype, from: []con
 
 test "empty context" {
     const allocator = std.testing.allocator;
-    const buf = try allocator.alloc(u8, (std.fs.max_path_bytes * 4) + 32);
+    const buf = try allocator.alloc(u8, (std.Io.Dir.max_path_bytes * 4) + 32);
     defer allocator.free(buf);
     PATH_ALLOCATOR = .init(buf);
     const EmptyContext = struct {
@@ -407,7 +407,7 @@ test "empty context" {
 
 test "home context" {
     const allocator = std.testing.allocator;
-    const buf = try allocator.alloc(u8, (std.fs.max_path_bytes * 4) + 32);
+    const buf = try allocator.alloc(u8, (std.Io.Dir.max_path_bytes * 4) + 32);
     defer allocator.free(buf);
     PATH_ALLOCATOR = .init(buf);
     const HomeContext = struct {
@@ -459,7 +459,7 @@ test "home context" {
 
 test "broken config" {
     const allocator = std.testing.allocator;
-    const buf = try allocator.alloc(u8, (std.fs.max_path_bytes * 4) + 32);
+    const buf = try allocator.alloc(u8, (std.Io.Dir.max_path_bytes * 4) + 32);
     defer allocator.free(buf);
     PATH_ALLOCATOR = .init(buf);
     const BrokenConfig = struct {
@@ -481,7 +481,7 @@ test "broken config" {
 
 test "config tree" {
     const allocator = std.testing.allocator;
-    const buf = try allocator.alloc(u8, (std.fs.max_path_bytes * 4) + 32);
+    const buf = try allocator.alloc(u8, (std.Io.Dir.max_path_bytes * 4) + 32);
     defer allocator.free(buf);
     PATH_ALLOCATOR = .init(buf);
     const ConfigTree = std.StaticStringMap([:0]const u8).initComptime(.{

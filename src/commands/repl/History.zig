@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const Zune = @import("zune");
+
 const History = @This();
 
 allocator: std.mem.Allocator,
@@ -13,9 +15,9 @@ pub const MAX_HISTORY_SIZE: u16 = 200;
 
 pub fn init(allocator: std.mem.Allocator, comptime location: []const u8) !History {
     var file_path: ?[]const u8 = null;
-    if (std.process.getEnvVarOwned(allocator, "HOME") catch null) |path| {
+    if (Zune.STATE.ENV_MAP.get("HOME")) |path| {
         file_path = try std.fs.path.resolve(allocator, &.{ path, location });
-    } else if (std.process.getEnvVarOwned(allocator, "USERPROFILE") catch null) |path| {
+    } else if (Zune.STATE.ENV_MAP.get("USERPROFILE")) |path| {
         file_path = try std.fs.path.resolve(allocator, &.{ path, location });
     }
     var history_data: std.ArrayList([]const u8) = .empty;
@@ -23,7 +25,7 @@ pub fn init(allocator: std.mem.Allocator, comptime location: []const u8) !Histor
     errdefer for (history_data.items) |data| allocator.free(data);
     if (file_path) |path| {
         errdefer allocator.free(path);
-        const file = std.fs.openFileAbsolute(path, .{}) catch |err| {
+        const file = std.Io.Dir.openFileAbsolute(Zune.io(), path, .{}) catch |err| {
             if (err == error.FileNotFound) {
                 return .{
                     .allocator = allocator,
@@ -33,8 +35,9 @@ pub fn init(allocator: std.mem.Allocator, comptime location: []const u8) !Histor
                 };
             } else return err;
         };
+        defer file.close(Zune.io());
         var buffer: [1024]u8 = undefined;
-        var reader = file.reader(&buffer);
+        var reader = file.reader(Zune.io(), &buffer);
 
         var allocating: std.Io.Writer.Allocating = .init(allocator);
         defer allocating.deinit();
@@ -145,16 +148,16 @@ pub fn deinit(self: *History) void {
 
         const location = std.fs.path.dirname(path) orelse return;
 
-        std.fs.cwd().makePath(location) catch |err| {
+        std.Io.Dir.cwd().createDirPath(Zune.io(), location) catch |err| {
             std.debug.print("MkDirError: {}\n", .{err});
             return;
         };
 
-        const history_file = std.fs.createFileAbsolute(path, .{}) catch return;
-        defer history_file.close();
+        const history_file = std.Io.Dir.createFileAbsolute(Zune.io(), path, .{}) catch return;
+        defer history_file.close(Zune.io());
 
         var buffer: [1024]u8 = undefined;
-        var file_writer = history_file.writer(&buffer);
+        var file_writer = history_file.writer(Zune.io(), &buffer);
         const writer = &file_writer.interface;
         for (self.list.items) |data| {
             writer.writeAll(data) catch break;

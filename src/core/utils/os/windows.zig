@@ -8,7 +8,7 @@ const unicode = std.unicode;
 const process = std.process;
 const windows = std.os.windows;
 
-const File = std.fs.File;
+const File = std.Io.File;
 const Allocator = std.mem.Allocator;
 const ChildProcess = std.process.Child;
 
@@ -268,12 +268,12 @@ pub fn spawnWindows(self: *ChildProcess) ChildProcess.SpawnError!void {
         var cmd_line_cache = WindowsCommandLineCache.init(self.allocator, self.argv);
         defer cmd_line_cache.deinit();
 
-        var app_buf: std.ArrayListUnmanaged(u16) = .empty;
+        var app_buf: std.ArrayList(u16) = .empty;
         defer app_buf.deinit(self.allocator);
 
         try app_buf.appendSlice(self.allocator, app_name_w);
 
-        var dir_buf: std.ArrayListUnmanaged(u16) = .empty;
+        var dir_buf: std.ArrayList(u16) = .empty;
         defer dir_buf.deinit(self.allocator);
 
         if (cwd_path_w.len > 0) {
@@ -369,8 +369,8 @@ pub fn spawnWindows(self: *ChildProcess) ChildProcess.SpawnError!void {
 /// Note: If the dir is the cwd, dir_buf should be empty (len = 0).
 fn windowsCreateProcessPathExt(
     allocator: mem.Allocator,
-    dir_buf: *std.ArrayListUnmanaged(u16),
-    app_buf: *std.ArrayListUnmanaged(u16),
+    dir_buf: *std.ArrayList(u16),
+    app_buf: *std.ArrayList(u16),
     pathext: [:0]const u16,
     cmd_line_cache: *WindowsCommandLineCache,
     envp_ptr: ?[*]u16,
@@ -845,7 +845,7 @@ const WindowsCommandLineCache = struct {
 /// Returns the absolute path of `cmd.exe` within the Windows system directory.
 /// The caller owns the returned slice.
 fn windowsCmdExePath(allocator: mem.Allocator) error{ OutOfMemory, Unexpected }![:0]u16 {
-    var buf = try std.ArrayListUnmanaged(u16).initCapacity(allocator, 128);
+    var buf = try std.ArrayList(u16).initCapacity(allocator, 128);
     errdefer buf.deinit(allocator);
     while (true) {
         const unused_slice = buf.unusedCapacitySlice();

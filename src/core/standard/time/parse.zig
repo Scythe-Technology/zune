@@ -2,6 +2,8 @@ const std = @import("std");
 const luau = @import("luau");
 const time = @import("datetime");
 
+const Zune = @import("zune");
+
 const LuaDatetime = @import("lib.zig").LuaDatetime;
 
 const Month = enum {
@@ -83,7 +85,7 @@ pub fn parseModified(self: *LuaDatetime, allocator: std.mem.Allocator, timestrin
         else => {
             if (tz.len != 3)
                 return error.InvalidFormat;
-            self.timezone = try time.Timezone.fromTzdata(tz, allocator);
+            self.timezone = try time.Timezone.fromTzdata(Zune.io(), tz, allocator);
         },
     }
     errdefer if (self.timezone) |*t| {
@@ -149,7 +151,7 @@ pub fn parseModifiedShort(self: *LuaDatetime, allocator: std.mem.Allocator, time
         else => {
             if (tz.len != 3)
                 return error.InvalidFormat;
-            self.timezone = try time.Timezone.fromTzdata(tz, allocator);
+            self.timezone = try time.Timezone.fromTzdata(Zune.io(), tz, allocator);
         },
     }
     errdefer if (self.timezone) |*t| {
@@ -168,7 +170,7 @@ pub fn parseModifiedShort(self: *LuaDatetime, allocator: std.mem.Allocator, time
 }
 
 pub fn parse(self: *LuaDatetime, allocator: std.mem.Allocator, str: []const u8) !void {
-    const trimmed = std.mem.trimLeft(u8, std.mem.trimRight(u8, str, " "), " ");
+    const trimmed = std.mem.trimStart(u8, std.mem.trimEnd(u8, str, " "), " ");
     if ((std.mem.indexOfScalar(u8, trimmed, '-') orelse 9) > 8) {
         if (str.len < 29)
             return parseModifiedShort(self, allocator, trimmed);

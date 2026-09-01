@@ -122,8 +122,8 @@ pub const Transporter = struct {
     outgoing: Lists.DoublyLinkedList = .{},
     incoming_queue: Lists.DoublyLinkedList = .{},
     outgoing_queue: Lists.DoublyLinkedList = .{},
-    incoming_mutex: std.Thread.Mutex = .{},
-    outgoing_mutex: std.Thread.Mutex = .{},
+    incoming_mutex: std.Io.Mutex = .init,
+    outgoing_mutex: std.Io.Mutex = .init,
 
     pub const MessageNode = struct {
         node: Lists.DoublyLinkedList.Node = .{},
@@ -206,7 +206,7 @@ pub const Runtime = struct {
     L: *VM.lua.State,
     scheduler: Scheduler,
     transporter: Transporter,
-    access_mutex: std.Thread.Mutex = .{},
+    access_mutex: std.Io.Mutex = .init,
     thread: ?std.Thread = null,
     join_queue: Lists.DoublyLinkedList = .{},
     status: std.atomic.Value(enum(u8) { ready, running, dead }) align(std.atomic.cache_line) = .init(.ready),
@@ -230,8 +230,8 @@ pub const Runtime = struct {
             Zune.Runtime.Engine.runAsync(ML, &self.scheduler, .{ .cleanUp = false }) catch {};
         }
 
-        self.access_mutex.lock();
-        defer self.access_mutex.unlock();
+        self.access_mutex.lockUncancelable(Zune.io());
+        defer self.access_mutex.unlock(Zune.io());
 
         var node = self.join_queue.first;
         while (node) |n| {
@@ -276,7 +276,7 @@ const LuaThread = struct {
 
         const send_count = L.gettop() - 1;
 
-        var values: std.ArrayListUnmanaged(LuaValue) = if (send_count > 0) try .initCapacity(allocator, 1) else .empty;
+        var values: std.ArrayList(LuaValue) = if (send_count > 0) try .initCapacity(allocator, 1) else .empty;
         defer values.deinit(allocator);
         errdefer for (values.items) |value| value.deinit(allocator);
         if (send_count > 0) {
@@ -284,8 +284,8 @@ const LuaThread = struct {
                 return error.TooManyValues;
             var err_type: VM.lua.Type = .None;
             for (2..send_count + 2) |i| {
-                var map = std.AutoArrayHashMap(usize, bool).init(allocator);
-                defer map.deinit();
+                var map: std.AutoArrayHashMapUnmanaged(usize, bool) = .empty;
+                defer map.deinit(allocator);
                 const value = storevalue(L, allocator, @intCast(i), &err_type, &map) catch |err| switch (err) {
                     error.UnsupportedType => return L.Zerrorf("unsupported lua type for sending (got {s})", .{VM.lapi.typename(err_type)}),
                     else => return err,
@@ -308,8 +308,8 @@ const LuaThread = struct {
             const port = &runtime.transporter.outgoing;
             const sync_port = &runtime.transporter.outgoing_queue;
 
-            runtime.transporter.outgoing_mutex.lock();
-            defer runtime.transporter.outgoing_mutex.unlock();
+            runtime.transporter.outgoing_mutex.lockUncancelable(Zune.io());
+            defer runtime.transporter.outgoing_mutex.unlock(Zune.io());
 
             if (sync_port.popFirst()) |n| {
                 const s = Sync.from(n);
@@ -329,8 +329,8 @@ const LuaThread = struct {
         const port = &runtime.transporter.incoming;
         const sync_port = &runtime.transporter.incoming_queue;
 
-        runtime.transporter.incoming_mutex.lock();
-        defer runtime.transporter.incoming_mutex.unlock();
+        runtime.transporter.incoming_mutex.lockUncancelable(Zune.io());
+        defer runtime.transporter.incoming_mutex.unlock(Zune.io());
         if (try runtime.transporter.pushAndConsumeMessage(L, port)) |amt| {
             return amt;
         } else {
@@ -351,8 +351,8 @@ const LuaThread = struct {
 
     pub fn lua_join(self: *LuaThread, L: *VM.lua.State) !i32 {
         const runtime = self.runtime;
-        runtime.access_mutex.lock();
-        defer runtime.access_mutex.unlock();
+        runtime.access_mutex.lockUncancelable(Zune.io());
+        defer runtime.access_mutex.unlock(Zune.io());
         switch (runtime.status.load(.acquire)) {
             .ready, .dead => return 0,
             .running => {},
@@ -391,13 +391,13 @@ const LuaThread = struct {
     pub fn __dtor(L: *VM.lua.State, self: *LuaThread) void {
         _ = L;
         const runtime = self.runtime;
-        runtime.access_mutex.lock();
+        runtime.access_mutex.lockUncancelable(Zune.io());
         if (runtime.status.load(.acquire) == .running) {
-            defer runtime.access_mutex.unlock();
+            defer runtime.access_mutex.unlock(Zune.io());
             runtime.owner = .thread; // TODO: maybe atomic owner?
             return;
         }
-        runtime.access_mutex.unlock();
+        runtime.access_mutex.unlock(Zune.io());
         THREADS.remove(&runtime.node);
         if (runtime.thread) |t|
             t.join();
@@ -405,7 +405,7 @@ const LuaThread = struct {
     }
 };
 
-fn storevalue(L: *VM.lua.State, allocator: std.mem.Allocator, idx: i32, out_type: ?*VM.lua.Type, map: *std.AutoArrayHashMap(usize, bool)) !LuaValue {
+fn storevalue(L: *VM.lua.State, allocator: std.mem.Allocator, idx: i32, out_type: ?*VM.lua.Type, map: *std.AutoArrayHashMapUnmanaged(usize, bool)) !LuaValue {
     switch (L.typeOf(idx)) {
         .Nil => return .nil,
         .Boolean => return .{ .boolean = L.toboolean(idx) },
@@ -422,12 +422,12 @@ fn storevalue(L: *VM.lua.State, allocator: std.mem.Allocator, idx: i32, out_type
             const ptr = @intFromPtr(L.topointer(idx).?);
             if (map.get(ptr)) |_|
                 return error.CyclicReference;
-            try map.put(ptr, true);
+            try map.put(allocator, ptr, true);
 
-            var keys: std.ArrayListUnmanaged(LuaValue) = .empty;
+            var keys: std.ArrayList(LuaValue) = .empty;
             errdefer keys.deinit(allocator);
             errdefer for (keys.items) |v| v.deinit(allocator);
-            var values: std.ArrayListUnmanaged(LuaValue) = .empty;
+            var values: std.ArrayList(LuaValue) = .empty;
             errdefer values.deinit(allocator);
             errdefer for (values.items) |v| v.deinit(allocator);
 
@@ -520,7 +520,7 @@ fn lua_fromModule(L: *VM.lua.State) !i32 {
 
     const moduleName = try L.Zcheckvalue([:0]const u8, 1, null);
 
-    const cwd = std.fs.cwd();
+    const cwd = std.Io.Dir.cwd();
 
     const script_path = try Zune.Resolvers.Require.resolveScriptPath(allocator, L, moduleName, cwd);
     defer allocator.free(script_path);
@@ -528,7 +528,7 @@ fn lua_fromModule(L: *VM.lua.State) !i32 {
     const module_src_buf: [:0]u8 = try allocator.allocSentinel(u8, 1 + script_path.len + Zune.Resolvers.File.LARGEST_EXTENSION.len, 0);
     defer allocator.free(module_src_buf);
 
-    std.debug.assert(script_path.len <= std.fs.max_path_bytes);
+    std.debug.assert(script_path.len <= std.Io.Dir.max_path_bytes);
 
     module_src_buf[0] = '@';
     @memcpy(module_src_buf[1..][0..script_path.len], script_path);
@@ -555,8 +555,11 @@ fn lua_fromModule(L: *VM.lua.State) !i32 {
 
     const file_content: []const u8 = switch (file.val) {
         .contents => |c| c,
-        .handle => |h| h.readToEndAlloc(allocator, std.math.maxInt(usize)) catch |err| {
-            return L.Zerrorf("could not read module file '{s}': {}", .{ module_src, err });
+        .handle => |h| blk: {
+            var reader = h.reader(Zune.io(), &.{});
+            break :blk reader.interface.allocRemaining(allocator, .unlimited) catch |err| {
+                return L.Zerrorf("could not read module file '{s}': {}", .{ module_src, err });
+            };
         },
     };
     defer if (file.val == .handle) allocator.free(file_content);
@@ -621,8 +624,8 @@ fn lua_selfReceive(L: *VM.lua.State) !i32 {
     const port = &runtime.transporter.outgoing;
     const sync_port = &runtime.transporter.outgoing_queue;
 
-    runtime.transporter.outgoing_mutex.lock();
-    defer runtime.transporter.outgoing_mutex.unlock();
+    runtime.transporter.outgoing_mutex.lockUncancelable(Zune.io());
+    defer runtime.transporter.outgoing_mutex.unlock(Zune.io());
     if (try runtime.transporter.pushAndConsumeMessage(L, port)) |amt| {
         return amt;
     } else {
@@ -653,7 +656,7 @@ fn lua_selfSend(L: *VM.lua.State) !i32 {
 
     const send_count = L.gettop();
 
-    var values: std.ArrayListUnmanaged(LuaValue) = if (send_count > 0) try .initCapacity(allocator, 1) else .empty;
+    var values: std.ArrayList(LuaValue) = if (send_count > 0) try .initCapacity(allocator, 1) else .empty;
     defer values.deinit(allocator);
     errdefer for (values.items) |value| value.deinit(allocator);
     if (send_count > 0) {
@@ -661,8 +664,8 @@ fn lua_selfSend(L: *VM.lua.State) !i32 {
             return error.TooManyValues;
         var err_type: VM.lua.Type = .None;
         for (1..send_count + 1) |i| {
-            var map = std.AutoArrayHashMap(usize, bool).init(allocator);
-            defer map.deinit();
+            var map: std.AutoArrayHashMapUnmanaged(usize, bool) = .empty;
+            defer map.deinit(allocator);
             const value = storevalue(L, allocator, @intCast(i), &err_type, &map) catch |err| switch (err) {
                 error.UnsupportedType => return L.Zerrorf("unsupported lua type for sending (got {s})", .{VM.lapi.typename(err_type)}),
                 else => return err,
@@ -685,8 +688,8 @@ fn lua_selfSend(L: *VM.lua.State) !i32 {
         const port = &runtime.transporter.incoming;
         const sync_port = &runtime.transporter.incoming_queue;
 
-        runtime.transporter.incoming_mutex.lock();
-        defer runtime.transporter.incoming_mutex.unlock();
+        runtime.transporter.incoming_mutex.lockUncancelable(Zune.io());
+        defer runtime.transporter.incoming_mutex.unlock(Zune.io());
 
         if (sync_port.popFirst()) |n| {
             const s = Sync.from(n);

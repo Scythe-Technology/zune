@@ -5,20 +5,19 @@ const posix = std.posix;
 const linux = std.os.linux;
 const windows = std.os.windows;
 
-const File = std.fs.File;
-const Mode = std.fs.File.Mode;
-const Kind = std.fs.File.Kind;
+const File = std.Io.File;
+const Kind = std.Io.File.Kind;
 
-const ChmodError = std.fs.File.ChmodError;
+const ChmodError = std.Io.File.ChmodError;
 
 pub const SetPermissionsError = ChmodError;
 
 /// Cross-platform representation of permissions on a file.
 /// The `readonly` and `setReadonly` are the only methods available across all platforms.
 /// Platform-specific functionality is available through the `inner` field.
-pub const Permissions = std.fs.File.Permissions;
-pub const PermissionsWindows = std.fs.File.PermissionsWindows;
-pub const PermissionsUnix = std.fs.File.PermissionsUnix;
+pub const Permissions = std.Io.File.Permissions;
+pub const PermissionsWindows = std.Io.File.PermissionsWindows;
+pub const PermissionsUnix = std.Io.File.PermissionsUnix;
 
 /// Sets permissions according to the provided `Permissions` struct.
 /// This method is *NOT* available on WASI
@@ -198,7 +197,7 @@ pub const MetadataLinux = struct {
 
     /// Returns a `Permissions` struct, representing the permissions on the file
     pub fn permissions(self: Self) Permissions {
-        return Permissions{ .inner = PermissionsUnix{ .mode = self.statx.mode } };
+        return .fromMode(self.statx.mode);
     }
 
     /// Returns the `Kind` of the file
@@ -232,7 +231,7 @@ pub const MetadataLinux = struct {
     /// Returns the time the file was created in nanoseconds since UTC 1970-01-01.
     /// Returns null if this is not supported by the filesystem, or on kernels before than version 4.11
     pub fn created(self: Self) ?i128 {
-        if (self.statx.mask & std.os.linux.STATX_BTIME == 0) return null;
+        if (!self.statx.mask.BTIME) return null;
         return @as(i128, self.statx.btime.sec) * std.time.ns_per_s + self.statx.btime.nsec;
     }
 };
@@ -325,7 +324,7 @@ pub const MetadataWindows = struct {
     }
 };
 
-pub const MetadataError = posix.FStatError;
+pub const MetadataError = File.StatError;
 
 pub fn metadata(self: File) MetadataError!Metadata {
     return .{
@@ -381,11 +380,11 @@ pub fn metadata(self: File) MetadataError!Metadata {
                     self.handle,
                     "",
                     linux.AT.EMPTY_PATH,
-                    linux.STATX_BASIC_STATS | linux.STATX_BTIME,
+                    @bitCast(@as(u32, @bitCast(linux.STATX.BASIC_STATS)) | @as(u32, @bitCast(linux.STATX{ .BTIME = true }))),
                     &stx,
                 );
 
-                switch (linux.E.init(rc)) {
+                switch (linux.errno(rc)) {
                     .SUCCESS => {},
                     .ACCES => unreachable,
                     .BADF => unreachable,

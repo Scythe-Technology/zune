@@ -59,7 +59,7 @@ pub fn printValue(
     idx: i32,
     depth: usize,
     asKey: bool,
-    map: ?*std.AutoArrayHashMap(usize, bool),
+    map: ?*std.AutoArrayHashMapUnmanaged(usize, bool),
     max_depth: usize,
 ) anyerror!void {
     const allocator = Scheduler.fromState(L).allocator;
@@ -107,7 +107,7 @@ pub fn printValue(
                             try Zune.debug.writerPrint(writer, "<dim><<recursive, table>><clear>", .{});
                         return;
                     }
-                    try tracked.put(ptr, true);
+                    try tracked.put(allocator, ptr, true);
                 }
                 defer _ = if (map) |tracked| tracked.orderedRemove(ptr);
                 if (Zune.STATE.FORMAT.TABLE_ADDRESS) {
@@ -188,8 +188,8 @@ pub fn writeIdx(allocator: std.mem.Allocator, L: *VM.lua.State, writer: *std.Io.
         },
         else => {
             if (!Zune.STATE.FORMAT.RECURSIVE_TABLE) {
-                var map = std.AutoArrayHashMap(usize, bool).init(allocator);
-                defer map.deinit();
+                var map: std.AutoArrayHashMapUnmanaged(usize, bool) = .empty;
+                defer map.deinit(allocator);
                 try printValue(L, writer, idx, 0, false, &map, max_depth);
             } else try printValue(L, writer, idx, 0, false, null, max_depth);
         },

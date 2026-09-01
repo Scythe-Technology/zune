@@ -8,16 +8,6 @@ const Status = enum {
     Skipped,
 };
 
-fn getenvOwned(alloc: std.mem.Allocator, key: []const u8) ?[]u8 {
-    const v = std.process.getEnvVarOwned(alloc, key) catch |err| {
-        if (err == error.EnvironmentVariableNotFound)
-            return null;
-        std.log.warn("Failed to get env var {s} due to err {}", .{ key, err });
-        return null;
-    };
-    return v;
-}
-
 const Printer = struct {
     out: *std.Io.Writer,
 
@@ -37,20 +27,21 @@ const Printer = struct {
     }
 };
 
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{ .stack_trace_frames = 12 }){};
+pub fn main(init: std.process.Init) !void {
+    var gpa: std.heap.DebugAllocator(.{ .stack_trace_frames = 12 }) = .init;
+    const io = std.testing.io;
     const alloc = gpa.allocator();
     const fail_first = blk: {
-        if (getenvOwned(alloc, "TEST_FAIL_FIRST")) |e| {
+        if (init.environ_map.get("TEST_FAIL_FIRST")) |e| {
             defer alloc.free(e);
             break :blk std.mem.eql(u8, e, "true");
         }
         break :blk false;
     };
 
-    const stderr = std.fs.File.stderr();
+    const stderr = std.Io.File.stderr();
     var buffer: [1024]u8 = undefined;
-    var err_writer = stderr.writer(&buffer);
+    var err_writer = stderr.writer(io, &buffer);
     const writer = &err_writer.interface;
     var printer: Printer = .{
         .out = writer,
@@ -63,6 +54,7 @@ pub fn main() !void {
 
     for (builtin.test_functions) |t| {
         std.testing.allocator_instance = .{};
+        std.testing.environ = init.minimal.environ;
         var status = Status.Passed;
 
         std.debug.print("{s}...\n", .{t.name});
@@ -87,7 +79,7 @@ pub fn main() !void {
                     failed += 1;
                     printer.status(.Failed, "[Error] \"{s}\": {s}\n", .{ t.name, @errorName(err) });
                     if (@errorReturnTrace()) |trace|
-                        std.debug.dumpStackTrace(trace.*);
+                        std.debug.dumpErrorReturnTrace(trace);
                     if (fail_first)
                         break;
                 },

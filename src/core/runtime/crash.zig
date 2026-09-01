@@ -105,15 +105,15 @@ fn waitForOtherThreadToFinishPanicking() void {
         if (builtin.single_threaded) unreachable;
 
         // Sleep forever without hammering the CPU
-        var futex = std.atomic.Value(u32).init(0);
-        while (true) std.Thread.Futex.wait(&futex, 0);
+        var futex: std.atomic.Value(u32) = .init(0);
+        while (true) Zune.io().futexWaitUncancelable(u32, &futex.raw, 0);
         unreachable;
     }
 }
 
 var panicking = std.atomic.Value(u8).init(0);
 threadlocal var panic_stage: usize = 0;
-fn handleSegfaultPosix(sig: i32, info: *const std.posix.siginfo_t, _: ?*anyopaque) callconv(.c) noreturn {
+fn handleSegfaultPosix(sig: std.posix.SIG, info: *const std.posix.siginfo_t, _: ?*anyopaque) callconv(.c) noreturn {
     // Reset to the default handler so that if a segfault happens in this handler it will crash
     // the process. Also when this handler returns, the original instruction will be repeated
     // and the resulting segfault will crash the process rather than continually dump stack traces.
@@ -124,7 +124,7 @@ fn handleSegfaultPosix(sig: i32, info: *const std.posix.siginfo_t, _: ?*anyopaqu
         .freebsd, .macos => @intFromPtr(info.addr),
         .netbsd => @intFromPtr(info.info.reason.fault.addr),
         .openbsd => @intFromPtr(info.data.fault.addr),
-        .solaris, .illumos => @intFromPtr(info.reason.fault.addr),
+        .illumos => @intFromPtr(info.reason.fault.addr),
         else => unreachable,
     };
 
@@ -135,11 +135,11 @@ fn handleSegfaultPosix(sig: i32, info: *const std.posix.siginfo_t, _: ?*anyopaqu
             _ = panicking.fetchAdd(1, .seq_cst);
 
             {
-                const stderr = std.debug.lockStderrWriter(&.{});
-                defer std.debug.unlockStderrWriter();
+                const stderr = std.debug.lockStderr(&.{});
+                defer std.debug.unlockStderr();
 
                 const case: SegfaultCase = switch (sig) {
-                    std.posix.SIG.SEGV => if (builtin.cpu.arch == .x86_64 and builtin.os.tag == .linux and code == 128) // SI_KERNEL
+                    .SEGV => if (builtin.cpu.arch == .x86_64 and builtin.os.tag == .linux and code == 128) // SI_KERNEL
                         // x86_64 doesn't have a full 64-bit virtual address space.
                         // Addresses outside of that address space are non-canonical
                         // and the CPU won't provide the faulting address to us.
@@ -150,20 +150,20 @@ fn handleSegfaultPosix(sig: i32, info: *const std.posix.siginfo_t, _: ?*anyopaqu
                         .GeneralProtection
                     else
                         .SegmentViolation,
-                    std.posix.SIG.ILL => .IllegalInstruction,
-                    std.posix.SIG.BUS => .BusError,
-                    std.posix.SIG.FPE => .FloatingPointException,
+                    .ILL => .IllegalInstruction,
+                    .BUS => .BusError,
+                    .FPE => .FloatingPointException,
                     else => unreachable,
                 };
 
-                dumpSegfaultInfo(case, addr, stderr) catch std.posix.abort();
+                dumpSegfaultInfo(case, addr, &stderr.file_writer.interface) catch std.process.abort();
             }
 
             waitForOtherThreadToFinishPanicking();
         },
         1 => {
             panic_stage = 2;
-            std.fs.File.stderr().writeAll("aborting due to recursive panic\n") catch {};
+            std.Io.File.stderr().writeStreamingAll(Zune.io(), "aborting due to recursive panic\n") catch {};
         },
         else => {},
     };
@@ -171,7 +171,7 @@ fn handleSegfaultPosix(sig: i32, info: *const std.posix.siginfo_t, _: ?*anyopaqu
     // We cannot allow the signal handler to return because when it runs the original instruction
     // again, the memory may be mapped and undefined behavior would occur rather than repeating
     // the segfault. So we simply abort here.
-    std.posix.abort();
+    std.process.abort();
 }
 
 fn handleSegfaultWindows(info: *std.os.windows.EXCEPTION_POINTERS) callconv(.winapi) c_long {
@@ -196,8 +196,8 @@ fn handleSegfaultWindows(info: *std.os.windows.EXCEPTION_POINTERS) callconv(.win
             _ = panicking.fetchAdd(1, .seq_cst);
 
             {
-                const stderr = std.debug.lockStderrWriter(&.{});
-                defer std.debug.unlockStderrWriter();
+                const stderr = std.debug.lockStderr(&.{});
+                defer std.debug.unlockStderr();
 
                 const addr: usize = switch (case) {
                     .UnalignedMemoryAccess => 0,
@@ -207,14 +207,14 @@ fn handleSegfaultWindows(info: *std.os.windows.EXCEPTION_POINTERS) callconv(.win
                     else => unreachable,
                 };
 
-                dumpSegfaultInfo(case, addr, stderr) catch std.posix.abort();
+                dumpSegfaultInfo(case, addr, &stderr.file_writer.interface) catch std.posix.abort();
             }
 
             waitForOtherThreadToFinishPanicking();
         },
         1 => {
             panic_stage = 2;
-            std.fs.File.stderr().writeAll("aborting due to recursive panic\n") catch {};
+            std.Io.File.stderr().writeStreamingAll(Zune.io(), "aborting due to recursive panic\n") catch {};
         },
         else => {},
     };

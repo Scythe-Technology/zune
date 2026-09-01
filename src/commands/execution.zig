@@ -17,14 +17,15 @@ const Terminal = @import("repl/Terminal.zig");
 
 const VM = luau.VM;
 
-fn getFile(allocator: std.mem.Allocator, comptime from: enum { Run, Test, Other }, dir: std.fs.Dir, input: []const u8) !struct { [:0]u8, []const u8 } {
+fn getFile(allocator: std.mem.Allocator, comptime from: enum { Run, Test, Other }, dir: std.Io.Dir, input: []const u8) !struct { [:0]u8, []const u8 } {
     var maybe_src: ?[:0]u8 = null;
     errdefer if (maybe_src) |s| allocator.free(s);
     var maybe_content: ?[]const u8 = null;
     errdefer if (maybe_content) |c| allocator.free(c);
 
     if (input.len == 1 and input[0] == '-') {
-        maybe_content = try std.fs.File.stdin().deprecatedReader().readAllAlloc(allocator, std.math.maxInt(usize));
+        var stdin_reader = std.Io.File.stdin().reader(Zune.io(), &.{});
+        maybe_content = try stdin_reader.interface.allocRemaining(allocator, .unlimited);
         maybe_src = try allocator.dupeZ(u8, "@STDIN");
     } else {
         const path = try File.resolve(allocator, Zune.STATE.ENV_MAP, switch (comptime from) {
@@ -33,7 +34,7 @@ fn getFile(allocator: std.mem.Allocator, comptime from: enum { Run, Test, Other 
             else => &.{input},
         });
         defer allocator.free(path);
-        if (dir.readFileAlloc(allocator, path, std.math.maxInt(usize)) catch null) |content| {
+        if (dir.readFileAlloc(Zune.io(), path, allocator, .unlimited) catch null) |content| {
             maybe_content = content;
             maybe_src = try std.mem.concatWithSentinel(allocator, u8, &.{ "@", path }, 0);
         } else {
@@ -41,7 +42,8 @@ fn getFile(allocator: std.mem.Allocator, comptime from: enum { Run, Test, Other 
                 error.RedundantFileExtension => return error.FileNotFound,
                 else => return err,
             } orelse return error.FileNotFound;
-            maybe_content = try result.val.handle.deprecatedReader().readAllAlloc(allocator, std.math.maxInt(usize));
+            var reader = result.val.handle.reader(Zune.io(), &.{});
+            maybe_content = try reader.interface.allocRemaining(allocator, .unlimited);
             maybe_src = try std.mem.concatWithSentinel(allocator, u8, &.{ "@", path, result.ext }, 0);
         }
     }
@@ -72,14 +74,12 @@ fn cmdRun(allocator: std.mem.Allocator, args: []const []const u8) !void {
     @branchHint(.likely);
     const run_args, const flags = splitArgs(args);
 
-    if (run_args.len < 1) {
-        Zune.debug.print("<red>usage<clear>: run [OPTIONS] <<luau file>>\n", .{});
-        std.process.exit(1);
-    }
+    if (run_args.len < 1)
+        Zune.quitMsg("<red>usage<clear>: run [OPTIONS] <<luau file>>\n", .{});
 
     Zune.STATE.RUN_MODE = .Run;
 
-    Zune.loadConfiguration(std.fs.cwd());
+    Zune.loadConfiguration(std.Io.Dir.cwd());
 
     var LOAD_FLAGS: Zune.Flags = .{};
     var PROFILER: ?u64 = null;
@@ -138,7 +138,7 @@ fn cmdRun(allocator: std.mem.Allocator, args: []const []const u8) !void {
         }
     };
 
-    const dir = std.fs.cwd();
+    const dir = std.Io.Dir.cwd();
 
     const file_src_path, const file_content = if (Zune.STATE.WORKSPACE.scripts.get(run_args[0])) |defined|
         getFile(allocator, .Other, dir, defined) catch |err| switch (err) {
@@ -182,7 +182,6 @@ fn cmdRun(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     Engine.loadModule(ML, file_src_path, file_content, null) catch |err| switch (err) {
         error.Syntax => Zune.quitMsg("<red>syntax error<clear>: {s}\n", .{ML.tostring(-1) orelse "unknown"}),
-        else => return err,
     };
 
     if (PROFILER) |freq|
@@ -197,12 +196,10 @@ fn cmdRun(allocator: std.mem.Allocator, args: []const []const u8) !void {
 fn cmdTest(allocator: std.mem.Allocator, args: []const []const u8) !void {
     const run_args, const flags = splitArgs(args);
 
-    if (run_args.len < 1) {
-        Zune.debug.print("<red>usage<clear>: test <<luau file>>\n", .{});
-        std.process.exit(1);
-    }
+    if (run_args.len < 1)
+        Zune.quitMsg("<red>usage<clear>: test <<luau file>>\n", .{});
 
-    Zune.loadConfiguration(std.fs.cwd());
+    Zune.loadConfiguration(std.Io.Dir.cwd());
 
     Zune.STATE.RUN_MODE = .Test;
 
@@ -256,7 +253,7 @@ fn cmdTest(allocator: std.mem.Allocator, args: []const []const u8) !void {
         }
     };
 
-    const dir = std.fs.cwd();
+    const dir = std.Io.Dir.cwd();
 
     const file_src_path, const file_content = if (Zune.STATE.WORKSPACE.scripts.get(run_args[0])) |defined|
         getFile(allocator, .Other, dir, defined) catch |err| switch (err) {
@@ -315,7 +312,6 @@ fn cmdTest(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     Engine.loadModule(ML, file_src_path, file_content, null) catch |err| switch (err) {
         error.Syntax => Zune.quitMsg("<red>syntax error<clear>: {s}\n", .{ML.tostring(-1) orelse "unknown"}),
-        else => return err,
     };
 
     const start = VM.lperf.clock();
@@ -334,7 +330,7 @@ fn cmdEval(allocator: std.mem.Allocator, args: []const []const u8) !void {
         Zune.quitMsg("<red>usage<clear>: eval <<luau>>\n", .{});
     }
 
-    Zune.loadConfiguration(std.fs.cwd());
+    Zune.loadConfiguration(std.Io.Dir.cwd());
 
     const file_content = args[0];
 
@@ -367,7 +363,6 @@ fn cmdEval(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     Engine.loadModule(ML, "@EVAL", file_content, null) catch |err| switch (err) {
         error.Syntax => Zune.quitMsg("<red>syntax error<clear>: {s}\n", .{ML.tostring(-1) orelse "unknown"}),
-        else => return err,
     };
 
     Engine.runAsync(ML, &scheduler, .{ .cleanUp = true }) catch std.process.exit(1);
@@ -390,7 +385,7 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     Zune.STATE.RUN_MODE = .Debug;
 
-    Zune.loadConfiguration(std.fs.cwd());
+    Zune.loadConfiguration(std.Io.Dir.cwd());
 
     var LOAD_FLAGS: Zune.Flags = .{};
     var ALWAYS_DEBUG = true;
@@ -441,7 +436,7 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
     Zune.STATE.LUAU_OPTIONS.CODEGEN = false;
     Zune.STATE.LUAU_OPTIONS.JIT_ENABLED = false;
 
-    const dir = std.fs.cwd();
+    const dir = std.Io.Dir.cwd();
     const module = run_args[0];
 
     const file_src_path, const file_content = getFile(allocator, .Other, dir, module) catch |err| switch (err) {
@@ -451,22 +446,24 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
     defer allocator.free(file_src_path);
     defer allocator.free(file_content);
 
-    const stdin = std.fs.File.stdin();
+    const stdin = std.Io.File.stdin();
     var reader_buffer: [128]u8 = undefined;
     if (IPC_PORT) |port| {
-        const address = try std.net.Address.parseIp4("127.0.0.1", port);
-        Debugger.COMM = .{
-            .stream = try std.net.tcpConnectToAddress(address),
-        };
-        try Debugger.COMM.stream.writeAll("zune/" ++ Zune.VERSION_STR ++ "\n");
-        try Debugger.COMM.stream.writeAll(std.fmt.comptimePrint("luau/{d}.{d}\n", .{ luau.LUAU_VERSION.major, luau.LUAU_VERSION.minor }));
+        const address = try std.Io.net.IpAddress.parseIp4("127.0.0.1", port);
+        const stream = try address.connect(Zune.io(), .{ .mode = .stream });
+        Debugger.COMM = .{ .stream = stream };
+        var write_buf: [128]u8 = undefined;
+        var stream_writer = stream.writer(Zune.io(), &write_buf);
+        try stream_writer.interface.writeAll("zune/" ++ Zune.VERSION_STR ++ "\n");
+        try stream_writer.interface.writeAll(std.fmt.comptimePrint("luau/{d}.{d}\n", .{ luau.LUAU_VERSION.major, luau.LUAU_VERSION.minor }));
+        try stream_writer.interface.flush();
     } else {
         Debugger.COMM = .{
-            .io = stdin.reader(&reader_buffer),
+            .io = stdin.reader(Zune.io(), &reader_buffer),
         };
     }
     defer switch (Debugger.COMM) {
-        .stream => |s| s.close(),
+        .stream => |s| s.close(Zune.io()),
         .io => {},
     };
 
@@ -522,7 +519,6 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
         Engine.loadModule(ML, file_src_path, file_content, null) catch |err| switch (err) {
             error.Syntax => Zune.quitMsg("<red>syntax error<clear>: {s}\n", .{ML.tostring(-1) orelse "unknown"}),
-            else => return err,
         };
 
         try Debugger.prompt(ML, .None, null);

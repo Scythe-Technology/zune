@@ -34,8 +34,8 @@ const cpu_endian = builtin.cpu.arch.endian();
 
 const Hash = std.crypto.hash.sha3.Sha3_256;
 
-threadlocal var TAGGED_FFI_POINTERS: std.StringArrayHashMapUnmanaged(bool) = undefined;
-threadlocal var CACHED_C_COMPILATON: std.StringHashMapUnmanaged(*CallableFunction) = undefined;
+threadlocal var TAGGED_FFI_POINTERS: std.array_hash_map.String(bool) = undefined;
+threadlocal var CACHED_C_COMPILATON: std.hash_map.StringHashMapUnmanaged(*CallableFunction) = undefined;
 
 pub threadlocal var CALLING_STATE: ?*VM.lua.State = null;
 
@@ -990,7 +990,7 @@ const LuaDataType = struct {
         array: struct { DataType, u32 },
         @"struct": struct {
             offsets: []usize,
-            fields_map: std.StringArrayHashMap(DataType),
+            fields_map: std.array_hash_map.String(DataType),
         },
     };
 
@@ -1258,15 +1258,16 @@ const LuaDataType = struct {
         .{ "array", lua_array },
     });
 
-    pub fn __dtor(_: *VM.lua.State, self: *LuaDataType) void {
+    pub fn __dtor(L: *VM.lua.State, self: *LuaDataType) void {
         switch (self.info) {
             .@"struct" => |*s| {
                 const fields_map = &s.fields_map;
-                const allocator = fields_map.allocator;
+                const allocator = Scheduler.fromState(L).allocator;
                 var iter = fields_map.iterator();
-                while (iter.next()) |entry|
+                while (iter.next()) |entry| {
                     allocator.free(entry.key_ptr.*);
-                fields_map.deinit();
+                }
+                fields_map.deinit(allocator);
                 allocator.free(s.offsets);
             },
             else => {},
@@ -1538,8 +1539,8 @@ fn lua_struct(L: *VM.lua.State) !i32 {
 
     const allocator = Scheduler.fromState(L).allocator;
 
-    var struct_map = std.StringArrayHashMap(DataType).init(allocator);
-    errdefer struct_map.deinit();
+    var struct_map: std.array_hash_map.String(DataType) = .empty;
+    errdefer struct_map.deinit(allocator);
     errdefer {
         var iter = struct_map.iterator();
         while (iter.next()) |entry|
@@ -1566,7 +1567,7 @@ fn lua_struct(L: *VM.lua.State) !i32 {
             {
                 const name_copy = try allocator.dupe(u8, name); // Zig owned string to prevent GC from Lua owned strings
                 errdefer allocator.free(name_copy);
-                try struct_map.put(name_copy, try toFFIType(L, -1));
+                try struct_map.put(allocator, name_copy, try toFFIType(L, -1));
             }
 
             L.pop(2);
@@ -1798,8 +1799,8 @@ fn lua_dlopen(L: *VM.lua.State) !i32 {
 
     try L.Zchecktype(2, .Table);
 
-    var func_map = std.StringArrayHashMap(FunctionSymbol).init(allocator);
-    defer func_map.deinit();
+    var func_map: std.array_hash_map.String(FunctionSymbol) = .empty;
+    defer func_map.deinit(allocator);
     defer {
         var iter = func_map.iterator();
         while (iter.next()) |entry| {
@@ -1820,7 +1821,7 @@ fn lua_dlopen(L: *VM.lua.State) !i32 {
 
             const name_copy = try allocator.dupe(u8, name); // Zig owned string to prevent GC from Lua owned strings
             errdefer allocator.free(name_copy);
-            try func_map.put(name_copy, symbol);
+            try func_map.put(allocator, name_copy, symbol);
         },
         else => return L.Zerrorf("external function name must be a string (got {s})", .{VM.lapi.typename(key)}),
     };

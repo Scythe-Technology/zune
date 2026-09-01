@@ -575,7 +575,7 @@ pub fn processResponse(
             }
             if (!written_headers.date) {
                 try writer.writeAll("Date: ");
-                try time.Datetime.nowUTC().toString("%:a, %d %:b %Y %H:%M:%S GMT", writer);
+                try time.Datetime.nowUTC(Zune.io()).toString("%:a, %d %:b %Y %H:%M:%S GMT", writer);
                 try writer.writeAll("\r\n");
             }
             if (!written_headers.server) {
@@ -611,7 +611,7 @@ pub fn processResponse(
             var writer: std.Io.Writer = .fixed(&buf);
 
             try writer.writeAll("Date: ");
-            try time.Datetime.nowUTC().toString("%:a, %d %:b %Y %H:%M:%S GMT", &writer);
+            try time.Datetime.nowUTC(Zune.io()).toString("%:a, %d %:b %Y %H:%M:%S GMT", &writer);
 
             const response = try std.fmt.allocPrint(allocator, "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n{s}\r\nServer: zune\r\nContent-Length: {d}\r\n\r\n{s}", .{ writer.buffered(), content.len, content });
             defer allocator.free(response);

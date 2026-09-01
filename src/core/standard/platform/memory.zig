@@ -15,7 +15,7 @@ pub fn getTotalSystemMemory() SystemMemoryError!u64 {
         .linux => {
             var info: std.os.linux.Sysinfo = undefined;
             const result: usize = std.os.linux.sysinfo(&info);
-            if (std.os.linux.E.init(result) != .SUCCESS) {
+            if (std.os.linux.errno(result) != .SUCCESS) {
                 return error.UnknownTotalSystemMemory;
             }
             return info.totalram * info.mem_unit;
@@ -81,7 +81,7 @@ pub fn getFreeMemory() SystemMemoryError!u64 {
         .linux => {
             var info: std.os.linux.Sysinfo = undefined;
             const result: usize = std.os.linux.sysinfo(&info);
-            if (std.os.linux.E.init(result) != .SUCCESS) {
+            if (std.os.linux.errno(result) != .SUCCESS) {
                 return error.UnknownFreeSystemMemory;
             }
             return info.freeram * info.mem_unit;

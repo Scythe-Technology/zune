@@ -14,7 +14,31 @@ pub const objects = @import("core/objects/lib.zig");
 
 const mimalloc = @import("mimalloc");
 
-pub const DEFAULT_ALLOCATOR = mimalloc.basic_allocator;
+var DEBUG_ALLOCATOR = switch (builtin.mode) {
+    .Debug => std.heap.DebugAllocator(.{}).init,
+    else => @as(void, undefined),
+};
+pub const DEFAULT_ALLOCATOR = switch (builtin.mode) {
+    .Debug => DEBUG_ALLOCATOR.allocator(),
+    else => mimalloc.basic_allocator,
+};
+
+const ThreadedIo = struct {
+    var backend: std.Io.Threaded = .init_single_threaded;
+    var upgraded: bool = false;
+
+    pub inline fn upgrade() void {
+        if (!upgraded) {
+            @branchHint(.unlikely);
+            backend = .init(DEFAULT_ALLOCATOR, .{});
+            upgraded = true;
+        }
+    }
+};
+
+pub fn io() std.Io {
+    return ThreadedIo.backend.io();
+}
 
 pub const options: std.Options = .{
     .enable_segfault_handler = builtin.mode == .Debug,
@@ -116,7 +140,7 @@ pub var FEATURES: struct {
 } = .{};
 
 pub const ZuneState = struct {
-    ENV_MAP: std.process.EnvMap = undefined,
+    ENV_MAP: std.process.Environ.Map = undefined,
     RUN_MODE: RunMode = .Run,
     CONFIG_CACHE: std.StringArrayHashMapUnmanaged(Resolvers.Config) = .empty,
     MAIN_THREAD_ID: ?std.Thread.Id = null,
@@ -152,10 +176,12 @@ pub const ZuneState = struct {
 
 pub var STATE: ZuneState = .{};
 
-pub fn init() !void {
+pub fn init(environ: std.process.Environ) !void {
     const allocator = DEFAULT_ALLOCATOR;
 
-    STATE.ENV_MAP = try std.process.getEnvMap(allocator);
+    ThreadedIo.upgrade();
+
+    STATE.ENV_MAP = try environ.createMap(allocator);
 
     if (!options.enable_segfault_handler) {
         @import("./core/runtime/crash.zig").init();
@@ -186,9 +212,10 @@ pub fn init() !void {
     }
 }
 
-pub fn loadConfiguration(dir: std.fs.Dir) void {
+pub fn loadConfiguration(dir: std.Io.Dir) void {
     const allocator = DEFAULT_ALLOCATOR;
-    const config_content = dir.readFileAlloc(allocator, "zune.toml", std.math.maxInt(usize)) catch |err| switch (err) {
+    const io_impl = io();
+    const config_content = dir.readFileAlloc(io_impl, "zune.toml", allocator, .unlimited) catch |err| switch (err) {
         error.FileNotFound => return,
         else => return std.debug.print("failed to read 'zune.toml': {}\n", .{err}),
     };
@@ -233,10 +260,10 @@ pub fn loadConfiguration(dir: std.fs.Dir) void {
     if (toml.checkTable(zune_config, "workspace")) |config| {
         if (toml.checkString(config, "cwd")) |path| {
             if (comptime builtin.target.os.tag != .wasi) {
-                const cwd = dir.openDir(path, .{}) catch |err| {
+                const cwd = dir.openDir(io_impl, path, .{}) catch |err| {
                     quitMsg("[zune.toml] Failed to open cwd (\"{s}\"): {}\n", .{ path, err });
                 };
-                cwd.setAsCwd() catch |err| {
+                std.process.setCurrentDir(io_impl, cwd) catch |err| {
                     quitMsg("[zune.toml] Failed to set cwd to (\"{s}\"): {}\n", .{ path, err });
                 };
             }
@@ -378,7 +405,7 @@ pub fn openZune(L: *VM.lua.State, args: []const []const u8, flags: Flags) !void 
     L.pop(1); // drop: _LIBS
 }
 
-pub fn main() !void {
+pub fn main(i: std.process.Init.Minimal) !void {
     switch (comptime builtin.os.tag) {
         .windows => {
             const handle = struct {
@@ -393,7 +420,7 @@ pub fn main() !void {
         },
         .linux, .macos => {
             const handle = struct {
-                fn handler(_: c_int) callconv(.c) void {
+                fn handler(_: std.posix.SIG) callconv(.c) void {
                     shutdown();
                 }
             }.handler;
@@ -406,11 +433,11 @@ pub fn main() !void {
         else => {},
     }
 
-    try init();
+    try init(i.environ);
 
     const allocator = DEFAULT_ALLOCATOR;
-    const args = try std.process.argsAlloc(allocator);
-    defer std.process.argsFree(allocator, args);
+    const args = try i.args.toSlice(allocator);
+    defer allocator.free(args);
 
     if (comptime Resolvers.Bundle.PlatformSupported()) {
         if (try Resolvers.Bundle.get(allocator)) |b| {
@@ -446,7 +473,6 @@ pub fn main() !void {
             switch (b.mode.compiled) {
                 .debug => Runtime.Engine.loadModule(ML, b.entry.name, b.entry.data, null) catch |err| switch (err) {
                     error.Syntax => unreachable, // should not happen
-                    else => return err,
                 },
                 .release => {
                     ML.load(b.entry.name, b.entry.data, 0) catch unreachable; // should not error

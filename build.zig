@@ -19,10 +19,10 @@ fn compileFile(b: *std.Build, exe: *std.Build.Step.Compile, file: []const u8, ou
     return embedded_compiler_run;
 }
 
-fn compressRecursive(b: *std.Build, exe: *std.Build.Step.Compile, step: *std.Build.Step, dependentStep: *std.Build.Step, path: []const u8) !void {
-    const dir = try std.fs.cwd().openDir(path, .{ .iterate = true });
+fn compressRecursive(b: *std.Build, io: std.Io, exe: *std.Build.Step.Compile, step: *std.Build.Step, dependentStep: *std.Build.Step, path: []const u8) !void {
+    const dir = try std.Io.Dir.cwd().openDir(io, path, .{ .iterate = true });
     var iter = dir.iterate();
-    while (try iter.next()) |entry| {
+    while (try iter.next(io)) |entry| {
         if (entry.kind == .file and entry.name.len > 2 and !std.mem.eql(u8, entry.name[entry.name.len - 3 ..], ".gz")) {
             const file_name = try std.fs.path.resolve(b.allocator, &[_][]const u8{ path, entry.name });
             defer b.allocator.free(file_name);
@@ -36,7 +36,7 @@ fn compressRecursive(b: *std.Build, exe: *std.Build.Step.Compile, step: *std.Bui
         } else if (entry.kind == .directory) {
             const dir_path = try std.fs.path.resolve(b.allocator, &[_][]const u8{ path, entry.name });
             defer b.allocator.free(dir_path);
-            try compressRecursive(b, exe, step, dependentStep, dir_path);
+            try compressRecursive(b, io, exe, step, dependentStep, dir_path);
         }
     }
 }
@@ -48,14 +48,6 @@ fn getPackageVersion(b: *std.Build) !std.SemanticVersion {
     if (version.len < 3)
         @panic("Version length too short");
     return std.SemanticVersion.parse(version[1 .. version.len - 1]);
-}
-
-fn buildLegacyCompress(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) !void {
-    _ = b.addModule("legacy-compress", .{
-        .root_source_file = b.path("legacy/compress.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
 }
 
 fn prebuild(b: *std.Build, step: *std.Build.Step) !void {
@@ -79,7 +71,7 @@ fn prebuild(b: *std.Build, step: *std.Build.Step) !void {
             .use_llvm = true,
         });
 
-        bytecode_builder.root_module.addImport("luau", dep_luau.module("root"));
+        bytecode_builder.root_module.addImport("luau", dep_luau.module("luau"));
 
         const testing_framework_run = compileFile(
             b,
@@ -101,13 +93,7 @@ fn prebuild(b: *std.Build, step: *std.Build.Step) !void {
             }),
             .use_llvm = true,
         });
-        embedded_compressor.root_module.addImport("lcompress", b.createModule(.{
-            .root_source_file = b.path("legacy/compress.zig"),
-            .target = build_native_target,
-            .optimize = .Debug,
-        }));
-
-        try compressRecursive(b, embedded_compressor, compress, compile, "src/types/");
+        try compressRecursive(b, b.graph.io, embedded_compressor, compress, compile, "src/types/");
     }
 
     step.dependOn(compile);
@@ -152,7 +138,12 @@ pub fn build(b: *std.Build) !void {
     const dep_brotli = b.dependency("brotli", .{ .target = target, .optimize = packed_optimize });
     const dep_zstd = b.dependency("zstd", .{ .target = target, .optimize = packed_optimize });
     const dep_pcre2 = b.dependency("pcre2", .{ .target = target, .optimize = packed_optimize });
-    const dep_tinycc = b.dependency("tinycc", .{ .target = target, .optimize = packed_optimize, .CONFIG_TCC_BACKTRACE = false, .no_fail = true });
+    const dep_tinycc = b.dependency("tinycc", .{
+        .target = target,
+        .optimize = packed_optimize,
+        .CONFIG_TCC_BACKTRACE = false,
+        .no_fail = true,
+    });
     const dep_sqlite = b.dependency("sqlite", .{
         .target = target,
         .optimize = packed_optimize,
@@ -168,8 +159,6 @@ pub fn build(b: *std.Build) !void {
     const prebuild_step = b.step("prebuild", "Setup project for build");
 
     prebuild_step.dependOn(&dep_tinycc.builder.top_level_steps.get("config-tcc").?.step);
-
-    try buildLegacyCompress(b, target, optimize);
 
     try prebuild(b, prebuild_step);
 
@@ -198,19 +187,19 @@ pub fn build(b: *std.Build) !void {
 
     mod_zune.addOptions("zune-info", zune_info);
 
-    mod_zune.addImport("luau", dep_luau.module("root"));
+    mod_zune.addImport("luau", dep_luau.module("luau"));
     mod_zune.addImport("xev", dep_xev.module("xev"));
     mod_zune.addImport("mimalloc", dep_mimalloc.module("root"));
     mod_zune.addImport("tls", dep_tls.module("tls"));
     mod_zune.addImport("yaml", dep_yaml.module("yaml"));
-    mod_zune.addImport("lz4", dep_lz4.module("lz4"));
-    mod_zune.addImport("brotli", dep_brotli.module("brotli"));
-    mod_zune.addImport("zstd", dep_zstd.module("zig-zstd"));
+    mod_zune.addImport("lz4", dep_lz4.module("root"));
+    mod_zune.addImport("brotli", dep_brotli.module("root"));
+    mod_zune.addImport("zstd", dep_zstd.module("root"));
     mod_zune.addImport("json", dep_json.module("json"));
-    mod_zune.addImport("regex", dep_pcre2.module("zpcre2"));
+    mod_zune.addImport("regex", dep_pcre2.module("root"));
     mod_zune.addImport("datetime", dep_datetime.module("zdt"));
-    mod_zune.addImport("toml", dep_toml.module("tomlz"));
-    mod_zune.addImport("sqlite", dep_sqlite.module("z-sqlite"));
+    mod_zune.addImport("toml", dep_toml.module("root"));
+    mod_zune.addImport("sqlite", dep_sqlite.module("root"));
     switch (target.result.os.tag) {
         .windows => switch (target.result.cpu.arch) {
             .aarch64 => {},
@@ -221,8 +210,6 @@ pub fn build(b: *std.Build) !void {
             else => {},
         },
     }
-    mod_zune.addImport("lcompress", b.modules.get("legacy-compress").?);
-
     const exe = b.addExecutable(.{
         .name = "zune",
         .root_module = mod_zune,

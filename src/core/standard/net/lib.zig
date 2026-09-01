@@ -11,6 +11,7 @@ const LuaHelper = Zune.Utils.LuaHelper;
 const VM = luau.VM;
 
 const Socket = @import("../../objects/network/Socket.zig");
+const sysfd = @import("../../utils/sysfd.zig");
 
 pub const LIB_NAME = "net";
 pub fn PlatformSupported() bool {
@@ -22,10 +23,29 @@ pub fn PlatformSupported() bool {
 }
 
 pub fn createSocket(domain: u32, flags: u32, protocol: u32) !std.posix.socket_t {
-    return switch (comptime builtin.os.tag) {
-        .windows => try @import("../../utils/os/windows.zig").socket(domain, flags, protocol),
-        else => try std.posix.socket(domain, flags, protocol),
-    };
+    return sysfd.socket(domain, flags, protocol);
+}
+
+pub fn lookupAddresses(allocator: std.mem.Allocator, name: []const u8, port: u16) ![]std.Io.net.IpAddress {
+    const host = try std.Io.net.HostName.init(name);
+    var storage: [16]std.Io.net.HostName.LookupResult = undefined;
+    var queue: std.Io.Queue(std.Io.net.HostName.LookupResult) = .init(&storage);
+    try host.lookup(Zune.io(), &queue, .{ .port = port });
+
+    var list: std.ArrayList(std.Io.net.IpAddress) = .empty;
+    errdefer list.deinit(allocator);
+    while (true) {
+        var item: [1]std.Io.net.HostName.LookupResult = undefined;
+        const n = queue.getUncancelable(Zune.io(), &item, 0) catch |err| switch (err) {
+            error.Closed => break,
+        };
+        if (n == 0) break;
+        switch (item[0]) {
+            .address => |address| try list.append(allocator, address),
+            .canonical_name => {},
+        }
+    }
+    return list.toOwnedSlice(allocator);
 }
 
 fn lua_createSocket(L: *VM.lua.State) !i32 {
@@ -48,15 +68,18 @@ fn lua_getAddressList(L: *VM.lua.State) !i32 {
     const port = L.Lcheckunsigned(2);
     if (port > std.math.maxInt(u16))
         return L.Zerror("port out of range");
-    const list = try std.net.getAddressList(allocator, name, @intCast(port));
-    defer list.deinit();
-    if (list.addrs.len > std.math.maxInt(i32))
+    const list = try lookupAddresses(allocator, name, @intCast(port));
+    defer allocator.free(list);
+    if (list.len > std.math.maxInt(i32))
         return L.Zerror("address list too large");
-    try L.createtable(@intCast(list.addrs.len), 0);
-    for (list.addrs, 1..) |address, i| {
+    try L.createtable(@intCast(list.len), 0);
+    for (list, 1..) |address, i| {
         var buf: [Socket.LONGEST_ADDRESS]u8 = undefined;
         try L.Zpushvalue(.{
-            .family = address.any.family,
+            .family = @as(i32, switch (address) {
+                .ip4 => std.posix.AF.INET,
+                .ip6 => std.posix.AF.INET6,
+            }),
             .port = address.getPort(),
             .address = Socket.AddressToString(&buf, address),
         });

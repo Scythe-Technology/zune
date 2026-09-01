@@ -30,7 +30,7 @@ const TestOptions = struct {
 pub fn runTest(comptime testFile: TestFile, args: []const []const u8, comptime options: TestOptions) !Zune.corelib.testing.TestResult {
     const allocator = std.testing.allocator;
 
-    try Zune.init();
+    try Zune.init(std.testing.environ);
 
     var L = try luau.VM.lstate.Lnewstate();
     defer L.deinit();
@@ -49,8 +49,7 @@ pub fn runTest(comptime testFile: TestFile, args: []const []const u8, comptime o
     var temporaryDir = std.testing.tmpDir(.{
         .access_sub_paths = true,
     });
-    // FIXME: freezes windows
-    // defer temporaryDir.cleanup();
+    defer temporaryDir.cleanup();
 
     const tempPath = try std.mem.joinZ(allocator, "/", &.{
         ".zig-cache/tmp",
@@ -59,14 +58,15 @@ pub fn runTest(comptime testFile: TestFile, args: []const []const u8, comptime o
     defer allocator.free(tempPath);
     try L.Zsetglobal("__test_tempdir", tempPath);
 
-    const cwd = std.fs.cwd();
+    const io = Zune.io();
+    const cwd = std.Io.Dir.cwd();
 
-    const content = try cwd.readFileAlloc(allocator, testFile.path, std.math.maxInt(usize));
+    const content = try cwd.readFileAlloc(io, testFile.path, allocator, .unlimited);
     defer allocator.free(content);
 
     const dir_path = std.fs.path.dirname(testFile.path) orelse unreachable;
-    var dir = try cwd.openDir(dir_path, .{});
-    defer dir.close();
+    var dir = try cwd.openDir(io, dir_path, .{});
+    defer dir.close(io);
 
     Zune.STATE.RUN_MODE = .Test;
 
@@ -96,7 +96,6 @@ pub fn runTest(comptime testFile: TestFile, args: []const []const u8, comptime o
             std.debug.print("Syntax: {s}\n", .{ML.tostring(-1) orelse "UnknownError"});
             return err;
         },
-        else => return err,
     };
 
     Zune.corelib.testing.REF_LEAK_CHECK = options.ref_leak_check;

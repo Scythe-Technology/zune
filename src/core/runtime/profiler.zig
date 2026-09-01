@@ -21,7 +21,7 @@ var gcstats: [16]u64 = [_]u64{0} ** 16;
 var callbacks: ?*VM.lua.Callbacks = null;
 
 var STACK: std.ArrayList(u8) = .empty;
-var DATA: std.StringHashMap(u64) = .init(std.heap.page_allocator);
+var DATA: std.hash_map.StringHashMapUnmanaged(u64) = .empty;
 
 var thread: ?std.Thread = null;
 
@@ -32,34 +32,36 @@ fn interrupt(lua_state: *VM.lua.State, gc: c_int) !void {
     const currTicks = ticks;
     const elapsedTicks = currTicks - currentTicks;
 
+    const allocator = Zune.DEFAULT_ALLOCATOR;
+
     if (elapsedTicks > 0) {
         STACK.clearRetainingCapacity();
 
         if (gc > 0)
-            try STACK.appendSlice(std.heap.page_allocator, "GC,GC,");
+            try STACK.appendSlice(allocator, "GC,GC,");
 
         var level: i32 = 0;
         var ar: VM.lua.Debug = .{ .ssbuf = undefined };
         while (L.getinfo(level, "sn", &ar)) : (level += 1) {
             if (STACK.items.len > 0)
-                try STACK.append(std.heap.page_allocator, ';');
+                try STACK.append(allocator, ';');
 
-            try STACK.appendSlice(std.heap.page_allocator, ar.short_src.?);
-            try STACK.append(std.heap.page_allocator, ',');
+            try STACK.appendSlice(allocator, ar.short_src.?);
+            try STACK.append(allocator, ',');
 
             if (ar.name) |name|
-                try STACK.appendSlice(std.heap.page_allocator, name);
+                try STACK.appendSlice(allocator, name);
 
-            try STACK.append(std.heap.page_allocator, ',');
+            try STACK.append(allocator, ',');
 
             var buf: [48]u8 = undefined;
             const slice = std.fmt.bufPrint(&buf, "{d}", .{ar.linedefined.?}) catch unreachable;
-            try STACK.appendSlice(std.heap.page_allocator, slice);
+            try STACK.appendSlice(allocator, slice);
         }
 
         if (STACK.items.len > 0) {
             if (!DATA.contains(STACK.items))
-                try DATA.put(try std.heap.page_allocator.dupe(u8, STACK.items), elapsedTicks)
+                try DATA.put(allocator, try allocator.dupe(u8, STACK.items), elapsedTicks)
             else {
                 const entry = DATA.getEntry(STACK.items) orelse std.debug.panic("[Profiler] entry key not found", .{});
                 entry.value_ptr.* += elapsedTicks;
@@ -115,18 +117,18 @@ pub fn end() void {
     active = false;
     if (thread) |t|
         t.join();
-    STACK.deinit(std.heap.page_allocator);
+    STACK.deinit(Zune.DEFAULT_ALLOCATOR);
 }
 
 pub fn dump(path: []const u8) void {
     const data_size = DATA.count();
     var total: u64 = 0;
     {
-        const file = std.fs.cwd().createFile(path, .{}) catch |err| std.debug.panic("[Profiler] Failed to create file: {}", .{err});
-        defer file.close();
+        const file = std.Io.Dir.cwd().createFile(Zune.io(), path, .{}) catch |err| std.debug.panic("[Profiler] Failed to create file: {}", .{err});
+        defer file.close(Zune.io());
 
         var buffer: [1024]u8 = undefined;
-        var file_writer = file.writer(&buffer);
+        var file_writer = file.writer(Zune.io(), &buffer);
 
         const writer = &file_writer.interface;
 
@@ -134,10 +136,10 @@ pub fn dump(path: []const u8) void {
         while (data_iter.next()) |entry| {
             writer.print("{d} {s}\n", .{ entry.value_ptr.*, entry.key_ptr.* }) catch |err| std.debug.panic("[Profiler] Failed to write into file: {}", .{err});
             total += entry.value_ptr.*;
-            std.heap.page_allocator.free(entry.key_ptr.*);
+            Zune.DEFAULT_ALLOCATOR.free(entry.key_ptr.*);
         }
         writer.flush() catch |err| std.debug.panic("[Profiler] Failed to flush file: {}", .{err});
-        DATA.deinit();
+        DATA.deinit(Zune.DEFAULT_ALLOCATOR);
     }
     std.debug.print("[Profiler] dump written to {s} (total runtime {d:.3} seconds, {d} samples, {d} stacks)\n", .{
         path,

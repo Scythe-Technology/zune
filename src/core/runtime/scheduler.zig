@@ -105,7 +105,7 @@ const Synchronization = struct {
     completion: xev.Dynamic.Completion,
     completed: LinkedList = .{},
     queue: LinkedList = .{},
-    mutex: std.Thread.Mutex = .{},
+    mutex: std.Io.Mutex = .init,
     notified: std.atomic.Value(bool) align(std.atomic.cache_line) = .init(false),
     waiting: std.atomic.Value(bool) align(std.atomic.cache_line) = .init(false),
 
@@ -147,8 +147,8 @@ const Synchronization = struct {
         _: xev.Dynamic.Async.WaitError!void,
     ) xev.Dynamic.CallbackAction {
         const self: *Synchronization = @alignCast(@fieldParentPtr("completion", completion));
-        self.mutex.lock();
-        defer self.mutex.unlock();
+        self.mutex.lockUncancelable(Zune.io());
+        defer self.mutex.unlock(Zune.io());
         if (self.queue.len > 0)
             return .rearm;
         self.waiting.store(false, .release);
@@ -238,9 +238,9 @@ pub const CompletionLinkedList = struct {
 
 global: *VM.lua.State,
 allocator: std.mem.Allocator,
-sleeping: SleepingQueue,
+sleeping: SleepingQueue = .empty,
 deferred: DeferredThread.LinkedList = .{},
-awaits: std.ArrayListUnmanaged(Awaiting) = .empty,
+awaits: std.ArrayList(Awaiting) = .empty,
 timer: xev.Dynamic.Timer,
 loop: xev.Dynamic.Loop,
 async: xev.Dynamic.Async,
@@ -270,7 +270,6 @@ pub fn init(allocator: std.mem.Allocator) !Scheduler {
         }),
         .timer = try xev.Dynamic.Timer.init(),
         .async = try xev.Dynamic.Async.init(),
-        .sleeping = SleepingQueue.init(allocator, {}),
         .sync = .init(),
     };
 }
@@ -302,7 +301,7 @@ pub fn sleepThread(
     const start = VM.lperf.clock();
     const wake = start + time + if (time == 0 and self.frame == .Sleeping) @as(f64, 0.0001) else @as(f64, 0);
 
-    self.sleeping.add(.{
+    self.sleeping.push(self.allocator, .{
         .thread = .init(thread),
         .from = from,
         .start = start,
@@ -400,8 +399,8 @@ pub fn cancelAsyncTask(
 pub fn synchronize(self: *Scheduler, data: anytype) void {
     const Node = Synchronization.Node(@typeInfo(@TypeOf(data)).pointer.child);
     const ptr: *Node = @fieldParentPtr("data", data);
-    self.sync.mutex.lock();
-    defer self.sync.mutex.unlock();
+    self.sync.mutex.lockUncancelable(Zune.io());
+    defer self.sync.mutex.unlock(Zune.io());
     self.sync.queue.remove(&ptr.node);
     self.sync.completed.append(&ptr.node);
     self.sync.notify(self);
@@ -410,8 +409,8 @@ pub fn synchronize(self: *Scheduler, data: anytype) void {
 pub fn asyncWaitForSync(self: *Scheduler, data: anytype) void {
     const Node = Synchronization.Node(@typeInfo(@TypeOf(data)).pointer.child);
     const ptr: *Node = @fieldParentPtr("data", data);
-    self.sync.mutex.lock();
-    defer self.sync.mutex.unlock();
+    self.sync.mutex.lockUncancelable(Zune.io());
+    defer self.sync.mutex.unlock(Zune.io());
     self.sync.queue.append(&ptr.node);
     self.sync.wait(self);
 }
@@ -493,7 +492,7 @@ pub fn cancelThread(self: *Scheduler, thread: *VM.lua.State) void {
     const sleeping_items = self.sleeping.items;
     for (sleeping_items, 0..) |item, i| {
         if (item.thread.value == thread) {
-            var slept = self.sleeping.removeIndex(i);
+            var slept = self.sleeping.popIndex(i);
             slept.thread.deref();
             return;
         }
@@ -526,14 +525,14 @@ inline fn processFrame(self: *Scheduler, comptime frame: FrameKind) void {
             std.debug.print("EventLoop Error: {}\n", .{err});
         },
         .Synchronize => {
-            self.sync.mutex.lock();
+            self.sync.mutex.lockUncancelable(Zune.io());
 
             var list: Synchronization.LinkedList = self.sync.completed;
             self.sync.completed = .{};
 
             self.sync.notified.store(false, .release);
 
-            self.sync.mutex.unlock();
+            self.sync.mutex.unlock(Zune.io());
 
             const SyncNode = Synchronization.Node(void);
             while (list.popFirst()) |node| {
@@ -545,7 +544,7 @@ inline fn processFrame(self: *Scheduler, comptime frame: FrameKind) void {
             const now = self.now_clock;
             while (self.sleeping.peek()) |current| {
                 if (current.wake <= now) {
-                    var slept = self.sleeping.remove();
+                    var slept = self.sleeping.pop().?;
                     var args = slept.args;
                     const thread = slept.thread.value;
                     const status = thread.status();
@@ -653,7 +652,7 @@ pub fn run(self: *Scheduler, comptime mode: Zune.RunMode) void {
 
 pub fn deinit(self: *Scheduler) void {
     KillScheduler(self, true);
-    self.sleeping.deinit();
+    self.sleeping.deinit(self.allocator);
     {
         while (self.deferred.pop()) |node|
             self.allocator.destroy(node);

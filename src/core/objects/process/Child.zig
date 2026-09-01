@@ -28,9 +28,9 @@ child: std.process.Child,
 dead: bool = false,
 code: u32 = 0,
 
-stdin: ?std.fs.File = null,
-stdout: ?std.fs.File = null,
-stderr: ?std.fs.File = null,
+stdin: ?std.Io.File = null,
+stdout: ?std.Io.File = null,
+stderr: ?std.Io.File = null,
 
 stdin_file: LuaHelper.Ref(void) = .empty,
 stdout_file: LuaHelper.Ref(void) = .empty,
@@ -99,7 +99,7 @@ fn lua_kill(self: *Child, L: *VM.lua.State) !i32 {
     const scheduler = Scheduler.fromState(L);
     const allocator = scheduler.allocator;
 
-    var child = try xev.Process.init(self.child.id);
+    var child = try xev.Process.init(self.child.id orelse return error.AlreadyTerminated);
     errdefer child.deinit();
 
     switch (comptime builtin.os.tag) {
@@ -108,8 +108,8 @@ fn lua_kill(self: *Child, L: *VM.lua.State) !i32 {
             else => return err,
         },
         else => {
-            self.code = std.posix.SIG.TERM;
-            try std.posix.kill(self.child.id, std.posix.SIG.TERM);
+            self.code = @intFromEnum(std.posix.SIG.TERM);
+            try std.posix.kill(self.child.id orelse return error.AlreadyTerminated, std.posix.SIG.TERM);
         },
     }
 
@@ -149,7 +149,7 @@ fn lua_wait(self: *Child, L: *VM.lua.State) !i32 {
     const allocator = Scheduler.fromState(L).allocator;
     const scheduler = Scheduler.fromState(L);
 
-    var child = try xev.Process.init(self.child.id);
+    var child = try xev.Process.init(self.child.id orelse return error.AlreadyTerminated);
     errdefer child.deinit();
 
     const wait = try allocator.create(WaitAsyncContext);
@@ -219,7 +219,7 @@ pub fn __index(L: *VM.lua.State) !i32 {
             switch (comptime builtin.os.tag) {
                 .windows => L.pushunsigned(@truncate(@intFromPtr(self.child.id))),
                 .wasi => L.pushunsigned(0),
-                else => L.pushinteger(self.child.id),
+                else => L.pushinteger(self.child.id orelse 0),
             }
             return 1;
         },

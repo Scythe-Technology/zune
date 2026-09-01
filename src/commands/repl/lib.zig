@@ -39,10 +39,8 @@ fn PlatformSupported() bool {
 }
 
 fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
-    if (comptime !PlatformSupported()) {
-        Zune.debug.print("<red>error<clear>: platform not supported\n", .{});
-        std.process.exit(1);
-    }
+    if (comptime !PlatformSupported())
+        Zune.quitMsg("<red>error<clear>: platform not supported\n", .{});
     REPL_STATE = 1;
 
     var history = try History.init(allocator, ".zune/.history");
@@ -72,10 +70,10 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     L.setsafeenv(VM.lua.GLOBALSINDEX, true);
 
-    var stdin = std.fs.File.stdin();
+    var stdin = std.Io.File.stdin();
 
     var in_buffer: [128]u8 = undefined;
-    var in_reader = stdin.reader(&in_buffer);
+    var in_reader = stdin.reader(Zune.io(), &in_buffer);
 
     const reader = &in_reader.interface;
 
@@ -92,7 +90,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
     const stdout = terminal.stdout_file;
     var out_buffer: [256]u8 = undefined;
 
-    var out_writer = stdout.writer(&out_buffer);
+    var out_writer = stdout.writer(Zune.io(), &out_buffer);
 
     const out = &out_writer.interface;
 
@@ -235,7 +233,6 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
                         try out.print("SyntaxError: {s}\n", .{ML.tostring(-1) orelse "UnknownError"});
                         ML.pop(1);
                     },
-                    else => return err,
                 }
 
                 L.pop(1); // drop: thread

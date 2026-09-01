@@ -1,15 +1,12 @@
 const std = @import("std");
 const json = @import("json");
 const builtin = @import("builtin");
-const lcompress = @import("lcompress");
-
 const Zune = @import("zune");
 
 const command = @import("lib.zig");
 
 const file = @import("../core/resolvers/file.zig");
-
-const OldWriter = @import("../core/utils/old_writer.zig");
+const Flate = @import("../core/utils/flate.zig");
 
 const typedef = struct {
     name: []const u8,
@@ -26,7 +23,7 @@ pub const luaudefs = &[_]typedef{
 };
 
 const SetupInfo = struct {
-    cwd: std.fs.Dir,
+    cwd: std.Io.Dir,
     home: []const u8,
 };
 
@@ -56,15 +53,17 @@ fn setup(editor: EditorKind, allocator: std.mem.Allocator, setupInfo: SetupInfo)
     const cwd = setupInfo.cwd;
 
     if (std.fs.path.dirname(settings_file_path)) |parent_dir|
-        cwd.makeDir(parent_dir) catch |err| switch (err) {
+        cwd.createDir(Zune.io(), parent_dir, .default_dir) catch |err| switch (err) {
             error.PathAlreadyExists => {},
             else => return err,
         };
 
-    const settings_file = try cwd.createFile(settings_file_path, .{ .read = true, .truncate = false });
-    defer settings_file.close();
+    const settings_file = try cwd.createFile(Zune.io(), settings_file_path, .{ .read = true, .truncate = false });
+    defer settings_file.close(Zune.io());
 
-    const settings_content = try settings_file.readToEndAlloc(allocator, std.math.maxInt(usize));
+    var settings_file_reader = settings_file.reader(Zune.io(), &.{});
+
+    const settings_content = try settings_file_reader.interface.allocRemaining(allocator, .unlimited);
     defer allocator.free(settings_content);
 
     const data = switch (editor) {
@@ -81,13 +80,13 @@ fn setup(editor: EditorKind, allocator: std.mem.Allocator, setupInfo: SetupInfo)
                 },
                 else => return err,
             };
-            defer settings_root.deinit();
+            defer settings_root.deinit(allocator);
 
             var settings_object = settings_root.value.asObject();
 
             // Get Values of luau-lsp.require.mode and luau-lsp.require.directoryAliases
-            const definition_files = settings_object.get(LUAU_LSP_DEFINITION_FILES) orelse try settings_root.value.setWith(LUAU_LSP_DEFINITION_FILES, try settings_root.newObject());
-            const documentation_files = settings_object.get(LUAU_LSP_DOCUMENTATION_FILES) orelse try settings_root.value.setWith(LUAU_LSP_DOCUMENTATION_FILES, try settings_root.newArray());
+            const definition_files = settings_object.get(LUAU_LSP_DEFINITION_FILES) orelse try settings_root.value.setWith(allocator, LUAU_LSP_DEFINITION_FILES, try json.Value.newObject(allocator));
+            const documentation_files = settings_object.get(LUAU_LSP_DOCUMENTATION_FILES) orelse try settings_root.value.setWith(allocator, LUAU_LSP_DOCUMENTATION_FILES, try json.Value.newArray(allocator));
             var definition_files_object = definition_files.objectOrNull() orelse Zune.quitMsg("{s} is not a valid Object", .{LUAU_LSP_DEFINITION_FILES});
             var documentation_files_array = documentation_files.arrayOrNull() orelse Zune.quitMsg("{s} is not a valid Array", .{LUAU_LSP_DOCUMENTATION_FILES});
 
@@ -99,11 +98,11 @@ fn setup(editor: EditorKind, allocator: std.mem.Allocator, setupInfo: SetupInfo)
                     defer allocator.free(def_path);
                     if (definition_files_object.contains("zune"))
                         continue;
-                    const def_path_copy = try settings_root.allocator.dupe(u8, def_path);
+                    const def_path_copy = try allocator.dupe(u8, def_path);
                     errdefer allocator.free(def_path_copy);
-                    const key = try settings_root.allocator.dupe(u8, "zune");
+                    const key = try allocator.dupe(u8, "zune");
                     errdefer allocator.free(key);
-                    try definition_files_object.put(key, .{ .string = def_path_copy });
+                    try definition_files_object.put(allocator, key, .{ .string = def_path_copy });
                 }
                 if (type_file.docs) |_| {
                     const file_name = try std.mem.join(allocator, "", &.{ type_file.name, ".d.json" });
@@ -122,7 +121,7 @@ fn setup(editor: EditorKind, allocator: std.mem.Allocator, setupInfo: SetupInfo)
                     }
                     if (exists)
                         continue;
-                    const file_path_copy = try settings_root.allocator.dupe(u8, file_path);
+                    const file_path_copy = try allocator.dupe(u8, file_path);
                     errdefer allocator.free(file_path_copy);
                     try documentation_files_array.append(allocator, .{ .string = file_path_copy });
                 }
@@ -158,21 +157,21 @@ fn setup(editor: EditorKind, allocator: std.mem.Allocator, setupInfo: SetupInfo)
                 },
                 else => return err,
             };
-            defer settings_root.deinit();
+            defer settings_root.deinit(allocator);
 
             // Get Values of luau-lsp.require.mode and luau-lsp.require.directoryAliases
-            var lsp = settings_root.value.asObject().get("lsp") orelse try settings_root.value.setWith("lsp", try settings_root.newObject());
+            var lsp = settings_root.value.asObject().get("lsp") orelse try settings_root.value.setWith(allocator, "lsp", try json.Value.newObject(allocator));
 
-            var luau_lsp_ext = lsp.asObject().get("luau-lsp") orelse try lsp.setWith("luau-lsp", try settings_root.newObject());
+            var luau_lsp_ext = lsp.asObject().get("luau-lsp") orelse try lsp.setWith(allocator, "luau-lsp", try json.Value.newObject(allocator));
 
-            var lsp_settings = luau_lsp_ext.asObject().get("settings") orelse try luau_lsp_ext.setWith("settings", try settings_root.newObject());
+            var lsp_settings = luau_lsp_ext.asObject().get("settings") orelse try luau_lsp_ext.setWith(allocator, "settings", try json.Value.newObject(allocator));
 
-            var luau_ext = lsp_settings.asObject().get("ext") orelse try lsp_settings.setWith("ext", try settings_root.newObject());
+            var luau_ext = lsp_settings.asObject().get("ext") orelse try lsp_settings.setWith(allocator, "ext", try json.Value.newObject(allocator));
 
-            var definition_files = luau_ext.asObject().get("definitions") orelse try luau_ext.setWith("definitions", try settings_root.newArray());
+            var definition_files = luau_ext.asObject().get("definitions") orelse try luau_ext.setWith(allocator, "definitions", try json.Value.newArray(allocator));
             const definition_files_array = definition_files.asArray();
 
-            var documentation_files = luau_ext.asObject().get("documentation") orelse try luau_ext.setWith("documentation", try settings_root.newArray());
+            var documentation_files = luau_ext.asObject().get("documentation") orelse try luau_ext.setWith(allocator, "documentation", try json.Value.newArray(allocator));
             const documentation_files_array = documentation_files.asArray();
 
             for (luaudefs) |type_file| {
@@ -194,7 +193,7 @@ fn setup(editor: EditorKind, allocator: std.mem.Allocator, setupInfo: SetupInfo)
                     if (exists)
                         continue;
 
-                    const file_path_copy = try settings_root.allocator.dupe(u8, file_path);
+                    const file_path_copy = try allocator.dupe(u8, file_path);
                     errdefer allocator.free(file_path_copy);
                     try definition_files_array.append(allocator, .{ .string = file_path_copy });
                 }
@@ -216,7 +215,7 @@ fn setup(editor: EditorKind, allocator: std.mem.Allocator, setupInfo: SetupInfo)
                     if (exists)
                         continue;
 
-                    const file_path_copy = try settings_root.allocator.dupe(u8, file_path);
+                    const file_path_copy = try allocator.dupe(u8, file_path);
                     errdefer allocator.free(file_path_copy);
                     try documentation_files_array.append(allocator, .{ .string = file_path_copy });
                 }
@@ -318,19 +317,17 @@ fn setup(editor: EditorKind, allocator: std.mem.Allocator, setupInfo: SetupInfo)
     };
     defer allocator.free(data);
 
-    try settings_file.seekTo(0);
-    try settings_file.writeAll(data);
-    try settings_file.setEndPos(data.len);
+    try settings_file.writePositionalAll(Zune.io(), data, 0);
+    try settings_file.setLength(Zune.io(), data.len);
 
     std.debug.print("Saved configuration to '{s}'\n", .{settings_file_path});
 }
 
 const OPTIONS = "<nvim | zed | vscode | emacs>";
 fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
-    var envMap = try std.process.getEnvMap(allocator);
-    defer envMap.deinit();
+    const envMap = Zune.STATE.ENV_MAP;
 
-    const cwd = std.fs.cwd();
+    const cwd = std.Io.Dir.cwd();
 
     const HOME = file.getHomeDir(envMap) orelse Zune.quitMsg("<red>error<clear>: failed to setup, $HOME/$USERPROFILE variable not found", .{});
 
@@ -342,7 +339,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
     {
         const global_dir = try std.fs.path.resolve(allocator, &.{ path, "global" });
         defer allocator.free(global_dir);
-        cwd.makePath(global_dir) catch |err| switch (err) {
+        cwd.createDirPath(Zune.io(), global_dir) catch |err| switch (err) {
             error.PathAlreadyExists => {},
             else => return err,
         };
@@ -355,15 +352,12 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
         defer allocator.free(type_path);
 
         {
-            var reader: std.Io.Reader = .fixed(type_def.content);
-            var decompressed: std.Io.Writer.Allocating = .init(allocator);
-            defer decompressed.deinit();
+            const decompressed = try Flate.decompress(allocator, type_def.content, .gzip);
+            defer allocator.free(decompressed);
 
-            try lcompress.gzip.decompress(reader.adaptToOldInterface(), OldWriter.adaptToOldInterface(&decompressed.writer));
-
-            try cwd.writeFile(.{
+            try cwd.writeFile(Zune.io(), .{
                 .sub_path = type_path,
-                .data = decompressed.written(),
+                .data = decompressed,
             });
         }
 
@@ -373,15 +367,12 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
             const docs_path = try std.fs.path.resolve(allocator, &.{ path, docs_name });
             defer allocator.free(docs_path);
 
-            var reader: std.Io.Reader = .fixed(docs);
-            var decompressed: std.Io.Writer.Allocating = .init(allocator);
-            defer decompressed.deinit();
+            const decompressed = try Flate.decompress(allocator, docs, .gzip);
+            defer allocator.free(decompressed);
 
-            try lcompress.gzip.decompress(reader.adaptToOldInterface(), OldWriter.adaptToOldInterface(&decompressed.writer));
-
-            try cwd.writeFile(.{
+            try cwd.writeFile(Zune.io(), .{
                 .sub_path = docs_path,
-                .data = decompressed.written(),
+                .data = decompressed,
             });
         }
     }

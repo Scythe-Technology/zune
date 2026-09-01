@@ -16,7 +16,7 @@ const Profiler = Zune.Runtime.Profiler;
 const File = Zune.Resolvers.File;
 const Bundle = Zune.Resolvers.Bundle;
 
-fn getFile(allocator: std.mem.Allocator, dir: std.fs.Dir, input: []const u8) !struct { []u8, []const u8 } {
+fn getFile(allocator: std.mem.Allocator, dir: std.Io.Dir, input: []const u8) !struct { []u8, []const u8 } {
     var maybe_src: ?[]u8 = null;
     errdefer if (maybe_src) |s| allocator.free(s);
     var maybe_content: ?[]const u8 = null;
@@ -48,14 +48,14 @@ const ScanOptions = struct {
 
 fn scanDir(
     allocator: std.mem.Allocator,
-    map: *std.StringArrayHashMapUnmanaged(void),
-    dir: std.fs.Dir,
+    map: *std.array_hash_map.String(void),
+    dir: std.Io.Dir,
     opts: ScanOptions,
     path: []const u8,
     recursive: bool,
 ) !void {
     var iter = dir.iterate();
-    while (try iter.next()) |entry| {
+    while (try iter.next(Zune.io())) |entry| {
         const entry_path = try std.fs.path.join(allocator, &.{ path, entry.name });
         errdefer allocator.free(entry_path);
         blk: switch (entry.kind) {
@@ -71,8 +71,8 @@ fn scanDir(
             .directory => {
                 if (!recursive)
                     break :blk;
-                var entry_dir = try dir.openDir(entry.name, .{ .iterate = true });
-                defer entry_dir.close();
+                var entry_dir = try dir.openDir(Zune.io(), entry.name, .{ .iterate = true });
+                defer entry_dir.close(Zune.io());
                 try scanDir(allocator, map, entry_dir, opts, entry_path, recursive);
             },
             else => {},
@@ -91,16 +91,14 @@ const COMPRESSION_MAP = std.StaticStringMap(Bundle.Section.Compression).initComp
 });
 
 fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
-    if (comptime !Bundle.PlatformSupported()) {
-        Zune.debug.print("<red>error<clear>: platform not supported\n", .{});
-        std.process.exit(1);
-    }
+    if (comptime !Bundle.PlatformSupported())
+        Zune.quitMsg("<red>error<clear>: platform not supported\n", .{});
     if (args.len < 1) {
         Zune.debug.print("<red>usage<clear>: bundle [...flags or files]\n", .{});
         return;
     }
 
-    Zune.loadConfiguration(std.fs.cwd());
+    Zune.loadConfiguration(std.Io.Dir.cwd());
 
     if (std.mem.eql(u8, args[0], "--read")) {
         if (args.len != 2) {
@@ -108,21 +106,15 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
             return;
         }
         const path = args[1];
-        const file = try std.fs.cwd().openFile(path, .{ .mode = .read_only });
-        defer file.close();
+        const file = try std.Io.Dir.cwd().openFile(Zune.io(), path, .{ .mode = .read_only });
+        defer file.close(Zune.io());
 
         const last_color = Zune.STATE.FORMAT.USE_COLOR;
 
         const map = Bundle.getFromFile(allocator, file) catch |err| switch (err) {
-            error.CorruptBundle => {
-                Zune.debug.print("<red>error<clear>: '{s}' is not a valid zune bundle (corrupt)\n", .{path});
-                std.process.exit(1);
-            },
+            error.CorruptBundle => Zune.quitMsg("<red>error<clear>: '{s}' is not a valid zune bundle (corrupt)\n", .{path}),
             else => return err,
-        } orelse {
-            Zune.debug.print("<red>error<clear>: '{s}' is not a valid zune bundle\n", .{path});
-            std.process.exit(1);
-        };
+        } orelse Zune.quitMsg("<red>error<clear>: '{s}' is not a valid zune bundle\n", .{path});
 
         Zune.STATE.FORMAT.USE_COLOR = last_color;
 
@@ -137,10 +129,10 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     var home_dir = File.getHomeDir(Zune.STATE.ENV_MAP) orelse "";
 
-    var dir = try std.fs.cwd().openDir(".", .{ .iterate = true });
-    defer dir.close();
+    var dir = try std.Io.Dir.cwd().openDir(Zune.io(), ".", .{ .iterate = true });
+    defer dir.close(Zune.io());
 
-    const cwd_path = try dir.realpathAlloc(allocator, ".");
+    const cwd_path = try std.process.currentPathAlloc(Zune.io(), allocator);
     defer allocator.free(cwd_path);
 
     var EXEC: ?[]const u8 = null;
@@ -153,15 +145,15 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
     } = .{ .default = undefined };
     var LOAD_FLAGS: Zune.Flags = .{};
 
-    var SCRIPTS: std.StringArrayHashMapUnmanaged(void) = .empty;
+    var SCRIPTS: std.array_hash_map.String(void) = .empty;
     defer SCRIPTS.deinit(allocator);
     defer for (SCRIPTS.keys()) |script| allocator.free(script);
-    var FILES: std.StringArrayHashMapUnmanaged(void) = .empty;
+    var FILES: std.array_hash_map.String(void) = .empty;
     defer FILES.deinit(allocator);
     defer for (FILES.keys()) |file| allocator.free(file);
 
     {
-        var basket: *std.StringArrayHashMapUnmanaged(void) = &SCRIPTS;
+        var basket: *std.array_hash_map.String(void) = &SCRIPTS;
         var backet_kind: ScanOptions.Kind = .script;
         for (args) |arg| {
             if (std.mem.startsWith(u8, arg, "-")) {
@@ -177,10 +169,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
                             else => unreachable,
                         };
                         Zune.STATE.LUAU_OPTIONS.OPTIMIZATION_LEVEL = level;
-                    } else {
-                        Zune.debug.print("<red>error<clear>: invalid optimization level, usage: -O<<N>>\n", .{});
-                        std.process.exit(1);
-                    },
+                    } else Zune.quitMsg("<red>error<clear>: invalid optimization level, usage: -O<<N>>\n", .{}),
                     'g' => {
                         if (flag.len == 3 and flag[2] >= '0' and flag[2] <= '2') {
                             const level: u2 = switch (flag[2]) {
@@ -190,10 +179,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
                                 else => unreachable,
                             };
                             Zune.STATE.LUAU_OPTIONS.DEBUG_LEVEL = level;
-                        } else {
-                            Zune.debug.print("<red>error<clear>: invalid debug level, usage: -g<<N>>\n", .{});
-                            std.process.exit(1);
-                        }
+                        } else Zune.quitMsg("<red>error<clear>: invalid debug level, usage: -g<<N>>\n", .{});
                     },
                     'f' => if (std.mem.eql(u8, arg, "-f")) {
                         basket = &FILES;
@@ -236,15 +222,9 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
                     } else if (std.mem.startsWith(u8, flag, "--home=") and flag.len > 7) {
                         home_dir = flag[7..];
                     } else if (std.mem.startsWith(u8, flag, "--compression=") and flag.len > 14) {
-                        COMPRESSION = COMPRESSION_MAP.get(flag[14..]) orelse {
-                            Zune.debug.print("<red>error<clear>: unknown compression type '{s}'\n", .{flag[14..]});
-                            std.process.exit(1);
-                        };
+                        COMPRESSION = COMPRESSION_MAP.get(flag[14..]) orelse Zune.quitMsg("<red>error<clear>: unknown compression type '{s}'\n", .{flag[14..]});
                     } else continue :sw 0,
-                    else => {
-                        Zune.debug.print("<red>error<clear>: unknown flag '{s}'\n", .{flag});
-                        std.process.exit(1);
-                    },
+                    else => Zune.quitMsg("<red>error<clear>: unknown flag '{s}'\n", .{flag}),
                 }
                 continue;
             }
@@ -253,8 +233,8 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
                 defer allocator.free(glob);
                 if (comptime builtin.os.tag == .windows)
                     std.mem.replaceScalar(u8, glob, '\\', '/');
-                var d = if (i > 0) try dir.openDir(glob[0..i], .{ .iterate = true }) else dir;
-                defer if (i > 0) d.close();
+                var d = if (i > 0) try dir.openDir(Zune.io(), glob[0..i], .{ .iterate = true }) else dir;
+                defer if (i > 0) d.close(Zune.io());
                 try scanDir(allocator, basket, d, .{
                     .glob = glob,
                     .kind = backet_kind,
@@ -278,28 +258,26 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
         OUTPUT = .{ .default = std.fs.path.stem(entry_file) };
 
     const exe = if (EXEC) |path|
-        std.fs.cwd().openFile(path, .{ .mode = .read_only }) catch |err| switch (err) {
-            error.FileNotFound => {
-                Zune.debug.print("<red>error<clear>: executable '{s}' was not found\n", .{path});
-                std.process.exit(1);
-            },
-            error.IsDir => {
-                Zune.debug.print("<red>error<clear>: '{s}' is a directory, expected an executable file\n", .{path});
-                std.process.exit(1);
-            },
+        std.Io.Dir.cwd().openFile(Zune.io(), path, .{ .mode = .read_only }) catch |err| switch (err) {
+            error.FileNotFound => Zune.quitMsg("<red>error<clear>: executable '{s}' was not found\n", .{path}),
+            error.IsDir => Zune.quitMsg("<red>error<clear>: '{s}' is a directory, expected an executable file\n", .{path}),
             else => |e| return e,
         }
     else
-        try std.fs.openSelfExe(.{ .mode = .read_only });
-    defer exe.close();
+        try std.process.openExecutable(Zune.io(), .{ .mode = .read_only });
+    defer exe.close(Zune.io());
 
-    const zune_build = try exe.readToEndAlloc(allocator, std.math.maxInt(usize));
+    var reader = exe.reader(Zune.io(), &.{});
+
+    const zune_build = try reader.interface.allocRemaining(allocator, .unlimited);
     const zune_build_len = zune_build.len;
 
-    var bundled_bytes: std.ArrayListUnmanaged(u8) = .{ .capacity = zune_build_len, .items = zune_build };
-    defer bundled_bytes.deinit(allocator);
+    var bundled_bytes = std.Io.Writer.Allocating.initOwnedSlice(allocator, zune_build);
+    defer bundled_bytes.deinit();
 
-    const writer = bundled_bytes.writer(allocator);
+    bundled_bytes.shrinkRetainingCapacity(zune_build_len);
+
+    const writer = &bundled_bytes.writer;
 
     try Bundle.PackedState.write(writer, .{
         .mode = .{
@@ -329,7 +307,7 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
     try Bundle.Features.write(writer, features);
 
     {
-        const home_relative = if (home_dir.len > 0) try std.fs.path.relative(allocator, cwd_path, home_dir) else "";
+        const home_relative = if (home_dir.len > 0) try std.fs.path.relative(allocator, cwd_path, null, cwd_path, home_dir) else "";
         defer if (home_dir.len > 0) allocator.free(home_relative);
         if (std.mem.indexOfAny(u8, home_relative, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789") != null) {
             Zune.debug.print("<yellow>warning<clear>: resolved home directory relative path '{s}' contains normal characters\n", .{home_relative});
@@ -340,13 +318,10 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
     }
 
     for (SCRIPTS.keys()) |script| {
-        const name = try std.fs.path.relative(allocator, cwd_path, script);
+        const name = try std.fs.path.relative(allocator, cwd_path, null, cwd_path, script);
         defer allocator.free(name);
-        const script_contents = std.fs.cwd().readFileAlloc(allocator, script, std.math.maxInt(usize)) catch |err| switch (err) {
-            error.FileNotFound => {
-                Zune.debug.print("<red>error<clear>: '{s}' was not found\n", .{name});
-                std.process.exit(1);
-            },
+        const script_contents = std.Io.Dir.cwd().readFileAlloc(Zune.io(), script, allocator, .unlimited) catch |err| switch (err) {
+            error.FileNotFound => Zune.quitMsg("<red>error<clear>: '{s}' was not found\n", .{name}),
             error.IsDir => continue, // skip directories
             else => |e| return e,
         };
@@ -356,22 +331,14 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
             .debugLevel = Zune.STATE.LUAU_OPTIONS.DEBUG_LEVEL,
         });
         defer allocator.free(bytecode);
-        if (bytecode[0] == 0) {
-            Zune.debug.print("<red>compile error<clear>: {s}{s}\n", .{ name, bytecode[1..] });
-            std.process.exit(1);
-        }
+        if (bytecode[0] == 0)
+            Zune.quitMsg("<red>compile error<clear>: {s}{s}\n", .{ name, bytecode[1..] });
         (switch (BUILD_MODE) {
             .debug => Bundle.Section.writeScript(writer, name, script_contents),
             .release => Bundle.Section.writeScript(writer, name, bytecode),
         }) catch |err| switch (err) {
-            error.NameTooLong => {
-                Zune.debug.print("<red>error<clear>: script name '{s}' is too long to bundle\n", .{name});
-                std.process.exit(1);
-            },
-            error.DataTooLarge => {
-                Zune.debug.print("<red>error<clear>: script '{s}' is too large to bundle\n", .{name});
-                std.process.exit(1);
-            },
+            error.NameTooLong => Zune.quitMsg("<red>error<clear>: script name '{s}' is too long to bundle\n", .{name}),
+            error.DataTooLarge => Zune.quitMsg("<red>error<clear>: script '{s}' is too large to bundle\n", .{name}),
             else => return err,
         };
     }
@@ -381,19 +348,13 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
             Zune.debug.print("<yellow>warning<clear>: attempted to bundle an existing script '{s}' as file, skipping...\n", .{file});
             continue;
         }
-        const name = try std.fs.path.relative(allocator, cwd_path, file);
+        const name = try std.fs.path.relative(allocator, cwd_path, null, cwd_path, file);
         defer allocator.free(name);
-        const file_contents = try std.fs.cwd().readFileAlloc(allocator, file, std.math.maxInt(usize));
+        const file_contents = try std.Io.Dir.cwd().readFileAlloc(Zune.io(), file, allocator, .unlimited);
         defer allocator.free(file_contents);
         Bundle.Section.writeFile(allocator, writer, name, file_contents, COMPRESSION) catch |err| switch (err) {
-            error.NameTooLong => {
-                Zune.debug.print("<red>error<clear>: file name '{s}' is too long to bundle\n", .{name});
-                std.process.exit(1);
-            },
-            error.DataTooLarge => {
-                Zune.debug.print("<red>error<clear>: file '{s}' is too large to bundle\n", .{name});
-                std.process.exit(1);
-            },
+            error.NameTooLong => Zune.quitMsg("<red>error<clear>: file name '{s}' is too long to bundle\n", .{name}),
+            error.DataTooLarge => Zune.quitMsg("<red>error<clear>: file '{s}' is too large to bundle\n", .{name}),
             else => return err,
         };
     }
@@ -403,15 +364,13 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     if (sections > Bundle.ExeHeader.maxValue(.sections)) {
         Zune.debug.print("<red>error<clear>: too many sections ({d}), maximum is {d}\n", .{ sections, Bundle.ExeHeader.maxValue(.sections) });
-        Zune.debug.print("sections are files and scripts combined, try reducing the amount of files or scripts.\n", .{});
-        std.process.exit(1);
+        Zune.quitMsg("sections are files and scripts combined, try reducing the amount of files or scripts.\n", .{});
     }
-    const bundled = bundled_bytes.items[zune_build_len..];
+    const bundled = bundled_bytes.written()[zune_build_len..];
     if (bundled.len > Bundle.ExeHeader.maxValue(.size)) {
         Zune.debug.print("<red>error<clear>: large bundled size ({d} MB), exceeds maximum ({d} MB)\n", .{ @divTrunc(bundled.len, 1_000_000), @divTrunc(Bundle.ExeHeader.maxValue(.size), 1_000_000) });
         Zune.debug.print("try bundling more compact data, either by bundling with bytecode instead of script source code with --release flag,\n", .{});
-        Zune.debug.print("or compressing files with --compression=<<zstd|lz4|zlib|gzip|flate>>.\n", .{});
-        std.process.exit(1);
+        Zune.quitMsg("or compressing files with --compression=<<zstd|lz4|zlib|gzip|flate>>.\n", .{});
     }
     const hash = std.hash.XxHash3.hash(Bundle.SEED, bundled);
     try Bundle.ExeHeader.write(writer, .{
@@ -422,22 +381,19 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
     try writer.writeAll(Bundle.TAG);
 
     switch (OUTPUT) {
-        .stdout => |_| {
-            const stdout = std.fs.File.stdout();
+        .stdout => {
+            const stdout = std.Io.File.stdout();
             var buffer: [4096]u8 = undefined;
-            var stdout_writer = stdout.writer(&buffer);
+            var stdout_writer = stdout.writer(Zune.io(), &buffer);
             const wr = &stdout_writer.interface;
-            try wr.writeAll(bundled_bytes.items);
+            try wr.writeAll(bundled_bytes.written());
             try wr.flush();
         },
         inline .path, .default => |path| {
             const dir_path = std.fs.path.dirname(path);
             if (dir_path != null and dir_path.?.len > 0)
-                std.fs.cwd().makePath(dir_path.?) catch |err| switch (err) {
-                    error.NotDir => {
-                        Zune.debug.print("<red>error<clear>: failed to create path tree '{s}' (expected directory, got file)\n", .{dir_path.?});
-                        std.process.exit(1);
-                    },
+                std.Io.Dir.cwd().createDirPath(Zune.io(), dir_path.?) catch |err| switch (err) {
+                    error.NotDir => Zune.quitMsg("<red>error<clear>: failed to create path tree '{s}' (expected directory, got file)\n", .{dir_path.?}),
                     else => return err,
                 };
             const file_name = if (comptime builtin.os.tag == .windows)
@@ -445,23 +401,20 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
             else
                 path;
             defer if (comptime builtin.os.tag == .windows) if (OUTPUT == .default) allocator.free(file_name);
-            const handle = std.fs.cwd().createFile(file_name, .{
+            const handle = std.Io.Dir.cwd().createFile(Zune.io(), file_name, .{
                 .truncate = true,
                 .exclusive = OUTPUT == .default,
-                .mode = switch (comptime builtin.os.tag) {
-                    .wasi, .windows => 0,
-                    else => 0o755,
+                .permissions = switch (comptime builtin.os.tag) {
+                    .wasi, .windows => @enumFromInt(0),
+                    else => @enumFromInt(0o755),
                 },
             }) catch |err| switch (err) {
-                error.PathAlreadyExists => {
-                    Zune.debug.print("<red>error<clear>: '{s}' already exists, use '--out=<<file>>' to specify a path you allow to be written to\n", .{file_name});
-                    std.process.exit(1);
-                },
+                error.PathAlreadyExists => Zune.quitMsg("<red>error<clear>: '{s}' already exists, use '--out=<<file>>' to specify a path you allow to be written to\n", .{file_name}),
                 else => |e| return e,
             };
-            defer handle.close();
-            try handle.writeAll(bundled_bytes.items);
-            try handle.sync();
+            defer handle.close(Zune.io());
+            try handle.writePositionalAll(Zune.io(), bundled_bytes.written(), 0);
+            try handle.sync(Zune.io());
         },
     }
 }
@@ -499,8 +452,8 @@ test "cmdBundle" {
 
         try Execute(allocator, args);
 
-        const file = try std.fs.cwd().openFile(exe_path, .{ .mode = .read_only });
-        defer file.close();
+        const file = try std.Io.Dir.cwd().openFile(Zune.io(), exe_path, .{ .mode = .read_only });
+        defer file.close(Zune.io());
 
         var map = (try Bundle.getFromFile(allocator, file)) orelse unreachable;
         defer map.deinit();
@@ -519,8 +472,8 @@ test "cmdBundle" {
 
         try Execute(allocator, args);
 
-        const file = try std.fs.cwd().openFile(exe_path, .{ .mode = .read_only });
-        defer file.close();
+        const file = try std.Io.Dir.cwd().openFile(Zune.io(), exe_path, .{ .mode = .read_only });
+        defer file.close(Zune.io());
 
         var map = (try Bundle.getFromFile(allocator, file)) orelse unreachable;
         defer map.deinit();

@@ -64,7 +64,7 @@ pub fn lua_hash(L: *VM.lua.State) !i32 {
                 .allocator = allocator,
                 .params = .{ .m = cost, .t = cost2, .p = threads },
                 .mode = mode,
-            }, &buf);
+            }, &buf, Zune.io());
             try L.pushlstring(hash);
         },
         .bcrypt => {
@@ -72,7 +72,7 @@ pub fn lua_hash(L: *VM.lua.State) !i32 {
                 .allocator = allocator,
                 .params = .{ .rounds_log = @intCast(cost), .silently_truncate_password = false },
                 .encoding = .phc,
-            }, &buf);
+            }, &buf, Zune.io());
             try L.pushlstring(hash);
         },
     }
@@ -103,6 +103,7 @@ pub fn lua_verify(L: *VM.lua.State) !i32 {
             hash,
             password,
             .{ .allocator = allocator },
+            Zune.io(),
         )) true else |_| false);
 
     return 1;

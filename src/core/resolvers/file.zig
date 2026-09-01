@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const Zune = @import("zune");
+
 const Bundle = @import("bundle.zig");
 
 const fs = std.fs;
@@ -7,7 +9,7 @@ const fs = std.fs;
 const LuauFile = struct {
     ext: []const u8,
     val: union(enum) {
-        handle: std.fs.File,
+        handle: std.Io.File,
         contents: []const u8,
     },
 };
@@ -41,11 +43,11 @@ pub fn getLuaFileType(path: []const u8) ?LuaFileType {
     return null;
 }
 
-pub fn findLuauFile(dir: std.fs.Dir, fileName: []const u8) !?LuauFile {
+pub fn findLuauFile(dir: std.Io.Dir, fileName: []const u8) !?LuauFile {
     if (getLuaFileType(fileName)) |_|
         return error.RedundantFileExtension;
 
-    var path_buf: [std.fs.max_path_bytes]u8 = undefined;
+    var path_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
 
     if (fileName.len > path_buf.len - LARGEST_EXTENSION.len)
         return error.PathTooLong;
@@ -57,14 +59,14 @@ pub fn findLuauFile(dir: std.fs.Dir, fileName: []const u8) !?LuauFile {
         @memcpy(ext_buf[0..ext.len], ext);
         const result = path_buf[0 .. fileName.len + ext.len];
 
-        const file = dir.openFile(result, .{ .mode = .read_only }) catch |err| switch (err) {
+        const file = dir.openFile(Zune.io(), result, .{ .mode = .read_only }) catch |err| switch (err) {
             else => continue,
         };
-        errdefer file.close();
+        errdefer file.close(Zune.io());
 
-        const md = try file.stat();
+        const md = try file.stat(Zune.io());
         if (md.kind != .file) {
-            file.close();
+            file.close(Zune.io());
             continue;
         }
 
@@ -93,14 +95,14 @@ pub const SearchResult = struct {
     pub fn deinit(self: SearchResult) void {
         for (self.results[0..self.count]) |file| {
             switch (file.val) {
-                .handle => |h| h.close(),
+                .handle => |h| h.close(Zune.io()),
                 .contents => {},
             }
         }
     }
 };
 
-pub fn searchLuauFile(buf: []u8, dir: std.fs.Dir, fileName: []const u8) !SearchResult {
+pub fn searchLuauFile(buf: []u8, dir: std.Io.Dir, fileName: []const u8) !SearchResult {
     if (getLuaFileType(fileName)) |_|
         return error.RedundantFileExtension;
 
@@ -117,14 +119,14 @@ pub fn searchLuauFile(buf: []u8, dir: std.fs.Dir, fileName: []const u8) !SearchR
         @memcpy(ext_buf[0..ext.len], ext);
         const result = buf[0 .. fileName.len + ext.len];
 
-        const file = dir.openFile(result, .{ .mode = .read_only }) catch |err| switch (err) {
+        const file = dir.openFile(Zune.io(), result, .{ .mode = .read_only }) catch |err| switch (err) {
             else => continue,
         };
-        errdefer file.close();
+        errdefer file.close(Zune.io());
 
-        const md = try file.stat();
+        const md = try file.stat(Zune.io());
         if (md.kind != .file) {
-            file.close();
+            file.close(Zune.io());
             continue;
         }
 
@@ -169,7 +171,7 @@ pub fn searchLuauFileBundle(buf: []u8, b: *const Bundle.Map, fileName: []const u
     return results;
 }
 
-pub fn getHomeDir(envMap: std.process.EnvMap) ?[]const u8 {
+pub fn getHomeDir(envMap: std.process.Environ.Map) ?[]const u8 {
     return envMap.get("HOME") orelse envMap.get("USERPROFILE");
 }
 
@@ -179,7 +181,7 @@ pub inline fn shouldFetchHomeDir(path: []const u8) bool {
 
 pub fn resolve(
     allocator: std.mem.Allocator,
-    envMap: std.process.EnvMap,
+    envMap: std.process.Environ.Map,
     paths: []const []const u8,
 ) ![]u8 {
     std.debug.assert(paths.len <= 2);
@@ -207,7 +209,7 @@ pub fn resolve(
 
 pub fn resolveBundled(
     allocator: std.mem.Allocator,
-    envMap: std.process.EnvMap,
+    envMap: std.process.Environ.Map,
     paths: []const []const u8,
     map: ?Bundle.Map,
 ) ![]u8 {

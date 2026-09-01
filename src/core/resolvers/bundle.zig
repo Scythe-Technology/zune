@@ -2,7 +2,7 @@ const std = @import("std");
 const lz4 = @import("lz4");
 const zstd = @import("zstd");
 const builtin = @import("builtin");
-const lcompress = @import("lcompress");
+const Flate = @import("../utils/flate.zig");
 
 const Zune = @import("zune");
 
@@ -70,7 +70,7 @@ pub const Section = union(enum) {
         size: u37,
     };
 
-    pub fn writeScript(writer: anytype, name: []const u8, data: []const u8) !void {
+    pub fn writeScript(writer: *std.Io.Writer, name: []const u8, data: []const u8) !void {
         if (name.len > std.math.maxInt(u15))
             return error.NameTooLong;
         if (data.len > std.math.maxInt(u37))
@@ -88,7 +88,7 @@ pub const Section = union(enum) {
 
     pub fn writeFile(
         allocator: std.mem.Allocator,
-        writer: anytype,
+        writer: *std.Io.Writer,
         name: []const u8,
         data: []const u8,
         compression: Compression,
@@ -114,22 +114,25 @@ pub const Section = union(enum) {
             defer array.deinit(allocator);
             switch (compression) {
                 .zlib => {
-                    var reader: std.Io.Reader = .fixed(data);
-                    try lcompress.zlib.compress(reader.adaptToOldInterface(), array.writer(allocator), .{
-                        .level = .default,
-                    });
+                    const compressed_bytes = try Flate.compress(allocator, data, .zlib, .default);
+                    array = .{
+                        .capacity = compressed_bytes.len,
+                        .items = compressed_bytes,
+                    };
                 },
                 .gzip => {
-                    var reader: std.Io.Reader = .fixed(data);
-                    try lcompress.gzip.compress(reader.adaptToOldInterface(), array.writer(allocator), .{
-                        .level = .default,
-                    });
+                    const compressed_bytes = try Flate.compress(allocator, data, .gzip, .default);
+                    array = .{
+                        .capacity = compressed_bytes.len,
+                        .items = compressed_bytes,
+                    };
                 },
                 .flate => {
-                    var reader: std.Io.Reader = .fixed(data);
-                    try lcompress.flate.compress(reader.adaptToOldInterface(), array.writer(allocator), .{
-                        .level = .default,
-                    });
+                    const compressed_bytes = try Flate.compress(allocator, data, .raw, .default);
+                    array = .{
+                        .capacity = compressed_bytes.len,
+                        .items = compressed_bytes,
+                    };
                 },
                 .lz4 => {
                     const compressed_bytes = try lz4.Standard.compress(allocator, data);
@@ -221,19 +224,10 @@ pub const PackedState = packed struct(u40) {
         jit_enabled: bool = true,
     };
 
-    pub fn write(writer: anytype, state: PackedState) !void {
+    pub fn write(writer: *std.Io.Writer, state: PackedState) !void {
         try writer.writeInt(u40, @bitCast(state), .big);
     }
 };
-
-pub fn adaptToOldInterface(r: *std.Io.Writer) std.Io.AnyWriter {
-    return .{ .context = r, .writeFn = derpWrite };
-}
-
-fn derpWrite(context: *const anyopaque, buffer: []const u8) anyerror!usize {
-    const w: *std.Io.Writer = @ptrCast(@alignCast(@constCast(context)));
-    return w.write(buffer);
-}
 
 pub const Map = struct {
     allocator: std.mem.Allocator,
@@ -259,31 +253,19 @@ pub const Map = struct {
         switch (file.compression) {
             .zlib => {
                 const decompressed_bytes = try self.allocator.alloc(u8, file.size);
-
-                var writer: std.Io.Writer = .fixed(decompressed_bytes);
-                var reader: std.Io.Reader = .fixed(file.data);
-
-                try lcompress.zlib.decompress(reader.adaptToOldInterface(), adaptToOldInterface(&writer));
+                try Flate.decompressInto(decompressed_bytes, file.data, .zlib);
                 file.data = decompressed_bytes;
                 return decompressed_bytes;
             },
             .gzip => {
                 const decompressed_bytes = try self.allocator.alloc(u8, file.size);
-
-                var writer: std.Io.Writer = .fixed(decompressed_bytes);
-                var reader: std.Io.Reader = .fixed(file.data);
-
-                try lcompress.gzip.decompress(reader.adaptToOldInterface(), adaptToOldInterface(&writer));
+                try Flate.decompressInto(decompressed_bytes, file.data, .gzip);
                 file.data = decompressed_bytes;
                 return decompressed_bytes;
             },
             .flate => {
                 const decompressed_bytes = try self.allocator.alloc(u8, file.size);
-
-                var writer: std.Io.Writer = .fixed(decompressed_bytes);
-                var reader: std.Io.Reader = .fixed(file.data);
-
-                try lcompress.flate.decompress(reader.adaptToOldInterface(), adaptToOldInterface(&writer));
+                try Flate.decompressInto(decompressed_bytes, file.data, .raw);
                 file.data = decompressed_bytes;
                 return decompressed_bytes;
             },
@@ -313,7 +295,7 @@ pub const Map = struct {
     fn shortResolve(path: []const u8) []const u8 {
         var resolved = path;
         while (std.mem.startsWith(u8, resolved, "./") or std.mem.startsWith(u8, resolved, ".\\"))
-            resolved = std.mem.trimLeft(u8, resolved[1..], "\\/");
+            resolved = std.mem.trimStart(u8, resolved[1..], "\\/");
         return resolved;
     }
 
@@ -344,7 +326,7 @@ pub const Map = struct {
 };
 
 pub fn loadBundle(allocator: std.mem.Allocator, exe_header: ExeHeader, bundle: []const u8) !Map {
-    var map: std.StringHashMapUnmanaged(Section) = .empty;
+    var map: std.hash_map.StringHashMapUnmanaged(Section) = .empty;
     try map.ensureTotalCapacity(allocator, @intCast(exe_header.sections));
     errdefer map.deinit(allocator);
 
@@ -428,16 +410,17 @@ pub fn loadBundle(allocator: std.mem.Allocator, exe_header: ExeHeader, bundle: [
     };
 }
 
-pub fn getFromFile(allocator: std.mem.Allocator, exe: std.fs.File) !?Map {
+pub fn getFromFile(allocator: std.mem.Allocator, exe: std.Io.File) !?Map {
     const HEADER_SIZE = @sizeOf(ExeHeader) + @sizeOf(u64) + TAG.len;
+    const io = Zune.io();
 
-    const end = try exe.getEndPos();
+    const end = try exe.length(io);
     if (end < HEADER_SIZE)
         return null;
-    try exe.seekFromEnd(-@as(i64, @intCast(HEADER_SIZE)));
+    var pos: u64 = end - HEADER_SIZE;
 
     var header_bytes: [HEADER_SIZE]u8 = undefined;
-    const amt = try exe.readAll(&header_bytes);
+    const amt = try exe.readPositionalAll(io, &header_bytes, pos);
     std.debug.assert(amt == HEADER_SIZE);
     if (!std.mem.eql(u8, header_bytes[@sizeOf(ExeHeader) + @sizeOf(u64) ..], TAG))
         return null;
@@ -445,13 +428,13 @@ pub fn getFromFile(allocator: std.mem.Allocator, exe: std.fs.File) !?Map {
     const header: ExeHeader = @bitCast(std.mem.readVarInt(u64, header_bytes[0..8], .big));
     const hash: u64 = std.mem.readVarInt(u64, header_bytes[@sizeOf(ExeHeader)..][0..8], .big);
 
-    if (end - HEADER_SIZE <= header.size)
+    if (pos <= header.size)
         return error.CorruptBundle;
 
-    try exe.seekBy(-@as(i64, @intCast(header.size + HEADER_SIZE)));
+    pos -= header.size;
 
     const allocated = try allocator.alloc(u8, header.size);
-    const amt_read = try exe.readAll(allocated);
+    const amt_read = try exe.readPositionalAll(io, allocated, pos);
     std.debug.assert(amt_read == header.size);
 
     if (std.hash.XxHash3.hash(SEED, allocated) != hash)
@@ -461,8 +444,8 @@ pub fn getFromFile(allocator: std.mem.Allocator, exe: std.fs.File) !?Map {
 }
 
 pub fn get(allocator: std.mem.Allocator) !?Map {
-    const exe = try std.fs.openSelfExe(.{ .mode = .read_only });
-    defer exe.close();
+    const exe = try std.process.openExecutable(Zune.io(), .{ .mode = .read_only });
+    defer exe.close(Zune.io());
 
     return try getFromFile(allocator, exe);
 }

@@ -58,3 +58,93 @@ pub const context = switch (builtin.os.tag) {
     },
     else => @compileError("Unsupported OS"),
 };
+
+pub fn close(fd: std.posix.fd_t) void {
+    switch (comptime builtin.os.tag) {
+        .windows => std.os.windows.CloseHandle(fd),
+        .linux => _ = std.os.linux.close(fd),
+        else => _ = std.posix.system.close(fd),
+    }
+}
+
+pub fn closeSocket(sock: std.posix.socket_t) void {
+    switch (comptime builtin.os.tag) {
+        .windows => std.os.windows.closesocket(sock) catch {},
+        else => close(sock),
+    }
+}
+
+pub fn listen(sock: std.posix.socket_t, backlog: u32) !void {
+    const rc = std.os.linux.listen(sock, backlog);
+    return switch (std.os.linux.errno(rc)) {
+        .SUCCESS => {},
+        .ADDRINUSE => error.AddressInUse,
+        else => |e| std.posix.unexpectedErrno(e),
+    };
+}
+
+pub fn ipFamily(address: std.Io.net.IpAddress) u32 {
+    return switch (address) {
+        .ip4 => std.posix.AF.INET,
+        .ip6 => std.posix.AF.INET6,
+    };
+}
+
+pub fn bindIp(sock: std.posix.socket_t, address: std.Io.net.IpAddress) !void {
+    const linux = std.os.linux;
+    switch (address) {
+        .ip4 => |a| {
+            var sa: linux.sockaddr.in = .{
+                .port = std.mem.nativeToBig(u16, a.port),
+                .addr = @bitCast(a.bytes),
+            };
+            const rc = linux.bind(sock, @ptrCast(&sa), @sizeOf(@TypeOf(sa)));
+            return switch (linux.errno(rc)) {
+                .SUCCESS => {},
+                .ADDRINUSE => error.AddressInUse,
+                .ACCES => error.AccessDenied,
+                else => |e| std.posix.unexpectedErrno(e),
+            };
+        },
+        .ip6 => |a| {
+            var sa: linux.sockaddr.in6 = .{
+                .port = std.mem.nativeToBig(u16, a.port),
+                .flowinfo = 0,
+                .addr = a.bytes,
+                .scope_id = 0,
+            };
+            const rc = linux.bind(sock, @ptrCast(&sa), @sizeOf(@TypeOf(sa)));
+            return switch (linux.errno(rc)) {
+                .SUCCESS => {},
+                .ADDRINUSE => error.AddressInUse,
+                .ACCES => error.AccessDenied,
+                else => |e| std.posix.unexpectedErrno(e),
+            };
+        },
+    }
+}
+
+pub fn socket(domain: u32, flags: u32, protocol: u32) !std.posix.socket_t {
+    switch (comptime builtin.os.tag) {
+        .windows => return @import("os/windows.zig").socket(domain, flags, protocol),
+        .linux => {
+            const rc = std.os.linux.socket(domain, flags, protocol);
+            return switch (std.os.linux.errno(rc)) {
+                .SUCCESS => @intCast(rc),
+                .MFILE => error.ProcessFdQuotaExceeded,
+                .NFILE => error.SystemFdQuotaExceeded,
+                .NOBUFS, .NOMEM => error.SystemResources,
+                .AFNOSUPPORT => error.AddressFamilyNotSupported,
+                .PROTONOSUPPORT => error.ProtocolNotSupported,
+                else => |e| std.posix.unexpectedErrno(e),
+            };
+        },
+        else => {
+            const rc = std.posix.system.socket(@intCast(domain), @intCast(flags), @intCast(protocol));
+            return switch (std.posix.errno(@intCast(rc))) {
+                .SUCCESS => @intCast(rc),
+                else => |e| std.posix.unexpectedErrno(e),
+            };
+        },
+    }
+}

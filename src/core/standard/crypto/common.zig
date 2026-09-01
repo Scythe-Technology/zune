@@ -18,10 +18,15 @@ pub fn lua_genEncryptFn(comptime algorithm: anytype) VM.zapi.LuaZigFn(anyerror!i
             if (key.len != algorithm.key_length)
                 return L.Zerrorf("invalid key length (expected size {d})", .{algorithm.key_length});
 
-            const nonce = try L.Zcheckvalue([]const u8, 3, null);
-
-            if (nonce.len != algorithm.nonce_length)
-                return L.Zerrorf("invalid nonce length (expected size {d})", .{algorithm.nonce_length});
+            const nonce = if (comptime @hasDecl(algorithm, "nonce_length")) blk: {
+                const n = try L.Zcheckvalue([]const u8, 3, null);
+                if (n.len != algorithm.nonce_length)
+                    return L.Zerrorf("invalid nonce length (expected size {d})", .{algorithm.nonce_length});
+                break :blk n;
+            } else blk: {
+                const n = try L.Zcheckvalue(?[]const u8, 3, null);
+                break :blk n;
+            };
 
             const ad = try L.Zcheckvalue(?[]const u8, 4, null) orelse "";
 
@@ -29,8 +34,12 @@ pub fn lua_genEncryptFn(comptime algorithm: anytype) VM.zapi.LuaZigFn(anyerror!i
             const c = try allocator.alloc(u8, msg.len);
             defer allocator.free(c);
 
-            var snonce: [algorithm.nonce_length]u8 = undefined;
-            @memcpy(snonce[0..], nonce[0..algorithm.nonce_length]);
+            const snonce = if (@hasDecl(algorithm, "nonce_length")) blk: {
+                var s: [algorithm.nonce_length]u8 = undefined;
+                if (nonce.len != 0)
+                    @memcpy(s[0..], nonce[0..nonce.len]);
+                break :blk s;
+            } else nonce;
             var skey: [algorithm.key_length]u8 = undefined;
             @memcpy(skey[0..], key[0..algorithm.key_length]);
 
@@ -65,10 +74,15 @@ pub fn lua_genDecryptFn(comptime algorithm: anytype) VM.zapi.LuaZigFn(anyerror!i
             if (key.len != algorithm.key_length)
                 return L.Zerrorf("invalid key length (expected size {})", .{algorithm.key_length});
 
-            const nonce = try L.Zcheckvalue([]const u8, 4, null);
-
-            if (nonce.len != algorithm.nonce_length)
-                return L.Zerrorf("invalid nonce length (expected size {})", .{algorithm.nonce_length});
+            const nonce = if (comptime @hasDecl(algorithm, "nonce_length")) blk: {
+                const n = try L.Zcheckvalue([]const u8, 4, null);
+                if (n.len != algorithm.nonce_length)
+                    return L.Zerrorf("invalid nonce length (expected size {d})", .{algorithm.nonce_length});
+                break :blk n;
+            } else blk: {
+                const n = try L.Zcheckvalue(?[]const u8, 4, null);
+                break :blk n;
+            };
 
             const ad = try L.Zcheckvalue(?[]const u8, 5, null) orelse "";
 
@@ -77,8 +91,12 @@ pub fn lua_genDecryptFn(comptime algorithm: anytype) VM.zapi.LuaZigFn(anyerror!i
 
             var stag: [algorithm.tag_length]u8 = undefined;
             @memcpy(stag[0..], tag[0..algorithm.tag_length]);
-            var snonce: [algorithm.nonce_length]u8 = undefined;
-            @memcpy(snonce[0..], nonce[0..algorithm.nonce_length]);
+            const snonce = if (@hasDecl(algorithm, "nonce_length")) blk: {
+                var s: [algorithm.nonce_length]u8 = undefined;
+                if (nonce.len != 0)
+                    @memcpy(s[0..], nonce[0..nonce.len]);
+                break :blk s;
+            } else nonce;
             var skey: [algorithm.key_length]u8 = undefined;
             @memcpy(skey[0..], key[0..algorithm.key_length]);
 

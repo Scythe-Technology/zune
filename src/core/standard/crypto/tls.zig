@@ -63,7 +63,7 @@ pub fn lua_bundleFromSystem(L: *VM.lua.State) !i32 {
 
     const self = try L.newuserdatatagged(tls.config.cert.Bundle, TAG_CRYPTO_TLS_CERTBUNDLE);
 
-    self.* = try tls.config.cert.fromSystem(allocator);
+    self.* = try tls.config.cert.fromSystem(allocator, Zune.io());
 
     return 1;
 }
@@ -72,11 +72,11 @@ pub fn lua_bundleFromFile(L: *VM.lua.State) !i32 {
     const allocator = Scheduler.fromState(L).allocator;
 
     const path = try L.Zcheckvalue([]const u8, 1, null);
-    const dir = std.fs.cwd();
+    const dir = std.Io.Dir.cwd();
 
     const self = try L.newuserdatatagged(tls.config.cert.Bundle, TAG_CRYPTO_TLS_CERTBUNDLE);
 
-    self.* = try tls.config.cert.fromFilePath(allocator, dir, path);
+    self.* = try tls.config.cert.fromFilePath(allocator, Zune.io(), dir, path);
 
     return 1;
 }
@@ -87,11 +87,11 @@ pub fn lua_keyPairFromFile(L: *VM.lua.State) !i32 {
     const cert_path = try L.Zcheckvalue([]const u8, 1, null);
     const key_path = try L.Zcheckvalue([]const u8, 2, null);
 
-    const dir = std.fs.cwd();
+    const dir = std.Io.Dir.cwd();
 
     const self = try L.newuserdatatagged(tls.config.CertKeyPair, TAG_CRYPTO_TLS_CERTKEYPAIR);
 
-    self.* = try tls.config.CertKeyPair.fromFilePath(allocator, dir, cert_path, key_path);
+    self.* = try tls.config.CertKeyPair.fromFilePath(allocator, Zune.io(), dir, cert_path, key_path);
 
     return 1;
 }
@@ -154,10 +154,17 @@ pub fn lua_setupClient(L: *VM.lua.State) !i32 {
         .connection = .{
             .handshake = .{
                 .client = .init(.{
+                    .rng = blk: {
+                        const S = struct {
+                            var src: std.Random.IoSource = .{ .io = undefined };
+                        };
+                        S.src.io = Zune.io();
+                        break :blk S.src.interface();
+                    },
+                    .now = std.Io.Clock.now(.real, Zune.io()),
                     .host = host,
                     .root_ca = ca_bundle,
                     .cipher_suites = tls.config.cipher_suites.secure,
-                    .key_log_callback = tls.config.key_log.callback,
                 }),
             },
         },

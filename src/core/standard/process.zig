@@ -58,7 +58,7 @@ fn getProcessArgs(L: *VM.lua.State, allocator: std.mem.Allocator, array: *std.Ar
     };
 }
 
-fn writeProcessEnvMap(L: *VM.lua.State, envMap: *std.process.EnvMap, idx: i32) !void {
+fn writeProcessEnvMap(L: *VM.lua.State, envMap: *std.process.Environ.Map, idx: i32) !void {
     try L.Zchecktype(idx, .Table);
     var iter: LuaHelper.TableIterator = .{ .L = L, .idx = idx };
     while (iter.next()) |t| switch (t) {
@@ -73,7 +73,7 @@ fn writeProcessEnvMap(L: *VM.lua.State, envMap: *std.process.EnvMap, idx: i32) !
 
 const ProcessOptions = struct {
     cwd: ?[]const u8 = null,
-    env: ?process.EnvMap = null,
+    env: ?process.Environ.Map = null,
     joined: ?[]const u8 = null,
     args: std.ArrayList([]const u8),
     stdin: Behavior = .pipe,
@@ -102,7 +102,7 @@ const ProcessOptions = struct {
             if (LuaHelper.maybeKnownType(L.rawgetfield(3, "env"))) |@"type"| {
                 if (@"type" != .Table)
                     return L.Zerrorf("invalid environment (table expected, got {s})", .{VM.lapi.typename(@"type")});
-                options.env = std.process.EnvMap.init(allocator);
+                options.env = std.process.Environ.Map.init(allocator);
                 try writeProcessEnvMap(L, &options.env.?, -1);
             }
             L.pop(1);
@@ -234,8 +234,8 @@ const ProcessAsyncRunContext = struct {
     stdout_read_buffer: [4096]u8 = undefined,
     stderr_read_buffer: [4096]u8 = undefined,
 
-    stdout: ?std.fs.File,
-    stderr: ?std.fs.File,
+    stdout: ?std.Io.File,
+    stderr: ?std.Io.File,
 
     pub fn cleanup(self: *ProcessAsyncRunContext, allocator: std.mem.Allocator) void {
         defer allocator.destroy(self);
@@ -326,7 +326,7 @@ const ProcessAsyncRunContext = struct {
         const bytes = r catch 0;
         if (bytes == 0) {
             self.state.stdout = false;
-            self.stdout.?.close();
+            self.stdout.?.close(Zune.io());
             return .disarm;
         }
         const scheduler = Scheduler.fromState(self.ref.value);
@@ -338,7 +338,7 @@ const ProcessAsyncRunContext = struct {
             self.stdout_writer.appendSlice(allocator, buffer) catch |e| std.debug.panic("{}", .{e});
         if (free_space - buffer.len == 0 or bytes == 0) {
             self.state.stdout = false;
-            self.stdout.?.close();
+            self.stdout.?.close(Zune.io());
             return .disarm;
         }
 
@@ -362,7 +362,7 @@ const ProcessAsyncRunContext = struct {
         const bytes = r catch 0;
         if (bytes == 0) {
             self.state.stderr = false;
-            self.stderr.?.close();
+            self.stderr.?.close(Zune.io());
             return .disarm;
         }
 
@@ -375,7 +375,7 @@ const ProcessAsyncRunContext = struct {
             self.stderr_writer.appendSlice(allocator, buffer) catch |e| std.debug.panic("{}", .{e});
         if (free_space - buffer.len == 0) {
             self.state.stderr = false;
-            self.stderr.?.close();
+            self.stderr.?.close(Zune.io());
             return .disarm;
         }
 
@@ -395,30 +395,26 @@ fn lua_run(L: *VM.lua.State) !i32 {
     var options = try ProcessOptions.init(L, allocator);
     defer options.deinit(allocator);
 
-    var child = process.Child.init(options.args.items, allocator);
-    child.stdin_behavior = if (options.stdin == .inherit) .Inherit else .Ignore;
-    child.stdout_behavior = switch (options.stdout) {
-        .inherit => .Inherit,
-        .pipe => .Pipe,
-        .ignore => .Ignore,
-    };
-    child.stderr_behavior = switch (options.stderr) {
-        .inherit => .Inherit,
-        .pipe => .Pipe,
-        .ignore => .Ignore,
-    };
-    child.cwd = options.cwd;
-    child.env_map = if (options.env) |env|
-        &env
-    else
-        null;
-    child.expand_arg0 = .no_expand;
+    var child = try process.spawn(Zune.io(), .{
+        .argv = options.args.items,
+        .cwd = if (options.cwd) |cwd| .{ .path = cwd } else .inherit,
+        .environ_map = if (options.env != null) &options.env.? else null,
+        .expand_arg0 = .no_expand,
+        .stdin = if (options.stdin == .inherit) .inherit else .ignore,
+        .stdout = switch (options.stdout) {
+            .inherit => .inherit,
+            .pipe => .pipe,
+            .ignore => .ignore,
+        },
+        .stderr = switch (options.stderr) {
+            .inherit => .inherit,
+            .pipe => .pipe,
+            .ignore => .ignore,
+        },
+    });
+    errdefer child.kill(Zune.io());
 
-    try child.spawn();
-    try child.waitForSpawn();
-    errdefer _ = child.kill() catch {};
-
-    var proc = try xev.Process.init(child.id);
+    var proc = try xev.Process.init(child.id orelse return error.AlreadyTerminated);
     errdefer proc.deinit();
 
     const self = try allocator.create(ProcessAsyncRunContext);
@@ -483,35 +479,28 @@ fn lua_create(L: *VM.lua.State) !i32 {
     var options = try ProcessOptions.init(L, allocator);
     defer options.deinit(allocator);
 
-    var child = process.Child.init(options.args.items, allocator);
-    child.expand_arg0 = .no_expand;
-    child.stdin_behavior = switch (options.stdin) {
-        .inherit => .Inherit,
-        .pipe => .Pipe,
-        .ignore => .Ignore,
-    };
-    child.stdout_behavior = switch (options.stdout) {
-        .inherit => .Inherit,
-        .pipe => .Pipe,
-        .ignore => .Ignore,
-    };
-    child.stderr_behavior = switch (options.stderr) {
-        .inherit => .Inherit,
-        .pipe => .Pipe,
-        .ignore => .Ignore,
-    };
-    child.cwd = options.cwd;
-    child.env_map = if (options.env) |env|
-        &env
-    else
-        null;
-
-    switch (comptime builtin.os.tag) {
-        .windows => try @import("../utils/os/windows.zig").spawnWindows(&child),
-        else => try child.spawn(),
-    }
-    try child.waitForSpawn();
-    errdefer _ = child.kill() catch {};
+    var child = try process.spawn(Zune.io(), .{
+        .argv = options.args.items,
+        .cwd = if (options.cwd) |cwd| .{ .path = cwd } else .inherit,
+        .environ_map = if (options.env != null) &options.env.? else null,
+        .expand_arg0 = .no_expand,
+        .stdin = switch (options.stdin) {
+            .inherit => .inherit,
+            .pipe => .pipe,
+            .ignore => .ignore,
+        },
+        .stdout = switch (options.stdout) {
+            .inherit => .inherit,
+            .pipe => .pipe,
+            .ignore => .ignore,
+        },
+        .stderr = switch (options.stderr) {
+            .inherit => .inherit,
+            .pipe => .pipe,
+            .ignore => .ignore,
+        },
+    });
+    errdefer child.kill(Zune.io());
 
     try ProcessChild.push(L, child);
 
@@ -631,7 +620,7 @@ fn decodeEnvironment(L: *VM.lua.State, string: []const u8) !void {
 }
 
 fn loadEnvironment(L: *VM.lua.State, allocator: std.mem.Allocator, file: []const u8) !void {
-    const bytes: []const u8 = std.fs.cwd().readFileAlloc(allocator, file, std.math.maxInt(usize)) catch |err| switch (err) {
+    const bytes: []const u8 = std.Io.Dir.cwd().readFileAlloc(Zune.io(), file, allocator, .unlimited) catch |err| switch (err) {
         error.FileNotFound => return,
         else => return L.Zerrorf("internal error ({s})", .{@errorName(err)}),
     };
@@ -695,7 +684,7 @@ fn lua_onsignal(L: *VM.lua.State) !i32 {
 
 fn lua_cwd(L: *VM.lua.State) !i32 {
     const allocator = Scheduler.fromState(L).allocator;
-    const path = try std.fs.cwd().realpathAlloc(allocator, ".");
+    const path = try std.process.currentPathAlloc(Zune.io(), allocator);
     defer allocator.free(path);
     try L.pushlstring(path);
     return 1;

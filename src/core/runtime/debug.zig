@@ -112,15 +112,15 @@ fn ColorFormat(comptime fmt: []const u8, comptime use_colors: bool) []const u8 {
 
 pub fn print(comptime fmt: []const u8, args: anytype) void {
     var buffer: [64]u8 = undefined;
-    const bw = std.debug.lockStderrWriter(&buffer);
-    defer std.debug.unlockStderrWriter();
+    const stderr = std.debug.lockStderr(&buffer);
+    defer std.debug.unlockStderr();
 
     if (Zune.STATE.FORMAT.USE_COLOR == true and std.mem.eql(u8, Zune.STATE.ENV_MAP.get("NO_COLOR") orelse "0", "0")) {
         const color_format = comptime ColorFormat(fmt, true);
-        nosuspend bw.print(color_format, args) catch return;
+        nosuspend stderr.file_writer.interface.print(color_format, args) catch return;
     } else {
         const color_format = comptime ColorFormat(fmt, false);
-        nosuspend bw.print(color_format, args) catch return;
+        nosuspend stderr.file_writer.interface.print(color_format, args) catch return;
     }
 }
 
@@ -165,23 +165,25 @@ pub fn dumpStackInfo(writer: *std.Io.Writer, padded_string: []u8, info: StackInf
     });
 
     var buffer: [4096]u8 = undefined;
-    var file: std.fs.File = undefined;
-    var file_reader: std.fs.File.Reader = undefined;
+    var file: std.Io.File = undefined;
+    var file_reader: std.Io.File.Reader = undefined;
+    var fixed_reader: std.Io.Reader = undefined;
+    var reader: *std.Io.Reader = undefined;
 
     if (Zune.STATE.BUNDLE) |b| {
         const script = b.loadScript(src[1..]) catch |e| {
             return writeFullPreviewError(writer, padded_string, current_line, "Failed to open source file: {t}", .{e});
         };
-        file_reader.interface = .fixed(script);
+        fixed_reader = .fixed(script);
+        reader = &fixed_reader;
     } else {
-        file = std.fs.cwd().openFile(src[1..], .{ .mode = .read_only }) catch |e| {
+        file = std.Io.Dir.cwd().openFile(Zune.io(), src[1..], .{ .mode = .read_only }) catch |e| {
             return writeFullPreviewError(writer, padded_string, current_line, "Failed to open source file: {t}", .{e});
         };
-        file_reader = file.reader(&buffer);
+        file_reader = file.reader(Zune.io(), &buffer);
+        reader = &file_reader.interface;
     }
-    defer if (Zune.STATE.BUNDLE == null) file.close();
-
-    var reader = &file_reader.interface;
+    defer if (Zune.STATE.BUNDLE == null) file.close(Zune.io());
 
     if (current_line > 1) for (0..@intCast(current_line - 1)) |_| {
         while (true) {
@@ -376,10 +378,10 @@ pub fn dumpDefinitionTrace(L: *VM.lua.State, idx: i32) !void {
 
         @memset(padded_string, ' ');
 
-        const stderr = std.debug.lockStderrWriter(&.{});
-        defer std.debug.unlockStderrWriter();
+        const stderr = std.debug.lockStderr(&.{});
+        defer std.debug.unlockStderr();
 
-        try dumpStackInfo(stderr, padded_string, info, null);
+        try dumpStackInfo(&stderr.file_writer.interface, padded_string, info, null);
     } else {
         print("<green>error<clear>: {s}\n", .{err_msg});
         print("{s}\n", .{L.debugtrace()});
@@ -499,16 +501,16 @@ pub fn dumpErrorStackTrace(L: *VM.lua.State) !void {
         err_msg = err_trimmed[line_number.len..];
     }
 
-    const stderr = std.debug.lockStderrWriter(&.{});
-    defer std.debug.unlockStderrWriter();
+    const stderr = std.debug.lockStderr(&.{});
+    defer std.debug.unlockStderr();
 
-    try writerPrint(stderr, "<red>error<clear>: {s}\n", .{err_msg});
+    try writerPrint(&stderr.file_writer.interface, "<red>error<clear>: {s}\n", .{err_msg});
 
     if (Zune.STATE.BUNDLE) |b|
         if (b.mode.compiled == .release)
             return;
 
-    try dumpStackTrace(stderr, list.items, reference_level);
+    try dumpStackTrace(&stderr.file_writer.interface, list.items, reference_level);
 }
 
 pub fn dumpErrorTrace(L: *VM.lua.State, err: anyerror, forceDetailed: bool) void {

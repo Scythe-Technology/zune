@@ -33,10 +33,10 @@ const RequireItem = union(enum) {
     loading: void,
     @"error": void,
     loaded: void,
-    yielded: std.ArrayListUnmanaged(QueueItem),
+    yielded: std.ArrayList(QueueItem),
 };
 
-threadlocal var REQUIRE_MAP: std.StringHashMapUnmanaged(RequireItem) = .empty;
+threadlocal var REQUIRE_MAP: std.hash_map.StringHashMapUnmanaged(RequireItem) = .empty;
 
 const RequireContext = struct {
     allocator: std.mem.Allocator,
@@ -116,7 +116,7 @@ fn require_dtor(self: *RequireContext, _: *VM.lua.State, _: *Scheduler) void {
 }
 
 const RequireNavigatorContext = struct {
-    dir: std.fs.Dir,
+    dir: std.Io.Dir,
     allocator: std.mem.Allocator,
 
     const This = @This();
@@ -134,7 +134,7 @@ const RequireNavigatorContext = struct {
                         error.FileNotFound => return error.NotPresent,
                         else => return err,
                     };
-            break :blk self.dir.readFileAlloc(allocator, path, std.math.maxInt(usize)) catch |err| switch (err) {
+            break :blk self.dir.readFileAlloc(Zune.io(), path, allocator, .unlimited) catch |err| switch (err) {
                 error.AccessDenied, error.FileNotFound => return error.NotPresent,
                 else => return err,
             };
@@ -172,7 +172,7 @@ pub fn resolveScriptPath(
     allocator: std.mem.Allocator,
     L: *VM.lua.State,
     moduleName: []const u8,
-    dir: std.fs.Dir,
+    dir: std.Io.Dir,
 ) ![]const u8 {
     var ar: VM.lua.Debug = .{ .ssbuf = undefined };
     {
@@ -213,10 +213,10 @@ pub fn checkSearchResult(
     if (res.count > 1) {
         @branchHint(.unlikely);
 
-        var buf: std.ArrayListUnmanaged(u8) = .empty;
-        defer buf.deinit(allocator);
+        var buf: std.Io.Writer.Allocating = .init(allocator);
+        defer buf.deinit();
 
-        const writer = buf.writer(allocator);
+        const writer = &buf.writer;
 
         try writer.writeAll("module name conflicted.");
 
@@ -229,7 +229,7 @@ pub fn checkSearchResult(
             try writer.print("{s}{s}", .{ path, entry.ext });
         }
 
-        try L.pushlstring(buf.items);
+        try L.pushlstring(buf.written());
         return error.RaiseLuauError;
     }
 }
@@ -240,7 +240,7 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
 
     const moduleName = L.Lcheckstring(1);
 
-    const cwd = std.fs.cwd();
+    const cwd = std.Io.Dir.cwd();
 
     const script_path = try resolveScriptPath(allocator, L, moduleName, cwd);
     jmp: {
@@ -284,7 +284,7 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
     const search_result = blk: {
         errdefer allocator.free(script_path);
 
-        std.debug.assert(script_path.len <= std.fs.max_path_bytes);
+        std.debug.assert(script_path.len <= std.Io.Dir.max_path_bytes);
 
         module_src_buf[0] = '@';
         @memcpy(module_src_buf[1..][0..script_path.len], script_path);
@@ -330,9 +330,12 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
     {
         const file_content: []const u8 = switch (file.val) {
             .contents => |c| c,
-            .handle => |h| h.readToEndAlloc(allocator, std.math.maxInt(usize)) catch |err| {
-                entry.value_ptr.* = .@"error";
-                return L.Zerrorf("could not read file: {}", .{err});
+            .handle => |h| blk: {
+                var reader = h.reader(Zune.io(), &.{});
+                break :blk reader.interface.allocRemaining(allocator, .unlimited) catch |err| {
+                    entry.value_ptr.* = .@"error";
+                    return L.Zerrorf("could not read file: {}", .{err});
+                };
             },
         };
         defer if (file.val == .handle) allocator.free(file_content);
@@ -419,7 +422,7 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
 
 pub fn init(allocator: std.mem.Allocator) !void {
     REQUIRE_MAP = .empty;
-    Navigator.PATH_ALLOCATOR = .init(try allocator.alloc(u8, (std.fs.max_path_bytes * 4) + 32));
+    Navigator.PATH_ALLOCATOR = .init(try allocator.alloc(u8, (std.Io.Dir.max_path_bytes * 4) + 32));
 }
 
 pub fn deinit(allocator: std.mem.Allocator) void {

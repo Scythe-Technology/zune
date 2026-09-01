@@ -1,6 +1,8 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
+const Zune = @import("zune");
+
 const Terminal = @This();
 
 const WindowsSettings = struct {
@@ -17,8 +19,8 @@ const Modes = enum {
 stdin_istty: bool,
 stdout_istty: bool,
 
-stdin_file: std.fs.File,
-stdout_file: std.fs.File,
+stdin_file: std.Io.File,
+stdout_file: std.Io.File,
 settings: ?if (builtin.os.tag == .windows) WindowsSettings else std.posix.termios = null,
 current_settings: if (builtin.os.tag == .windows) WindowsSettings else void = if (builtin.os.tag == .windows) .{
     .stdin_mode = 0,
@@ -64,10 +66,10 @@ pub fn SupportedPlatform() bool {
     };
 }
 
-pub fn init(stdin_file: std.fs.File, stdout_file: std.fs.File) Terminal {
+pub fn init(stdin_file: std.Io.File, stdout_file: std.Io.File) Terminal {
     return .{
-        .stdin_istty = std.posix.isatty(stdin_file.handle),
-        .stdout_istty = std.posix.isatty(stdout_file.handle),
+        .stdin_istty = stdin_file.isTty(Zune.io()) catch false,
+        .stdout_istty = stdout_file.isTty(Zune.io()) catch false,
         .stdin_file = stdin_file,
         .stdout_file = stdout_file,
         .mode = .Plain, // prob best to assume plain text.
@@ -137,7 +139,7 @@ pub fn generateSequenceWriter(seq: []const u8) fn (self: *Terminal) anyerror!voi
     return struct {
         fn inner(self: *Terminal) !void {
             var buffer: [6]u8 = undefined;
-            var writer = self.stdout_file.writer(&buffer);
+            var writer = self.stdout_file.writer(Zune.io(), &buffer);
             try writer.interface.writeAll(seq);
             try writer.interface.flush();
         }
@@ -151,14 +153,14 @@ pub const clearEndToCursor = generateSequenceWriter("\x1b[0J");
 
 pub fn writeAllRetainCursor(self: *Terminal, string: []const u8) !void {
     var buffer: [64]u8 = undefined;
-    var writer = self.stdout_file.writer(&buffer);
+    var writer = self.stdout_file.writer(Zune.io(), &buffer);
     try writer.interface.writeAll(string);
     try writer.interface.print("\x1b[{d}D", .{string.len});
     try writer.interface.flush();
 }
 pub fn moveCursor(self: *Terminal, comptime action: MoveCursorAction, amount: usize) !void {
     var buffer: [8]u8 = undefined;
-    var writer = self.stdout_file.writer(&buffer);
+    var writer = self.stdout_file.writer(Zune.io(), &buffer);
     switch (amount) {
         0 => return,
         1 => try writer.interface.writeAll("\x1b[" ++ switch (action) {

@@ -79,11 +79,12 @@ pub const OpenMode = packed struct {
     }
 };
 
-file: std.fs.File,
+file: std.Io.File,
 mode: OpenMode = .{},
 kind: FileKind = .File,
 overlapped: if (builtin.os.tag == .windows) bool else void = if (builtin.os.tag == .windows) true else undefined,
 list: *Scheduler.CompletionLinkedList,
+offset: u64 = 0,
 
 pub const AsyncReadContext = struct {
     completion: Scheduler.CompletionLinkedList.Node = .{
@@ -229,7 +230,7 @@ pub const AsyncReadContext = struct {
 
     pub fn queue(
         L: *VM.lua.State,
-        f: std.fs.File,
+        f: std.Io.File,
         useBuffer: bool,
         pre_alloc_size: usize,
         max_size: usize,
@@ -289,7 +290,7 @@ pub const AsyncReadContext = struct {
     // for windows
     pub const Thread = struct {
         task: xev.ThreadPool.Task,
-        file: std.fs.File,
+        file: std.Io.File,
         async: AsyncReadContext,
 
         pub fn perform(task: *xev.ThreadPool.Task) void {
@@ -451,7 +452,7 @@ pub const AsyncWriteContext = struct {
 
     pub fn queue(
         L: *VM.lua.State,
-        f: std.fs.File,
+        f: std.Io.File,
         data: []const u8,
         auto_close: bool,
         pos: u64,
@@ -507,7 +508,7 @@ pub const AsyncWriteContext = struct {
 
 inline fn getPos(self: *File) !u64 {
     return switch (self.kind) {
-        .File => if (self.mode.canSeek()) try self.file.getPos() else 0,
+        .File => if (self.mode.canSeek()) self.offset else 0,
         .Tty => 0,
     };
 }
@@ -516,11 +517,14 @@ fn lua_write(self: *File, L: *VM.lua.State) !i32 {
     if (!self.mode.canWrite())
         return error.NotOpenForWriting;
     const data = try L.Zcheckvalue([]const u8, 2, null);
+    defer if (self.mode.canSeek()) {
+        self.offset += data.len;
+    };
 
     switch (comptime builtin.os.tag) {
         .windows => if (self.kind == .Tty and !self.overlapped) {
             // use sync since most times files are not open with overlapped
-            try self.file.writeAll(data);
+            try self.file.writePositionalAll(Zune.io(), data, self.offset);
             return 0;
         },
         else => {},
@@ -531,14 +535,14 @@ fn lua_write(self: *File, L: *VM.lua.State) !i32 {
         self.file,
         data,
         false,
-        try self.getPos(),
+        self.offset,
         self.kind,
         self.list,
     );
 }
 
 fn windows_pwriteAll(self: *File, data: []const u8, pos: u64) !void {
-    const file: std.fs.File = blk: {
+    const file: std.Io.File = blk: {
         if (!self.overlapped)
             break :blk self.file;
         var io_status_block: std.os.windows.IO_STATUS_BLOCK = undefined;
@@ -568,7 +572,7 @@ fn windows_pwriteAll(self: *File, data: []const u8, pos: u64) !void {
 
         break :blk .{ .handle = handle };
     };
-    defer if (self.overlapped) file.close();
+    defer if (self.overlapped) file.close(Zune.io());
 
     defer if (self.overlapped and self.mode.canSeek()) self.file.seekTo(pos + data.len) catch {};
     try file.pwriteAll(data, pos);
@@ -578,10 +582,13 @@ fn lua_writeSync(self: *File, L: *VM.lua.State) !i32 {
     if (!self.mode.canWrite())
         return error.NotOpenForWriting;
     const data = try L.Zcheckvalue([]const u8, 2, null);
+    defer if (self.mode.canSeek()) {
+        self.offset += data.len;
+    };
 
     switch (comptime builtin.os.tag) {
-        .windows => try self.windows_pwriteAll(data, try self.getPos()),
-        else => try self.file.writeAll(data),
+        .windows => try self.windows_pwriteAll(data, self.offset),
+        else => try self.file.writePositionalAll(Zune.io(), data, self.offset),
     }
 
     return 0;
@@ -591,11 +598,14 @@ fn lua_append(self: *File, L: *VM.lua.State) !i32 {
     if (!self.mode.canWrite())
         return error.NotOpenForWriting;
     const string = try L.Zcheckvalue([]const u8, 2, null);
+    defer if (self.mode.canSeek()) {
+        self.offset += string.len;
+    };
 
     const pos = pos: {
         if (self.mode.canSeek()) {
-            try self.file.seekFromEnd(0);
-            break :pos try self.file.getPos();
+            self.offset = try self.file.length(Zune.io());
+            break :pos self.offset;
         }
         break :pos 0;
     };
@@ -607,12 +617,15 @@ fn lua_appendSync(self: *File, L: *VM.lua.State) !i32 {
     if (!self.mode.canWrite())
         return error.NotOpenForWriting;
     const string = try L.Zcheckvalue([]const u8, 2, null);
+    defer if (self.mode.canSeek()) {
+        self.offset += string.len;
+    };
 
     if (self.mode.canSeek())
-        try self.file.seekFromEnd(0);
+        self.offset = try self.file.length(Zune.io());
     switch (comptime builtin.os.tag) {
-        .windows => try self.windows_pwriteAll(string, try self.getPos()),
-        else => try self.file.writeAll(string),
+        .windows => try self.windows_pwriteAll(string, self.offset),
+        else => try self.file.writePositionalAll(Zune.io(), string, self.offset),
     }
 
     return 0;
@@ -623,7 +636,7 @@ fn lua_getSeekPosition(self: *File, L: *VM.lua.State) !i32 {
         .File => {},
         .Tty => return error.NotSeekable,
     }
-    L.pushnumber(@floatFromInt(try self.getPos()));
+    L.pushnumber(@floatFromInt(self.offset));
     return 1;
 }
 
@@ -632,7 +645,7 @@ fn lua_getSize(self: *File, L: *VM.lua.State) !i32 {
         .File => {},
         .Tty => return error.NotSeekable,
     }
-    L.pushnumber(@floatFromInt(try self.file.getEndPos()));
+    L.pushnumber(@floatFromInt(try self.file.length(Zune.io())));
     return 1;
 }
 
@@ -641,7 +654,16 @@ fn lua_seekFromEnd(self: *File, L: *VM.lua.State) !i32 {
         .File => {},
         .Tty => return error.NotSeekable,
     }
-    try self.file.seekFromEnd(@intFromFloat(L.Loptnumber(2, 0)));
+    const length: u64 = try self.file.length(Zune.io());
+    const offset: i64 = @intFromFloat(L.Loptnumber(2, 0));
+    if (offset < 0) {
+        self.offset = length;
+        return 0;
+    } else if (offset > length) {
+        self.offset = 0;
+        return 0;
+    }
+    self.offset = @intCast(@as(i64, @intCast(length)) - offset);
     return 0;
 }
 
@@ -650,7 +672,7 @@ fn lua_seekTo(self: *File, L: *VM.lua.State) !i32 {
         .File => {},
         .Tty => return error.NotSeekable,
     }
-    try self.file.seekTo(@intFromFloat(@max(0, L.Loptnumber(2, 0))));
+    self.offset = @intFromFloat(@max(0, L.Loptnumber(2, 0)));
     return 0;
 }
 
@@ -659,7 +681,14 @@ fn lua_seekBy(self: *File, L: *VM.lua.State) !i32 {
         .File => {},
         .Tty => return error.NotSeekable,
     }
-    try self.file.seekBy(@intFromFloat(L.Loptnumber(2, 1)));
+    if (!self.mode.canSeek())
+        return error.NotOpenForSeeking;
+    const offset: i64 = @intFromFloat(L.Loptnumber(2, 0));
+    if (offset < 0 and @abs(offset) > self.offset) {
+        self.offset = 0;
+        return 0;
+    }
+    self.offset = @intCast(@as(i64, @intCast(self.offset)) + offset);
     return 0;
 }
 
@@ -739,9 +768,9 @@ fn lua_readSync(self: *File, L: *VM.lua.State) !i32 {
         .File => {
             switch (comptime builtin.os.tag) {
                 .windows => {
-                    const pos = try self.getPos();
+                    const pos = self.offset;
 
-                    const file: std.fs.File = blk: {
+                    const file: std.Io.File = blk: {
                         if (!self.overlapped)
                             break :blk self.file;
                         var io_status_block: std.os.windows.IO_STATUS_BLOCK = undefined;
@@ -771,7 +800,7 @@ fn lua_readSync(self: *File, L: *VM.lua.State) !i32 {
 
                         break :blk .{ .handle = handle };
                     };
-                    defer if (self.overlapped) file.close();
+                    defer if (self.overlapped) file.close(Zune.io());
 
                     var list = try std.ArrayList(u8).initCapacity(allocator, @min(size, 4096));
                     defer list.deinit(allocator);
@@ -801,7 +830,9 @@ fn lua_readSync(self: *File, L: *VM.lua.State) !i32 {
                         try L.pushlstring(list.items);
                 },
                 else => {
-                    const data = try self.file.readToEndAlloc(allocator, @intCast(size));
+                    var read_buf: [4096]u8 = undefined;
+                    var file_reader = self.file.reader(Zune.io(), &read_buf);
+                    const data = try file_reader.interface.allocRemaining(allocator, .limited(@intCast(size)));
                     defer allocator.free(data);
 
                     if (useBuffer)
@@ -822,14 +853,19 @@ fn lua_readSync(self: *File, L: *VM.lua.State) !i32 {
             if (poll < 0)
                 std.debug.panic("InternalError (Bad Poll)", .{});
             if (poll == 0) {
-                try L.pushlstring("");
+                if (useBuffer)
+                    try L.Zpushbuffer("")
+                else
+                    try L.pushlstring("");
                 break :blk;
             }
 
             var buffer = try allocator.alloc(u8, @intCast(size));
             defer allocator.free(buffer);
 
-            const amount = try self.file.read(buffer);
+            var read_buf: [1]u8 = undefined;
+            var file_reader = self.file.reader(Zune.io(), &read_buf);
+            const amount = try file_reader.interface.readSliceShort(buffer);
 
             const data = buffer[0..amount];
             if (useBuffer)
@@ -851,7 +887,7 @@ fn lua_lock(self: *File, L: *VM.lua.State) !i32 {
         .freebsd, .openbsd, .netbsd, .dragonfly => {},
         else => return error.UnsupportedPlatform,
     }
-    var lockOpt: std.fs.File.Lock = .exclusive;
+    var lockOpt: std.Io.File.Lock = .exclusive;
     if (L.typeOf(2) == .String) {
         const lockType = L.tostring(2) orelse unreachable;
         if (std.mem.eql(u8, lockType, "shared")) {
@@ -888,7 +924,7 @@ fn lua_lock(self: *File, L: *VM.lua.State) !i32 {
         }
         L.pushboolean(true);
     } else {
-        L.pushboolean(try self.file.tryLock(lockOpt));
+        L.pushboolean(try self.file.tryLock(Zune.io(), lockOpt));
     }
     return 1;
 }
@@ -904,7 +940,7 @@ fn lua_unlock(self: *File, L: *VM.lua.State) !i32 {
         else => return error.UnsupportedPlatform,
     }
     _ = L;
-    self.file.unlock();
+    self.file.unlock(Zune.io());
     return 0;
 }
 
@@ -913,7 +949,7 @@ fn lua_sync(self: *File, _: *VM.lua.State) !i32 {
         .File => {},
         .Tty => return error.NotFile,
     }
-    try self.file.sync();
+    try self.file.sync(Zune.io());
 
     return 0;
 }
@@ -930,8 +966,8 @@ fn lua_readonly(self: *File, L: *VM.lua.State) !i32 {
         L.pushboolean(permissions.readOnly());
         return 1;
     } else L.toboolean(2);
-    permissions.setReadOnly(enabled);
-    try self.file.setPermissions(permissions);
+    permissions = permissions.setReadOnly(enabled);
+    try self.file.setPermissions(Zune.io(), permissions);
     return 0;
 }
 
@@ -1030,7 +1066,7 @@ const __index = MethodMap.CreateStaticIndexMap(File, TAG_FS_FILE, .{
 pub fn __dtor(L: *VM.lua.State, self: *File) void {
     const allocator = Scheduler.fromState(L).allocator;
     if (self.mode.isOpen() and self.mode.close)
-        self.file.close();
+        self.file.close(Zune.io());
     self.list.deinit(allocator);
 }
 
@@ -1045,7 +1081,7 @@ pub inline fn load(L: *VM.lua.State) !void {
     L.setuserdatadtor(File, TAG_FS_FILE, __dtor);
 }
 
-pub fn push(L: *VM.lua.State, file: std.fs.File, kind: FileKind, mode: OpenMode) !*File {
+pub fn push(L: *VM.lua.State, file: std.Io.File, kind: FileKind, mode: OpenMode) !*File {
     const allocator = Scheduler.fromState(L).allocator;
     const self = try L.newuserdatataggedwithmetatable(File, TAG_FS_FILE);
     const list = try allocator.create(Scheduler.CompletionLinkedList);

@@ -1,45 +1,36 @@
 const std = @import("std");
-const lcompress = @import("lcompress");
 
-pub fn adaptToOldInterface(r: *std.Io.Writer) std.Io.AnyWriter {
-    return .{ .context = r, .writeFn = derpWrite };
-}
+pub fn main(init: std.process.Init) !void {
+    const allocator = init.gpa;
+    const io = init.io;
 
-fn derpWrite(context: *const anyopaque, buffer: []const u8) anyerror!usize {
-    const w: *std.Io.Writer = @ptrCast(@alignCast(@constCast(context)));
-    return w.write(buffer);
-}
-
-pub fn main() !void {
-    const allocator = std.heap.page_allocator;
-    const args = try std.process.argsAlloc(allocator);
-    defer std.process.argsFree(allocator, args);
+    const args = try init.minimal.args.toSlice(allocator);
+    defer allocator.free(args);
 
     if (args.len < 3) {
-        try std.fs.File.stderr().writeAll("Usage: <FilePath> <FilePath>\n");
+        std.debug.print("Usage: <FilePath> <FilePath>\n", .{});
         std.process.exit(1);
     }
 
-    const file = try std.fs.openFileAbsolute(args[1], .{
+    const file = try std.Io.Dir.openFileAbsolute(io, args[1], .{
         .mode = .read_only,
     });
-    defer file.close();
+    defer file.close(io);
 
     var read_buffer: [4096]u8 = undefined;
-    var file_reader = file.reader(&read_buffer);
+    var file_reader = file.reader(io, &read_buffer);
 
-    const reader = &file_reader.interface;
-    const old_reader = reader.adaptToOldInterface();
-
-    const compressed_file = try std.fs.createFileAbsolute(args[2], .{});
-    defer compressed_file.close();
+    const compressed_file = try std.Io.Dir.createFileAbsolute(io, args[2], .{});
+    defer compressed_file.close(io);
 
     var write_buffer: [4096]u8 = undefined;
-    var file_writer = compressed_file.writer(&write_buffer);
-
+    var file_writer = compressed_file.writer(io, &write_buffer);
     const writer = &file_writer.interface;
-    const old_writer = adaptToOldInterface(writer);
 
-    try lcompress.gzip.compress(old_reader, old_writer, .{});
+    var compress_buffer: [std.compress.flate.max_window_len]u8 = undefined;
+    var compression = try std.compress.flate.Compress.init(writer, &compress_buffer, .gzip, .best);
+
+    _ = try file_reader.interface.streamRemaining(&compression.writer);
+    try compression.finish();
     try writer.flush();
 }

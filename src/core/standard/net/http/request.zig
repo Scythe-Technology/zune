@@ -9,8 +9,8 @@ const Self = @This();
 
 const Url = @import("url.zig");
 
-const Stream = std.net.Stream;
-const Address = std.net.Address;
+const Stream = std.Io.net.Stream;
+const Address = std.Io.net.IpAddress;
 const Allocator = std.mem.Allocator;
 const ArenaAllocator = std.heap.ArenaAllocator;
 
@@ -31,12 +31,7 @@ pub const Protocol = enum {
 };
 
 /// converts ascii to unsigned int of appropriate size
-pub fn asUint(comptime string: anytype) @Type(std.builtin.Type{
-    .int = .{
-        .bits = @bitSizeOf(@TypeOf(string.*)) - 8, // (- 8) to exclude sentinel 0
-        .signedness = .unsigned,
-    },
-}) {
+pub fn asUint(comptime string: anytype) @Int(.unsigned, @bitSizeOf(@TypeOf(string.*)) - 8) {
     const byteLength = @bitSizeOf(@TypeOf(string.*)) / 8 - 1;
     const expectedType = *const [byteLength:0]u8;
     if (@TypeOf(string) != expectedType) {
@@ -60,12 +55,12 @@ pub const Parser = struct {
     stage: Stage = .method,
     method: Method = .GET,
     protocol: Protocol = .HTTP10,
-    headers: std.StringHashMapUnmanaged([]const u8),
+    headers: std.hash_map.StringHashMapUnmanaged([]const u8),
     body: ?union(enum) {
         dynamic: std.Io.Writer,
         chunked: struct {
             size: ?usize = null,
-            buffer: std.ArrayListUnmanaged(u8) = .empty,
+            buffer: std.ArrayList(u8) = .empty,
         },
         static: []const u8,
     } = null,
@@ -78,7 +73,7 @@ pub const Parser = struct {
     const Stage = enum { method, url, protocol, headers, body, done };
 
     pub fn init(allocator: Allocator, max_body_size: usize, max_header_size: usize, max_header_count: u32) Parser {
-        var headers: std.StringHashMapUnmanaged([]const u8) = .empty;
+        var headers: std.hash_map.StringHashMapUnmanaged([]const u8) = .empty;
         headers.ensureTotalCapacity(allocator, max_header_count) catch |err| std.debug.panic("{}\n", .{err});
         return .{
             .arena = .init(allocator),

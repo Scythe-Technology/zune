@@ -16,6 +16,8 @@ const Response = @import("../response.zig");
 
 const TAG_CRYPTO_TLS_CERTBUNDLE = Zune.Tags.get("CRYPTO_TLS_CERTBUNDLE").?;
 
+const sysfd = @import("../../../../utils/sysfd.zig");
+
 const VM = luau.VM;
 
 const ZUNE_CLIENT_HEADER = "zune/" ++ Zune.VERSION_STR;
@@ -42,7 +44,7 @@ pub const State = struct {
     http_request: []const u8,
     tls: ?*TlsContext = null,
     timeout: ?f64 = null,
-    address_list: ?*std.net.AddressList,
+    address_list: ?[]std.Io.net.IpAddress,
     socket: std.posix.socket_t,
     address_index: usize = 0,
     body_type: VM.lua.Type = .String,
@@ -506,7 +508,7 @@ pub fn onWrite(
 fn resumeError(self: *Self, err: anyerror) void {
     const L = self.lua_ref.value;
 
-    std.posix.close(self.state.socket);
+    sysfd.close(self.state.socket);
 
     if (L.status() != .Yield)
         return self.deinit();
@@ -584,17 +586,19 @@ fn onConnectComplete(
         error.Canceled => return self.safeResumeWithError(error.Timeout),
         else => {
             self.state.address_index += 1;
-            if (self.state.address_list.?.addrs.len == self.state.address_index)
+            if (self.state.address_list.?.len == self.state.address_index)
                 return self.safeResumeWithError(error.ConnectionRefused);
-            const addr = self.state.address_list.?.addrs[self.state.address_index];
+            const addr = self.state.address_list.?[self.state.address_index];
             const socket = self.state.socket;
             self.connectAddress(addr) catch |cerr| return self.safeResumeWithError(cerr);
-            std.posix.close(socket);
+            sysfd.close(socket);
             return .disarm;
         },
     };
-    self.state.address_list.?.deinit();
-    self.state.address_list = null;
+    if (self.state.address_list) |list| {
+        self.parser.arena.child_allocator.free(list);
+        self.state.address_list = null;
+    }
     if (self.state.stage == .closed)
         return self.safeResumeWithError(error.Timeout);
     if (self.state.tls) |ctx| {
@@ -623,10 +627,10 @@ fn onConnectComplete(
     return .disarm;
 }
 
-fn connectAddress(self: *Self, addr: std.net.Address) !void {
+fn connectAddress(self: *Self, addr: std.Io.net.IpAddress) !void {
     const scheduler = Scheduler.fromState(self.lua_ref.value);
     const socket = try @import("../../lib.zig").createSocket(
-        addr.any.family,
+        sysfd.ipFamily(addr),
         std.posix.SOCK.STREAM | std.posix.SOCK.CLOEXEC | std.posix.SOCK.NONBLOCK,
         std.posix.IPPROTO.TCP,
     );
@@ -656,7 +660,7 @@ fn deinit(self: *Self) void {
         allocator.destroy(ctx);
     }
     if (self.state.address_list) |addr|
-        addr.deinit();
+        allocator.free(addr);
     allocator.free(self.state.http_request);
     self.parser.deinit();
 }
@@ -700,7 +704,7 @@ pub fn lua_request(L: *VM.lua.State) !i32 {
     errdefer if (host_copy) |h| allocator.free(h);
     errdefer if (ca_bundle) |*b| b.deinit(allocator);
 
-    var headers: std.ArrayListUnmanaged(u8) = .empty;
+    var headers: std.ArrayList(u8) = .empty;
     defer headers.deinit(allocator);
     var host_handled = false;
     var user_agent_handled = false;
@@ -824,13 +828,13 @@ pub fn lua_request(L: *VM.lua.State) !i32 {
     });
     errdefer allocator.free(request);
 
-    const list = try std.net.getAddressList(allocator, host, valid_uri.port orelse switch (protocol) {
+    const list = try @import("../../lib.zig").lookupAddresses(allocator, host, valid_uri.port orelse switch (protocol) {
         .plain => 80,
         .tls => 443,
     });
-    errdefer list.deinit();
+    errdefer allocator.free(list);
 
-    if (list.addrs.len == 0)
+    if (list.len == 0)
         return error.UnknownHostName;
 
     var tls_ctx: ?*TlsContext = null;
@@ -838,7 +842,7 @@ pub fn lua_request(L: *VM.lua.State) !i32 {
     if (protocol == .tls or force_tls) {
         tls_ctx = try allocator.create(TlsContext);
         host_copy = host_copy orelse try allocator.dupe(u8, host);
-        ca_bundle = ca_bundle orelse try tls.config.cert.fromSystem(allocator);
+        ca_bundle = ca_bundle orelse try tls.config.cert.fromSystem(allocator, Zune.io());
         tls_ctx.?.* = .{
             .record = .{
                 .buffer = &tls_ctx.?.record_buffer,
@@ -867,10 +871,17 @@ pub fn lua_request(L: *VM.lua.State) !i32 {
             .connection = .{
                 .handshake = .{
                     .client = .init(.{
+                        .rng = blk: {
+                            const Rng = struct {
+                                var src: std.Random.IoSource = .{ .io = undefined };
+                            };
+                            Rng.src.io = Zune.io();
+                            break :blk Rng.src.interface();
+                        },
+                        .now = std.Io.Clock.now(.real, Zune.io()),
                         .host = host_copy.?,
                         .root_ca = ca_bundle.?,
                         .cipher_suites = tls.config.cipher_suites.secure,
-                        .key_log_callback = tls.config.key_log.callback,
                     }),
                 },
             },
@@ -904,7 +915,7 @@ pub fn lua_request(L: *VM.lua.State) !i32 {
     };
     errdefer self.lua_ref.deref();
 
-    try self.connectAddress(list.addrs[0]);
+    try self.connectAddress(list[0]);
 
     if (timeout) |t| {
         self.timer.started = true;

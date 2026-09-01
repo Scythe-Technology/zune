@@ -1,6 +1,8 @@
 // This code is based on https://github.com/oven-sh/bun/blob/1aa35089d64f32b43901e850e34bc18b96c02899/src/http/websocket.zig
 const std = @import("std");
 
+const Zune = @import("zune");
+
 pub const Opcode = enum(u4) {
     Continue = 0x0,
     Text = 0x1,
@@ -116,7 +118,7 @@ pub fn writeDataFrame(buf: []u8, dataframe: DataFrame) void {
 
     if (dataframe.header.mask) {
         var mask: [4]u8 = undefined;
-        std.crypto.random.bytes(&mask);
+        Zune.io().random(&mask);
         @memcpy(buf[pos .. pos + 4], &mask);
         pos += 4;
 

@@ -21,6 +21,7 @@ const TAG_FS_WATCHER = Zune.Tags.get("FS_WATCHER").?;
 const VM = luau.VM;
 
 const fs = std.fs;
+const Io = std.Io;
 
 const BufferError = error{FailedToCreateBuffer};
 const HardwareError = error{NotSupported};
@@ -40,16 +41,16 @@ fn lua_readFileAsync(L: *VM.lua.State) !i32 {
     const path = L.Lcheckstring(1);
     const useBuffer = L.Loptboolean(2, false);
 
-    const file: fs.File = switch (comptime builtin.os.tag) {
-        .windows => try @import("../../utils/os/windows.zig").OpenFile(fs.cwd(), path, .{
+    const file: std.Io.File = switch (comptime builtin.os.tag) {
+        .windows => try @import("../../utils/os/windows.zig").OpenFile(Io.Dir.cwd(), path, .{
             .accessMode = std.os.windows.GENERIC_READ,
             .creationDisposition = std.os.windows.OPEN_EXISTING,
         }),
-        else => try fs.cwd().openFile(path, .{
+        else => try Io.Dir.cwd().openFile(Zune.io(), path, .{
             .mode = .read_only,
         }),
     };
-    errdefer file.close();
+    errdefer file.close(Zune.io());
 
     return File.AsyncReadContext.queue(
         L,
@@ -67,7 +68,7 @@ fn lua_readFileSync(L: *VM.lua.State) !i32 {
     const allocator = Scheduler.fromState(L).allocator;
     const path = L.Lcheckstring(1);
     const useBuffer = L.Loptboolean(2, false);
-    const data = try fs.cwd().readFileAlloc(allocator, path, LuaHelper.MAX_LUAU_SIZE);
+    const data = try Io.Dir.cwd().readFileAlloc(Zune.io(), path, allocator, .limited(LuaHelper.MAX_LUAU_SIZE));
     defer allocator.free(data);
 
     if (useBuffer)
@@ -80,14 +81,14 @@ fn lua_readFileSync(L: *VM.lua.State) !i32 {
 
 fn lua_entries(L: *VM.lua.State) !i32 {
     const path = L.Lcheckstring(1);
-    var dir = try fs.cwd().openDir(path, .{
+    var dir = try Io.Dir.cwd().openDir(Zune.io(), path, .{
         .iterate = true,
     });
-    defer dir.close();
+    defer dir.close(Zune.io());
     var iter = dir.iterate();
     try L.newtable();
     var i: i32 = 1;
-    while (try iter.next()) |entry| {
+    while (try iter.next(Zune.io())) |entry| {
         L.pushinteger(i);
         try L.Zpushvalue(.{
             .name = entry.name,
@@ -103,16 +104,16 @@ fn lua_writeFileAsync(L: *VM.lua.State) !i32 {
     const path = L.Lcheckstring(1);
     const data = try L.Zcheckvalue([]const u8, 2, null);
 
-    const file: fs.File = switch (comptime builtin.os.tag) {
-        .windows => try @import("../../utils/os/windows.zig").OpenFile(fs.cwd(), path, .{
+    const file: std.Io.File = switch (comptime builtin.os.tag) {
+        .windows => try @import("../../utils/os/windows.zig").OpenFile(Io.Dir.cwd(), path, .{
             .accessMode = std.os.windows.GENERIC_READ | std.os.windows.GENERIC_WRITE,
             .creationDisposition = std.os.windows.CREATE_ALWAYS,
         }),
-        else => try fs.cwd().createFile(path, .{
+        else => try Io.Dir.cwd().createFile(Zune.io(), path, .{
             .truncate = true,
         }),
     };
-    errdefer file.close();
+    errdefer file.close(Zune.io());
 
     return File.AsyncWriteContext.queue(L, file, data, true, 0, .File, null);
 }
@@ -120,7 +121,7 @@ fn lua_writeFileAsync(L: *VM.lua.State) !i32 {
 fn lua_writeFileSync(L: *VM.lua.State) !i32 {
     const path = L.Lcheckstring(1);
     const data = try L.Zcheckvalue([]const u8, 2, null);
-    try fs.cwd().writeFile(.{
+    try Io.Dir.cwd().writeFile(Zune.io(), .{
         .sub_path = path,
         .data = data,
     });
@@ -130,45 +131,45 @@ fn lua_writeFileSync(L: *VM.lua.State) !i32 {
 fn lua_makeDir(L: *VM.lua.State) !i32 {
     const path = L.Lcheckstring(1);
     const recursive = L.Loptboolean(2, false);
-    const cwd = std.fs.cwd();
+    const cwd = std.Io.Dir.cwd();
     try (if (recursive)
-        cwd.makePath(path)
+        cwd.createDirPath(Zune.io(), path)
     else
-        cwd.makeDir(path));
+        cwd.createDir(Zune.io(), path, .default_dir));
     return 0;
 }
 
 fn lua_deleteFile(L: *VM.lua.State) !i32 {
     const path = L.Lcheckstring(1);
-    try fs.cwd().deleteFile(path);
+    try Io.Dir.cwd().deleteFile(Zune.io(), path);
     return 0;
 }
 
 fn lua_deleteDir(L: *VM.lua.State) !i32 {
     const path = L.Lcheckstring(1);
     const recursive = L.Loptboolean(2, false);
-    const cwd = std.fs.cwd();
+    const cwd = std.Io.Dir.cwd();
     try (if (recursive)
-        cwd.deleteTree(path)
+        cwd.deleteTree(Zune.io(), path)
     else
-        cwd.deleteDir(path));
+        cwd.deleteDir(Zune.io(), path));
     return 0;
 }
 
-fn internal_isDir(srcDir: fs.Dir, path: []const u8) bool {
+fn internal_isDir(srcDir: std.Io.Dir, path: []const u8) bool {
     if (comptime builtin.os.tag == .windows) {
-        var dir = srcDir.openDir(path, .{
+        var dir = srcDir.openDir(Zune.io(), path, .{
             .iterate = true,
         }) catch return false;
-        defer dir.close();
+        defer dir.close(Zune.io());
         return true;
     }
-    const stat = srcDir.statFile(path) catch return false;
+    const stat = srcDir.statFile(Zune.io(), path, .{}) catch return false;
     return stat.kind == .directory;
 }
 
-fn internal_isFile(srcDir: fs.Dir, path: []const u8) bool {
-    const stat = srcDir.statFile(path) catch return false;
+fn internal_isFile(srcDir: std.Io.Dir, path: []const u8) bool {
+    const stat = srcDir.statFile(Zune.io(), path, .{}) catch return false;
     return stat.kind == .file;
 }
 
@@ -176,17 +177,17 @@ fn internal_lossyfloat_time(n: i128) f64 {
     return @as(f64, @floatFromInt(n)) / 1_000_000_000.0;
 }
 
-fn internal_stat(dir: fs.Dir, path: []const u8) !fs.Dir.Stat {
+fn internal_stat(dir: std.Io.Dir, path: []const u8) !std.Io.Dir.Stat {
     if (comptime builtin.os.tag == .windows) {
-        var d = dir.openDir(path, .{}) catch {
-            const file = try dir.openFile(path, .{});
-            defer file.close();
-            return try file.stat();
+        var d = dir.openDir(Zune.io(), path, .{}) catch {
+            const file = try dir.openFile(Zune.io(), path, .{});
+            defer file.close(Zune.io());
+            return try file.stat(Zune.io());
         };
-        defer d.close();
-        return try d.stat();
+        defer d.close(Zune.io());
+        return try d.stat(Zune.io());
     }
-    return try dir.statFile(path);
+    return try dir.statFile(Zune.io(), path, .{});
 }
 
 fn lua_stat(L: *VM.lua.State) !i32 {
@@ -196,7 +197,7 @@ fn lua_stat(L: *VM.lua.State) !i32 {
         else => return error.UnsupportedPlatform,
     }
     const path = L.Lcheckstring(1);
-    const cwd = std.fs.cwd();
+    const cwd = std.Io.Dir.cwd();
     const stat = internal_stat(cwd, path) catch {
         try L.Zpushvalue(.{
             .kind = "none",
@@ -205,10 +206,10 @@ fn lua_stat(L: *VM.lua.State) !i32 {
     };
     try L.Zpushvalue(.{
         .kind = @tagName(stat.kind),
-        .changed_at = internal_lossyfloat_time(stat.ctime),
-        .modified_at = internal_lossyfloat_time(stat.mtime),
-        .accessed_at = internal_lossyfloat_time(stat.atime),
-        .mode = stat.mode,
+        .changed_at = internal_lossyfloat_time(@intCast(stat.ctime.nanoseconds)),
+        .modified_at = internal_lossyfloat_time(@intCast(stat.mtime.nanoseconds)),
+        .accessed_at = internal_lossyfloat_time(@intCast((stat.atime orelse std.Io.Timestamp.zero).nanoseconds)),
+        .mode = @intFromEnum(stat.permissions),
         .size = @as(f64, @floatFromInt(stat.size)),
     });
     return 1;
@@ -238,28 +239,28 @@ fn lua_metadata(L: *VM.lua.State) !i32 {
     const allocator = Scheduler.fromState(L).allocator;
     const buf = try allocator.alloc(u8, 4096);
     defer allocator.free(buf);
-    const cwd = std.fs.cwd();
+    const cwd = std.Io.Dir.cwd();
     if (internal_isDir(cwd, path)) {
-        var dir = try cwd.openDir(path, .{});
-        defer dir.close();
-        const metadata = try ext_fs.metadata(.{ .handle = dir.fd });
+        var dir = try cwd.openDir(Zune.io(), path, .{});
+        defer dir.close(Zune.io());
+        const metadata = try ext_fs.metadata(.{ .handle = dir.handle, .flags = .{ .nonblocking = false } });
         var isLink = builtin.os.tag != .windows;
         if (builtin.os.tag != .windows)
-            _ = cwd.readLink(path, buf) catch |err| switch (err) {
+            _ = cwd.readLink(Zune.io(), path, buf) catch |err| switch (err) {
                 else => {
                     isLink = false;
                 },
             };
         try internal_metadata_table(L, metadata, isLink);
     } else {
-        var file = try cwd.openFile(path, .{
+        var file = try cwd.openFile(Zune.io(), path, .{
             .mode = .read_only,
         });
-        defer file.close();
+        defer file.close(Zune.io());
         const metadata = try ext_fs.metadata(file);
         var isLink = builtin.os.tag != .windows;
         if (builtin.os.tag != .windows)
-            _ = cwd.readLink(path, buf) catch |err| switch (err) {
+            _ = cwd.readLink(Zune.io(), path, buf) catch |err| switch (err) {
                 else => {
                     isLink = false;
                 },
@@ -273,32 +274,32 @@ fn lua_move(L: *VM.lua.State) !i32 {
     const fromPath = L.Lcheckstring(1);
     const toPath = L.Lcheckstring(2);
     const overwrite = L.Loptboolean(3, false);
-    const cwd = std.fs.cwd();
+    const cwd = std.Io.Dir.cwd();
     if (overwrite == false) {
         if (internal_isFile(cwd, toPath) or internal_isDir(cwd, toPath))
-            return std.fs.Dir.MakeError.PathAlreadyExists;
+            return error.PathAlreadyExists;
     }
-    try cwd.rename(fromPath, toPath);
+    try cwd.rename(fromPath, cwd, toPath, Zune.io());
     return 0;
 }
 
-fn copyDir(fromDir: fs.Dir, toDir: fs.Dir, overwrite: bool) !void {
+fn copyDir(fromDir: std.Io.Dir, toDir: std.Io.Dir, overwrite: bool) !void {
     var iter = fromDir.iterate();
-    while (try iter.next()) |entry| switch (entry.kind) {
+    while (try iter.next(Zune.io())) |entry| switch (entry.kind) {
         .file => {
             if (overwrite == false and internal_isFile(toDir, entry.name))
                 return error.PathAlreadyExists;
-            try fromDir.copyFile(entry.name, toDir, entry.name, .{});
+            try fromDir.copyFile(entry.name, toDir, entry.name, Zune.io(), .{});
         },
         .directory => {
-            toDir.makeDir(entry.name) catch |err| switch (err) {
+            toDir.createDir(Zune.io(), entry.name, .default_dir) catch |err| switch (err) {
                 error.PathAlreadyExists => {},
                 else => return err,
             };
-            var toEntryDir = try toDir.openDir(entry.name, .{ .access_sub_paths = true, .iterate = true, .no_follow = true });
-            defer toEntryDir.close();
-            var fromEntryDir = try fromDir.openDir(entry.name, .{ .access_sub_paths = true, .iterate = true, .no_follow = true });
-            defer fromEntryDir.close();
+            var toEntryDir = try toDir.openDir(Zune.io(), entry.name, .{ .access_sub_paths = true, .iterate = true, .follow_symlinks = false });
+            defer toEntryDir.close(Zune.io());
+            var fromEntryDir = try fromDir.openDir(Zune.io(), entry.name, .{ .access_sub_paths = true, .iterate = true, .follow_symlinks = false });
+            defer fromEntryDir.close(Zune.io());
             try copyDir(fromEntryDir, toEntryDir, overwrite);
         },
         else => {},
@@ -309,34 +310,34 @@ fn lua_copy(L: *VM.lua.State) !i32 {
     const fromPath = L.Lcheckstring(1);
     const toPath = L.Lcheckstring(2);
     const override = L.Loptboolean(3, false);
-    const cwd = std.fs.cwd();
+    const cwd = std.Io.Dir.cwd();
     if (internal_isDir(cwd, fromPath)) {
-        var fromDir = try cwd.openDir(fromPath, .{
+        var fromDir = try cwd.openDir(Zune.io(), fromPath, .{
             .iterate = true,
             .access_sub_paths = true,
-            .no_follow = true,
+            .follow_symlinks = false,
         });
-        defer fromDir.close();
+        defer fromDir.close(Zune.io());
         if (override == false and internal_isDir(cwd, toPath))
-            return std.fs.Dir.MakeError.PathAlreadyExists
+            return error.PathAlreadyExists
         else {
-            cwd.makeDir(toPath) catch |err| switch (err) {
+            cwd.createDir(Zune.io(), toPath, .default_dir) catch |err| switch (err) {
                 error.PathAlreadyExists => {},
                 else => return UnhandledError.UnknownError,
             };
         }
-        var toDir = try cwd.openDir(toPath, .{
+        var toDir = try cwd.openDir(Zune.io(), toPath, .{
             .iterate = true,
             .access_sub_paths = true,
-            .no_follow = true,
+            .follow_symlinks = false,
         });
-        defer toDir.close();
+        defer toDir.close(Zune.io());
         try copyDir(fromDir, toDir, override);
     } else {
         if (override == false and internal_isFile(cwd, toPath))
-            return std.fs.Dir.MakeError.PathAlreadyExists;
+            return error.PathAlreadyExists;
 
-        try cwd.copyFile(fromPath, cwd, toPath, fs.Dir.CopyFileOptions{});
+        try cwd.copyFile(fromPath, cwd, toPath, Zune.io(), .{});
     }
     return 0;
 }
@@ -344,14 +345,13 @@ fn lua_copy(L: *VM.lua.State) !i32 {
 fn lua_symlink(L: *VM.lua.State) !i32 {
     const fromPath = L.Lcheckstring(1);
     const toPath = L.Lcheckstring(2);
-    const cwd = std.fs.cwd();
+    const cwd = std.Io.Dir.cwd();
 
-    const allocator = Scheduler.fromState(L).allocator;
+    var buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const len = try cwd.realPathFile(Zune.io(), fromPath, &buf);
+    const full_path = buf[0..len];
 
-    const fullPath = try cwd.realpathAlloc(allocator, fromPath);
-    defer allocator.free(fullPath);
-
-    try cwd.symLink(fullPath, toPath, .{
+    try cwd.symLink(Zune.io(), full_path, toPath, .{
         // only this applies to windows
         .is_directory = if (comptime builtin.os.tag == .windows)
             internal_isDir(cwd, fromPath)
@@ -390,7 +390,7 @@ fn lua_embedFile(L: *VM.lua.State) !i32 {
                 break :blk;
             }
         }
-        const contents = try fs.cwd().readFileAlloc(allocator, resolved_path, std.math.maxInt(usize));
+        const contents = try Io.Dir.cwd().readFileAlloc(Zune.io(), resolved_path, allocator, .unlimited);
         defer allocator.free(contents);
         try L.Zpushbuffer(contents);
     }
@@ -445,7 +445,7 @@ const LuaWatch = struct {
 fn lua_openFile(L: *VM.lua.State) !i32 {
     const path = L.Lcheckstring(1);
 
-    var mode: fs.File.OpenMode = .read_write;
+    var mode: std.Io.File.OpenMode = .read_write;
 
     const Options = struct {
         mode: ?[:0]const u8 = null,
@@ -463,8 +463,8 @@ fn lua_openFile(L: *VM.lua.State) !i32 {
         } else return OpenError.InvalidMode;
     }
 
-    const file: fs.File = switch (comptime builtin.os.tag) {
-        .windows => try @import("../../utils/os/windows.zig").OpenFile(fs.cwd(), path, .{
+    const file: std.Io.File = switch (comptime builtin.os.tag) {
+        .windows => try @import("../../utils/os/windows.zig").OpenFile(Io.Dir.cwd(), path, .{
             .accessMode = switch (mode) {
                 .read_only => std.os.windows.GENERIC_READ,
                 .read_write => std.os.windows.GENERIC_READ | std.os.windows.GENERIC_WRITE,
@@ -472,7 +472,7 @@ fn lua_openFile(L: *VM.lua.State) !i32 {
             },
             .creationDisposition = std.os.windows.OPEN_EXISTING,
         }),
-        else => try fs.cwd().openFile(path, .{
+        else => try Io.Dir.cwd().openFile(Zune.io(), path, .{
             .mode = mode,
         }),
     };
@@ -498,12 +498,12 @@ fn lua_createFile(L: *VM.lua.State) !i32 {
         read: bool = true,
         exclusive: bool = false,
         truncate: bool = true,
-        mode: Mode = fs.File.default_mode,
+        mode: Mode = @intFromEnum(std.Io.File.Permissions.default_file),
     };
     const opts: Options = try L.Zcheckvalue(?Options, 2, null) orelse .{};
 
-    const file: fs.File = switch (comptime builtin.os.tag) {
-        .windows => try @import("../../utils/os/windows.zig").OpenFile(fs.cwd(), path, .{
+    const file: std.Io.File = switch (comptime builtin.os.tag) {
+        .windows => try @import("../../utils/os/windows.zig").OpenFile(Io.Dir.cwd(), path, .{
             .accessMode = if (opts.read)
                 std.os.windows.GENERIC_WRITE | std.os.windows.GENERIC_READ
             else
@@ -515,11 +515,11 @@ fn lua_createFile(L: *VM.lua.State) !i32 {
             else
                 std.os.windows.OPEN_ALWAYS,
         }),
-        else => try fs.cwd().createFile(path, .{
+        else => try Io.Dir.cwd().createFile(Zune.io(), path, .{
             .read = opts.read,
             .exclusive = opts.exclusive,
             .truncate = opts.truncate,
-            .mode = @intCast(opts.mode),
+            .permissions = @enumFromInt(opts.mode),
         }),
     };
 
@@ -532,14 +532,14 @@ fn lua_getExePath(L: *VM.lua.State) !i32 {
     switch (comptime builtin.os.tag) {
         .macos, .driverkit, .ios, .tvos, .visionos, .watchos => {}, // Darwin
         .freebsd, .openbsd, .netbsd, .dragonfly => {}, // BSD
-        .solaris, .illumos => {}, // Solaris
+        .illumos => {},
         .haiku => {},
         .windows, .linux => {},
         else => return error.UnsupportedPlatform,
     }
 
-    var buf: [std.fs.max_path_bytes]u8 = undefined;
-    const path = try std.fs.selfExePath(&buf);
+    var buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const path = buf[0..try std.process.executablePath(Zune.io(), &buf)];
     try L.pushlstring(path);
     return 1;
 }
@@ -552,8 +552,8 @@ fn lua_realPath(L: *VM.lua.State) !i32 {
         else => return error.UnsupportedPlatform,
     }
     const path = L.Lcheckstring(1);
-    var buf: [std.fs.max_path_bytes]u8 = undefined;
-    const real_path = try std.fs.realpath(path, &buf);
+    var buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const real_path = buf[0..try Io.Dir.cwd().realPathFile(Zune.io(), path, &buf)];
     try L.pushlstring(real_path);
     return 1;
 }
@@ -561,26 +561,26 @@ fn lua_realPath(L: *VM.lua.State) !i32 {
 const WatchState = struct {
     watcher: Watch.FileSystemWatcher,
     callback: LuaHelper.Ref(void),
-    mutex: std.Thread.Mutex = .{},
-    cond: std.Thread.Condition = .{},
+    mutex: std.Io.Mutex = .init,
+    cond: std.Io.Condition = .init,
     info: ?Watch.WatchInfo = null,
     state: std.atomic.Value(LoopState) = .{ .raw = .Alive },
 
     pub const LoopState = enum(u8) { Alive, Terminating, Dead };
 
     pub fn complete(self: *WatchState, scheduler: *Scheduler) void {
-        self.mutex.lock();
+        self.mutex.lockUncancelable(Zune.io());
         const state = self.state.load(.acquire);
         if (state == .Dead) {
             defer scheduler.freeSync(self);
             defer if (self.info) |info| info.deinit(self.watcher.allocator);
-            defer self.mutex.unlock();
+            defer self.mutex.unlock(Zune.io());
             self.watcher.deinit();
             self.callback.deref(scheduler.global);
             return;
         }
-        defer self.mutex.unlock();
-        defer self.cond.signal();
+        defer self.mutex.unlock(Zune.io());
+        defer self.cond.signal(Zune.io());
 
         defer scheduler.asyncWaitForSync(self);
 
@@ -642,15 +642,15 @@ const WatchState = struct {
 
     pub fn threadLoop(self: *WatchState, scheduler: *Scheduler) void {
         while (self.state.load(.acquire) == .Alive) {
-            self.mutex.lock();
-            defer self.mutex.unlock();
+            self.mutex.lockUncancelable(Zune.io());
+            defer self.mutex.unlock(Zune.io());
             if (self.watcher.next() catch |err| {
                 std.debug.print("LuaWatch error: {}\n", .{err});
                 break;
             }) |info| {
                 self.info = info;
                 scheduler.synchronize(self);
-                self.cond.wait(&self.mutex);
+                self.cond.waitUncancelable(Zune.io(), &self.mutex);
             }
         }
 
@@ -674,13 +674,13 @@ fn lua_watch(L: *VM.lua.State) !i32 {
     const ref = try L.ref(2) orelse unreachable;
     errdefer L.unref(ref);
 
-    var dir = fs.cwd().openDir(path, .{}) catch |err| switch (err) {
+    var dir = Io.Dir.cwd().openDir(Zune.io(), path, .{}) catch |err| switch (err) {
         error.FileNotFound => return error.FileNotFound,
         else => return error.PathNotFound,
     };
-    dir.close();
+    dir.close(Zune.io());
 
-    var watch = Watch.FileSystemWatcher.init(allocator, fs.cwd(), path);
+    var watch = Watch.FileSystemWatcher.init(allocator, Io.Dir.cwd(), path);
     errdefer watch.deinit();
 
     const state = try scheduler.createSync(WatchState, WatchState.complete);
@@ -710,7 +710,7 @@ const Path = struct {
         const top = L.gettop();
         if (top == 0)
             return 0;
-        var paths: std.ArrayListUnmanaged([]const u8) = try .initCapacity(allocator, @min(16, top));
+        var paths: std.ArrayList([]const u8) = try .initCapacity(allocator, @min(16, top));
         defer paths.deinit(allocator);
         for (0..top) |i| {
             const path = try L.Zcheckvalue([:0]const u8, @intCast(i + 1), null);
@@ -730,7 +730,7 @@ const Path = struct {
         const from = try L.Zcheckvalue([:0]const u8, 1, null);
         const to = try L.Zcheckvalue([:0]const u8, 2, null);
 
-        const resolved = try fs.path.relative(allocator, from, to);
+        const resolved = try fs.path.relative(allocator, "", &Zune.STATE.ENV_MAP, from, to);
         defer allocator.free(resolved);
 
         try L.pushlstring(resolved);
@@ -743,7 +743,7 @@ const Path = struct {
         const top = L.gettop();
         if (top == 0)
             return 0;
-        var paths: std.ArrayListUnmanaged([]const u8) = try .initCapacity(allocator, @min(16, top));
+        var paths: std.ArrayList([]const u8) = try .initCapacity(allocator, @min(16, top));
         defer paths.deinit(allocator);
         for (0..top) |i| {
             const path = try L.Zcheckvalue([:0]const u8, @intCast(i + 1), null);

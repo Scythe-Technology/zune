@@ -1,6 +1,10 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
+const Zune = @import("zune");
+
+const sysfd = @import("../../utils/sysfd.zig");
+
 const MAX_EVENTS = 1024 * 2;
 
 const WatchEvent = struct {
@@ -45,7 +49,7 @@ const InotifyAttributes = struct {
 
     pub fn deinit(self: *InotifyAttributes) void {
         if (self.fd) |fd|
-            std.posix.close(fd);
+            sysfd.close(fd);
     }
 };
 
@@ -53,13 +57,13 @@ const KqueueAttributes = struct {
     const kevent = std.c.Kevent;
 
     fd: ?i32 = null,
-    dir: ?std.fs.Dir = null,
+    dir: ?std.Io.Dir = null,
     named_fds: std.AutoArrayHashMapUnmanaged(usize, []const u8) = .empty,
-    fds: std.StringArrayHashMapUnmanaged(FdInfo) = .empty,
+    fds: std.array_hash_map.String(FdInfo) = .empty,
 
     const FdInfo = struct {
         handle: usize,
-        kind: std.fs.File.Kind,
+        kind: std.Io.File.Kind,
     };
 
     const FileDifference = struct {
@@ -85,7 +89,7 @@ const KqueueAttributes = struct {
 
         {
             var named_fds: std.AutoArrayHashMapUnmanaged(usize, []const u8) = .empty;
-            var temp_fds: std.StringArrayHashMapUnmanaged(FdInfo) = .empty;
+            var temp_fds: std.array_hash_map.String(FdInfo) = .empty;
             errdefer named_fds.deinit(allocator);
             errdefer temp_fds.deinit(allocator);
             var fds = self.fds;
@@ -103,12 +107,12 @@ const KqueueAttributes = struct {
                 var changelist: [64]KqueueAttributes.kevent = std.mem.zeroes([64]KqueueAttributes.kevent);
 
                 var iter = dir.iterate();
-                while (try iter.next()) |entry| {
+                while (try iter.next(Zune.io())) |entry| {
                     const exists = fds.getEntry(entry.name) orelse {
                         if (entry.kind == .file) {
                             const copy_path = try allocator.dupe(u8, entry.name);
                             errdefer allocator.free(copy_path);
-                            const sub_file = try dir.openFile(entry.name, .{});
+                            const sub_file = try dir.openFile(Zune.io(), entry.name, .{});
 
                             changelist[changes] = .{
                                 .data = 0,
@@ -133,7 +137,7 @@ const KqueueAttributes = struct {
                         } else if (entry.kind == .directory) {
                             const copy_path = try allocator.dupe(u8, entry.name);
                             errdefer allocator.free(copy_path);
-                            const sub_dir = try dir.openDir(entry.name, .{
+                            const sub_dir = try dir.openDir(Zune.io(), entry.name, .{
                                 .iterate = false,
                             });
                             changelist[changes] = .{
@@ -204,25 +208,33 @@ const KqueueAttributes = struct {
 
     pub fn deinit(self: *KqueueAttributes, allocator: std.mem.Allocator) void {
         if (self.fd) |fd|
-            std.posix.close(fd);
+            sysfd.close(fd);
         if (self.dir) |*dir|
-            dir.close();
+            dir.close(Zune.io());
         for (self.fds.keys()) |name|
             allocator.free(name);
         for (self.fds.values(), 0..) |info, i| {
             if (i > 0)
-                std.posix.close(@intCast(info.handle));
+                sysfd.close(@intCast(info.handle));
         }
         self.fds.deinit(allocator);
         self.named_fds.deinit(allocator);
     }
 };
 
+const Overlapped = if (builtin.os.tag == .windows) extern struct {
+    Internal: usize = 0,
+    InternalHigh: usize = 0,
+    Offset: u32 = 0,
+    OffsetHigh: u32 = 0,
+    hEvent: ?std.os.windows.HANDLE = null,
+} else void;
+
 const IOCPAttributes = struct {
     handle: ?std.os.windows.HANDLE = null,
     iocp: ?std.os.windows.HANDLE = null,
-    overlapped: std.os.windows.OVERLAPPED = std.mem.zeroes(std.os.windows.OVERLAPPED),
-    buf: [64 * 1024]u8 align(@alignOf(std.os.windows.FILE_NOTIFY_INFORMATION)) = undefined,
+    overlapped: Overlapped = if (builtin.os.tag == .windows) .{} else {},
+    buf: [64 * 1024]u8 align(if (builtin.os.tag == .windows) @alignOf(std.os.windows.FILE_NOTIFY_INFORMATION) else 1) = undefined,
     active: bool = true,
     monitoring: bool = false,
 
@@ -276,7 +288,7 @@ const IOCPAttributes = struct {
 
 pub const FileSystemWatcher = struct {
     allocator: std.mem.Allocator,
-    dir: std.fs.Dir,
+    dir: std.Io.Dir,
     path: []const u8,
 
     backend: union(enum) {
@@ -285,7 +297,7 @@ pub const FileSystemWatcher = struct {
         iocp: IOCPAttributes,
     },
 
-    pub fn init(allocator: std.mem.Allocator, dir: std.fs.Dir, pathname: []const u8) FileSystemWatcher {
+    pub fn init(allocator: std.mem.Allocator, dir: std.Io.Dir, pathname: []const u8) FileSystemWatcher {
         return FileSystemWatcher{
             .allocator = allocator,
             .dir = dir,
@@ -508,17 +520,27 @@ pub const FileSystemWatcher = struct {
     }
 
     fn startInotify(self: *FileSystemWatcher) !void {
-        const fd = try std.posix.inotify_init1(std.os.linux.IN.CLOEXEC);
-        errdefer std.posix.close(fd);
+        const init_rc = std.os.linux.inotify_init1(std.os.linux.IN.CLOEXEC);
+        const fd: i32 = switch (std.os.linux.errno(init_rc)) {
+            .SUCCESS => @intCast(init_rc),
+            else => |e| return std.posix.unexpectedErrno(e),
+        };
+        errdefer sysfd.close(fd);
 
-        const full_path = try self.dir.realpathAlloc(self.allocator, self.path);
-        defer self.allocator.free(full_path);
+        var buf: [std.Io.Dir.max_path_bytes:0]u8 = undefined;
+        @memset(buf[0..], 0);
+        const len = try self.dir.realPathFile(Zune.io(), self.path, &buf);
+        const full_path = buf[0..len :0];
 
-        const wd = try std.posix.inotify_add_watch(
+        const wd_rc = std.os.linux.inotify_add_watch(
             fd,
             full_path,
             std.os.linux.IN.MODIFY | std.os.linux.IN.CREATE | std.os.linux.IN.MOVED_TO | std.os.linux.IN.DELETE | std.os.linux.IN.MOVED_FROM | std.os.linux.IN.MOVE_SELF,
         );
+        const wd: i32 = switch (std.os.linux.errno(wd_rc)) {
+            .SUCCESS => @intCast(wd_rc),
+            else => |e| return std.posix.unexpectedErrno(e),
+        };
 
         if (wd < 0)
             return error.InotifyAddWatchFailed;
@@ -535,13 +557,13 @@ pub const FileSystemWatcher = struct {
         const fd = try std.posix.kqueue();
         if (fd == 0)
             return error.KQueueError;
-        errdefer std.posix.close(fd);
+        errdefer sysfd.close(fd);
 
-        var dir = try self.dir.openDir(self.path, .{
+        var dir = try self.dir.openDir(Zune.io(), self.path, .{
             .access_sub_paths = false,
             .iterate = true,
         });
-        errdefer dir.close();
+        errdefer dir.close(Zune.io());
 
         const copy_path = try self.allocator.dupe(u8, self.path);
         errdefer self.allocator.free(copy_path);
@@ -643,7 +665,7 @@ test "Platform Watch" {
 
     const tempDir = temporaryDir.dir;
 
-    try tempDir.makeDir("fs-watch-test");
+    try tempDir.createDir(Zune.io(), "fs-watch-test", .default_dir);
 
     var watcher = FileSystemWatcher.init(allocator, tempDir, "fs-watch-test");
     defer watcher.deinit();
@@ -658,8 +680,8 @@ test "Platform Watch" {
     }
 
     { // Create file
-        const file = try tempDir.createFile("fs-watch-test/test.txt", .{});
-        defer file.close();
+        const file = try tempDir.createFile(Zune.io(), "fs-watch-test/test.txt", .{});
+        defer file.close(Zune.io());
 
         {
             var info = try watcher.next() orelse return error.ExpectedEvent;
@@ -674,8 +696,8 @@ test "Platform Watch" {
         }
 
         // Modify file
-        try file.writeAll("Hello, world!\n");
-        try file.sync();
+        _ = try file.writePositionalAll(std.testing.io, "Hello, world!\n", 0);
+        try file.sync(std.testing.io);
 
         {
             var info = try watcher.next() orelse return error.ExpectedEvent;
@@ -691,7 +713,7 @@ test "Platform Watch" {
     }
 
     // Delete file
-    try tempDir.deleteFile("fs-watch-test/test.txt");
+    try tempDir.deleteFile(std.testing.io, "fs-watch-test/test.txt");
 
     {
         var info = try watcher.next() orelse return error.ExpectedEvent;

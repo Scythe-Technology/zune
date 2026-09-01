@@ -77,7 +77,7 @@ const EncodeInfo = struct {
     isName: bool = false,
     keyName: []const u8,
     tracked: *std.AutoHashMapUnmanaged(*const anyopaque, void),
-    tagged: *std.StringArrayHashMap([]const u8),
+    tagged: *std.array_hash_map.String([]const u8),
 };
 
 fn createIndex(allocator: std.mem.Allocator, all: []const u8, key: []const u8) ![]const u8 {
@@ -329,7 +329,7 @@ fn encodeTable(L: *VM.lua.State, allocator: std.mem.Allocator, writer: *std.Io.W
                         });
                         if (allocating.written().len > 0) {
                             const nameCopy = try allocator.dupe(u8, name);
-                            try info.tagged.put(nameCopy, try allocating.toOwnedSlice());
+                            try info.tagged.put(allocator, nameCopy, try allocating.toOwnedSlice());
                         }
                     }
                 }
@@ -823,8 +823,8 @@ pub fn lua_encode(L: *VM.lua.State) !i32 {
     var allocating: std.Io.Writer.Allocating = .init(allocator);
     defer allocating.deinit();
 
-    var tagged = std.StringArrayHashMap([]const u8).init(allocator);
-    defer tagged.deinit();
+    var tagged: std.array_hash_map.String([]const u8) = .empty;
+    defer tagged.deinit(allocator);
 
     var tracked: std.AutoHashMapUnmanaged(*const anyopaque, void) = .empty;
     defer tracked.deinit(allocator);

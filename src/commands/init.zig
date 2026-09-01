@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const Zune = @import("zune");
+
 const command = @import("lib.zig");
 
 const INIT_CONFIG_FILE =
@@ -53,7 +55,7 @@ const INIT_CONFIG_FILE =
 ;
 
 fn Execute(_: std.mem.Allocator, args: []const []const u8) !void {
-    const config_file = std.fs.cwd().createFile("zune.toml", .{
+    const config_file = std.Io.Dir.cwd().createFile(Zune.io(), "zune.toml", .{
         .exclusive = true,
     }) catch |err| switch (err) {
         error.PathAlreadyExists => {
@@ -62,27 +64,27 @@ fn Execute(_: std.mem.Allocator, args: []const []const u8) !void {
         },
         else => return err,
     };
-    defer config_file.close();
+    defer config_file.close(Zune.io());
 
-    try config_file.writeAll(INIT_CONFIG_FILE);
+    try config_file.writeStreamingAll(Zune.io(), INIT_CONFIG_FILE);
 
     if (args.len > 0 and std.mem.eql(u8, args[0], "bare"))
         return;
 
-    try std.fs.cwd().makePath("src");
+    try std.Io.Dir.cwd().createDirPath(Zune.io(), "src");
 
     if (args.len > 0 and std.mem.eql(u8, args[0], "module")) {
-        try std.fs.cwd().makePath("tests");
+        try std.Io.Dir.cwd().createDirPath(Zune.io(), "tests");
         blk: {
-            const file = std.fs.cwd().createFile("src/init.luau", .{
+            const file = std.Io.Dir.cwd().createFile(Zune.io(), "src/init.luau", .{
                 .exclusive = true,
             }) catch |err| switch (err) {
                 error.PathAlreadyExists => break :blk,
                 else => return err,
             };
-            defer file.close();
+            defer file.close(Zune.io());
 
-            try file.writeAll(
+            try file.writeStreamingAll(Zune.io(), 
                 \\local io = zune.io
                 \\
                 \\local module = {}
@@ -95,15 +97,15 @@ fn Execute(_: std.mem.Allocator, args: []const []const u8) !void {
             );
         }
         blk: {
-            const file = std.fs.cwd().createFile("tests/init.luau", .{
+            const file = std.Io.Dir.cwd().createFile(Zune.io(), "tests/init.luau", .{
                 .exclusive = true,
             }) catch |err| switch (err) {
                 error.PathAlreadyExists => break :blk,
                 else => return err,
             };
-            defer file.close();
+            defer file.close(Zune.io());
 
-            try file.writeAll(
+            try file.writeStreamingAll(Zune.io(), 
                 \\local testing = zune.testing
                 \\
                 \\local test = testing.test
@@ -116,15 +118,15 @@ fn Execute(_: std.mem.Allocator, args: []const []const u8) !void {
             );
         }
     } else {
-        const file = std.fs.cwd().createFile("src/main.luau", .{
+        const file = std.Io.Dir.cwd().createFile(Zune.io(), "src/main.luau", .{
             .exclusive = true,
         }) catch |err| switch (err) {
             error.PathAlreadyExists => return,
             else => return err,
         };
-        defer file.close();
+        defer file.close(Zune.io());
 
-        try file.writeAll(
+        try file.writeStreamingAll(Zune.io(), 
             \\local io = zune.io
             \\
             \\local function main()

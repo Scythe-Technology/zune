@@ -18,6 +18,8 @@ const WebSocket = @import("../websocket.zig");
 const TAG_NET_HTTP_WEBSOCKET = Zune.Tags.get("NET_HTTP_CLIENTWEBSOCKET").?;
 const TAG_CRYPTO_TLS_CERTBUNDLE = Zune.Tags.get("CRYPTO_TLS_CERTBUNDLE").?;
 
+const sysfd = @import("../../../../utils/sysfd.zig");
+
 const VM = luau.VM;
 
 const ZUNE_CLIENT_HEADER = "zune/" ++ Zune.VERSION_STR;
@@ -66,7 +68,7 @@ pub const State = struct {
     handshake_parser: ?*Response.Parser = null,
     tls: ?*TlsContext = null,
     timeout: ?f64 = null,
-    address_list: ?*std.net.AddressList,
+    address_list: ?[]std.Io.net.IpAddress,
     socket: std.posix.socket_t,
     address_index: usize = 0,
     sending: bool = false,
@@ -848,7 +850,7 @@ fn resumeError(self: *Self, err: anyerror) void {
     defer self.ref.deref(L);
     defer self.lua_ref.deref();
 
-    std.posix.close(self.state.socket);
+    sysfd.close(self.state.socket);
 
     if (L.status() != .Yield)
         return;
@@ -880,7 +882,7 @@ fn safeResumeWithError(
 
 fn emitError(
     self: *Self,
-    comptime scope: @Type(.enum_literal),
+    comptime scope: @EnumLiteral(),
     err: anyerror,
 ) void {
     if (!self.callbacks.@"error".hasRef())
@@ -955,17 +957,19 @@ fn onConnectComplete(
         error.Canceled => return self.safeResumeWithError(error.Timeout),
         else => {
             self.state.address_index += 1;
-            if (self.state.address_list.?.addrs.len == self.state.address_index)
+            if (self.state.address_list.?.len == self.state.address_index)
                 return self.safeResumeWithError(error.ConnectionRefused);
-            const addr = self.state.address_list.?.addrs[self.state.address_index];
+            const addr = self.state.address_list.?[self.state.address_index];
             const socket = self.state.socket;
             self.connectAddress(addr) catch |cerr| return self.safeResumeWithError(cerr);
-            std.posix.close(socket);
+            sysfd.close(socket);
             return .disarm;
         },
     };
-    self.state.address_list.?.deinit();
-    self.state.address_list = null;
+    if (self.state.address_list) |list| {
+        self.allocator.free(list);
+        self.state.address_list = null;
+    }
     if (self.state.stage == .closing)
         return self.safeResumeWithError(error.Timeout);
     if (self.state.tls) |ctx| {
@@ -986,10 +990,10 @@ fn onConnectComplete(
     return .disarm;
 }
 
-fn connectAddress(self: *Self, addr: std.net.Address) !void {
+fn connectAddress(self: *Self, addr: std.Io.net.IpAddress) !void {
     const scheduler = Scheduler.fromState(self.lua_ref.value);
     const socket = try @import("../../lib.zig").createSocket(
-        addr.any.family,
+        sysfd.ipFamily(addr),
         std.posix.SOCK.STREAM | std.posix.SOCK.CLOEXEC | std.posix.SOCK.NONBLOCK,
         std.posix.IPPROTO.TCP,
     );
@@ -1134,7 +1138,7 @@ pub fn __dtor(L: *VM.lua.State, self: *Self) void {
         allocator.destroy(ctx);
     }
     if (self.state.address_list) |addr|
-        addr.deinit();
+        allocator.free(addr);
     if (self.state.handshake_request) |req|
         allocator.free(req);
     if (self.state.handshake_parser) |parser| {
@@ -1167,7 +1171,7 @@ pub fn validateUri(uri: std.Uri, arena: std.mem.Allocator) !struct { std.http.Cl
 
 pub fn generateKey(encoded: []u8) void {
     var key: [16]u8 = undefined;
-    std.crypto.random.bytes(&key);
+    Zune.io().random(&key);
     _ = std.base64.standard.Encoder.encode(encoded, &key);
 }
 
@@ -1232,9 +1236,9 @@ pub fn lua_websocket(L: *VM.lua.State) !i32 {
     }
     L.pop(1);
 
-    var headers: std.ArrayListUnmanaged(u8) = .empty;
+    var headers: std.ArrayList(u8) = .empty;
     defer headers.deinit(allocator);
-    var protocols: std.ArrayListUnmanaged(u8) = .empty;
+    var protocols: std.ArrayList(u8) = .empty;
     defer protocols.deinit(allocator);
 
     var host_handled = false;
@@ -1330,7 +1334,7 @@ pub fn lua_websocket(L: *VM.lua.State) !i32 {
     var encoded_key: [24]u8 = undefined;
     {
         var key: [16]u8 = undefined;
-        std.crypto.random.bytes(&key);
+        Zune.io().random(&key);
         const out = std.base64.standard.Encoder.encode(&encoded_key, &key);
         std.debug.assert(out.len == encoded_key.len);
     }
@@ -1358,13 +1362,13 @@ pub fn lua_websocket(L: *VM.lua.State) !i32 {
     });
     errdefer allocator.free(request);
 
-    const list = try std.net.getAddressList(allocator, host, valid_uri.port orelse switch (protocol) {
+    const list = try @import("../../lib.zig").lookupAddresses(allocator, host, valid_uri.port orelse switch (protocol) {
         .plain => 80,
         .tls => 443,
     });
-    errdefer list.deinit();
+    errdefer allocator.free(list);
 
-    if (list.addrs.len == 0)
+    if (list.len == 0)
         return error.UnknownHostName;
 
     const parser = try allocator.create(Response.Parser);
@@ -1376,7 +1380,7 @@ pub fn lua_websocket(L: *VM.lua.State) !i32 {
     if (protocol == .tls or force_tls) {
         tls_ctx = try allocator.create(TlsContext);
         host_copy = host_copy orelse try allocator.dupe(u8, host);
-        ca_bundle = ca_bundle orelse try tls.config.cert.fromSystem(allocator);
+        ca_bundle = ca_bundle orelse try tls.config.cert.fromSystem(allocator, Zune.io());
         tls_ctx.?.* = .{
             .record = .{
                 .buffer = &tls_ctx.?.record_buffer,
@@ -1405,10 +1409,17 @@ pub fn lua_websocket(L: *VM.lua.State) !i32 {
             .connection = .{
                 .handshake = .{
                     .client = .init(.{
+                        .rng = blk: {
+                            const Rng = struct {
+                                var src: std.Random.IoSource = .{ .io = undefined };
+                            };
+                            Rng.src.io = Zune.io();
+                            break :blk Rng.src.interface();
+                        },
+                        .now = std.Io.Clock.now(.real, Zune.io()),
                         .host = host_copy.?,
                         .root_ca = ca_bundle.?,
                         .cipher_suites = tls.config.cipher_suites.secure,
-                        .key_log_callback = tls.config.key_log.callback,
                     }),
                 },
             },
@@ -1446,7 +1457,7 @@ pub fn lua_websocket(L: *VM.lua.State) !i32 {
         self.lua_ref.deref();
     }
 
-    try self.connectAddress(list.addrs[0]);
+    try self.connectAddress(list[0]);
 
     if (timeout) |t| {
         self.timer.started = true;

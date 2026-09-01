@@ -139,14 +139,14 @@ fn lua_trim(L: *VM.lua.State) !i32 {
 fn lua_trimLeft(L: *VM.lua.State) !i32 {
     const slice = try getReadableSlice(L, 1);
     const values_to_strip = try getReadableSlice(L, 2);
-    try L.Zpushbuffer(std.mem.trimLeft(u8, slice, values_to_strip));
+    try L.Zpushbuffer(std.mem.trimStart(u8, slice, values_to_strip));
     return 1;
 }
 
 fn lua_trimRight(L: *VM.lua.State) !i32 {
     const slice = try getReadableSlice(L, 1);
     const values_to_strip = try getReadableSlice(L, 2);
-    try L.Zpushbuffer(std.mem.trimRight(u8, slice, values_to_strip));
+    try L.Zpushbuffer(std.mem.trimEnd(u8, slice, values_to_strip));
     return 1;
 }
 

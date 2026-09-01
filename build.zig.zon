@@ -1,59 +1,59 @@
 .{
     .name = .Zune,
     .version = "0.6.0",
-    .minimum_zig_version = "0.15.2",
+    .minimum_zig_version = "0.16.0",
     .dependencies = .{
         .luau = .{
-            .url = "git+https://github.com/Scythe-Technology/zig-luau#7f6fc0a99e20d64b6ce7a67777d54a07e18d12c1",
-            .hash = "luau-0.0.0+729-uDAGp912CgAhtrzODagKiMykcwBnx8lFNpKkEtlf-AQc",
+            .url = "git+https://github.com/Scythe-Technology/zig-luau#c4ce309feb34135b355dd0473b0b2e1440a19747",
+            .hash = "luau-0.0.0+729-uDAGp_R_CgC2wHSydIMh0IbwbINoYHIPsVSzpcEDd211",
         },
         .libxev = .{
-            .url = "git+https://github.com/Scythe-Technology/libxev#39bfe9f6f7e5c122dba86fccaea42796c867dc26",
-            .hash = "libxev-0.0.0-Gdacvl84DAAU2pl3TT8SJC-Y94YQp8bGZ11Mza0u3AZ8",
+            .url = "git+https://github.com/Scythe-Technology/libxev#a1ae52775388b8b67e6fa9749828d9784424f607",
+            .hash = "libxev-0.0.0-GdacvuIfDQAOjTELb-KvSjkkF4ERiOdGuBUPw_ZgRA5R",
         },
         .json = .{
-            .url = "git+https://github.com/Scythe-Technology/zig-json#bfa3d87788301b0df3b05b29f6e323f91bf3abbe",
-            .hash = "json-0.2.0-yTw8k2mOAQDGhdeNxl2WX1FI194JP0ukvByo1RGXOlEf",
+            .url = "git+https://github.com/Scythe-Technology/zig-json#594bafadbd123010ca5a2e2c36b89a29544e4b46",
+            .hash = "json-0.4.0-yTw8kwuOAQCJ-7m4aJEbvWY2kMi8Kq-ML9Zulrb_kpuo",
         },
         .yaml = .{
-            .url = "git+https://github.com/Scythe-Technology/zig-yaml#4b48a2df68f623c6c6036c74707ab12665df6ad7",
-            .hash = "zig_yaml-0.1.0-C1161oWrAgCzhAwHIWW-cvg4so5TdCEt38TeYG-b2JYi",
+            .url = "git+https://github.com/Scythe-Technology/zig-yaml#8d0e8b9a39a74c290ac593c42e18cf1ae0af37ec",
+            .hash = "zig_yaml-0.3.0-C1161v2rAgAHqFSxndvEHA1_0ARld49ppiZFHVhAclmr",
         },
         .lz4 = .{
-            .url = "git+https://github.com/Scythe-Technology/zig-lz4#041fc3bc7348b2583562a28605506b6e1f5f8d4a",
-            .hash = "lz4-0.3.0-OvBcT35cAABHjkHxaWRdRg3RfjTAlr_KU0bbMsnqe0Nk",
+            .url = "git+https://github.com/Scythe-Technology/zig-lz4#06e4e5569b39026b5307d9db5c4e0a350da1f6e0",
+            .hash = "lz4-0.4.0-OvBcT0hbAADEWGWNLJeRv_1yC1K59cdmAZ2vQ4baydJf",
         },
         .brotli = .{
-            .url = "git+https://github.com/Scythe-Technology/zbrotli#db376685b19c03745531c0d625b3222c3cdbe0ba",
-            .hash = "zbrotli-0.0.0-YmfP91IzAACrukOcZGkDpS1-EIoNadUG0nRtGXgVOc6C",
+            .url = "git+https://github.com/Scythe-Technology/zbrotli#a735d973f1be803b0f93b77703201ca94a7cbb2e",
+            .hash = "zbrotli-0.0.0-YmfP9_czAAAPK11eAqKgYiI6OblWDIRKv5ia-6W20qsC",
         },
         .pcre2 = .{
-            .url = "git+https://github.com/Scythe-Technology/zpcre2#3ceb1c0e8afee5ba5c9893081d74cbec7d936f52",
-            .hash = "zpcre2-0.0.3-p7xIaFsBMgCTbBTG_CekjUxWFA2a4oLnuLtSDIeMvLkz",
+            .url = "git+https://github.com/Scythe-Technology/zpcre2#f4e180b1f4997e3585d86790571b047c1644b56a",
+            .hash = "zpcre2-0.1.0-p7xIaOsAMgBeAJyF22v8PhJEqNd5WGGP3pJxLw_5K8Zz",
         },
         .datetime = .{
-            .url = "git+https://github.com/Scythe-Technology/zdt#fa55f4080752ce1c48f2bb392e9513f87b59d8cb",
-            .hash = "zdt-0.8.1-xr0_vABUDwDExZVsT91Qid0tOc_48sI47Xhg6nbFsqqC",
+            .url = "git+https://codeberg.org/FObersteiner/zdt#ef21e970c3fead80b4a43051f8e7ab5327efa4b1",
+            .hash = "zdt-0.9.4-xr0_vHvnEQBa2kexZk6j3CrdybDFd0BHa7DdL7hgDqfD",
         },
         .toml = .{
-            .url = "git+https://github.com/Scythe-Technology/tomlz#702c826500ff075302426de918f0e022911c1cc6",
-            .hash = "N-V-__8AADiCAwBidXOdXeoSJ6s1iGcJ0m3N_Pt2P7MEkWb3",
+            .url = "git+https://github.com/Scythe-Technology/tomlz#29189728a77abe6a320042651429259e5ff51976",
+            .hash = "N-V-__8AAHuEAwCLGNulS6r9PIqzotcBzOUP7MFPh8_NKdXm",
         },
         .sqlite = .{
-            .url = "git+https://github.com/Scythe-Technology/z-sqlite#de0e6576f542322da9c9cec63cfb7cf283025077",
-            .hash = "z_sqlite-0.0.3-t6ggsH_ylAArzj2luMYmxf2I8X1uoS9480nClMEGmyD1",
+            .url = "git+https://github.com/Scythe-Technology/z-sqlite#ace699c62ba628fb7c41f444d875ec70d350df10",
+            .hash = "z_sqlite-0.1.0-t6ggsLHxlABuMJFD4v7IeGPFAVDY0gO1i047d9s4Jxbo",
         },
         .zstd = .{
-            .url = "git+https://github.com/Scythe-Technology/zig-zstd#87c845ae49fef7efb425bd56891fa5fe42f8247b",
-            .hash = "zstd-1.6.0-Z4uSultEAABdjaCdI9B_dzRVGFkWjdl0_wDWjAf3ACc-",
+            .url = "git+https://github.com/Scythe-Technology/zig-zstd#dca74d57cf15063cfca0d23e4c893963da47d76e",
+            .hash = "zstd-1.7.0-Z4uSuttBAACrx173YvnnxQ7r8etvlC6x8OMHm7-Mov5l",
         },
         .tinycc = .{
-            .url = "git+https://github.com/Scythe-Technology/zig-tinycc#cf3f6b1c04b56f23ae9af88fecf4e5810d4b4941",
-            .hash = "tinycc-0.1.0-T6dU87zJAAAMRrgVu3omXhysrz4VrOYy0RKxxV8SqwJ3",
+            .url = "git+https://github.com/Scythe-Technology/zig-tinycc#7ffc51927b15c8058dc02f841bb2f61bdb93306f",
+            .hash = "tinycc-0.1.0-T6dU82bJAACrGMmLp-mbqr7KKAVf15-M-rv1CdNCgQUL",
         },
         .tls = .{
-            .url = "git+https://github.com/Scythe-Technology/tls.zig#c5b2ef01b4900a41b9aaa2db863ca829419a2936",
-            .hash = "tls-0.1.0-ER2e0tNIBQBsCrX_2e-QTHCdzCts_3JAUQx-yCgF6UeE",
+            .url = "git+https://github.com/Scythe-Technology/tls.zig#b6ef31a59c4ce231697d87ebf3f7f46762df7d3e",
+            .hash = "tls-0.1.0-ER2e0gatBQCeU9gYAibXFwlunJlbmdOkUVd3Tr3SsfNx",
         },
         .mimalloc = .{
             .url = "git+https://github.com/Scythe-Technology/zig-mimalloc#4ab0002af5ba338e438d6e457847528dca5622f1",

@@ -10,6 +10,8 @@ const Scheduler = Zune.Runtime.Scheduler;
 const LuaHelper = Zune.Utils.LuaHelper;
 const MethodMap = Zune.Utils.MethodMap;
 
+const sysfd = @import("../../utils/sysfd.zig");
+
 const VM = luau.VM;
 
 const Socket = @This();
@@ -123,25 +125,21 @@ tls: TlsContext = .none,
 const OpenCase = enum { created, accepted, closed };
 
 fn closesocket(socket: std.posix.socket_t) void {
-    switch (comptime builtin.os.tag) {
-        .windows => std.os.windows.closesocket(socket) catch unreachable,
-        else => std.posix.close(socket),
-    }
+    sysfd.closeSocket(socket);
 }
 
 pub const LONGEST_ADDRESS = 108;
-pub fn AddressToString(buf: []u8, address: std.net.Address) []const u8 {
-    switch (address.any.family) {
-        std.posix.AF.INET, std.posix.AF.INET6 => {
-            const b = std.fmt.bufPrint(buf, "{f}", .{address}) catch @panic("OutOfMemory");
-            var iter = std.mem.splitBackwardsAny(u8, b, ":");
-            _ = iter.first();
-            return iter.rest();
+pub fn AddressToString(buf: []u8, address: std.Io.net.IpAddress) []const u8 {
+    var w: std.Io.Writer = .fixed(buf);
+    address.format(&w) catch @panic("OutOfMemory");
+    const b = buf[0..w.end];
+    return switch (address) {
+        .ip4 => std.mem.sliceTo(b, ':'),
+        .ip6 => blk: {
+            if (std.mem.lastIndexOfScalar(u8, b, ']')) |i| break :blk b[0 .. i + 1];
+            break :blk b;
         },
-        else => {
-            return std.fmt.bufPrint(buf, "{f}", .{address}) catch @panic("OutOfMemory");
-        },
-    }
+    };
 }
 
 const AsyncSendContext = struct {
@@ -526,7 +524,7 @@ const AsyncRecvMsgContext = struct {
         _: *xev.Loop,
         _: *xev.Completion,
         _: *xev.UDP.State,
-        address: std.net.Address,
+        address: std.Io.net.IpAddress,
         _: xev.UDP,
         _: xev.ReadBuffer,
         r: xev.ReadError!usize,
@@ -551,7 +549,10 @@ const AsyncRecvMsgContext = struct {
         };
 
         L.createtable(0, 3) catch |e| std.debug.panic("{}", .{e});
-        L.Zsetfield(-1, "family", address.any.family) catch |e| std.debug.panic("{}", .{e});
+        L.Zsetfield(-1, "family", @as(i32, switch (address) {
+            .ip4 => std.posix.AF.INET,
+            .ip6 => std.posix.AF.INET6,
+        })) catch |e| std.debug.panic("{}", .{e});
         L.Zsetfield(-1, "port", address.getPort()) catch |e| std.debug.panic("{}", .{e});
         var buf: [LONGEST_ADDRESS]u8 = undefined;
         L.pushlstring(AddressToString(&buf, address)) catch |e| std.debug.panic("{}", .{e});
@@ -643,6 +644,14 @@ const AsyncAcceptContext = struct {
                         .handshake = .{
                             .keypair = keypair,
                             .server = .init(.{
+                                .rng = blk: {
+                                    const Rng = struct {
+                                        var src: std.Random.IoSource = .{ .io = undefined };
+                                    };
+                                    Rng.src.io = Zune.io();
+                                    break :blk Rng.src.interface();
+                                },
+                                .now = std.Io.Clock.now(.real, Zune.io()),
                                 .auth = &context.connection.handshake.keypair,
                             }),
                         },
@@ -1046,9 +1055,9 @@ fn lua_sendMsg(self: *Socket, L: *VM.lua.State) !i32 {
     errdefer allocator.free(buf);
 
     const address = if (address_str.len <= 15)
-        try std.net.Address.parseIp4(address_str, @intCast(port))
+        try std.Io.net.IpAddress.parseIp4(address_str, @intCast(port))
     else
-        try std.net.Address.parseIp6(address_str, @intCast(port));
+        try std.Io.net.IpAddress.parseIp6(address_str, @intCast(port));
 
     const ptr = try allocator.create(AsyncSendMsgContext);
 
@@ -1206,9 +1215,9 @@ fn lua_connect(self: *Socket, L: *VM.lua.State) !i32 {
         return L.Zerror("port out of range");
 
     const address = if (address_str.len <= 15)
-        try std.net.Address.parseIp4(address_str, @intCast(port))
+        try std.Io.net.IpAddress.parseIp4(address_str, @intCast(port))
     else
-        try std.net.Address.parseIp6(address_str, @intCast(port));
+        try std.Io.net.IpAddress.parseIp6(address_str, @intCast(port));
 
     const ptr = try allocator.create(AsyncConnectContext);
 
@@ -1237,7 +1246,7 @@ fn lua_listen(self: *Socket, L: *VM.lua.State) !i32 {
     const backlog = L.Loptunsigned(2, 128);
     if (backlog > std.math.maxInt(u31))
         return L.Zerror("too large");
-    try std.posix.listen(self.socket, @intCast(backlog));
+    try sysfd.listen(self.socket, @intCast(backlog));
     return 0;
 }
 
@@ -1247,24 +1256,11 @@ fn lua_bindIp(self: *Socket, L: *VM.lua.State) !i32 {
     if (port > std.math.maxInt(u16))
         return L.Zerror("port out of range");
     const address = if (address_ip.len <= 15)
-        try std.net.Address.parseIp4(address_ip, @intCast(port))
+        try std.Io.net.IpAddress.parseIp4(address_ip, @intCast(port))
     else
-        try std.net.Address.parseIp6(address_ip, @intCast(port));
-    _ = try std.posix.bind(self.socket, &address.any, address.getOsSockLen());
+        try std.Io.net.IpAddress.parseIp6(address_ip, @intCast(port));
+    try sysfd.bindIp(self.socket, address);
     return 0;
-}
-
-fn lua_getName(self: *Socket, L: *VM.lua.State) !i32 {
-    var address: std.net.Address = undefined;
-    var len: std.posix.socklen_t = @sizeOf(std.posix.sockaddr);
-    try std.posix.getsockname(self.socket, &address.any, &len);
-    try L.createtable(0, 3);
-    try L.Zsetfield(-1, "family", address.any.family);
-    try L.Zsetfield(-1, "port", address.getPort());
-    var buf: [LONGEST_ADDRESS]u8 = undefined;
-    try L.pushlstring(AddressToString(&buf, address));
-    try L.rawsetfield(-2, "address");
-    return 1;
 }
 
 fn lua_setOption(self: *Socket, L: *VM.lua.State) !i32 {
@@ -1382,7 +1378,6 @@ const __index = MethodMap.CreateStaticIndexMap(Socket, TAG_NET_SOCKET, .{
     .{ "connect", MethodMap.WithFn(Socket, lua_connect, before_method) },
     .{ "listen", MethodMap.WithFn(Socket, lua_listen, before_method) },
     .{ "bindIp", MethodMap.WithFn(Socket, lua_bindIp, before_method) },
-    .{ "getName", MethodMap.WithFn(Socket, lua_getName, before_method) },
     .{ "setOption", MethodMap.WithFn(Socket, lua_setOption, before_method) },
     .{ "kind", MethodMap.WithFn(Socket, lua_kind, before_method) },
     .{ "close", lua_close },
