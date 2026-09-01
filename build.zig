@@ -71,7 +71,7 @@ fn prebuild(b: *std.Build, step: *std.Build.Step) !void {
             .use_llvm = true,
         });
 
-        bytecode_builder.root_module.addImport("luau", dep_luau.module("luau"));
+        bytecode_builder.root_module.addImport("luau", dep_luau.module("root"));
 
         const testing_framework_run = compileFile(
             b,
@@ -187,7 +187,7 @@ pub fn build(b: *std.Build) !void {
 
     mod_zune.addOptions("zune-info", zune_info);
 
-    mod_zune.addImport("luau", dep_luau.module("luau"));
+    mod_zune.addImport("luau", dep_luau.module("root"));
     mod_zune.addImport("xev", dep_xev.module("xev"));
     mod_zune.addImport("mimalloc", dep_mimalloc.module("root"));
     mod_zune.addImport("tls", dep_tls.module("tls"));

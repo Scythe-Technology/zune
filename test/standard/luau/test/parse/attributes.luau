@@ -365,7 +365,7 @@ function abc() end
                     },
                     tag = "global",
                 },
-                span_start = vector.create(2, 6),
+                span_start = vector.create(0, 6),
                 span_stop = vector.create(18, 7),
                 function_keyword = {
                     trailing_trivia = {},

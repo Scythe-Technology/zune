@@ -1387,7 +1387,7 @@ const ffi_c_interface = struct {
                             return L.LerrorL("buffer too small", .{}) catch |e| std.debug.panic("{}", .{e});
                         return std.mem.bytesToValue(T, lua_buf[0..size]);
                     },
-                    .Proto, .UpVal, .Deadkey => unreachable,
+                    .Proto, .UpVal, .Deadkey, .All => unreachable,
                     inline else => |e| L.LerrorL("invalid argument type (got {s})", .{comptime VM.lapi.typename(e)}) catch |err| std.debug.panic("{}", .{err}),
                 }
             }
@@ -1446,7 +1446,7 @@ const ffi_c_interface = struct {
                 const vec = L.tovector(index).?;
                 return .{ .x = vec[0], .y = vec[1] };
             },
-            .Proto, .UpVal, .Deadkey => unreachable,
+            .Proto, .UpVal, .Deadkey, .All => unreachable,
             inline else => |e| L.LerrorL("invalid argument type (got {s})", .{comptime VM.lapi.typename(e)}) catch |err| std.debug.panic("{}", .{err}),
         }
     }
@@ -1465,7 +1465,7 @@ const ffi_c_interface = struct {
                 const vec = L.tovector(index).?;
                 return .{ .x = vec[0], .y = vec[1], .z = vec[2] };
             },
-            .Proto, .UpVal, .Deadkey => unreachable,
+            .Proto, .UpVal, .Deadkey, .All => unreachable,
             inline else => |e| L.LerrorL("invalid argument type (got {s})", .{comptime VM.lapi.typename(e)}) catch |err| std.debug.panic("{}", .{err}),
         }
     }
@@ -2252,7 +2252,7 @@ const FFIFunction = struct {
                                 ptrs[order] = @ptrCast(@alignCast(dup.ptr));
                             },
                             .Nil => ptrs[order] = @ptrFromInt(0),
-                            .Proto, .UpVal, .Deadkey => unreachable,
+                            .Proto, .UpVal, .Deadkey, .All => unreachable,
                             inline else => |e| return L.Zerrorf("invalid argument type (got {s})", .{comptime VM.lapi.typename(e)}),
                         }
                     },
@@ -2261,7 +2261,7 @@ const FFIFunction = struct {
                         const idx: i32 = @intCast(i);
                         switch (L.typeOf(idx)) {
                             .Buffer => {},
-                            .Proto, .UpVal, .Deadkey => unreachable,
+                            .Proto, .UpVal, .Deadkey, .All => unreachable,
                             inline else => |e| return L.Zerrorf("invalid argument type (expected buffer, got {s})", .{comptime VM.lapi.typename(e)}),
                         }
                         const buf = L.tobuffer(idx).?;
