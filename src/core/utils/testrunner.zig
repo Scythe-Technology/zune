@@ -68,7 +68,7 @@ pub fn runTest(comptime testFile: TestFile, args: []const []const u8, comptime o
     var dir = try cwd.openDir(io, dir_path, .{});
     defer dir.close(io);
 
-    Zune.STATE.RUN_MODE = .Test;
+    Zune.State.run_mode = .Test;
 
     Zune.loadConfiguration(dir);
 

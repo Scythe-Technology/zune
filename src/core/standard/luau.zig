@@ -139,7 +139,7 @@ fn lua_coverage(L: *VM.lua.State) !i32 {
 }
 
 pub fn computeLineOffsets(allocator: std.mem.Allocator, source: []const u8) ![]const u32 {
-    var offests: std.ArrayListUnmanaged(u32) = .empty;
+    var offests: std.ArrayList(u32) = .empty;
     defer offests.deinit(allocator);
 
     try offests.append(allocator, 0);
@@ -2043,13 +2043,13 @@ fn lua_parse(L: *VM.lua.State) !i32 {
     const allocator = Scheduler.fromState(L).allocator;
     const source = try L.Zcheckvalue([]const u8, 1, null);
 
-    const lallocator = luau.Ast.Allocator.init();
+    var lallocator = try luau.Ast.Allocator.init();
     defer lallocator.deinit();
 
-    const astNameTable = luau.Ast.Lexer.AstNameTable.init(lallocator);
+    var astNameTable = try luau.Ast.Lexer.AstNameTable.init(&lallocator);
     defer astNameTable.deinit();
 
-    const parseResult = luau.Ast.Parser.parse(source, astNameTable, lallocator, .{
+    const parseResult = luau.Ast.Parser.parse(source, &astNameTable, &lallocator, .{
         .captureComments = true,
         .allowDeclarationSyntax = false,
         .storeCstData = true, // doesn't do anything with AstJsonEncoder
@@ -2147,13 +2147,13 @@ fn lua_parseExpr(L: *VM.lua.State) !i32 {
     const allocator = Scheduler.fromState(L).allocator;
     const source = try L.Zcheckvalue([]const u8, 1, null);
 
-    const lallocator = luau.Ast.Allocator.init();
+    var lallocator = try luau.Ast.Allocator.init();
     defer lallocator.deinit();
 
-    const astNameTable = luau.Ast.Lexer.AstNameTable.init(lallocator);
+    var astNameTable = try luau.Ast.Lexer.AstNameTable.init(&lallocator);
     defer astNameTable.deinit();
 
-    const parseResult = luau.Ast.Parser.parseExpr(source, astNameTable, lallocator, .{
+    const parseResult = luau.Ast.Parser.parseExpr(source, &astNameTable, &lallocator, .{
         .captureComments = true,
         .allowDeclarationSyntax = false,
         .storeCstData = true,

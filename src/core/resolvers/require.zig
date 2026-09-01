@@ -390,7 +390,7 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
                 scheduler.awaitResult(RequireContext, ptr, ML, require_finished, require_dtor, .Internal);
             }
 
-            var list: std.ArrayListUnmanaged(QueueItem) = .empty;
+            var list: std.ArrayList(QueueItem) = .empty;
             if (L.isyieldable())
                 try list.append(Zune.DEFAULT_ALLOCATOR, .{
                     .state = Scheduler.ThreadRef.init(L),
