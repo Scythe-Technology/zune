@@ -403,7 +403,7 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
                         '2' => 2,
                         else => unreachable,
                     };
-                    Zune.State.options.luau.optimization_level = level;
+                    Zune.State.options.runtime.luau.optimization_level = level;
                 } else Zune.quitMsg("<red>error<clear>: invalid optimization level, usage: -O<<N>>\n", .{}),
                 'c' => if (flag.len == 3 and flag[2] >= '0' and flag[2] <= '2') {
                     const level: u2 = switch (flag[2]) {
@@ -412,7 +412,7 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
                         '2' => 2,
                         else => unreachable,
                     };
-                    Zune.State.options.luau.coverage_level = level;
+                    Zune.State.options.runtime.luau.coverage_level = level;
                 } else Zune.quitMsg("<red>error<clear>: invalid coverage level, usage: -c<<N>>\n", .{}),
                 '-' => if (std.mem.eql(u8, flag, "--once")) {
                     ALWAYS_DEBUG = false;
@@ -432,9 +432,9 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
         }
     };
 
-    Zune.State.options.luau.debug_level = 2;
-    Zune.State.options.luau.default_ncg = false;
-    Zune.State.options.luau.jit_enabled = false;
+    Zune.State.options.runtime.luau.debug_level = 2;
+    Zune.State.options.runtime.luau.default_ncg = false;
+    Zune.State.options.runtime.luau.jit_enabled = false;
 
     const dir = std.Io.Dir.cwd();
     const module = run_args[0];

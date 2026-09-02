@@ -325,7 +325,7 @@ fn setup(editor: EditorKind, allocator: std.mem.Allocator, setupInfo: SetupInfo)
 
 const OPTIONS = "<nvim | zed | vscode | emacs>";
 fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
-    const envMap = Zune.STATE.ENV_MAP;
+    const envMap = Zune.State.env_map;
 
     const cwd = std.Io.Dir.cwd();
 

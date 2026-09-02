@@ -46,7 +46,7 @@ fn dumpSegfaultInfo(case: SegfaultCase, addr: usize, stderr: *std.Io.Writer) !vo
 
     if (Zune.corelib.c.CALLING_STATE) |L| {
         jmp: {
-            if (Zune.STATE.BUNDLE) |b|
+            if (Zune.State.bundle) |b|
                 if (b.mode.compiled == .release)
                     break :jmp;
             try dumpLuauStackTrace(L, stderr);
@@ -55,7 +55,7 @@ fn dumpSegfaultInfo(case: SegfaultCase, addr: usize, stderr: *std.Io.Writer) !vo
     } else {
         if (Runtime.Scheduler.RUNNING_STATE) |L| {
             jmp: {
-                if (Zune.STATE.BUNDLE) |b|
+                if (Zune.State.bundle) |b|
                     if (b.mode.compiled == .release)
                         break :jmp;
                 try dumpLuauStackTrace(L, stderr);
