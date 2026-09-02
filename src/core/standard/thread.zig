@@ -219,11 +219,7 @@ pub const Runtime = struct {
     fn entry(self: *Runtime) void {
         const ML = self.L.tothread(1).?;
 
-        Scheduler.SCHEDULERS = .empty;
-
         jmp: {
-            Scheduler.SCHEDULERS.append(Zune.DEFAULT_ALLOCATOR, &self.scheduler) catch break :jmp;
-
             Zune.initState(self.L, self.scheduler.allocator) catch break :jmp;
             defer Zune.deinitState(self.L, self.scheduler.allocator);
 

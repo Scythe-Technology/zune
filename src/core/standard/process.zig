@@ -509,7 +509,6 @@ fn lua_create(L: *VM.lua.State) !i32 {
 
 fn lua_exit(L: *VM.lua.State) i32 {
     const code = L.Lcheckunsigned(1);
-    Scheduler.KillSchedulers();
     Engine.stateCleanUp();
     std.process.exit(@truncate(code));
     return 0;

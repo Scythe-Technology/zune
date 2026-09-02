@@ -163,8 +163,6 @@ fn cmdRun(allocator: std.mem.Allocator, args: []const []const u8) !void {
     try Zune.initState(L, allocator);
     defer Zune.deinitState(L, allocator);
 
-    try Scheduler.SCHEDULERS.append(Zune.DEFAULT_ALLOCATOR, &scheduler);
-
     try Engine.prep(L);
     try Zune.openZune(L, run_args, LOAD_FLAGS);
 
@@ -293,8 +291,6 @@ fn cmdTest(allocator: std.mem.Allocator, args: []const []const u8) !void {
     try Zune.initState(L, gpa_allocator);
     defer Zune.deinitState(L, gpa_allocator);
 
-    try Scheduler.SCHEDULERS.append(Zune.DEFAULT_ALLOCATOR, &scheduler);
-
     try Engine.prep(L);
     try Zune.openZune(L, args, LOAD_FLAGS);
 
@@ -343,8 +339,6 @@ fn cmdEval(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     try Zune.initState(L, allocator);
     defer Zune.deinitState(L, allocator);
-
-    try Scheduler.SCHEDULERS.append(Zune.DEFAULT_ALLOCATOR, &scheduler);
 
     try Engine.prep(L);
     try Zune.openZune(L, args, .{});
@@ -484,8 +478,6 @@ fn cmdDebug(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
         try Zune.initState(L, allocator);
         defer Zune.deinitState(L, allocator);
-
-        try Scheduler.SCHEDULERS.append(Zune.DEFAULT_ALLOCATOR, &scheduler);
 
         const callbacks = L.callbacks();
 

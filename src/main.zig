@@ -482,8 +482,6 @@ pub fn main(i: std.process.Init.Minimal) !void {
             try initState(L, allocator);
             defer deinitState(L, allocator);
 
-            try Runtime.Scheduler.SCHEDULERS.append(DEFAULT_ALLOCATOR, &scheduler);
-
             try Runtime.Engine.prep(L);
             try openZune(L, args, .{ .limbo = b.mode.limbo });
 
@@ -537,7 +535,6 @@ fn shutdown() void {
         L.pop(1); // drop: ?function
     }
     Runtime.Debugger.SigInt();
-    Runtime.Scheduler.KillSchedulers();
     Runtime.Engine.stateCleanUp();
     std.process.exit(0);
 }

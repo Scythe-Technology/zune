@@ -11,32 +11,6 @@ const Lists = Zune.Utils.Lists;
 
 const VM = luau.VM;
 
-pub threadlocal var SCHEDULERS: std.ArrayList(*Scheduler) = .empty;
-
-pub fn KillScheduler(scheduler: *Scheduler, cleanUp: bool) void {
-    {
-        var i = scheduler.awaits.items.len;
-        while (i > 0) {
-            i -= 1;
-            const awaiting = scheduler.awaits.items[i];
-            awaiting.virtualDtor(awaiting.data, awaiting.state.value, scheduler);
-            _ = scheduler.awaits.orderedRemove(i);
-        }
-    }
-    if (cleanUp)
-        for (SCHEDULERS.items, 0..) |o, p|
-            if (scheduler == o) {
-                _ = SCHEDULERS.orderedRemove(p);
-                break;
-            };
-}
-
-pub fn KillSchedulers() void {
-    for (SCHEDULERS.items) |scheduler|
-        KillScheduler(scheduler, false);
-    SCHEDULERS.clearAndFree(Zune.DEFAULT_ALLOCATOR);
-}
-
 pub const ThreadRef = struct {
     value: *VM.lua.State,
     ref: ?i32,
@@ -651,7 +625,6 @@ pub fn run(self: *Scheduler, comptime mode: Zune.RunMode) void {
 }
 
 pub fn deinit(self: *Scheduler) void {
-    KillScheduler(self, true);
     self.sleeping.deinit(self.allocator);
     {
         while (self.deferred.pop()) |node|

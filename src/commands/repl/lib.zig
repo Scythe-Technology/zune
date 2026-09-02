@@ -59,8 +59,6 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
     try Zune.initState(L, allocator);
     defer Zune.deinitState(L, allocator);
 
-    try Scheduler.SCHEDULERS.append(Zune.DEFAULT_ALLOCATOR, &scheduler);
-
     try Engine.prep(L);
     try Zune.openZune(L, args, .{});
 
