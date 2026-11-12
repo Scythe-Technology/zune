@@ -3,6 +3,8 @@ const luau = @import("luau");
 
 const Zune = @import("zune");
 
+const Debug = Zune.Runtime.Debug;
+const Debugger = Zune.Runtime.Debugger;
 const Scheduler = Zune.Runtime.Scheduler;
 
 const VM = luau.VM;
@@ -45,6 +47,20 @@ pub fn setLuaFileContext(L: *VM.lua.State, ctx: FileContext) !void {
     try L.rawsetfield(VM.lua.GLOBALSINDEX, "_FILE");
 }
 
+pub fn handleError(state: *VM.lua.State, err: anytype) anyerror {
+    Debug.dumpErrorTrace(state, err, false);
+    if (comptime Debugger.PlatformSupported()) |_| {
+        if (Debugger.ACTIVE) {
+            @branchHint(.unpredictable);
+            switch (err) {
+                error.Runtime => Debugger.luau_panic(state, -2),
+                else => {},
+            }
+        }
+    }
+    return err;
+}
+
 pub fn checkStatus(L: *VM.lua.State) !VM.lua.Status {
     const status = L.status();
     switch (status) {
@@ -63,29 +79,28 @@ pub fn prep(L: *VM.lua.State) !void {
 }
 
 pub fn stateCleanUp() void {
-    if (comptime !@import("../../commands/repl/Terminal.zig").SupportedPlatform())
+    if (comptime !@import("../standard/io/terminal.zig").SupportedPlatform())
         return;
-    if (Zune.corelib.io.TERMINAL) |*terminal| {
-        if (terminal.stdout_istty and terminal.stdin_istty) {
-            terminal.restoreSettings() catch Zune.debug.print("[Zune] Failed to restore terminal settings\n", .{});
-            terminal.restoreOutputMode() catch Zune.debug.print("[Zune] Failed to restore terminal output mode\n", .{});
-        }
+    const terminal = Zune.standard.libraries.io.terminal;
+    if (terminal.state.stdout_istty == true and terminal.state.stdin_istty == true) {
+        terminal.restoreSettings() catch Zune.debug.print("<blue>warning<clear> failed to restore terminal settings\n", .{});
+        terminal.restoreOutputMode() catch Zune.debug.print("<blue>warning<clear> failed to restore terminal output mode\n", .{});
     }
 }
 
 const RunOptions = struct {
-    cleanUp: bool,
-    mode: Zune.RunMode = .Run,
+    clean_up: bool = true,
+    consume_tests: bool = true,
 };
 
 pub fn runAsync(L: *VM.lua.State, sched: *Scheduler, comptime options: RunOptions) !void {
-    defer if (options.cleanUp) stateCleanUp();
-    if (comptime Zune.corelib.thread.PlatformSupported())
-        Zune.corelib.thread.THREADS = .{};
-    try sched.deferThread(L, null, 0);
-    sched.run(options.mode);
-    const threadlib = Zune.corelib.thread;
-    if (comptime Zune.corelib.thread.PlatformSupported()) {
+    defer if (options.clean_up) stateCleanUp();
+    if (comptime Zune.standard.libraries.thread.PlatformSupported()) |_|
+        Zune.standard.libraries.thread.THREADS = .{};
+    try sched.deferThread(.init(L), null, 0);
+    sched.run();
+    const threadlib = Zune.standard.libraries.thread;
+    if (comptime Zune.standard.libraries.thread.PlatformSupported()) |_| {
         var node = threadlib.THREADS.first;
         while (node) |n| {
             node = n.next;
@@ -98,6 +113,14 @@ pub fn runAsync(L: *VM.lua.State, sched: *Scheduler, comptime options: RunOption
         }
     }
     _ = try checkStatus(L);
+    if (comptime options.consume_tests) {
+        if (Zune.standard.libraries.testing.running()) {
+            @branchHint(.unlikely);
+            const res = try Zune.standard.libraries.testing.consumeTestingResults(L);
+            if (res.failed > 0)
+                return error.TestFailed;
+        }
+    }
 }
 
 pub fn run(L: *VM.lua.State) !void {

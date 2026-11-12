@@ -1,1 +1,1 @@
-return {"foo"};
+return { "foo" }

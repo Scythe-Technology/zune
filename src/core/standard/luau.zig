@@ -5,8 +5,7 @@ const json = @import("json");
 const Zune = @import("zune");
 
 const Scheduler = Zune.Runtime.Scheduler;
-
-const LuaHelper = Zune.Utils.LuaHelper;
+const Scripting = Zune.Runtime.Scripting;
 
 const SerdeJson = @import("./serde/json.zig");
 
@@ -14,7 +13,7 @@ const VM = luau.VM;
 
 pub const LIB_NAME = "luau";
 
-fn lua_compile(L: *VM.lua.State) !i32 {
+pub fn lua_compile(L: *VM.lua.State) !i32 {
     const source = try L.Zcheckvalue([]const u8, 1, null);
 
     var compileOpts = luau.CompileOptions{
@@ -53,7 +52,7 @@ fn lua_compile(L: *VM.lua.State) !i32 {
         // compileOpts.vector_type = opts.vector_type orelse compileOpts.vector_type;
     }
 
-    const allocator = Scheduler.fromState(L).allocator;
+    const allocator = Scheduler.fromState(L).allocator();
     const bytecode = try luau.compile(allocator, source, compileOpts);
     defer allocator.free(bytecode);
 
@@ -72,7 +71,7 @@ fn lua_compile(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn lua_load(L: *VM.lua.State) !i32 {
+pub fn lua_load(L: *VM.lua.State) !i32 {
     const bytecode = try L.Zcheckvalue([]const u8, 1, null);
 
     var use_code_gen = false;
@@ -113,9 +112,9 @@ fn lua_load(L: *VM.lua.State) !i32 {
 fn getcoverage(L: *VM.lua.State, fnname: ?[:0]const u8, line: i32, depth: i32, hits: []const i32) !void {
     try L.createtable(0, 3);
     if (fnname) |name|
-        try L.Zsetfield(-1, "name", name);
-    try L.Zsetfield(-1, "line", line);
-    try L.Zsetfield(-1, "depth", depth);
+        try L.Zsetfield("name", name);
+    try L.Zsetfield("line", line);
+    try L.Zsetfield("depth", depth);
     for (hits, 0..) |hit, i| {
         if (hit != -1) {
             L.pushinteger(hit);
@@ -125,7 +124,7 @@ fn getcoverage(L: *VM.lua.State, fnname: ?[:0]const u8, line: i32, depth: i32, h
     try L.rawseti(-2, @intCast(L.objlen(-2) + 1));
 }
 
-fn lua_coverage(L: *VM.lua.State) !i32 {
+pub fn lua_coverage(L: *VM.lua.State) !i32 {
     try L.Zchecktype(1, .Function);
 
     try L.newtable();
@@ -138,7 +137,110 @@ fn lua_coverage(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-pub fn computeLineOffsets(allocator: std.mem.Allocator, source: []const u8) ![]const u32 {
+pub fn lua_sync(L: *VM.lua.State) !i32 {
+    try L.Zchecktype(1, .Function);
+
+    L.call(@intCast(L.gettop() - 1), VM.lua.MULTRET);
+
+    return @intCast(L.gettop());
+}
+
+pub fn lua_garbagecollect(L: *VM.lua.State) !i32 {
+    const step = try L.Zcheckvalue(?bool, 1, null);
+    _ = L.gc(if (step orelse false) .Step else .Collect, 0);
+    return 0;
+}
+
+pub const lua_fflag = struct {
+    pub fn lua_get(L: *VM.lua.State) !i32 {
+        const name = try L.Zcheckvalue([]const u8, 1, null);
+        if (luau.FFlags.GetByName(bool, name)) |fflag| {
+            try L.Zpushvalue(.{
+                .name = std.mem.span(fflag.name),
+                .type = "boolean",
+                .value = fflag.value,
+                .dynamic = fflag.dynamic,
+            });
+            return 1;
+        } else if (luau.FFlags.GetByName(i32, name)) |fflag| {
+            try L.Zpushvalue(.{
+                .name = std.mem.span(fflag.name),
+                .type = "integer",
+                .value = fflag.value,
+                .dynamic = fflag.dynamic,
+            });
+            return 1;
+        } else return L.Zerrorf("unknown fflag '{s}'", .{name});
+    }
+
+    pub fn lua_set(L: *VM.lua.State) !i32 {
+        const name = try L.Zcheckvalue([]const u8, 1, null);
+        switch (L.typeOf(2)) {
+            .Boolean => {
+                const value = L.toboolean(2);
+                try luau.FFlags.SetByName(bool, name, value);
+                return 0;
+            },
+            .Number => {
+                const value = L.tointeger(2) orelse unreachable;
+                try luau.FFlags.SetByName(i32, name, @intCast(value));
+                return 0;
+            },
+            else => return L.Zerror("invalid value type"),
+        }
+    }
+
+    pub fn lua_list(L: *VM.lua.State) !i32 {
+        const bool_node = luau.FFlags.Get(bool);
+        const int_node = luau.FFlags.Get(i32);
+
+        var bool_iterator = bool_node.iterator();
+        var int_iterator = int_node.iterator();
+
+        var count: u32 = 0;
+        while (bool_iterator.next()) |_|
+            count += 1;
+        while (int_iterator.next()) |_|
+            count += 1;
+
+        bool_iterator = .{
+            .consumed = false,
+            .state = bool_node,
+        };
+
+        int_iterator = .{
+            .consumed = false,
+            .state = int_node,
+        };
+
+        try L.createtable(count, 0);
+
+        var index: i32 = 1;
+        while (bool_iterator.next()) |fflag| : (index += 1) {
+            try L.Zpushvalue(.{
+                .name = std.mem.span(fflag.name),
+                .type = "boolean",
+                .value = fflag.value,
+                .dynamic = fflag.dynamic,
+            });
+            try L.rawseti(-2, index);
+        }
+
+        while (int_iterator.next()) |fflag| : (index += 1) {
+            try L.Zpushvalue(.{
+                .name = std.mem.span(fflag.name),
+                .type = "integer",
+                .value = fflag.value,
+                .dynamic = fflag.dynamic,
+            });
+            try L.rawseti(-2, index);
+        }
+
+        return 1;
+    }
+};
+
+fn computeLineOffsets(allocator: std.mem.Allocator, source: []const u8) ![]const u32 {
     var offests: std.ArrayList(u32) = .empty;
     defer offests.deinit(allocator);
 
@@ -181,10 +283,33 @@ const AstSerializer = struct {
     last_token_ref: ?i32 = null,
     line_offsets: []const u32,
 
+    fn Used(a: type, b: []const []const u8) void {
+        comptime {
+            const names = @typeInfo(a).@"struct".field_names;
+            @setEvalBranchQuota(2000);
+            for (names) |field_name| jmp: {
+                if (std.mem.eql(u8, field_name, "vtable") or std.mem.eql(u8, field_name, "classIndex"))
+                    break :jmp;
+                for (b) |str|
+                    if (std.mem.eql(u8, str, field_name))
+                        break :jmp;
+                @compileError("unused field: " ++ field_name);
+            }
+            for (b) |str| jmp: {
+                for (names) |field_name|
+                    if (std.mem.eql(u8, str, field_name))
+                        break :jmp;
+                @compileError("unknown field: " ++ str);
+            }
+        }
+    }
+
     /// max stack: 1
     fn setSpanLocation(L: *VM.lua.State, loc: Location, comptime prefix: []const u8) !void {
-        try L.Zsetfield(-1, prefix ++ "_start", @Vector(3, f32){ @floatFromInt(loc.begin.column), @floatFromInt(loc.begin.line), 0 });
-        try L.Zsetfield(-1, prefix ++ "_stop", @Vector(3, f32){ @floatFromInt(loc.end.column), @floatFromInt(loc.end.line), 0 });
+        comptime Used(Location, &.{ "begin", "end" });
+        comptime Used(Location.Position, &.{ "column", "line" });
+        try L.Zsetfield(prefix ++ "_start", @Vector(3, f32){ @floatFromInt(loc.begin.column), @floatFromInt(loc.begin.line), 0 });
+        try L.Zsetfield(prefix ++ "_stop", @Vector(3, f32){ @floatFromInt(loc.end.column), @floatFromInt(loc.end.line), 0 });
     }
 
     fn advancePosition(self: *@This(), contents: []const u8) void {
@@ -207,6 +332,16 @@ const AstSerializer = struct {
     }
 
     fn serializeLocal(self: *@This(), local: *Ast.Local, createToken: bool, colonPosition: ?Location.Position) !void {
+        comptime Used(Ast.Local, &.{
+            "name",
+            "location",
+            "shadow",
+            "functionDepth",
+            "loopDepth",
+            "isConst",
+            "isExported",
+            "annotation",
+        });
         try self.L.rawcheckstack(3);
 
         self.L.pushlightuserdata(@ptrCast(@alignCast(local)));
@@ -223,8 +358,8 @@ const AstSerializer = struct {
                 try self.serializeToken(local.location.begin, std.mem.span(local.name.value), null);
                 try self.L.rawsetfield(-2, "name");
 
-                try self.L.Zsetfield(-1, "is_const", local.isConst);
-                try self.L.Zsetfield(-1, "is_exported", local.isExported);
+                try self.L.Zsetfield("is_const", local.isConst);
+                try self.L.Zsetfield("is_exported", local.isExported);
 
                 if (local.annotation) |annotation| {
                     std.debug.assert(colonPosition != null);
@@ -244,18 +379,26 @@ const AstSerializer = struct {
     }
 
     fn serializeExprTableItem(self: *@This(), item: Ast.ExprTable.Item, cstNode: *Cst.ExprTable.Item) !void {
+        comptime Used(Ast.ExprTable.Item, &.{ "kind", "key", "value" });
+        comptime Used(Cst.ExprTable.Item, &.{
+            "indexerOpenPosition",
+            "indexerClosePosition",
+            "equalsPosition",
+            "separator",
+            "separatorPosition",
+        });
         try self.L.rawcheckstack(2);
         switch (item.kind) {
             .List => {
                 try self.L.createtable(0, 3);
-                try self.L.Zsetfield(-1, "kind", "list");
+                try self.L.Zsetfield("kind", "list");
 
                 _ = try self.visitExpr(item.value);
                 try self.L.rawsetfield(-2, "value");
             },
             .Record => {
                 try self.L.createtable(0, 5);
-                try self.L.Zsetfield(-1, "kind", "record");
+                try self.L.Zsetfield("kind", "record");
 
                 const value = item.key.?.as(.expr_constant_string).?.value;
                 try self.serializeToken(item.key.?.location.begin, value.slice(), null);
@@ -270,7 +413,7 @@ const AstSerializer = struct {
             },
             .General => {
                 try self.L.createtable(0, 7);
-                try self.L.Zsetfield(-1, "kind", "general");
+                try self.L.Zsetfield("kind", "general");
 
                 std.debug.assert(cstNode.indexerOpenPosition.hasValue());
                 try self.serializeToken(cstNode.indexerOpenPosition, "[", null);
@@ -441,8 +584,8 @@ const AstSerializer = struct {
         }
         try self.L.rawsetfield(-2, "leading_trivia");
 
-        try self.L.Zsetfield(-1, "position", @Vector(3, f32){ @floatFromInt(position.column), @floatFromInt(position.line), 0 });
-        try self.L.Zsetfield(-1, "text", text);
+        try self.L.Zsetfield("position", @Vector(3, f32){ @floatFromInt(position.column), @floatFromInt(position.line), 0 });
+        try self.L.Zsetfield("text", text);
         self.advancePosition(text);
 
         try self.L.createtable(0, 0);
@@ -472,6 +615,7 @@ const AstSerializer = struct {
     }
 
     fn serializeAttributes(self: *@This(), attrs: Ast.Array(*Ast.Attr), nrec: u32) !void {
+        comptime Used(Ast.Attr, &.{ "location", "type", "args", "name" });
         try self.L.rawcheckstack(4);
         try self.L.createtable(@truncate(attrs.size), nrec);
 
@@ -500,9 +644,10 @@ const AstSerializer = struct {
                 try self.L.createtable(0, 5);
             }
 
-            try self.L.Zsetfield(-1, "tag", "attribute");
+            try self.L.Zsetfield("tag", "attribute");
             try setSpanLocation(self.L, attr.location, "span");
 
+            // try self.L.Zsetfield("name", std.mem.span(attr.name.value));
             try self.serializeToken(attr.location.begin, switch (attr.type) {
                 .Checked => if (attr.args.size > 0) "checked" else "@checked",
                 .Native => if (attr.args.size > 0) "native" else "@native",
@@ -565,6 +710,7 @@ const AstSerializer = struct {
         separators: []const Location.Position,
         separatorText: []const u8,
     ) !void {
+        comptime Used(Ast.TypeOrPack, &.{ "type", "typePack" });
         try self.L.rawcheckstack(3);
         try self.L.createtable(@truncate(nodes.size), 0);
 
@@ -616,10 +762,11 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitExprGroup(self: *@This(), node: *Ast.ExprGroup) !bool {
+        comptime Used(Ast.ExprGroup, &.{ "location", "expr" });
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 6);
 
-        try self.L.Zsetfield(-1, "tag", "group");
+        try self.L.Zsetfield("tag", "group");
         try setSpanLocation(self.L, node.location, "span");
 
         try self.serializeToken(node.location.begin, "(", null);
@@ -634,63 +781,72 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitExprConstantNil(self: *@This(), node: *Ast.ExprConstantNil) !bool {
+        comptime Used(Ast.ExprConstantNil, &.{"location"});
         try self.serializeToken(node.location.begin, "nil", 4);
-        try self.L.Zsetfield(-1, "tag", "nil");
+        try self.L.Zsetfield("tag", "nil");
         try setSpanLocation(self.L, node.location, "span");
         return false;
     }
     pub fn visitExprConstantBool(self: *@This(), node: *Ast.ExprConstantBool) !bool {
+        comptime Used(Ast.ExprConstantBool, &.{ "location", "value" });
         try self.serializeToken(node.location.begin, if (node.value) "true" else "false", 4);
-        try self.L.Zsetfield(-1, "tag", "boolean");
+        try self.L.Zsetfield("tag", "boolean");
         try setSpanLocation(self.L, node.location, "span");
 
-        try self.L.Zsetfield(-1, "value", node.value);
+        try self.L.Zsetfield("value", node.value);
         return false;
     }
     pub fn visitExprConstantNumber(self: *@This(), node: *Ast.ExprConstantNumber) !bool {
+        comptime Used(Ast.ExprConstantNumber, &.{ "location", "value", "parseResult" });
+        comptime Used(Cst.ExprConstantNumber, &.{"value"});
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.expr_constant_number).?;
 
         try self.serializeToken(node.location.begin, cstNode.value.slice(), 4);
-        try self.L.Zsetfield(-1, "tag", "number");
+        try self.L.Zsetfield("tag", "number");
         try setSpanLocation(self.L, node.location, "span");
 
-        try self.L.Zsetfield(-1, "value", node.value);
+        try self.L.Zsetfield("value", node.value);
         return false;
     }
     pub fn visitExprConstantInteger(self: *@This(), node: *Ast.ExprConstantInteger) !bool {
+        comptime Used(Ast.ExprConstantInteger, &.{ "location", "value", "parseResult" });
+        comptime Used(Cst.ExprConstantInteger, &.{"value"});
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.expr_constant_integer).?;
 
         try self.serializeToken(node.location.begin, cstNode.value.slice(), 4);
-        try self.L.Zsetfield(-1, "tag", "number");
+        try self.L.Zsetfield("tag", "number");
         try setSpanLocation(self.L, node.location, "span");
 
-        try self.L.Zsetfield(-1, "value", node.value);
+        try self.L.Zsetfield("value", node.value);
 
         return false;
     }
     pub fn visitExprConstantString(self: *@This(), node: *Ast.ExprConstantString) !bool {
+        comptime Used(Ast.ExprConstantString, &.{ "location", "value", "quoteStyle" });
+        comptime Used(Cst.ExprConstantString, &.{ "sourceString", "quoteStyle", "blockDepth" });
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.expr_constant_string).?;
 
         try self.serializeToken(node.location.begin, cstNode.sourceString.slice(), 5);
-        try self.L.Zsetfield(-1, "tag", "string");
+        try self.L.Zsetfield("tag", "string");
         try setSpanLocation(self.L, node.location, "span");
 
-        try self.L.Zsetfield(-1, "quote_style", switch (cstNode.quoteStyle) {
+        try self.L.Zsetfield("quote_style", switch (cstNode.quoteStyle) {
             .quoted_single => "single",
             .quoted_double => "double",
             .quoted_raw => "block",
             .quoted_interp => "interp",
         });
-        try self.L.Zsetfield(-1, "block_depth", cstNode.blockDepth);
+        try self.L.Zsetfield("block_depth", cstNode.blockDepth);
 
         self.current_position = node.location.end;
         return false;
     }
     pub fn visitExprLocal(self: *@This(), node: *Ast.ExprLocal) !bool {
+        comptime Used(Ast.ExprLocal, &.{ "location", "local", "upvalue" });
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 6);
 
-        try self.L.Zsetfield(-1, "tag", "local");
+        try self.L.Zsetfield("tag", "local");
         try setSpanLocation(self.L, node.location, "span");
 
         try self.serializeToken(node.location.begin, std.mem.span(node.local.?.name.value), null);
@@ -699,14 +855,15 @@ const AstSerializer = struct {
         try self.serializeLocal(node.local.?, true, null);
         try self.L.rawsetfield(-2, "local_node");
 
-        try self.L.Zsetfield(-1, "upvalue", node.upvalue);
+        try self.L.Zsetfield("upvalue", node.upvalue);
         return false;
     }
     pub fn visitExprGlobal(self: *@This(), node: *Ast.ExprGlobal) !bool {
+        comptime Used(Ast.ExprGlobal, &.{ "location", "name" });
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 4);
 
-        try self.L.Zsetfield(-1, "tag", "global");
+        try self.L.Zsetfield("tag", "global");
         try setSpanLocation(self.L, node.location, "span");
 
         try self.serializeToken(node.location.begin, std.mem.span(node.name.value), null);
@@ -714,18 +871,23 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitExprVarargs(self: *@This(), node: *Ast.ExprVarargs) !bool {
+        comptime Used(Ast.ExprVarargs, &.{"location"});
         try self.serializeToken(node.location.begin, "...", 3);
-        try self.L.Zsetfield(-1, "tag", "vararg");
+        try self.L.Zsetfield("tag", "vararg");
         try setSpanLocation(self.L, node.location, "span");
         return false;
     }
     pub fn visitExprCall(self: *@This(), node: *Ast.ExprCall) !bool {
+        comptime Used(Ast.ExprCall, &.{ "location", "func", "args", "typeArguments", "self", "argLocation", "tableCall" });
+        comptime Used(Cst.ExprCall, &.{ "openParens", "commaPositions", "explicitTypes", "closeParens" });
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.expr_call).?;
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 10);
 
-        try self.L.Zsetfield(-1, "tag", "call");
+        try self.L.Zsetfield("tag", "call");
         try setSpanLocation(self.L, node.location, "span");
+
+        try self.L.Zsetfield("table_call", node.tableCall);
 
         try node.func.visit(self);
         try self.L.rawsetfield(-2, "func");
@@ -743,7 +905,7 @@ const AstSerializer = struct {
             try self.L.rawsetfield(-2, "type_arguments");
         }
 
-        try self.L.Zsetfield(-1, "self", node.self);
+        try self.L.Zsetfield("self", node.self);
 
         try setSpanLocation(self.L, node.argLocation, "arg_span");
 
@@ -754,10 +916,11 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitExprIndexName(self: *@This(), node: *Ast.ExprIndexName) !bool {
+        comptime Used(Ast.ExprIndexName, &.{ "location", "expr", "opPosition", "index", "indexLocation", "op", "privateAccess" });
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 7);
 
-        try self.L.Zsetfield(-1, "tag", "indexname");
+        try self.L.Zsetfield("tag", "indexname");
         try setSpanLocation(self.L, node.location, "span");
 
         try node.expr.visit(self);
@@ -769,14 +932,19 @@ const AstSerializer = struct {
         try self.serializeToken(node.indexLocation.begin, std.mem.span(node.index.value), 2);
         try setSpanLocation(self.L, node.indexLocation, "span");
         try self.L.rawsetfield(-2, "index");
+
+        try self.L.Zsetfield("private_access", node.privateAccess);
+
         return false;
     }
     pub fn visitExprIndexExpr(self: *@This(), node: *Ast.ExprIndexExpr) !bool {
+        comptime Used(Ast.ExprIndexExpr, &.{ "location", "expr", "index" });
+        comptime Used(Cst.ExprIndexExpr, &.{ "openBracketPosition", "closeBracketPosition" });
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.expr_index_expr).?;
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 7);
 
-        try self.L.Zsetfield(-1, "tag", "index");
+        try self.L.Zsetfield("tag", "index");
         try setSpanLocation(self.L, node.location, "span");
 
         try node.expr.visit(self);
@@ -793,6 +961,33 @@ const AstSerializer = struct {
         return false;
     }
     pub fn serializeFunctionBody(self: *@This(), node: *Ast.ExprFunction) !void {
+        comptime Used(Ast.ExprFunction, &.{
+            "location",
+            "attributes",
+            "generics",
+            "genericPacks",
+            "self",
+            "argLocation",
+            "args",
+            "vararg",
+            "varargLocation",
+            "varargAnnotation",
+            "returnAnnotation",
+            "body",
+            "debugname", // ignored
+            "functionDepth", // ignored
+        });
+        comptime Used(Cst.ExprFunction, &.{
+            "attrLists",
+            "functionKeywordPosition",
+            "openGenericsPosition",
+            "closeGenericsPosition",
+            "genericsCommaPositions",
+            "argsCommaPositions",
+            "argsAnnotationColonPositions",
+            "varargAnnotationColonPosition",
+            "returnSpecifierPosition",
+        });
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.expr_function).?;
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 15);
@@ -868,7 +1063,7 @@ const AstSerializer = struct {
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 6);
 
-        try self.L.Zsetfield(-1, "tag", "function");
+        try self.L.Zsetfield("tag", "function");
         try setSpanLocation(self.L, node.location, "span");
 
         try self.serializeAttributes(node.attributes, 0);
@@ -884,11 +1079,13 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitExprTable(self: *@This(), node: *Ast.ExprTable) !bool {
+        comptime Used(Ast.ExprTable, &.{ "location", "items" });
+        comptime Used(Cst.ExprTable, &.{"items"});
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.expr_table).?;
         try self.L.rawcheckstack(4);
         try self.L.createtable(0, 6);
 
-        try self.L.Zsetfield(-1, "tag", "table");
+        try self.L.Zsetfield("tag", "table");
         try setSpanLocation(self.L, node.location, "span");
 
         try self.serializeToken(node.location.begin, "{", null);
@@ -909,10 +1106,12 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitExprUnary(self: *@This(), node: *Ast.ExprUnary) !bool {
+        comptime Used(Ast.ExprUnary, &.{ "location", "expr", "op" });
+        comptime Used(Cst.ExprOp, &.{"opPosition"});
         try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 4);
 
-        try self.L.Zsetfield(-1, "tag", "unary");
+        try self.L.Zsetfield("tag", "unary");
         try setSpanLocation(self.L, node.location, "span");
 
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.expr_op).?;
@@ -924,10 +1123,12 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitExprBinary(self: *@This(), node: *Ast.ExprBinary) !bool {
+        comptime Used(Ast.ExprBinary, &.{ "location", "left", "right", "op" });
+        comptime Used(Cst.ExprOp, &.{"opPosition"});
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 6);
 
-        try self.L.Zsetfield(-1, "tag", "binary");
+        try self.L.Zsetfield("tag", "binary");
         try setSpanLocation(self.L, node.location, "span");
 
         try node.left.visit(self);
@@ -942,10 +1143,12 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitExprTypeAssertion(self: *@This(), node: *Ast.ExprTypeAssertion) !bool {
+        comptime Used(Ast.ExprTypeAssertion, &.{ "location", "expr", "annotation" });
+        comptime Used(Cst.ExprTypeAssertion, &.{"opPosition"});
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 6);
 
-        try self.L.Zsetfield(-1, "tag", "cast");
+        try self.L.Zsetfield("tag", "cast");
         try setSpanLocation(self.L, node.location, "span");
 
         try node.expr.visit(self);
@@ -959,16 +1162,51 @@ const AstSerializer = struct {
         try self.L.rawsetfield(-2, "annotation");
         return false;
     }
+    pub fn serializeIfLocalBinding(self: *@This(), comptime CstType: Cst.Node.Kind, node: anytype) !void {
+        if (node.conditionLocal != null) {
+            std.debug.assert(node.conditionKeywordLocation.has);
+            try self.serializeToken(node.conditionKeywordLocation.to().?.begin, if (node.conditionIsConst) "const" else "local", null);
+            try self.L.rawsetfield(-2, "local_keyword");
+
+            const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(CstType).?;
+            try self.serializeLocal(node.conditionLocal.?, true, cstNode.annotationColonPosition);
+            try self.L.rawsetfield(-2, "condition_local");
+
+            std.debug.assert(node.conditionEqualsLocation.has);
+            try self.serializeToken(node.conditionEqualsLocation.to().?.begin, "=", null);
+            try self.L.rawsetfield(-2, "equals");
+        }
+    }
     pub fn visitExprIfElse(self: *@This(), node: *Ast.ExprIfElse) !bool {
+        comptime Used(Ast.ExprIfElse, &.{
+            "location",
+            "condition",
+            "trueExpr",
+            "falseExpr",
+            "hasThen",
+            "hasElse",
+            "conditionLocal",
+            "conditionIsConst",
+            "conditionKeywordLocation",
+            "conditionEqualsLocation",
+        });
+        comptime Used(Cst.ExprIfElse, &.{
+            "thenPosition",
+            "isElseIf",
+            "elsePosition",
+            "annotationColonPosition",
+        });
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.expr_if_else).?;
         try self.L.rawcheckstack(4);
         try self.L.createtable(0, 10);
 
-        try self.L.Zsetfield(-1, "tag", "conditional");
+        try self.L.Zsetfield("tag", "conditional");
         try setSpanLocation(self.L, node.location, "span");
 
         try self.serializeToken(node.location.begin, "if", null);
         try self.L.rawsetfield(-2, "if_keyword");
+
+        try self.serializeIfLocalBinding(.expr_if_else, node);
 
         try node.condition.visit(self);
         try self.L.rawsetfield(-2, "condition");
@@ -992,7 +1230,7 @@ const AstSerializer = struct {
             currentNode = node.falseExpr.as(.expr_if_else).?;
             currentCstNode = self.cst_node_map.find(@ptrCast(currentNode)).?.second.*.as(.expr_if_else).?;
 
-            try self.serializeToken(node.location.begin, "elseif", null);
+            try self.serializeToken(currentNode.location.begin, "elseif", null);
             try self.L.rawsetfield(-2, "elseif_keyword");
 
             try node.condition.visit(self);
@@ -1018,11 +1256,13 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitExprInterpString(self: *@This(), node: *Ast.ExprInterpString) !bool {
+        comptime Used(Ast.ExprInterpString, &.{ "location", "strings", "expressions" });
+        comptime Used(Cst.ExprInterpString, &.{ "stringPositions", "sourceStrings" });
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.expr_interp_string).?;
         try self.L.rawcheckstack(4);
         try self.L.createtable(0, 5);
 
-        try self.L.Zsetfield(-1, "tag", "interpolated_string");
+        try self.L.Zsetfield("tag", "interpolated_string");
         try setSpanLocation(self.L, node.location, "span");
 
         try self.L.createtable(@truncate(node.strings.size), 0);
@@ -1047,10 +1287,12 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitExprInstantiate(self: *@This(), node: *Ast.ExprInstantiate) !bool {
+        comptime Used(Ast.ExprInstantiate, &.{ "location", "expr", "typeArguments" });
+        comptime Used(Cst.ExprExplicitTypeInstantiation, &.{"instantiation"});
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 6);
 
-        try self.L.Zsetfield(-1, "tag", "instantiate");
+        try self.L.Zsetfield("tag", "instantiate");
         try setSpanLocation(self.L, node.location, "span");
 
         try node.expr.visit(self);
@@ -1063,10 +1305,15 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitExprError(self: *@This(), node: *Ast.ExprError) !bool {
+        comptime Used(Ast.ExprError, &.{
+            "location",
+            "expressions",
+            "messageIndex", // ignored
+        });
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 4);
 
-        try self.L.Zsetfield(-1, "tag", "error");
+        try self.L.Zsetfield("tag", "error");
         try setSpanLocation(self.L, node.location, "span");
 
         try self.serializeExprs(node.expressions, 0);
@@ -1078,10 +1325,16 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitStatBlock(self: *@This(), node: *Ast.StatBlock) !bool {
+        comptime Used(Ast.StatBlock, &.{
+            "location",
+            "body",
+            "hasEnd", // ignored
+            "hasSemicolon", // ignored
+        });
         try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 3);
 
-        try self.L.Zsetfield(-1, "tag", "block");
+        try self.L.Zsetfield("tag", "block");
         try setSpanLocation(self.L, node.location, "span");
 
         {
@@ -1097,14 +1350,32 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitStatIf(self: *@This(), node: *Ast.StatIf) !bool {
+        comptime Used(Ast.StatIf, &.{
+            "location",
+            "condition",
+            "thenLocation",
+            "thenbody",
+            "elseLocation",
+            "elsebody",
+            "conditionLocal",
+            "conditionIsConst",
+            "conditionKeywordLocation",
+            "conditionEqualsLocation",
+            "hasSemicolon", // ignored
+        });
+        comptime Used(Cst.StatIf, &.{
+            "annotationColonPosition",
+        });
         try self.L.rawcheckstack(4);
         try self.L.createtable(0, 11);
 
-        try self.L.Zsetfield(-1, "tag", "conditional");
+        try self.L.Zsetfield("tag", "conditional");
         try setSpanLocation(self.L, node.location, "span");
 
         try self.serializeToken(node.location.begin, "if", null);
         try self.L.rawsetfield(-2, "if_keyword");
+
+        try self.serializeIfLocalBinding(.stat_if, node);
 
         try node.condition.visit(self);
         try self.L.rawsetfield(-2, "condition");
@@ -1127,6 +1398,8 @@ const AstSerializer = struct {
             const elseif = elsebody.as(.stat_if).?;
             try self.serializeToken(elseif.location.begin, "elseif", null);
             try self.L.rawsetfield(-2, "elseif_keyword");
+
+            try self.serializeIfLocalBinding(.stat_if, elseif);
 
             try elseif.condition.visit(self);
             try self.L.rawsetfield(-2, "condition");
@@ -1158,14 +1431,28 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitStatWhile(self: *@This(), node: *Ast.StatWhile) !bool {
+        comptime Used(Ast.StatWhile, &.{
+            "location",
+            "condition",
+            "hasDo",
+            "doLocation",
+            "body",
+            "hasSemicolon", // ignored
+            "conditionLocal",
+            "conditionIsConst",
+            "conditionKeywordLocation",
+            "conditionEqualsLocation",
+        });
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 8);
 
-        try self.L.Zsetfield(-1, "tag", "while");
+        try self.L.Zsetfield("tag", "while");
         try setSpanLocation(self.L, node.location, "span");
 
         try self.serializeToken(node.location.begin, "while", null);
         try self.L.rawsetfield(-2, "while_keyword");
+
+        try self.serializeIfLocalBinding(.stat_while, node);
 
         try node.condition.visit(self);
         try self.L.rawsetfield(-2, "condition");
@@ -1183,10 +1470,18 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitStatRepeat(self: *@This(), node: *Ast.StatRepeat) !bool {
+        comptime Used(Ast.StatRepeat, &.{
+            "location",
+            "body",
+            "condition",
+            "DEPRECATED_hasUntil",
+            "hasSemicolon", // ignored
+        });
+        comptime Used(Cst.StatRepeat, &.{"untilPosition"});
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 7);
 
-        try self.L.Zsetfield(-1, "tag", "repeat");
+        try self.L.Zsetfield("tag", "repeat");
         try setSpanLocation(self.L, node.location, "span");
 
         try self.serializeToken(node.location.begin, "repeat", null);
@@ -1204,25 +1499,38 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitStatBreak(self: *@This(), node: *Ast.StatBreak) !bool {
+        comptime Used(Ast.StatBreak, &.{
+            "location",
+            "hasSemicolon", // ignored
+        });
         try self.L.rawcheckstack(2);
         try self.serializeToken(node.location.begin, "break", 3);
 
-        try self.L.Zsetfield(-1, "tag", "break");
+        try self.L.Zsetfield("tag", "break");
         try setSpanLocation(self.L, node.location, "span");
         return false;
     }
     pub fn visitStatContinue(self: *@This(), node: *Ast.StatContinue) !bool {
+        comptime Used(Ast.StatContinue, &.{
+            "location",
+            "hasSemicolon", // ignored
+        });
         try self.L.rawcheckstack(2);
         try self.serializeToken(node.location.begin, "continue", 3);
-        try self.L.Zsetfield(-1, "tag", "continue");
+        try self.L.Zsetfield("tag", "continue");
         try setSpanLocation(self.L, node.location, "span");
         return false;
     }
     pub fn visitStatReturn(self: *@This(), node: *Ast.StatReturn) !bool {
+        comptime Used(Ast.StatReturn, &.{
+            "location",
+            "list",
+            "hasSemicolon", // ignored
+        });
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 5);
 
-        try self.L.Zsetfield(-1, "tag", "return");
+        try self.L.Zsetfield("tag", "return");
         try setSpanLocation(self.L, node.location, "span");
 
         try self.serializeToken(node.location.begin, "return", null);
@@ -1234,10 +1542,15 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitStatExpr(self: *@This(), node: *Ast.StatExpr) !bool {
+        comptime Used(Ast.StatExpr, &.{
+            "location",
+            "expr",
+            "hasSemicolon", // ignored
+        });
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 4);
 
-        try self.L.Zsetfield(-1, "tag", "expression");
+        try self.L.Zsetfield("tag", "expression");
         try setSpanLocation(self.L, node.location, "span");
 
         try node.expr.visit(self);
@@ -1245,10 +1558,21 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitStatLocal(self: *@This(), node: *Ast.StatLocal) !bool {
+        comptime Used(Ast.StatLocal, &.{
+            "location",
+            "isExported",
+            "keywordLocation",
+            "isConst",
+            "vars",
+            "equalsSignLocation",
+            "values",
+            "hasSemicolon", // ignored
+        });
+        comptime Used(Cst.StatLocal, &.{ "varsCommaPositions", "varsAnnotationColonPositions", "valuesCommaPositions" });
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 7);
 
-        try self.L.Zsetfield(-1, "tag", "local");
+        try self.L.Zsetfield("tag", "local");
         try setSpanLocation(self.L, node.location, "span");
 
         if (node.isExported) {
@@ -1276,12 +1600,24 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitStatFor(self: *@This(), node: *Ast.StatFor) !bool {
+        comptime Used(Ast.StatFor, &.{
+            "location",
+            "variable",
+            "from",
+            "to",
+            "step",
+            "hasDo",
+            "doLocation",
+            "body",
+            "hasSemicolon", // ignored
+        });
+        comptime Used(Cst.StatFor, &.{ "annotationColonPosition", "equalsPosition", "endCommaPosition", "stepCommaPosition" });
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 14);
 
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.stat_for).?;
 
-        try self.L.Zsetfield(-1, "tag", "for");
+        try self.L.Zsetfield("tag", "for");
         try setSpanLocation(self.L, node.location, "span");
 
         try self.serializeToken(node.location.begin, "for", null);
@@ -1325,12 +1661,24 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitStatForIn(self: *@This(), node: *Ast.StatForIn) !bool {
+        comptime Used(Ast.StatForIn, &.{
+            "location",
+            "vars",
+            "hasIn",
+            "inLocation",
+            "values",
+            "hasDo",
+            "doLocation",
+            "body",
+            "hasSemicolon", // ignored
+        });
+        comptime Used(Cst.StatForIn, &.{ "varsCommaPositions", "varsAnnotationColonPositions", "valuesCommaPositions" });
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 10);
 
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.stat_for_in).?;
 
-        try self.L.Zsetfield(-1, "tag", "forin");
+        try self.L.Zsetfield("tag", "forin");
         try setSpanLocation(self.L, node.location, "span");
 
         try self.serializeToken(node.location.begin, "for", null);
@@ -1360,12 +1708,19 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitStatAssign(self: *@This(), node: *Ast.StatAssign) !bool {
+        comptime Used(Ast.StatAssign, &.{
+            "location",
+            "vars",
+            "values",
+            "hasSemicolon", // ignored
+        });
+        comptime Used(Cst.StatAssign, &.{ "varsCommaPositions", "equalsPosition", "valuesCommaPositions" });
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 6);
 
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.stat_assign).?;
 
-        try self.L.Zsetfield(-1, "tag", "assign");
+        try self.L.Zsetfield("tag", "assign");
         try setSpanLocation(self.L, node.location, "span");
 
         try self.serializePunctuated(node.vars, cstNode.varsCommaPositions.slice(), ",");
@@ -1379,10 +1734,18 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitStatCompoundAssign(self: *@This(), node: *Ast.StatCompoundAssign) !bool {
+        comptime Used(Ast.StatCompoundAssign, &.{
+            "location",
+            "variable",
+            "op",
+            "value",
+            "hasSemicolon", // ignored
+        });
+        comptime Used(Cst.StatCompoundAssign, &.{"opPosition"});
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 6);
 
-        try self.L.Zsetfield(-1, "tag", "compoundassign");
+        try self.L.Zsetfield("tag", "compoundassign");
         try setSpanLocation(self.L, node.location, "span");
 
         try node.variable.visit(self);
@@ -1397,10 +1760,17 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitStatFunction(self: *@This(), node: *Ast.StatFunction) !bool {
+        comptime Used(Ast.StatFunction, &.{
+            "location",
+            "func",
+            "name",
+            "hasSemicolon", // ignored
+        });
+        comptime Used(Cst.StatFunction, &.{ "attrLists", "functionKeywordPosition" });
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 7);
 
-        try self.L.Zsetfield(-1, "tag", "function");
+        try self.L.Zsetfield("tag", "function");
         try setSpanLocation(self.L, node.location, "span");
 
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.stat_function).?;
@@ -1419,10 +1789,19 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitStatLocalFunction(self: *@This(), node: *Ast.StatLocalFunction) !bool {
+        comptime Used(Ast.StatLocalFunction, &.{
+            "location",
+            "func",
+            "name",
+            "isConst",
+            "constKeywordBegin",
+            "hasSemicolon", // ignored
+        });
+        comptime Used(Cst.StatLocalFunction, &.{ "attrLists", "localKeywordPosition", "functionKeywordPosition" });
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 8);
 
-        try self.L.Zsetfield(-1, "tag", "localfunction");
+        try self.L.Zsetfield("tag", "localfunction");
         try setSpanLocation(self.L, node.location, "span");
 
         try self.serializeAttributes(node.func.attributes, 0);
@@ -1431,7 +1810,7 @@ const AstSerializer = struct {
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.stat_local_function).?;
 
         if (node.isConst) {
-            try self.serializeToken(cstNode.localKeywordPosition, "const", null);
+            try self.serializeToken(node.constKeywordBegin, "const", null);
             try self.L.rawsetfield(-2, "const_keyword");
         } else {
             try self.serializeToken(cstNode.localKeywordPosition, "local", null);
@@ -1449,10 +1828,27 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitStatTypeAlias(self: *@This(), node: *Ast.StatTypeAlias) !bool {
+        comptime Used(Ast.StatTypeAlias, &.{
+            "location",
+            "exported",
+            "nameLocation",
+            "name",
+            "generics",
+            "genericPacks",
+            "type",
+            "hasSemicolon", // ignored
+        });
+        comptime Used(Cst.StatTypeAlias, &.{
+            "typeKeywordPosition",
+            "genericsOpenPosition",
+            "genericsCommaPositions",
+            "genericsClosePosition",
+            "equalsPosition",
+        });
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 12);
 
-        try self.L.Zsetfield(-1, "tag", "typealias");
+        try self.L.Zsetfield("tag", "typealias");
         try setSpanLocation(self.L, node.location, "span");
 
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.stat_type_alias).?;
@@ -1492,12 +1888,22 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitStatTypeFunction(self: *@This(), node: *Ast.StatTypeFunction) !bool {
+        comptime Used(Ast.StatTypeFunction, &.{
+            "location",
+            "exported",
+            "nameLocation",
+            "name",
+            "body",
+            "hasSemicolon", // ignored
+            "hasErrors", // ignored
+        });
+        comptime Used(Cst.StatTypeFunction, &.{ "typeKeywordPosition", "functionKeywordPosition" });
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 8);
 
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.stat_type_function).?;
 
-        try self.L.Zsetfield(-1, "tag", "typefunction");
+        try self.L.Zsetfield("tag", "typefunction");
         try setSpanLocation(self.L, node.location, "span");
 
         if (node.exported) {
@@ -1539,10 +1945,17 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitStatError(self: *@This(), node: *Ast.StatError) !bool {
+        comptime Used(Ast.StatError, &.{
+            "location",
+            "expressions",
+            "statements",
+            "MAYBE_hasSemicolon", //ignored
+            "messageIndex", //ignored
+        });
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 6);
 
-        try self.L.Zsetfield(-1, "tag", "error");
+        try self.L.Zsetfield("tag", "error");
         try setSpanLocation(self.L, node.location, "span");
 
         try self.serializeExprs(node.expressions, 0);
@@ -1556,10 +1969,26 @@ const AstSerializer = struct {
         return true;
     }
     pub fn visitTypeReference(self: *@This(), node: *Ast.TypeReference) !bool {
+        comptime Used(Ast.TypeReference, &.{
+            "location",
+            "prefix",
+            "prefixLocation",
+            "prefixLocal",
+            "nameLocation",
+            "name",
+            "hasParameterList",
+            "parameters",
+        });
+        comptime Used(Cst.TypeReference, &.{
+            "prefixPointPosition",
+            "openParametersPosition",
+            "parametersCommaPositions",
+            "closeParametersPosition",
+        });
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 9);
 
-        try self.L.Zsetfield(-1, "tag", "reference");
+        try self.L.Zsetfield("tag", "reference");
         try setSpanLocation(self.L, node.location, "span");
 
         const cstNode = if (node.prefix.has or node.hasParameterList)
@@ -1595,12 +2024,14 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitTypeTable(self: *@This(), node: *Ast.TypeTable) !bool {
+        comptime Used(Ast.TypeTable, &.{ "location", "indexer", "props", "isExact" });
+        comptime Used(Cst.TypeTable, &.{ "items", "isArray" });
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.type_table).?;
         try self.L.rawcheckstack(2);
         if (cstNode.isArray) {
             try self.L.createtable(0, 7);
 
-            try self.L.Zsetfield(-1, "tag", "array");
+            try self.L.Zsetfield("tag", "array");
             try setSpanLocation(self.L, node.location, "span");
 
             try self.serializeToken(node.location.begin, "{", null);
@@ -1624,7 +2055,9 @@ const AstSerializer = struct {
         }
         try self.L.createtable(0, 6);
 
-        try self.L.Zsetfield(-1, "tag", "table");
+        try self.L.Zsetfield("is_exact", node.isExact);
+
+        try self.L.Zsetfield("tag", "table");
         try setSpanLocation(self.L, node.location, "span");
 
         try self.serializeToken(node.location.begin, "{", null);
@@ -1639,7 +2072,7 @@ const AstSerializer = struct {
             if (item.kind == .indexer) {
                 std.debug.assert(node.indexer != null);
 
-                try self.L.Zsetfield(-1, "kind", "indexer");
+                try self.L.Zsetfield("kind", "indexer");
 
                 if (node.indexer.?.accessLocation.to()) |accessLocation| {
                     std.debug.assert(node.indexer.?.access != .ReadWrite);
@@ -1667,7 +2100,7 @@ const AstSerializer = struct {
                     try self.L.rawsetfield(-2, "separator");
                 }
             } else {
-                try self.L.Zsetfield(-1, "kind", if (item.kind == .string_property) "stringproperty" else "property");
+                try self.L.Zsetfield("kind", if (item.kind == .string_property) "stringproperty" else "property");
 
                 if (prop.?[i].accessLocation.to()) |accessLocation| {
                     std.debug.assert(prop.?[i].access != .ReadWrite);
@@ -1682,8 +2115,8 @@ const AstSerializer = struct {
                         try self.serializeToken(item.stringPosition, item.stringInfo.?.sourceString.slice(), null);
 
                         switch (item.stringInfo.?.quoteStyle) {
-                            .quoted_single => try self.L.Zsetfield(-1, "quote_style", "single"),
-                            .quoted_double => try self.L.Zsetfield(-1, "quote_style", "double"),
+                            .quoted_single => try self.L.Zsetfield("quote_style", "single"),
+                            .quoted_double => try self.L.Zsetfield("quote_style", "double"),
                             else => unreachable,
                         }
 
@@ -1724,11 +2157,33 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitTypeFunction(self: *@This(), node: *Ast.TypeFunction) !bool {
+        comptime Used(Ast.TypeFunction, &.{
+            "location",
+            "generics",
+            "genericPacks",
+            "argTypes",
+            "argNames",
+            "returnTypes",
+            "attributes", // ignored
+        });
+        comptime Used(Cst.TypeFunction, &.{
+            "openGenericsPosition",
+            "genericsCommaPositions",
+            "closeGenericsPosition",
+            "openArgsPosition",
+            "argumentNameColonPositions",
+            "argumentsCommaPositions",
+            "closeArgsPosition",
+            "returnArrowPosition",
+        });
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 13);
 
-        try self.L.Zsetfield(-1, "tag", "function");
+        try self.L.Zsetfield("tag", "function");
         try setSpanLocation(self.L, node.location, "span");
+
+        // try self.serializeAttributes(node.attributes);
+        // try self.L.rawsetfield(-2, "attributes");
 
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.type_function).?;
 
@@ -1798,10 +2253,12 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitTypeTypeof(self: *@This(), node: *Ast.TypeTypeof) !bool {
+        comptime Used(Ast.TypeTypeof, &.{ "location", "expr" });
+        comptime Used(Cst.TypeTypeof, &.{ "openPosition", "closePosition" });
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 7);
 
-        try self.L.Zsetfield(-1, "tag", "typeof");
+        try self.L.Zsetfield("tag", "typeof");
         try setSpanLocation(self.L, node.location, "span");
 
         try self.serializeToken(node.location.begin, "typeof", null);
@@ -1819,12 +2276,14 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitTypeUnion(self: *@This(), node: *Ast.TypeUnion) !bool {
+        comptime Used(Ast.TypeUnion, &.{ "location", "types" });
+        comptime Used(Cst.TypeUnion, &.{ "leadingPosition", "separatorPositions" });
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.type_union).?;
 
         try self.L.rawcheckstack(4);
         try self.L.createtable(0, 5);
 
-        try self.L.Zsetfield(-1, "tag", "union");
+        try self.L.Zsetfield("tag", "union");
         try setSpanLocation(self.L, node.location, "span");
 
         if (cstNode.leadingPosition.hasValue()) {
@@ -1839,7 +2298,7 @@ const AstSerializer = struct {
 
             if (typeNode.is(.type_optional)) {
                 try self.serializeToken(typeNode.location.begin, "?", 1);
-                try self.L.Zsetfield(-1, "tag", "optional");
+                try self.L.Zsetfield("tag", "optional");
                 try self.L.rawsetfield(-2, "node");
             } else {
                 try typeNode.visit(self);
@@ -1860,12 +2319,14 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitTypeIntersection(self: *@This(), node: *Ast.TypeIntersection) !bool {
+        comptime Used(Ast.TypeIntersection, &.{ "location", "types" });
+        comptime Used(Cst.TypeIntersection, &.{ "leadingPosition", "separatorPositions" });
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.type_intersection).?;
 
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 5);
 
-        try self.L.Zsetfield(-1, "tag", "intersection");
+        try self.L.Zsetfield("tag", "intersection");
         try setSpanLocation(self.L, node.location, "span");
 
         if (cstNode.leadingPosition.hasValue()) {
@@ -1878,26 +2339,30 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitTypeSingletonBool(self: *@This(), node: *Ast.TypeSingletonBool) !bool {
+        comptime Used(Ast.TypeSingletonBool, &.{ "location", "value" });
         try self.serializeToken(node.location.begin, if (node.value) "true" else "false", 4);
-        try self.L.Zsetfield(-1, "tag", "boolean");
+        try self.L.Zsetfield("tag", "boolean");
         try setSpanLocation(self.L, node.location, "span");
 
-        try self.L.Zsetfield(-1, "value", node.value);
+        try self.L.Zsetfield("value", node.value);
         return false;
     }
     pub fn visitTypeSingletonString(self: *@This(), node: *Ast.TypeSingletonString) !bool {
+        comptime Used(Ast.TypeSingletonString, &.{ "location", "value" });
+        comptime Used(Cst.TypeSingletonString, &.{ "sourceString", "quoteStyle", "blockDepth" });
         try self.L.rawcheckstack(2);
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.type_singleton_string).?;
         try self.serializeToken(node.location.begin, cstNode.sourceString.slice(), 4);
 
-        try self.L.Zsetfield(-1, "tag", "string");
+        try self.L.Zsetfield("tag", "string");
         try setSpanLocation(self.L, node.location, "span");
 
         switch (cstNode.quoteStyle) {
-            .quoted_single => try self.L.Zsetfield(-1, "quote_style", "single"),
-            .quoted_double => try self.L.Zsetfield(-1, "quote_style", "double"),
+            .quoted_single => try self.L.Zsetfield("quote_style", "single"),
+            .quoted_double => try self.L.Zsetfield("quote_style", "double"),
             else => unreachable,
         }
+        try self.L.Zsetfield("block_depth", cstNode.blockDepth);
 
         std.debug.assert(self.current_position.lessThanOrEq(node.location.end));
         self.current_position = node.location.end;
@@ -1910,10 +2375,12 @@ const AstSerializer = struct {
         return true;
     }
     pub fn visitTypePackExplicit(self: *@This(), node: *Ast.TypePackExplicit) !bool {
+        comptime Used(Ast.TypePackExplicit, &.{ "location", "typeList" });
+        comptime Used(Cst.TypePackExplicit, &.{ "openParenthesesPosition", "closeParenthesesPosition", "commaPositions" });
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 7);
 
-        try self.L.Zsetfield(-1, "tag", "explicit");
+        try self.L.Zsetfield("tag", "explicit");
         try setSpanLocation(self.L, node.location, "span");
 
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.type_pack_explicit).?;
@@ -1940,10 +2407,11 @@ const AstSerializer = struct {
         return false;
     }
     fn serializeTypePackVariadic(self: *@This(), node: *Ast.TypePackVariadic, forVarArg: bool) !void {
+        comptime Used(Ast.TypePackVariadic, &.{ "location", "variadicType" });
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 5);
 
-        try self.L.Zsetfield(-1, "tag", "variadic");
+        try self.L.Zsetfield("tag", "variadic");
         try setSpanLocation(self.L, node.location, "span");
 
         if (!forVarArg) {
@@ -1959,10 +2427,12 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitTypePackGeneric(self: *@This(), node: *Ast.TypePackGeneric) !bool {
+        comptime Used(Ast.TypePackGeneric, &.{ "location", "genericName" });
+        comptime Used(Cst.TypePackGeneric, &.{"ellipsisPosition"});
         try self.L.rawcheckstack(2 + 4);
         try self.L.createtable(0, 4);
 
-        try self.L.Zsetfield(-1, "tag", "generic");
+        try self.L.Zsetfield("tag", "generic");
         try setSpanLocation(self.L, node.location, "span");
 
         try self.serializeToken(node.location.begin, std.mem.span(node.genericName.value), null);
@@ -1974,10 +2444,11 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitTypeGroup(self: *@This(), node: *Ast.TypeGroup) !bool {
+        comptime Used(Ast.TypeGroup, &.{ "location", "type" });
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 6);
 
-        try self.L.Zsetfield(-1, "tag", "group");
+        try self.L.Zsetfield("tag", "group");
         try setSpanLocation(self.L, node.location, "span");
 
         try self.serializeToken(node.location.begin, "(", null);
@@ -1994,10 +2465,12 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitGenericType(self: *@This(), node: *Ast.GenericType) !bool {
+        comptime Used(Ast.GenericType, &.{ "location", "name", "defaultValue" });
+        comptime Used(Cst.GenericType, &.{"defaultEqualsPosition"});
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 6);
 
-        try self.L.Zsetfield(-1, "tag", "generic");
+        try self.L.Zsetfield("tag", "generic");
         try setSpanLocation(self.L, node.location, "span");
 
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.generic_type).?;
@@ -2015,10 +2488,12 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitGenericTypePack(self: *@This(), node: *Ast.GenericTypePack) !bool {
+        comptime Used(Ast.GenericTypePack, &.{ "location", "name", "defaultValue" });
+        comptime Used(Cst.GenericTypePack, &.{ "ellipsisPosition", "defaultEqualsPosition" });
         try self.L.rawcheckstack(2);
         try self.L.createtable(0, 5);
 
-        try self.L.Zsetfield(-1, "tag", "generic");
+        try self.L.Zsetfield("tag", "generic");
         try setSpanLocation(self.L, node.location, "span");
 
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.generic_type_pack).?;
@@ -2039,8 +2514,8 @@ const AstSerializer = struct {
     }
 };
 
-fn lua_parse(L: *VM.lua.State) !i32 {
-    const allocator = Scheduler.fromState(L).allocator;
+pub fn lua_parse(L: *VM.lua.State) !i32 {
+    const allocator = Scheduler.fromState(L).allocator();
     const source = try L.Zcheckvalue([]const u8, 1, null);
 
     var lallocator = try luau.Ast.Allocator.init();
@@ -2064,7 +2539,7 @@ fn lua_parse(L: *VM.lua.State) !i32 {
             var count: i32 = 1;
             while (iter.next()) |err| : (count += 1) {
                 try L.createtable(0, 3);
-                try L.Zsetfield(-1, "message", err.value.message.slice());
+                try L.Zsetfield("message", err.value.message.slice());
                 try AstSerializer.setSpanLocation(L, err.value.location, "span");
                 try L.rawseti(-2, count);
             }
@@ -2116,10 +2591,10 @@ fn lua_parse(L: *VM.lua.State) !i32 {
     try serializer.serializeToken(parseResult.root.location.end, "", null);
     if (serializer.last_token_ref) |ref|
         L.unref(ref);
-    try L.Zsetfield(-1, "tag", "eof");
+    try L.Zsetfield("tag", "eof");
     try L.rawsetfield(-2, "eof");
 
-    try L.Zsetfield(-1, "lines", @as(f64, @floatFromInt(parseResult.lines)));
+    try L.Zsetfield("lines", @as(f64, @floatFromInt(parseResult.lines)));
     try L.createtable(@intCast(line_offsets.len), 0);
     for (line_offsets, 0..) |offset, i| {
         L.pushunsigned(offset);
@@ -2132,8 +2607,8 @@ fn lua_parse(L: *VM.lua.State) !i32 {
         var count: i32 = 1;
         while (iter.next()) |hc| : (count += 1) {
             try L.createtable(0, 4);
-            try L.Zsetfield(-1, "header", hc.header);
-            try L.Zsetfield(-1, "content", hc.content.slice());
+            try L.Zsetfield("header", hc.header);
+            try L.Zsetfield("content", hc.content.slice());
             try AstSerializer.setSpanLocation(L, hc.location, "span");
             try L.rawseti(-2, count);
         }
@@ -2143,8 +2618,8 @@ fn lua_parse(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn lua_parseExpr(L: *VM.lua.State) !i32 {
-    const allocator = Scheduler.fromState(L).allocator;
+pub fn lua_parseExpr(L: *VM.lua.State) !i32 {
+    const allocator = Scheduler.fromState(L).allocator();
     const source = try L.Zcheckvalue([]const u8, 1, null);
 
     var lallocator = try luau.Ast.Allocator.init();
@@ -2168,7 +2643,7 @@ fn lua_parseExpr(L: *VM.lua.State) !i32 {
             var count: i32 = 1;
             while (iter.next()) |err| : (count += 1) {
                 try L.createtable(0, 3);
-                try L.Zsetfield(-1, "message", err.value.message.slice());
+                try L.Zsetfield("message", err.value.message.slice());
                 try AstSerializer.setSpanLocation(L, err.value.location, "span");
                 try L.rawseti(-2, count);
             }
@@ -2216,135 +2691,4 @@ fn lua_parseExpr(L: *VM.lua.State) !i32 {
     if (serializer.last_token_ref) |ref|
         L.unref(ref);
     return 1;
-}
-
-fn lua_garbagecollect(L: *VM.lua.State) !i32 {
-    const step = try L.Zcheckvalue(?bool, 1, null);
-    _ = L.gc(if (step orelse false) .Step else .Collect, 0);
-    return 0;
-}
-
-const FFlag = struct {
-    fn lua_get(L: *VM.lua.State) !i32 {
-        const name = try L.Zcheckvalue([]const u8, 1, null);
-        if (luau.FFlags.GetByName(bool, name)) |fflag| {
-            try L.Zpushvalue(.{
-                .name = std.mem.span(fflag.name),
-                .type = "boolean",
-                .value = fflag.value,
-                .dynamic = fflag.dynamic,
-            });
-            return 1;
-        } else if (luau.FFlags.GetByName(i32, name)) |fflag| {
-            try L.Zpushvalue(.{
-                .name = std.mem.span(fflag.name),
-                .type = "integer",
-                .value = fflag.value,
-                .dynamic = fflag.dynamic,
-            });
-            return 1;
-        } else return L.Zerrorf("unknown fflag '{s}'", .{name});
-    }
-
-    fn lua_set(L: *VM.lua.State) !i32 {
-        const name = try L.Zcheckvalue([]const u8, 1, null);
-        switch (L.typeOf(2)) {
-            .Boolean => {
-                const value = L.toboolean(2);
-                try luau.FFlags.SetByName(bool, name, value);
-                return 0;
-            },
-            .Number => {
-                const value = L.tointeger(2) orelse unreachable;
-                try luau.FFlags.SetByName(i32, name, @intCast(value));
-                return 0;
-            },
-            else => return L.Zerror("invalid value type"),
-        }
-    }
-
-    fn lua_list(L: *VM.lua.State) !i32 {
-        const bool_node = luau.FFlags.Get(bool);
-        const int_node = luau.FFlags.Get(i32);
-
-        var bool_iterator = bool_node.iterator();
-        var int_iterator = int_node.iterator();
-
-        var count: u32 = 0;
-        while (bool_iterator.next()) |_|
-            count += 1;
-        while (int_iterator.next()) |_|
-            count += 1;
-
-        bool_iterator = .{
-            .consumed = false,
-            .state = bool_node,
-        };
-
-        int_iterator = .{
-            .consumed = false,
-            .state = int_node,
-        };
-
-        try L.createtable(count, 0);
-
-        var index: i32 = 1;
-        while (bool_iterator.next()) |fflag| : (index += 1) {
-            try L.Zpushvalue(.{
-                .name = std.mem.span(fflag.name),
-                .type = "boolean",
-                .value = fflag.value,
-                .dynamic = fflag.dynamic,
-            });
-            try L.rawseti(-2, index);
-        }
-
-        while (int_iterator.next()) |fflag| : (index += 1) {
-            try L.Zpushvalue(.{
-                .name = std.mem.span(fflag.name),
-                .type = "integer",
-                .value = fflag.value,
-                .dynamic = fflag.dynamic,
-            });
-            try L.rawseti(-2, index);
-        }
-
-        return 1;
-    }
-};
-
-pub fn loadLib(L: *VM.lua.State) !void {
-    try L.Zpushvalue(.{
-        .compile = lua_compile,
-        .load = lua_load,
-        .coverage = lua_coverage,
-        .parse = lua_parse,
-        .parseExpr = lua_parseExpr,
-        .garbagecollect = lua_garbagecollect,
-    });
-
-    try L.Zpushvalue(.{
-        .get = FFlag.lua_get,
-        .set = FFlag.lua_set,
-        .list = FFlag.lua_list,
-    });
-    L.setreadonly(-1, true);
-
-    try L.rawsetfield(-2, "fflag");
-
-    L.setreadonly(-1, true);
-    try LuaHelper.registerModule(L, LIB_NAME);
-}
-
-test "luau" {
-    const TestRunner = @import("../utils/testrunner.zig");
-
-    const testResult = try TestRunner.runTest(
-        TestRunner.newTestFile("standard/luau/init.test.luau"),
-        &.{},
-        .{},
-    );
-
-    try std.testing.expect(testResult.failed == 0);
-    try std.testing.expect(testResult.total > 0);
 }

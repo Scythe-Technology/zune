@@ -5,12 +5,9 @@ const Zune = @import("zune");
 
 const Runtime = Zune.Runtime;
 const Scheduler = Zune.Runtime.Scheduler;
+const Scripting = Zune.Runtime.Scripting;
 
 const Fmt = Zune.Resolvers.Fmt;
-
-const LuaHelper = Zune.Utils.LuaHelper;
-
-const test_lib_bytecode = @embedFile("../lua/testing_lib.luauc");
 
 const VM = luau.VM;
 
@@ -18,10 +15,29 @@ pub const LIB_NAME = "testing";
 
 pub var REF_LEAK_CHECK = false;
 
-fn testing_debug(L: *VM.lua.State) i32 {
-    const str = L.Lcheckstring(1);
-    Zune.debug.print("{s}\n", .{str});
-    return 0;
+pub var COMPLETE_LUA: ?LuaCompleteHandler = null;
+
+pub const TestResult = struct {
+    start: ?f64 = null,
+    finish: ?f64 = null,
+    failed: u32 = 0,
+    skipped: u32 = 0,
+    total: u32 = 0,
+};
+
+const LuaCompleteHandler = struct {
+    state: *VM.lua.State,
+    ref: Scripting.Reference,
+};
+
+pub threadlocal var results: TestResult = .{};
+
+pub fn init() void {
+    results = .{};
+}
+
+pub fn running() bool {
+    return results.start != null;
 }
 
 var REF_LEAKED_SOURCE = std.AutoHashMap(usize, struct {
@@ -37,8 +53,13 @@ fn freeRefTrace(allocator: std.mem.Allocator, index: usize) void {
     }
 }
 
+fn isCachedCwdRef(index: usize) bool {
+    const cached = Zune.standard.libraries.io.cachedCwdRegistryId() orelse return false;
+    return index == @as(usize, @intCast(cached));
+}
+
 fn stepCheckLeakedReferences(L: *VM.lua.State) void {
-    const allocator = Scheduler.fromState(L).allocator;
+    const allocator = Scheduler.fromState(L).allocator();
 
     L.pushvalue(VM.lua.REGISTRYINDEX);
 
@@ -46,6 +67,10 @@ fn stepCheckLeakedReferences(L: *VM.lua.State) void {
 
     for (1..references) |index| {
         const store_index = index - 1;
+        if (isCachedCwdRef(index)) {
+            freeRefTrace(allocator, store_index);
+            continue;
+        }
         defer L.pop(1);
         if (L.rawgeti(-1, @intCast(index)) == .Number) {
             freeRefTrace(allocator, store_index);
@@ -54,11 +79,11 @@ fn stepCheckLeakedReferences(L: *VM.lua.State) void {
     }
 }
 
-fn testing_checkLeakedReferences(L: *VM.lua.State) !i32 {
+pub fn lua_stepCheckReferences(L: *VM.lua.State) !i32 {
     if (!REF_LEAK_CHECK)
         return 0;
     const scope = L.Lcheckstring(1);
-    const allocator = Scheduler.fromState(L).allocator;
+    const allocator = Scheduler.fromState(L).allocator();
 
     L.pushvalue(VM.lua.REGISTRYINDEX);
 
@@ -66,6 +91,10 @@ fn testing_checkLeakedReferences(L: *VM.lua.State) !i32 {
 
     for (1..references) |index| {
         const store_index = index - 1;
+        if (isCachedCwdRef(index)) {
+            freeRefTrace(allocator, store_index);
+            continue;
+        }
         defer L.pop(1);
         if (L.rawgeti(-1, @intCast(index)) == .Number) {
             freeRefTrace(allocator, store_index);
@@ -76,59 +105,39 @@ fn testing_checkLeakedReferences(L: *VM.lua.State) !i32 {
             continue;
 
         const scope_copy = try allocator.dupe(u8, scope);
+        errdefer allocator.free(scope_copy);
 
         var allocating: std.Io.Writer.Allocating = .init(allocator);
+        defer allocating.deinit();
+
         try Fmt.writeIdx(allocator, L, &allocating.writer, @intCast(L.gettop()), Zune.State.options.format.max_depth);
 
-        try REF_LEAKED_SOURCE.put(store_index, .{ .scope = scope_copy, .value = try allocating.toOwnedSlice() });
+        const slice = try allocating.toOwnedSlice();
+        errdefer allocator.free(slice);
+
+        try REF_LEAKED_SOURCE.put(store_index, .{
+            .scope = scope_copy,
+            .value = slice,
+        });
     }
     return 0;
 }
 
-fn empty(L: *VM.lua.State) i32 {
-    _ = L;
-    return 0;
-}
+pub fn consumeTestingResults(L: *VM.lua.State) !TestResult {
+    defer results = .{};
+    if (results.start == null)
+        return results;
+    results.finish = VM.lperf.clock();
+    const scheduler = Scheduler.fromState(L);
+    const allocator = scheduler.allocator();
 
-pub const TestResult = struct {
-    failed: i32,
-    total: i32,
-};
+    var total: usize = 0;
+    total += scheduler.sleeping.items.len;
+    total += scheduler.deferred.count();
+    total += scheduler.awaiting;
+    total += if (!scheduler.loop.done()) scheduler.loop.state.loadActive() else 0;
 
-pub fn finish_testing(L: *VM.lua.State, rawstart: f64) !TestResult {
-    const allocator = Scheduler.fromState(L).allocator;
-    const end = VM.lperf.clock();
-
-    _ = try L.Lfindtable(VM.lua.REGISTRYINDEX, "_LIBS", 1);
-    if (L.rawgetfield(-1, LIB_NAME) != .Table)
-        std.debug.panic("No test framework loaded", .{});
-
-    const stdOut = if (L.rawgetfield(VM.lua.GLOBALSINDEX, "_testing_stdOut") == .Boolean)
-        L.toboolean(-1)
-    else
-        true;
-    L.pop(1);
-
-    const start = if (L.rawgetfield(-1, "_start") == .Number)
-        L.tonumber(-1) orelse rawstart
-    else
-        rawstart;
-    L.pop(1);
-
-    const time = end - start;
-    const mainTestCount = if (L.rawgetfield(-1, "_count") == .Number)
-        L.tointeger(-1) orelse unreachable
-    else
-        0;
-    L.pop(1);
-    const mainFailedCount = if (L.rawgetfield(-1, "_failed") == .Number)
-        L.tointeger(-1) orelse unreachable
-    else
-        0;
-    L.pop(1);
-
-    for (0..4) |_|
-        _ = L.gc(.Collect, 0);
+    _ = L.gc(.Collect, 0);
 
     stepCheckLeakedReferences(L);
 
@@ -153,79 +162,53 @@ pub fn finish_testing(L: *VM.lua.State, rawstart: f64) !TestResult {
     if (header)
         Zune.debug.print("\n", .{});
 
-    if (stdOut) {
-        Zune.debug.print("\n", .{});
-        if (mainFailedCount > 0) {
-            Zune.debug.print(" <bold>Tests<clear>: <bold><red>{} failed<clear>, {} total\n", .{ mainFailedCount, mainTestCount });
-        } else {
-            Zune.debug.print(" <bold>Tests<clear>: {} total\n", .{mainTestCount});
-        }
-        Zune.debug.print(" <bold>Time<clear>:  {d} s\n", .{std.math.ceil(time * 1000) / 1000});
-    }
-    return .{
-        .failed = mainFailedCount,
-        .total = mainTestCount,
-    };
-}
-
-pub fn runTestAsync(L: *VM.lua.State, sched: *Scheduler) !TestResult {
-    const start = VM.lperf.clock();
-
-    Runtime.Engine.runAsync(L, sched, .{ .cleanUp = true, .mode = .Test }) catch {};
-
-    if (Zune.State.options.runtime.features.c and comptime Zune.corelib.c.PlatformSupported())
-        Zune.corelib.c.deinitCacheTable(L);
-
-    return try finish_testing(L, start);
-}
-
-pub fn loadLib(L: *VM.lua.State, enabled: bool) !void {
-    if (enabled) {
-        const GL = L.mainthread();
-        const ML = try GL.newthread();
-        GL.xmove(L, 1);
-        try ML.Lsandboxthread();
-
-        if (L.rawgetfield(VM.lua.GLOBALSINDEX, "_testing_stdOut") == .Boolean and !L.toboolean(-1)) {
-            try ML.Zsetfieldfn(VM.lua.GLOBALSINDEX, "print", empty);
-        } else try ML.Zsetfieldfn(VM.lua.GLOBALSINDEX, "print", testing_debug);
-        L.pop(1);
-        try ML.Zsetfieldfn(VM.lua.GLOBALSINDEX, "stepcheck_references", testing_checkLeakedReferences);
-        try ML.Zsetfield(VM.lua.GLOBALSINDEX, "_FILE", false);
-
-        ML.setsafeenv(VM.lua.GLOBALSINDEX, true);
-
-        ML.load("test_framework", test_lib_bytecode, 0) catch |err|
-            std.debug.panic("Error loading test framework: {}\n", .{err});
-        _ = ML.pcall(0, 1, 0).check() catch |err| {
-            Zune.debug.print("Error loading test framework (2): {}\n", .{err});
-            Runtime.Debug.dumpErrorTrace(ML, err, false);
-            std.debug.panic("Test Framework (2)\n", .{});
+    if (COMPLETE_LUA) |handler| {
+        if (try Scripting.callSyncGlobalFunction(handler.state, handler.ref, results)) |res| switch (res) {
+            .boolean => |v| if (v) return .{ .failed = 0 },
+            else => {},
         };
-        ML.xmove(L, 1);
-
-        L.remove(-2);
-    } else {
-        try L.createtable(0, 4);
-        try L.Zsetfield(-1, "running", false);
-        try L.Zsetfieldfn(-1, "describe", empty);
-        try L.Zsetfieldfn(-1, "test", empty);
-        try L.Zsetfieldfn(-1, "expect", empty);
-        L.setreadonly(-1, true);
     }
 
-    try LuaHelper.registerModule(L, LIB_NAME);
+    return results;
 }
 
-test "Test" {
-    const TestRunner = @import("../utils/testrunner.zig");
+pub fn lua_consumeResults(L: *VM.lua.State) !i32 {
+    const res = try consumeTestingResults(L);
+    try L.Zpushvalue(res);
+    return 1;
+}
 
-    const testResult = try TestRunner.runTest(
-        TestRunner.newTestFile("standard/testing.test.luau"),
-        &.{},
-        .{ .std_out = false },
-    );
+pub fn lua_addFailed(L: *VM.lua.State) !i32 {
+    const amt = L.tounsigned(2) orelse 1;
+    results.failed += amt;
+    return 0;
+}
 
-    try std.testing.expect(testResult.failed == 3);
-    try std.testing.expect(testResult.total == 11);
+pub fn lua_addSkipped(L: *VM.lua.State) !i32 {
+    const amt = L.tounsigned(2) orelse 1;
+    results.skipped += amt;
+    return 0;
+}
+
+pub fn lua_addCount(L: *VM.lua.State) !i32 {
+    const amt = L.tounsigned(2) orelse 1;
+    results.total += amt;
+    return 0;
+}
+
+pub fn lua_start(_: *VM.lua.State) !i32 {
+    if (running())
+        return 0;
+    results.start = VM.lperf.clock();
+    return 0;
+}
+
+pub fn lua_onComplete(L: *VM.lua.State) !i32 {
+    try L.Zchecktype(1, .Function);
+
+    if (Zune.State.main_thread_id) |id|
+        if (id != std.Thread.getCurrentId())
+            return L.Zerror("function can only be called in the main thread");
+    COMPLETE_LUA = .{ .state = L.mainthread(), .ref = .init(L, 1) };
+    return 0;
 }

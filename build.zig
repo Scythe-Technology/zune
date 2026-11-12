@@ -1,103 +1,13 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
-fn compressFile(b: *std.Build, exe: *std.Build.Step.Compile, file: []const u8, out_file: []const u8) *std.Build.Step.Run {
-    const embedded_compressor_run = b.addRunArtifact(exe);
-
-    embedded_compressor_run.addArg(b.path(file).getPath(b));
-    embedded_compressor_run.addArg(b.path(out_file).getPath(b));
-
-    return embedded_compressor_run;
-}
-
-fn compileFile(b: *std.Build, exe: *std.Build.Step.Compile, file: []const u8, out_file: []const u8) *std.Build.Step.Run {
-    const embedded_compiler_run = b.addRunArtifact(exe);
-
-    embedded_compiler_run.addArg(b.path(file).getPath(b));
-    embedded_compiler_run.addArg(b.path(out_file).getPath(b));
-
-    return embedded_compiler_run;
-}
-
-fn compressRecursive(b: *std.Build, io: std.Io, exe: *std.Build.Step.Compile, step: *std.Build.Step, dependentStep: *std.Build.Step, path: []const u8) !void {
-    const dir = try std.Io.Dir.cwd().openDir(io, path, .{ .iterate = true });
-    var iter = dir.iterate();
-    while (try iter.next(io)) |entry| {
-        if (entry.kind == .file and entry.name.len > 2 and !std.mem.eql(u8, entry.name[entry.name.len - 3 ..], ".gz")) {
-            const file_name = try std.fs.path.resolve(b.allocator, &[_][]const u8{ path, entry.name });
-            defer b.allocator.free(file_name);
-            const file_name_with_ext = try std.mem.concat(b.allocator, u8, &[_][]const u8{ entry.name, ".gz" });
-            defer b.allocator.free(file_name_with_ext);
-            const out_file_name = try std.fs.path.resolve(b.allocator, &[_][]const u8{ path, file_name_with_ext });
-            defer b.allocator.free(out_file_name);
-            const run = compressFile(b, exe, file_name, out_file_name);
-            run.step.dependOn(dependentStep);
-            step.dependOn(&run.step);
-        } else if (entry.kind == .directory) {
-            const dir_path = try std.fs.path.resolve(b.allocator, &[_][]const u8{ path, entry.name });
-            defer b.allocator.free(dir_path);
-            try compressRecursive(b, io, exe, step, dependentStep, dir_path);
-        }
-    }
-}
-
 fn getPackageVersion(b: *std.Build) !std.SemanticVersion {
-    var tree = try std.zig.Ast.parse(b.allocator, @embedFile("build.zig.zon"), .zon);
+    var tree = try std.zig.Ast.parse(b.allocator, @embedFile("build.zig.zon"), .{ .mode = .zon });
     defer tree.deinit(b.allocator);
     const version = tree.tokenSlice(tree.nodes.items(.main_token)[2]);
     if (version.len < 3)
         @panic("Version length too short");
     return std.SemanticVersion.parse(version[1 .. version.len - 1]);
-}
-
-fn prebuild(b: *std.Build, step: *std.Build.Step) !void {
-    const compile = b.step("prebuild_compile", "Compile static luau");
-    const compress = b.step("prebuild_compress", "Compress static files");
-
-    const build_native_target: std.Build.ResolvedTarget = .{
-        .query = try std.Target.Query.parse(.{}),
-        .result = builtin.target,
-    };
-
-    { // Pre-compile Luau
-        const dep_luau = b.dependency("luau", .{ .target = build_native_target, .optimize = .Debug, .Analysis = false });
-        const bytecode_builder = b.addExecutable(.{
-            .name = "bytecode_builder",
-            .root_module = b.createModule(.{
-                .target = build_native_target,
-                .optimize = .Debug,
-                .root_source_file = b.path("prebuild/bytecode.zig"),
-            }),
-            .use_llvm = true,
-        });
-
-        bytecode_builder.root_module.addImport("luau", dep_luau.module("root"));
-
-        const testing_framework_run = compileFile(
-            b,
-            bytecode_builder,
-            "src/core/lua/testing_lib.luau",
-            "src/core/lua/testing_lib.luauc",
-        );
-
-        compile.dependOn(&testing_framework_run.step);
-    }
-
-    { // Compress files
-        const embedded_compressor = b.addExecutable(.{
-            .name = "embedded_compressor",
-            .root_module = b.createModule(.{
-                .root_source_file = b.path("prebuild/compressor.zig"),
-                .target = build_native_target,
-                .optimize = .Debug,
-            }),
-            .use_llvm = true,
-        });
-        try compressRecursive(b, b.graph.io, embedded_compressor, compress, compile, "src/types/");
-    }
-
-    step.dependOn(compile);
-    step.dependOn(compress);
 }
 
 pub fn build(b: *std.Build) !void {
@@ -108,59 +18,36 @@ pub fn build(b: *std.Build) !void {
     const release_ver = b.option(bool, "release-ver", "Set release version") orelse false;
     const use_llvm = b.option(bool, "llvm", "Use llvm");
 
+    const perf_profiling = b.option(bool, "pprof", "Build with performance profiling focused settings.");
+    const test_filter = b.option([]const u8, "test-filter", "test to filter");
+    const rt_test_filter = b.option([]const u8, "rt-test-filter", "test to filter");
+
+    const api_dump = b.option(bool, "api-dump", "Enable API dump") orelse false;
+
     const packed_optimize = switch (optimize) {
-        .ReleaseFast => .ReleaseSmall,
+        .fast => .small,
         else => optimize,
     };
     const fast_optimize = switch (optimize) {
-        .ReleaseSmall => .ReleaseFast,
+        .small => .fast,
         else => optimize,
     };
 
     const dep_luau = b.dependency("luau", .{
         .target = target,
         .optimize = fast_optimize,
-        .Analysis = true,
+        .Analysis = false,
     });
-    const dep_xev = b.dependency("libxev", .{ .target = target, .optimize = fast_optimize });
-    const dep_mimalloc = b.dependency("mimalloc", .{
-        .target = target,
-        .optimize = optimize,
-        .allow_thp = 0,
-        .mi_override = false,
-    });
+    const dep_zio = b.dependency("zio", .{ .target = target, .optimize = fast_optimize });
     const dep_tls = b.dependency("tls", .{ .target = target, .optimize = fast_optimize });
     const dep_json = b.dependency("json", .{ .target = target, .optimize = fast_optimize });
     const dep_yaml = b.dependency("yaml", .{ .target = target, .optimize = fast_optimize });
     const dep_toml = b.dependency("toml", .{ .target = target, .optimize = fast_optimize });
+    const dep_wire = b.dependency("wire", .{ .target = target, .optimize = fast_optimize });
     const dep_datetime = b.dependency("datetime", .{ .target = target, .optimize = packed_optimize });
     const dep_lz4 = b.dependency("lz4", .{ .target = target, .optimize = packed_optimize });
-    const dep_brotli = b.dependency("brotli", .{ .target = target, .optimize = packed_optimize });
     const dep_zstd = b.dependency("zstd", .{ .target = target, .optimize = packed_optimize });
     const dep_pcre2 = b.dependency("pcre2", .{ .target = target, .optimize = packed_optimize });
-    const dep_tinycc = b.dependency("tinycc", .{
-        .target = target,
-        .optimize = packed_optimize,
-        .CONFIG_TCC_BACKTRACE = false,
-        .no_fail = true,
-    });
-    const dep_sqlite = b.dependency("sqlite", .{
-        .target = target,
-        .optimize = packed_optimize,
-        .SQLITE_ENABLE_RTREE = true,
-        .SQLITE_ENABLE_FTS3 = true,
-        .SQLITE_ENABLE_FTS5 = true,
-        .SQLITE_ENABLE_COLUMN_METADATA = true,
-        .SQLITE_MAX_VARIABLE_NUMBER = 200000,
-        .SQLITE_ENABLE_MATH_FUNCTIONS = true,
-        .SQLITE_ENABLE_FTS3_PARENTHESIS = true,
-    });
-
-    const prebuild_step = b.step("prebuild", "Setup project for build");
-
-    prebuild_step.dependOn(&dep_tinycc.builder.top_level_steps.get("config-tcc").?.step);
-
-    try prebuild(b, prebuild_step);
 
     const version = try getPackageVersion(b);
     const commit_hash: ?[]const u8 = if (!release_ver) blk: {
@@ -170,6 +57,7 @@ pub fn build(b: *std.Build) !void {
     } else null;
 
     const zune_info = b.addOptions();
+    zune_info.addOption(bool, "api_dump", api_dump);
     zune_info.addOption(std.SemanticVersion, "version", version);
     zune_info.addOption(?[]const u8, "commit_hash", commit_hash);
 
@@ -178,9 +66,10 @@ pub fn build(b: *std.Build) !void {
         .target = target,
         .optimize = optimize,
         .strip = switch (optimize) {
-            .Debug, .ReleaseSafe => null,
-            .ReleaseFast, .ReleaseSmall => true,
+            .debug, .safe => null,
+            .fast, .small => true and !(perf_profiling orelse false),
         },
+        .omit_frame_pointer = if (perf_profiling) |p| !p else null,
     });
 
     mod_zune.addImport("zune", mod_zune);
@@ -188,38 +77,27 @@ pub fn build(b: *std.Build) !void {
     mod_zune.addOptions("zune-info", zune_info);
 
     mod_zune.addImport("luau", dep_luau.module("root"));
-    mod_zune.addImport("xev", dep_xev.module("xev"));
-    mod_zune.addImport("mimalloc", dep_mimalloc.module("root"));
+    mod_zune.addImport("zio", dep_zio.module("zio"));
     mod_zune.addImport("tls", dep_tls.module("tls"));
     mod_zune.addImport("yaml", dep_yaml.module("yaml"));
     mod_zune.addImport("lz4", dep_lz4.module("root"));
-    mod_zune.addImport("brotli", dep_brotli.module("root"));
     mod_zune.addImport("zstd", dep_zstd.module("root"));
     mod_zune.addImport("json", dep_json.module("json"));
     mod_zune.addImport("regex", dep_pcre2.module("root"));
     mod_zune.addImport("datetime", dep_datetime.module("zdt"));
     mod_zune.addImport("toml", dep_toml.module("root"));
-    mod_zune.addImport("sqlite", dep_sqlite.module("root"));
-    switch (target.result.os.tag) {
-        .windows => switch (target.result.cpu.arch) {
-            .aarch64 => {},
-            else => mod_zune.addImport("tinycc", dep_tinycc.module("root")),
-        },
-        else => switch (target.result.cpu.arch) {
-            .x86_64, .aarch64, .riscv64 => mod_zune.addImport("tinycc", dep_tinycc.module("root")),
-            else => {},
-        },
-    }
+    mod_zune.addImport("wire", dep_wire.module("root"));
+
     const exe = b.addExecutable(.{
         .name = "zune",
         .root_module = mod_zune,
         .use_llvm = use_llvm,
-        .use_lld = true,
+        .use_lld = use_llvm,
     });
 
     exe.lto = switch (optimize) {
-        .Debug => null,
-        .ReleaseSmall => .thin,
+        .debug => null,
+        .small => .thin,
         else => .full,
     };
 
@@ -227,19 +105,25 @@ pub fn build(b: *std.Build) !void {
     exe.link_data_sections = true;
     exe.link_gc_sections = true;
 
-    exe.step.dependOn(prebuild_step);
-
     if (no_bin) {
         b.getInstallStep().dependOn(&exe.step);
     } else {
         b.installArtifact(exe);
+        b.installDirectory(.{
+            .source_dir = b.path("lib"),
+            .install_dir = .bin,
+            .install_subdir = "lib",
+        });
+        b.installDirectory(.{
+            .source_dir = b.path("types"),
+            .install_dir = .bin,
+            .install_subdir = "types",
+        });
     }
 
     const run_cmd = b.addRunArtifact(exe);
-
     run_cmd.step.dependOn(b.getInstallStep());
-
-    if (b.args) |args| run_cmd.addArgs(args);
+    run_cmd.addPassthruArgs();
 
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
@@ -255,29 +139,29 @@ pub fn build(b: *std.Build) !void {
         }),
     });
 
-    sample_dylib.step.dependOn(prebuild_step);
+    // sample_dylib.step.dependOn(prebuild_step);
 
     const install_sample_dylib = b.addInstallArtifact(sample_dylib, .{
         .dest_dir = .{ .override = .lib },
     });
 
     const exe_unit_tests = b.addTest(.{
-        .filters = b.args orelse &.{},
-        .test_runner = .{
-            .mode = .simple,
-            .path = b.path("test/runner.zig"),
-        },
+        .filters = if (rt_test_filter) |filter| &.{filter} else &.{},
         .root_module = mod_zune,
         .use_llvm = use_llvm,
     });
 
-    exe_unit_tests.step.dependOn(prebuild_step);
     exe_unit_tests.step.dependOn(&install_sample_dylib.step);
 
     const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
 
+    const run_tests_cmd = b.addRunArtifact(exe);
+    run_tests_cmd.addArgs(&.{ "run", "test", if (test_filter) |filter| filter else "" });
+
+    run_tests_cmd.step.dependOn(&run_exe_unit_tests.step);
+
     const test_step = b.step("test", "Run unit tests");
-    test_step.dependOn(&run_exe_unit_tests.step);
+    test_step.dependOn(&run_tests_cmd.step);
 
     const version_step = b.step("version", "Get build version");
 

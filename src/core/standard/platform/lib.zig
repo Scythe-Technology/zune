@@ -1,5 +1,5 @@
 const std = @import("std");
-const xev = @import("xev").Dynamic;
+const zio = @import("zio");
 const luau = @import("luau");
 const builtin = @import("builtin");
 
@@ -7,10 +7,7 @@ const Zune = @import("zune");
 
 const Engine = Zune.Runtime.Engine;
 const Scheduler = Zune.Runtime.Scheduler;
-
-const LuaHelper = Zune.Utils.LuaHelper;
-const MethodMap = Zune.Utils.MethodMap;
-const EnumMap = Zune.Utils.EnumMap;
+const Scripting = Zune.Runtime.Scripting;
 
 const VM = luau.VM;
 
@@ -18,42 +15,44 @@ const memory = @import("memory.zig");
 
 pub const LIB_NAME = "platform";
 
-fn lua_getPageSize(L: *VM.lua.State) i32 {
+pub fn lua_getPageSize(L: *VM.lua.State) i32 {
     L.pushnumber(@floatFromInt(std.heap.pageSize()));
     return 1;
 }
 
-fn lua_getTotalMemory(L: *VM.lua.State) !i32 {
+pub fn lua_getTotalMemory(L: *VM.lua.State) !i32 {
     const amt = @divTrunc(try memory.getTotalSystemMemory(), memory.BYTES_PER_MB);
     L.pushnumber(@floatFromInt(amt));
     return 1;
 }
 
-fn lua_getFreeMemory(L: *VM.lua.State) !i32 {
+pub fn lua_getFreeMemory(L: *VM.lua.State) !i32 {
     const amt = @divTrunc(try memory.getFreeMemory(), memory.BYTES_PER_MB);
     L.pushnumber(@floatFromInt(amt));
     return 1;
 }
 
-fn lua_getHostName(L: *VM.lua.State) !i32 {
+pub fn lua_getHostName(L: *VM.lua.State) !i32 {
     comptime {
         if (!builtin.link_libc)
             @compileError("libc needed for gethostname");
     }
     switch (comptime builtin.os.tag) {
         .windows => {
-            const win = struct {
+            const WinApi = struct {
                 pub extern "ws2_32" fn GetHostNameW(
                     name: [*:0]u16,
                     namelen: i32,
                 ) callconv(.winapi) i32;
+
+                pub extern "ws2_32" fn WSAGetLastError() callconv(.winapi) i32;
             };
             var wtf16_buf: [256:0]std.os.windows.WCHAR = undefined;
-            const rc = win.GetHostNameW(&wtf16_buf, @sizeOf(@TypeOf(wtf16_buf)));
+            const rc = WinApi.GetHostNameW(&wtf16_buf, @sizeOf(@TypeOf(wtf16_buf)));
             if (rc != 0) {
-                return switch (std.os.windows.ws2_32.WSAGetLastError()) {
-                    .WSAEFAULT => unreachable,
-                    .WSANOTINITIALISED => @panic("WSANOTINITIALISED"),
+                return switch (WinApi.WSAGetLastError()) {
+                    10014 => unreachable, // WSAEFAULT
+                    10093 => @panic("WSANOTINITIALISED"), // WSANOTINITIALISED
                     else => error.UnknownHostName,
                 };
             }
@@ -73,7 +72,7 @@ fn lua_getHostName(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn lua_getKernelVersion(L: *VM.lua.State) !i32 {
+pub fn lua_getKernelVersion(L: *VM.lua.State) !i32 {
     switch (comptime builtin.os.tag) {
         .windows => {
             var info: std.os.windows.RTL_OSVERSIONINFOW = undefined;
@@ -120,36 +119,19 @@ fn lua_getKernelVersion(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-pub fn loadLib(L: *VM.lua.State) !void {
-    try L.Zpushvalue(.{
-        .os = @tagName(builtin.os.tag),
-        .abi = @tagName(builtin.abi),
-        .cpu = .{
-            .arch = @tagName(builtin.cpu.arch),
-            .endian = @tagName(builtin.cpu.arch.endian()),
+pub const lua_os = @tagName(builtin.os.tag);
+pub const lua_abi = @tagName(builtin.abi);
+pub const lua_cpu = struct {
+    pub const lua_arch = @tagName(builtin.cpu.arch);
+    pub const lua_endian = @tagName(builtin.cpu.arch.endian());
+};
+pub fn lua_custom_async(L: *VM.lua.State) !void {
+    switch (zio.ev.backend) {
+        .linux => {
+            const scheduler = Scheduler.fromState(L);
+            const engine = scheduler.loop.backend.selectedEngine();
+            try L.pushlstring(@tagName(engine));
         },
-        .async = @tagName(xev.backend),
-        .getPageSize = lua_getPageSize,
-        .getTotalMemory = lua_getTotalMemory,
-        .getFreeMemory = lua_getFreeMemory,
-        .getHostName = lua_getHostName,
-        .getKernelVersion = lua_getKernelVersion,
-    });
-
-    L.setreadonly(-1, true);
-
-    try LuaHelper.registerModule(L, LIB_NAME);
-}
-
-test "platform" {
-    const TestRunner = @import("../../utils/testrunner.zig");
-
-    const testResult = try TestRunner.runTest(
-        TestRunner.newTestFile("standard/platform.test.luau"),
-        &.{},
-        .{},
-    );
-
-    try std.testing.expect(testResult.failed == 0);
-    try std.testing.expect(testResult.total > 0);
+        else => |e| try L.pushlstring(@tagName(e)),
+    }
 }

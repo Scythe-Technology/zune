@@ -24,7 +24,7 @@ const AlgorithmMap = std.StaticStringMap(AlgorithmUnion).initComptime(.{
 });
 
 pub fn lua_hash(L: *VM.lua.State) !i32 {
-    const allocator = Scheduler.fromState(L).allocator;
+    const allocator = Scheduler.fromState(L).allocator();
     const password = try L.Zcheckvalue([]const u8, 1, null);
 
     var algorithm = DEFAULT_ALGO;
@@ -82,7 +82,7 @@ pub fn lua_hash(L: *VM.lua.State) !i32 {
 const TAG_BCRYPT: u32 = @bitCast([4]u8{ '$', 'b', 'c', 'r' });
 
 pub fn lua_verify(L: *VM.lua.State) !i32 {
-    const allocator = Scheduler.fromState(L).allocator;
+    const allocator = Scheduler.fromState(L).allocator();
     const password = try L.Zcheckvalue([]const u8, 1, null);
     const hash = try L.Zcheckvalue([]const u8, 2, null);
 

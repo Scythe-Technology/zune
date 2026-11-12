@@ -16,9 +16,10 @@ var currentTicks: u64 = 0;
 var samples: u64 = 0;
 var frequency: u64 = 10000;
 
-var gcstats: [16]u64 = [_]u64{0} ** 16;
+var gcstats: [16]u64 = @splat(0);
 
 var callbacks: ?*VM.lua.Callbacks = null;
+var budget_gate: *const std.atomic.Value(u32) = undefined;
 
 var STACK: std.ArrayList(u8) = .empty;
 var DATA: std.hash_map.StringHashMapUnmanaged(u64) = .empty;
@@ -73,12 +74,22 @@ fn interrupt(lua_state: *VM.lua.State, gc: c_int) !void {
     }
 
     currentTicks = currTicks;
-    if (callbacks) |cb|
-        cb.*.interrupt = null;
 }
 
 fn lua_interrupt(lua_state: ?*VM.lua.State, gc: c_int) callconv(.c) void {
     const L: *VM.lua.State = @ptrCast(lua_state.?);
+    interrupt(L, gc) catch |err| std.debug.panic("{}", .{err});
+    if (budget_gate.load(.acquire) != 0) {
+        Scheduler.Policy.checkLimit(L);
+        if (callbacks) |cb|
+            cb.*.interrupt = Scheduler.Policy.interruptCallback;
+        return;
+    }
+    if (callbacks) |cb|
+        cb.*.interrupt = null;
+}
+
+fn takeSample(L: *VM.lua.State, gc: c_int) void {
     interrupt(L, gc) catch |err| std.debug.panic("{}", .{err});
 }
 
@@ -91,8 +102,15 @@ fn loop() void {
 
             ticks += lticks;
             samples += 1;
-            if (callbacks) |cb|
+            if (budget_gate.load(.acquire) != 0) {
+                Scheduler.Policy.sample_due.store(true, .release);
+                if (callbacks) |cb| {
+                    if (cb.interrupt == null)
+                        cb.*.interrupt = Scheduler.Policy.interruptCallback;
+                }
+            } else if (callbacks) |cb| {
                 cb.*.interrupt = lua_interrupt;
+            }
 
             last += @as(f64, @floatFromInt(ticks)) * 1e-6;
         } else {
@@ -104,11 +122,13 @@ fn loop() void {
 pub fn start(L: *VM.lua.State, freq: u64) !void {
     if (comptime builtin.single_threaded)
         return error.UnsupportedPlatform;
-    const allocator = Scheduler.fromState(L).allocator;
+    const allocator = Scheduler.fromState(L).allocator();
 
     active = true;
     frequency = freq;
     callbacks = L.callbacks();
+    budget_gate = &Scheduler.fromState(L).policy.running_count;
+    Scheduler.Policy.sample_fn = takeSample;
 
     thread = try std.Thread.spawn(.{ .allocator = allocator }, loop, .{});
 }
@@ -117,6 +137,7 @@ pub fn end() void {
     active = false;
     if (thread) |t|
         t.join();
+    Scheduler.Policy.sample_fn = null;
     STACK.deinit(Zune.DEFAULT_ALLOCATOR);
 }
 

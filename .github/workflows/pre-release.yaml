@@ -19,7 +19,7 @@ jobs:
       - name: Setup Zig
         uses: mlugg/setup-zig@v2
         with:
-          version: 0.16.0
+          version: 0.17.1
           use-cache: false
 
       - name: Get Zune Version
@@ -33,44 +33,50 @@ jobs:
     strategy:
       matrix:
         include:
-          - name: Linux x86_64
+          - name: Linux x86_64 (gnu)
             target: x86_64-linux-gnu
-            artifact: zune-${{ needs.prep.outputs.version }}-linux-x86_64
-          - name: Linux Arm64
+            artifact: zune-linux-x86_64-gnu
+          - name: Linux x86_64 (musl)
+            target: x86_64-linux-musl
+            artifact: zune-linux-x86_64-musl
+          - name: Linux aarch64 (gnu)
             target: aarch64-linux-gnu
-            artifact: zune-${{ needs.prep.outputs.version }}-linux-aarch64
-          - name: Linux Risc-v64
+            artifact: zune-linux-aarch64-gnu
+          - name: Linux aarch64 (musl)
+            target: aarch64-linux-musl
+            artifact: zune-linux-aarch64-musl
+          - name: Linux riscv64
             target: riscv64-linux
-            artifact: zune-${{ needs.prep.outputs.version }}-linux-riscv64
-          - name: Linux PowerPC64LE
+            artifact: zune-linux-riscv64
+          - name: Linux powerpc64le
             target: powerpc64le-linux
-            artifact: zune-${{ needs.prep.outputs.version }}-linux-powerpc64le
+            artifact: zune-linux-powerpc64le
           - name: Windows x86_64
             target: x86_64-windows
-            artifact: zune-${{ needs.prep.outputs.version }}-windows-x86_64
+            artifact: zune-windows-x86_64
             ext: .exe
-          - name: Windows Arm64
+          - name: Windows aarch64
             target: aarch64-windows
-            artifact: zune-${{ needs.prep.outputs.version }}-windows-aarch64
+            artifact: zune-windows-aarch64
             ext: .exe
           - name: macOS x86_64
             target: x86_64-macos
-            artifact: zune-${{ needs.prep.outputs.version }}-macos-x86_64
-          - name: macOS Arm64
+            artifact: zune-macos-x86_64
+          - name: macOS aarch64
             target: aarch64-macos
-            artifact: zune-${{ needs.prep.outputs.version }}-macos-aarch64
+            artifact: zune-macos-aarch64
           - name: FreeBSD x86_64
             target: x86_64-freebsd
-            artifact: zune-${{ needs.prep.outputs.version }}-freebsd-x86_64
-          - name: FreeBSD Arm64
+            artifact: zune-freebsd-x86_64
+          - name: FreeBSD aarch64
             target: aarch64-freebsd
-            artifact: zune-${{ needs.prep.outputs.version }}-freebsd-aarch64
-          - name: FreeBSD Risc-v64
+            artifact: zune-freebsd-aarch64
+          - name: FreeBSD riscv64
             target: riscv64-freebsd
-            artifact: zune-${{ needs.prep.outputs.version }}-freebsd-riscv64
-          - name: FreeBSD PowerPC64LE
+            artifact: zune-freebsd-riscv64
+          - name: FreeBSD powerpc64le
             target: powerpc64le-freebsd
-            artifact: zune-${{ needs.prep.outputs.version }}-freebsd-powerpc64le
+            artifact: zune-freebsd-powerpc64le
 
     name: ${{ matrix.name }}
     timeout-minutes: 20
@@ -82,14 +88,14 @@ jobs:
     - name: Setup Zig
       uses: mlugg/setup-zig@v2
       with:
-        version: 0.16.0
+        version: 0.17.1
         use-cache: false
 
     - name: Build
       run: zig build -Doptimize=ReleaseFast -Dtarget=${{ matrix.target }}
 
     - name: Pack Artifact
-      run: cd ./zig-out/bin && zip ../../${{ matrix.artifact }}.zip ./zune${{ matrix.ext }}
+      run: cd ./zig-out/bin && zip ../../${{ matrix.artifact }}.zip ./zune${{ matrix.ext }} ./lib ./types
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4

@@ -534,6 +534,7 @@ local res = f<<number, string>>()
                                 },
                                 tag = "instantiate",
                             },
+                            table_call = false,
                             arguments = {},
                             close_parens = {
                                 trailing_trivia = {},

@@ -110,12 +110,17 @@ fn ColorFormat(comptime fmt: []const u8, comptime use_colors: bool) []const u8 {
     return new_fmt;
 }
 
+pub fn useColors() bool {
+    return Zune.State.options.format.use_color == true and
+        std.mem.eql(u8, Zune.State.env_map.get("NO_COLOR") orelse "0", "0");
+}
+
 pub fn print(comptime fmt: []const u8, args: anytype) void {
     var buffer: [64]u8 = undefined;
     const stderr = std.debug.lockStderr(&buffer);
     defer std.debug.unlockStderr();
 
-    if (Zune.State.options.format.use_color == true and std.mem.eql(u8, Zune.State.env_map.get("NO_COLOR") orelse "0", "0")) {
+    if (useColors()) {
         const color_format = comptime ColorFormat(fmt, true);
         nosuspend stderr.file_writer.interface.print(color_format, args) catch return;
     } else {
@@ -125,7 +130,7 @@ pub fn print(comptime fmt: []const u8, args: anytype) void {
 }
 
 pub fn writerPrint(writer: *std.Io.Writer, comptime fmt: []const u8, args: anytype) !void {
-    if (Zune.State.options.format.use_color == true and std.mem.eql(u8, Zune.State.env_map.get("NO_COLOR") orelse "0", "0")) {
+    if (useColors()) {
         const color_format = comptime ColorFormat(fmt, true);
         try writer.print(color_format, args);
     } else {
@@ -140,14 +145,14 @@ pub fn writeFullPreviewError(writer: *std.Io.Writer, padding: []u8, line: u32, c
     try writerPrint(writer, "{s}~ ", .{padding});
     try writePreviewError(writer, fmt, args);
     @memset(padding, ' ');
-    try writerPrint(writer, "{s}|\n", .{padding});
+    try writerPrint(writer, "{s}|", .{padding});
 }
 
 pub fn writePreviewError(writer: *std.Io.Writer, comptime fmt: []const u8, args: anytype) !void {
     try writerPrint(writer, " <dim>PreviewError: " ++ fmt ++ "<clear>\n", args);
 }
 
-const StackInfo = struct {
+pub const StackInfo = struct {
     what: VM.lua.Debug.Context,
     name: ?[]const u8 = null,
     source: ?[]const u8 = null,
@@ -170,7 +175,7 @@ pub fn dumpStackInfo(writer: *std.Io.Writer, padded_string: []u8, info: StackInf
     var fixed_reader: std.Io.Reader = undefined;
     var reader: *std.Io.Reader = undefined;
 
-    if (Zune.State.bundle) |b| {
+    if (Zune.State.bundle) |*b| {
         const script = b.loadScript(src[1..]) catch |e| {
             return writeFullPreviewError(writer, padded_string, current_line, "Failed to open source file: {t}", .{e});
         };
@@ -210,7 +215,7 @@ pub fn dumpStackInfo(writer: *std.Io.Writer, padded_string: []u8, info: StackInf
         else => {
             try writer.writeAll(buf[0..line_writer.end]);
             try writerPrint(writer, " <dim>(...cutoff) read error: {t}<clear>\n", .{e});
-            try writer.print("{s}|\n", .{padded_string});
+            try writer.print("{s}|", .{padded_string});
             return;
         },
     };
@@ -239,15 +244,15 @@ pub fn dumpStackInfo(writer: *std.Io.Writer, padded_string: []u8, info: StackInf
         try writer.print("{s}| {s}", .{ padded_string, space_slice });
         @memset(buf[0..len], '^');
         switch (color) {
-            .Red => try writerPrint(writer, "<red>{s}<clear>\n", .{buf[0..len]}),
-            .Yellow => try writerPrint(writer, "<yellow>{s}<clear>\n", .{buf[0..len]}),
+            .Red => try writerPrint(writer, "<red>{s}<clear>", .{buf[0..len]}),
+            .Yellow => try writerPrint(writer, "<yellow>{s}<clear>", .{buf[0..len]}),
         }
     } else {
-        try writer.print("{s}|\n", .{padded_string});
+        try writer.print("{s}|", .{padded_string});
     }
 }
 
-pub fn dumpStackTrace(writer: *std.Io.Writer, trace: []const StackInfo, ref_level: ?usize) !void {
+pub fn dumpStackTrace(writer: *std.Io.Writer, trace: []const StackInfo, ref_level: ?union(enum) { first: void, level: usize }) !void {
     var largest_line: usize = 1;
     for (trace) |info| {
         if (info.current_line) |line|
@@ -267,22 +272,29 @@ pub fn dumpStackTrace(writer: *std.Io.Writer, trace: []const StackInfo, ref_leve
     const padded_string = padding_buf[0 .. padding + 1];
     @memset(padded_string, ' ');
 
+    var wrote: usize = 0;
     for (trace, 0..) |info, lvl| {
         if (info.current_line == null)
             continue;
         if (info.what != .lua)
             continue;
+        if (wrote > 0)
+            try writer.writeByte('\n');
+        defer wrote += 1;
         try dumpStackInfo(
             writer,
             padded_string,
             info,
-            if (ref_level != null and ref_level.? == lvl) .Red else null,
+            if (ref_level) |r| switch (r) {
+                .first => if (wrote == 0) .Red else null,
+                .level => if (r.level == lvl) .Red else null,
+            } else null,
         );
     }
 }
 
 pub fn dumpDefinitionTrace(L: *VM.lua.State, idx: i32) !void {
-    const allocator = Scheduler.fromState(L).allocator;
+    const allocator = Scheduler.fromState(L).allocator();
 
     std.debug.assert(idx < 0);
     std.debug.assert(L.typeOf(idx) == .Function);
@@ -329,7 +341,7 @@ pub fn dumpDefinitionTrace(L: *VM.lua.State, idx: i32) !void {
                 switch (e) {
                     error.BadReturnType => break :str try TL.Ztolstringk(1),
                     error.Runtime => break :str try TL.Ztolstringk(1),
-                    else => std.debug.panic("{}\n", .{e}),
+                    else => std.debug.panic("{}", .{e}),
                 }
                 return;
             });
@@ -398,14 +410,14 @@ pub fn freeStackTrace(allocator: std.mem.Allocator, trace: []const StackInfo) vo
     }
 }
 
-pub fn getStackTrace(L: *VM.lua.State, allocator: std.mem.Allocator) !std.ArrayList(StackInfo) {
+pub fn getStackTrace(L: *VM.lua.State, allocator: std.mem.Allocator, startLevel: i32, limit: ?u32) !std.ArrayList(StackInfo) {
     var list: std.ArrayList(StackInfo) = try .initCapacity(allocator, 4);
     errdefer list.deinit(allocator);
     errdefer freeStackTrace(allocator, list.items);
 
-    var level: i32 = 0;
+    var level: i32 = startLevel;
     var ar: VM.lua.Debug = .{ .ssbuf = undefined };
-    while (L.getinfo(level, "sln", &ar)) : (level += 1) {
+    while (L.getinfo(level, "sln", &ar) and (limit == null or list.items.len < limit.?)) : (level += 1) {
         var info: StackInfo = .{
             .what = ar.what,
         };
@@ -423,10 +435,10 @@ pub fn getStackTrace(L: *VM.lua.State, allocator: std.mem.Allocator) !std.ArrayL
     return list;
 }
 
-pub fn dumpErrorStackTrace(L: *VM.lua.State) !void {
-    const allocator = Scheduler.fromState(L).allocator;
+pub fn dumpErrorStackTrace(L: *VM.lua.State, startLevel: i32) !void {
+    const allocator = Scheduler.fromState(L).allocator();
 
-    var list: std.ArrayList(StackInfo) = try getStackTrace(L, allocator);
+    var list: std.ArrayList(StackInfo) = try getStackTrace(L, allocator, startLevel, null);
     defer list.deinit(allocator);
     defer freeStackTrace(allocator, list.items);
 
@@ -448,7 +460,7 @@ pub fn dumpErrorStackTrace(L: *VM.lua.State) !void {
                 switch (e) {
                     error.BadReturnType => break :str try TL.Ztolstringk(1),
                     error.Runtime => break :str try TL.Ztolstringk(1),
-                    else => std.debug.panic("{}\n", .{e}),
+                    else => std.debug.panic("{}", .{e}),
                 }
                 return;
             });
@@ -510,14 +522,20 @@ pub fn dumpErrorStackTrace(L: *VM.lua.State) !void {
         if (b.mode.compiled == .release)
             return;
 
-    try dumpStackTrace(&stderr.file_writer.interface, list.items, reference_level);
+    try dumpStackTrace(
+        &stderr.file_writer.interface,
+        list.items,
+        if (reference_level) |lvl| .{ .level = lvl } else null,
+    );
+    try stderr.file_writer.interface.writeByte('\n');
+    try stderr.file_writer.interface.flush();
 }
 
 pub fn dumpErrorTrace(L: *VM.lua.State, err: anyerror, forceDetailed: bool) void {
     switch (err) {
         error.Runtime => {
             if (Zune.State.options.runtime.use_detailed_error or forceDetailed) {
-                dumpErrorStackTrace(L) catch |e| std.debug.panic("{}", .{e});
+                dumpErrorStackTrace(L, 0) catch |e| std.debug.panic("{}", .{e});
             } else {
                 switch (L.typeOf(-1)) {
                     .String, .Number => print("{s}\n", .{L.tostring(-1).?}),
@@ -533,7 +551,7 @@ pub fn dumpErrorTrace(L: *VM.lua.State, err: anyerror, forceDetailed: bool) void
                             switch (e) {
                                 error.BadReturnType => break :str TL.Ztolstringk(1) catch |er| std.debug.panic("{}", .{er}),
                                 error.Runtime => break :str TL.Ztolstringk(1) catch |er| std.debug.panic("{}", .{er}),
-                                else => std.debug.panic("{}\n", .{e}),
+                                else => std.debug.panic("{}", .{e}),
                             }
                             break :jmp;
                         };

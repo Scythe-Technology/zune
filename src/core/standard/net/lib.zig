@@ -1,29 +1,24 @@
 const std = @import("std");
 const luau = @import("luau");
+const zio = @import("zio");
 const builtin = @import("builtin");
 
 const Zune = @import("zune");
 
 const Scheduler = Zune.Runtime.Scheduler;
-
-const LuaHelper = Zune.Utils.LuaHelper;
+const Scripting = Zune.Runtime.Scripting;
 
 const VM = luau.VM;
 
-const Socket = @import("../../objects/network/Socket.zig");
-const sysfd = @import("../../utils/sysfd.zig");
+const Socket = Zune.objects.Socket;
 
 pub const LIB_NAME = "net";
-pub fn PlatformSupported() bool {
+pub fn PlatformSupported() ?Zune.PlatformSupportKind {
     return switch (comptime builtin.os.tag) {
-        .linux, .macos, .windows => true,
-        .freebsd => true,
-        else => false,
+        .linux, .macos, .windows => .Full,
+        .freebsd => .Full,
+        else => null,
     };
-}
-
-pub fn createSocket(domain: u32, flags: u32, protocol: u32) !std.posix.socket_t {
-    return sysfd.socket(domain, flags, protocol);
 }
 
 pub fn lookupAddresses(allocator: std.mem.Allocator, name: []const u8, port: u16) ![]std.Io.net.IpAddress {
@@ -48,22 +43,87 @@ pub fn lookupAddresses(allocator: std.mem.Allocator, name: []const u8, port: u16
     return list.toOwnedSlice(allocator);
 }
 
-fn lua_createSocket(L: *VM.lua.State) !i32 {
+const Async = struct {
+    pub const Open = struct {
+        op: Op = undefined,
+        ref: Scheduler.ThreadRef,
+
+        const Op = zio.ev.NetOpen;
+
+        pub fn callback(loop: *zio.ev.Loop, completion: *zio.ev.Completion) void {
+            const op: *Op = @alignCast(@fieldParentPtr("c", completion));
+            const self: *Open = @alignCast(@fieldParentPtr("op", op));
+            const scheduler: *Scheduler = @alignCast(@fieldParentPtr("loop", loop));
+
+            const L = self.ref.value;
+
+            defer scheduler.allocator().destroy(self);
+            defer self.ref.deref();
+
+            const handle = op.getResult() catch |err|
+                return Scheduler.resumeStateError(L, null, err) catch {};
+
+            _ = Socket.create(L, .{
+                .handle = handle,
+                .address = undefined,
+            }, .{}) catch |e| std.debug.panic("{}", .{e});
+            _ = Scheduler.resumeState(L, null, 1) catch {};
+        }
+
+        pub fn start(self: *Open, scheduler: *Scheduler) void {
+            self.op.c.callback = callback;
+            scheduler.loop.add(&self.op.c);
+        }
+    };
+};
+
+pub fn lua_openSocket(L: *VM.lua.State) !i32 {
     if (!L.isyieldable())
         return L.Zyielderror();
-    const domain = L.Lcheckunsigned(1);
-    const flags = L.Lcheckunsigned(2);
-    const protocol = L.Lcheckunsigned(3);
 
-    const socket = try createSocket(domain, flags, protocol);
+    const scheduler = Scheduler.fromState(L);
+    const allocator = scheduler.allocator();
 
-    _ = try Socket.push(L, socket, .created);
+    const DomainMap = comptime Scripting.createEnumMap(zio.os.net.Domain);
+    const TypeMap = comptime Scripting.createEnumMap(zio.os.net.Type);
+    const ProtocolMap = comptime Scripting.createEnumMap(zio.os.net.Protocol);
 
-    return 1;
+    const domain: zio.os.net.Domain = blk: {
+        if (L.typeOf(1) == .Number)
+            break :blk @fromBackingInt(@intCast(try L.Zcheckvalue(u32, 1, null)));
+        break :blk DomainMap.get(try L.Zcheckvalue([:0]const u8, 1, null)) orelse
+            return L.Zerror("invalid domain option");
+    };
+    const @"type": zio.os.net.Type = blk: {
+        if (L.typeOf(2) == .Number)
+            break :blk @fromBackingInt(@intCast(try L.Zcheckvalue(u32, 2, null)));
+        break :blk TypeMap.get(try L.Zcheckvalue([:0]const u8, 2, null)) orelse
+            return L.Zerror("invalid type option");
+    };
+    const protocol: zio.os.net.Protocol = blk: {
+        if (L.typeOf(3) == .Number)
+            break :blk @fromBackingInt(@intCast(try L.Zcheckvalue(u32, 3, null)));
+        break :blk ProtocolMap.get(try L.Zcheckvalue([:0]const u8, 3, null)) orelse
+            return L.Zerror("invalid protocol option");
+    };
+
+    const open = try allocator.create(Async.Open);
+
+    open.* = .{
+        .ref = .init(L),
+    };
+
+    open.op = .init(domain, @"type", protocol, .{
+        .nonblocking = true,
+    });
+
+    open.start(scheduler);
+
+    return L.yield(0) catch unreachable;
 }
 
-fn lua_getAddressList(L: *VM.lua.State) !i32 {
-    const allocator = Scheduler.fromState(L).allocator;
+pub fn lua_getAddressList(L: *VM.lua.State) !i32 {
+    const allocator = Scheduler.fromState(L).allocator();
     const name = L.Lcheckstring(1);
     const port = L.Lcheckunsigned(2);
     if (port > std.math.maxInt(u16))
@@ -74,71 +134,27 @@ fn lua_getAddressList(L: *VM.lua.State) !i32 {
         return L.Zerror("address list too large");
     try L.createtable(@intCast(list.len), 0);
     for (list, 1..) |address, i| {
-        var buf: [Socket.LONGEST_ADDRESS]u8 = undefined;
-        try L.Zpushvalue(.{
-            .family = @as(i32, switch (address) {
-                .ip4 => std.posix.AF.INET,
-                .ip6 => std.posix.AF.INET6,
-            }),
-            .port = address.getPort(),
-            .address = Socket.AddressToString(&buf, address),
+        try Socket.pushAddress(L, switch (address) {
+            .ip4 => .{
+                .ip = .initIp4(
+                    address.ip4.bytes,
+                    address.ip4.port,
+                ),
+            },
+            .ip6 => .{
+                .ip = .initIp6(
+                    address.ip6.bytes,
+                    address.ip6.port,
+                    address.ip6.flow,
+                    @intCast(address.ip6.scope()),
+                ),
+            },
         });
         try L.rawseti(-2, @intCast(i));
     }
     return 1;
 }
 
-fn ImportConstants(L: *VM.lua.State, namespace: anytype, comptime name: [:0]const u8) !void {
-    try L.createtable(0, @typeInfo(namespace).@"struct".decls.len);
-
-    inline for (@typeInfo(namespace).@"struct".decls) |field|
-        try L.Zsetfield(-1, field.name, @as(i32, @field(namespace, field.name)));
-
-    L.setreadonly(-1, true);
-    try L.rawsetfield(-2, name);
-}
-
-pub fn loadLib(L: *VM.lua.State) !void {
-    try L.createtable(0, 8);
-
-    try L.Zsetfieldfn(-1, "createSocket", lua_createSocket);
-    try L.Zsetfieldfn(-1, "getAddressList", lua_getAddressList);
-
-    try ImportConstants(L, std.posix.AF, "ADDRF");
-    try ImportConstants(L, std.posix.SOCK, "SOCKF");
-    try ImportConstants(L, std.posix.IPPROTO, "IPPROTO");
-    try ImportConstants(L, std.posix.SO, "SOCKOPT");
-    try ImportConstants(L, std.posix.SOL, "SOCKOPTLV");
-
-    {
-        try @import("http/lib.zig").load(L);
-        try L.rawsetfield(-2, "http");
-    }
-
-    L.setreadonly(-1, true);
-
-    try LuaHelper.registerModule(L, LIB_NAME);
-}
-
-test {
-    _ = @import("http/request.zig");
-}
-test {
-    _ = @import("http/response.zig");
-}
-test {
-    _ = @import("http/websocket.zig");
-}
-
-test "net" {
-    const TestRunner = @import("../../utils/testrunner.zig");
-
-    const testResult = try TestRunner.runTest(
-        TestRunner.newTestFile("standard/net/init.luau"),
-        &.{},
-        .{},
-    );
-
-    try std.testing.expect(testResult.failed == 0);
-    try std.testing.expect(testResult.total > 0);
-}
+pub const lua_forced_ADDRF = std.posix.AF;
+pub const lua_forced_SOCK = std.posix.SOCK;
+pub const lua_forced_IPPROTO = std.posix.IPPROTO;

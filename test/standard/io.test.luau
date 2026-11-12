@@ -1,347 +1,205 @@
 --!strict
-local io = zune.io;
-local task = zune.task;
-local testing = zune.testing;
+local io = zune.io
 
-local test = testing.test;
-local expect = testing.expect;
-local describe = testing.describe;
+local fs = require("@zune/fs")
+local wrapped = require("@zune/io")
+local testing = require("@zune/testing")
 
-describe("IO", function()
-    describe("BufferSink", function()
-        test("Generic", function()
-            local sink = io.createBufferSink();
-            expect(sink).toBe(expect.type("userdata"));
+local test = testing.test
+local expect = testing.expect
+local describe = testing.describe
 
-            local a = "test default";
-            sink:write(a);
-            expect(sink.len).toBe(#a);
-            expect(buffer.tostring(sink:flush())).toBe(a);
-            expect(sink.len).toBe(0);
+local function contents(array: any): string
+    if array.len == 0 then
+        return ""
+    end
 
-            local b = "test buffer";
-            sink:write(b);
-            expect(sink.len).toBe(#b);
-            expect(buffer.tostring(sink:flush(true))).toBe(b);
-            expect(sink.len).toBe(0);
+    local buf = buffer.create(array.len)
+    local n, err = array:readPositional(0, buf)
 
-            local c = "test string";
-            sink:write(c);
-            expect(sink.len).toBe(#c);
-            expect(sink:flush(false)).toBe(c);
-            expect(sink.len).toBe(0);
+    expect(n).toBe(array.len)
+    expect(err).toBeNil()
+    return buffer.tostring(buf)
+end
 
-            local chunk = buffer.create(1024);
-            local data = "test chunk";
-            buffer.writestring(chunk, 0, data);
-            sink:write(chunk);
-            expect(sink.len).toBe(1024);
-            local flushed_chunk = sink:flush();
-            local rem = 1024 - #data;
-            expect(buffer.readstring(flushed_chunk, #data, rem)).toBe(string.rep("\0", rem));
-            expect(buffer.readstring(flushed_chunk, 0, 10)).toBe("test chunk");
-            expect(sink.len).toBe(0);
+describe("io", function()
+    test("cwd", function()
+        local cwd = fs.realPathAlloc(io.cwd())
 
-            expect(function()
-                sink:close()
-            end).never.toThrow();
-        end)
-        test("WritableStream", function()
-            local sink = io.createBufferSink();
-            expect(sink).toBe(expect.type("userdata"));
-
-            local stream = sink:writer();
-            expect(stream).toBe(sink:writer());
-            expect(stream).toBe(sink:writer());
-
-            stream:writeu8(123);
-            expect(sink.len).toBe(1);
-            expect(buffer.readu8(sink:flush(), 0)).toBe(123);
-            expect(sink.len).toBe(0);
-
-            stream:writeu8(257);
-            expect(sink.len).toBe(1);
-            expect(buffer.readu8(sink:flush(), 0)).toBe(1);
-            expect(sink.len).toBe(0);
-
-            stream:writeu16(12345);
-            expect(sink.len).toBe(2);
-            expect(buffer.readu16(sink:flush(), 0)).toBe(12345);
-            expect(sink.len).toBe(0);
-
-            stream:writeu16(70000);
-            expect(sink.len).toBe(2);
-            expect(buffer.readu16(sink:flush(), 0)).toBe(4464);
-            expect(sink.len).toBe(0);
-
-            stream:writeu32(123456789);
-            expect(sink.len).toBe(4);
-            expect(buffer.readu32(sink:flush(), 0)).toBe(123456789);
-
-            stream:writef32(123.456);
-            expect(sink.len).toBe(4);
-            expect(
-                buffer.readf32(sink:flush(), 0) * 1000
-                // 1
-                / 1000
-            ).toBe(123.456);
-            expect(sink.len).toBe(0);
-
-            stream:writef64(12345.12345);
-            expect(sink.len).toBe(8);
-            expect(buffer.readf64(sink:flush(), 0)).toBe(12345.12345);
-            expect(sink.len).toBe(0);
-
-            expect(function()
-                sink:close()
-            end).never.toThrow();
-        end)
-        test("Limited Small", function()
-            local sink = io.createBufferSink({
-                limit = 1024,
-            });
-            expect(sink).toBe(expect.type("userdata"));
-    
-            local large = string.rep("a", 1024);
-            sink:write(large);
-            expect(sink.len).toBe(#large);
-            expect(buffer.tostring(sink:flush())).toBe(large);
-            expect(sink.len).toBe(0);
-
-            expect(function()
-                sink:write(large .. "a");
-            end).toThrow("limit exceeded");
-    
-            expect(function()
-                sink:close()
-            end).never.toThrow();
-        end)
-
-        test("Limited Small Init", function()
-            local sink = io.createBufferSink({
-                limit = 1024,
-                size = 1024,
-            });
-            expect(sink).toBe(expect.type("userdata"));
-    
-            local large = string.rep("a", 1024);
-            sink:write(large);
-            expect(sink.len).toBe(#large);
-            expect(buffer.tostring(sink:flush())).toBe(large);
-            expect(sink.len).toBe(0);
-
-            expect(function()
-                sink:write(large .. "a");
-            end).toThrow("limit exceeded");
-    
-            expect(function()
-                sink:close()
-            end).never.toThrow();
-        end)
+        expect(cwd).toBe(expect.any("string"))
+        expect(#cwd).toBeGreaterThan(0)
+        if zune.platform.os == "windows" then
+            expect(cwd:sub(2, 3) == ":\\").toBeTruthy()
+        else
+            expect(cwd:sub(1, 1) == "/").toBeTruthy()
+        end
     end)
 
-    describe("FixedBufferStream", function()
-        test("Generic Usage", function()
-            local buf = buffer.fromstring("test default");
-            local stream = io.createFixedBufferStream(buf);
-            expect(stream).toBe(expect.type("userdata"));
+    describe("createBufferArray", function()
+        test("write grows", function()
+            local array = io.createBufferArray({ limit = 8 })
 
-            local a = "test default";
-            stream:write(a);
-            expect(buffer.tostring(buf)).toBe(a);
-            expect(stream:pos()).toBe(#a);
+            expect(array:write("ab")).toBe(2)
+            expect(array.offset).toBe(2)
 
-            stream:seekTo(0);
-            expect(stream:pos()).toBe(0);
+            expect(array:write("cd")).toBe(2)
+            expect(array.len).toBe(4)
+            expect(array.offset).toBe(4)
+            expect(contents(array)).toBe("abcd")
 
-            local b = "test buffer";
-            stream:write(b);
-            expect(buffer.tostring(buf)).toBe(b .. (a:sub(#b + 1)));
-            expect(stream:pos()).toBe(#b);
-
-            stream:seekTo(0);
-            expect(stream:pos()).toBe(0);
-
-            local c = "test string";
-            stream:write(c);
-            expect(buffer.tostring(buf)).toBe(c .. (a:sub(#c + 1)));
-            expect(stream:pos()).toBe(#c);
-
-            stream:seekTo(0);
-            expect(stream:pos()).toBe(0);
-
-            local all = stream:read()
-            expect(all).never.toBeNil();
-            assert(all)
-            expect(buffer.tostring(all)).toBe(c .. (a:sub(#c + 1)));
-
-            stream:seekTo(0);
-            expect(stream:pos()).toBe(0);
-
-            buffer.writestring(buf, 0, "test default");
-            stream:write(buf);
-
-            local ok, err = pcall(stream.read, stream)
-            expect(ok).toBeTruthy();
-            expect(buffer.tostring(err)).toBe("");
-
-            stream:seekTo(0);
-            expect(stream:pos()).toBe(0)
-
-            expect(stream:canRead()).toBeTruthy()
-            expect(stream:canRead(4)).toBeTruthy()
-            expect(stream:canRead(#a)).toBeTruthy()
-            expect(stream:canRead(#a + 1)).toBeFalsy()
-
-            expect(stream:read(#a, false)).toBe(a)
-            
-            stream:seekTo(0)
-            expect(stream:pos()).toBe(0)
-
-            stream:seekBy(1)
-            expect(stream:pos()).toBe(1)
-            stream:seekBy(-1)
-            expect(stream:pos()).toBe(0)
-            stream:seekBy(-1)
-            expect(stream:pos()).toBe(0)
-            stream:seekBy(10000)
-            expect(stream:pos()).toBe(12)
-
-            stream:seekTo(0)
-            expect(stream:pos()).toBe(0)
-
-            local string_ok, string_err = pcall(stream.read, stream, 0, false)
-            expect(string_ok).toBeTruthy()
-            expect(string_err).toBe("")
-
-            local partial = stream:read(4)
-            expect(partial).never.toBeNil()
-            assert(partial)
-            expect(buffer.tostring(partial)).toBe("test")
+            array:seekTo(1)
+            expect(array:write("XY")).toBe(2)
+            expect(array.len).toBe(4)
+            expect(contents(array)).toBe("aXYd")
         end)
-        test("Generic Reader", function()
-            local buf = buffer.fromstring("test default");
-            local stream = io.createFixedBufferStream(buf);
-            expect(stream).toBe(expect.type("userdata"));
-            expect(stream:pos()).toBe(0);
-            expect(stream:size()).toBe(buffer.len(buf));
 
-            local reader = stream:reader();
-            expect(reader).toBe(expect.type("userdata"));
-            expect(reader).toBe(stream:reader());
-            expect(reader).toBe(stream:reader());
+        test("writePositional grows and zero-fills a gap", function()
+            local array = io.createBufferArray({ limit = 8 })
 
-            expect(reader:readu8()).toBe(116); -- 't'
-            expect(reader:readu8()).toBe(101); -- 'e'
-            expect(reader:readu8()).toBe(115); -- 's'
-            expect(reader:readu8()).toBe(116); -- 't'
+            expect(array:writePositional(0, "go")).toBe(2)
+            expect(array:writePositional(array.len, "od")).toBe(2)
+            expect(array.len).toBe(4)
+            expect(array.offset).toBe(0)
+            expect(contents(array)).toBe("good")
 
-            expect(stream:pos()).toBe(4);
-
-            expect(reader:read(nil, false)).toBe(" default");
-            expect(stream:pos()).toBe(12);
-
-            local ok, err = pcall(reader.readu8, reader)
-            expect(ok).toBeFalsy();
-            expect(err).toBe("EOF");
-            expect(stream:size()).toBe(buffer.len(buf));
+            expect(array:writePositional(6, "z")).toBe(1)
+            expect(array.len).toBe(7)
+            expect(contents(array)).toBe("good\0\0z")
         end)
-        test("Generic Writer", function()
-            local buf = buffer.fromstring("____ _______");
-            local stream = io.createFixedBufferStream(buf);
-            expect(stream).toBe(expect.type("userdata"));
-            expect(stream:pos()).toBe(0);
-            expect(stream:size()).toBe(buffer.len(buf));
 
-            local writer = stream:writer();
-            expect(writer).toBe(expect.type("userdata"));
-            expect(writer).toBe(stream:writer());
-            expect(writer).toBe(stream:writer());
+        test("limit returns an error and keeps the bytes", function()
+            local array = io.createBufferArray({ limit = 4 })
 
-            writer:writeu8(116); -- 't'
-            writer:writeu8(101); -- 'e'
-            writer:writeu8(115); -- 's'
-            writer:writeu8(116); -- 't'
-            expect(buffer.tostring(buf)).toBe("test _______");
+            expect(array:write("abcd")).toBe(4)
 
-            expect(stream:pos()).toBe(4);
+            local n, err = array:write("e")
+            expect(n).toBe(0)
+            expect(err).toBe("limit exceeded")
+            expect(array.len).toBe(4)
+            expect(contents(array)).toBe("abcd")
 
-            writer:write(" default");
-            expect(buffer.tostring(buf)).toBe("test default");
-            expect(stream:size()).toBe(buffer.len(buf));
+            array:seekTo(0)
+            expect(array:write("wxyz")).toBe(4)
+            expect(array.len).toBe(4)
+            expect(contents(array)).toBe("wxyz")
+
+            local positional_n, positional_err = array:writePositional(2, "abcd")
+            expect(positional_n).toBe(0)
+            expect(positional_err).toBe("limit exceeded")
+            expect(array.len).toBe(4)
+            expect(contents(array)).toBe("wxyz")
         end)
-        test("Complex Reader", function()
-            local complex: {any} = setmetatable({}, {__mode = "v"}) :: any;
 
-            local buf = buffer.fromstring("test complex");
-            local stream = io.createFixedBufferStream(buf);
-            expect(stream).toBe(expect.type("userdata"));
-            expect(stream:pos()).toBe(0);
-            local address = "";
-            do
-                local reader: IoReadable = stream:reader();
-                expect(reader:readu8()).toBe(116); -- 't'
-                expect(reader:readu8()).toBe(101); -- 'e'
-                task.wait();
-                expect(reader:readu8()).toBe(115); -- 's'
-                expect(reader:readu8()).toBe(116); -- 't'
-                address = tostring(reader);
-                complex[1] = reader;
-                reader = nil :: any; -- remove reference
-                repeat
-                    task.wait();
-                until complex[1] == nil;
-            end
-            local reader = stream:reader();
-            -- this should have created a new reader
-            -- old reader should be garbage collected
-            expect(address).never.toBe(tostring(reader));
-            expect(reader).toBe(expect.type("userdata"));
+        test("append and grow stop at the limit", function()
+            local array = io.createBufferArray({ limit = 4 })
 
-            expect(reader:readu8()).toBe(32); -- ' '
-            expect(reader:readu8()).toBe(99); -- 'c'
+            expect(array:append("ab")).toBe(2)
+            expect(array.len).toBe(2)
+            expect(array.offset).toBe(0)
 
-            complex[1] = stream;
-            stream = nil :: any; -- remove reference
-            for i = 1, 16 do
-                task.wait(); -- tick gc
-            end
+            local append_n, append_err = array:append("cdef")
+            expect(append_n).toBe(0)
+            expect(append_err).toBe("limit exceeded")
+            expect(array.len).toBe(2)
 
-            -- stream should not be garbage collected
-            -- reader exists, so stream should be alive
+            array:grow(2)
+            expect(array.len).toBe(4)
+            expect(contents(array)).toBe("ab\0\0")
 
-            expect(reader:read(nil, false)).toBe("omplex");
-
-            local ok, err = pcall(reader.readu8, reader)
-            expect(ok).toBeFalsy();
-            expect(err).toBe("EOF");
-            local string_ok, string_err = pcall(reader.read, reader, 0, false)
-            expect(string_ok).toBeTruthy()
-            expect(string_err).toBe("");
-
-            reader = nil :: any; -- remove reference
-
-            repeat
-                task.wait();
-            until complex[1] == nil;
+            expect(function()
+                array:grow(1)
+            end).toThrow("limit exceeded")
+            expect(array.len).toBe(4)
         end)
-    end)
 
-    test("Format", function()
-        local useColor = (zune.process.env["NO_COLOR"] == nil or zune.process.env["NO_COLOR"] == "0");
-        expect(io.format("test")).toBe("test");
-        expect(io.format(123)).toBe(if (useColor) then "\x1B[96m123\x1B[0m" else "123");
-        local res : string = io.format({[" "] = 1});
-        local start : number = (res:find(">")) or error("Bad format");
-        start += 1;
-        expect(res:sub(start)).toBe(
-            if (useColor) then " {\x1B[0m\n    \x1B[2m[\x1B[0;32m\" \"\x1B[0;2m]\x1B[0m\x1B[2m = \x1B[0m\x1B[96m1\x1B[0m\x1B[2m,\x1B[0m \n\x1B[2m}\x1B[0m"
-            else " {\n    [\" \"] = 1, \n}"
-        );
-        expect(((res:sub(1,start)):find(if (useColor) then "\x1B%[2m<table: 0x.+>" else "<table: 0x.+>"))).never.toBeNil();
-    end)
+        test("empty input returns zero", function()
+            local array = io.createBufferArray({ limit = 8 })
+            local empty = buffer.create(0)
 
-    test("StdOut write", function()
-        io.stdout:write("Hello from stdout\n");
+            local write_n, write_err = array:write(empty)
+            expect(write_n).toBe(0)
+            expect(write_err).toBeNil()
+
+            local append_n, append_err = array:append(empty)
+            expect(append_n).toBe(0)
+            expect(append_err).toBeNil()
+            expect(array.len).toBe(0)
+
+            local read_n, read_err = array:read(empty)
+            expect(read_n).toBe(0)
+            expect(read_err).toBeNil()
+        end)
+
+        test("read follows the cursor", function()
+            local array = io.createBufferArray({ limit = 8 })
+            expect(array:write("abcd")).toBe(4)
+
+            array:seekTo(0)
+            local buf = buffer.create(2)
+
+            expect(array:read(buf)).toBe(2)
+            expect(array.offset).toBe(2)
+            expect(buffer.readstring(buf, 0, 2)).toBe("ab")
+
+            expect(array:read(buf)).toBe(2)
+            expect(buffer.readstring(buf, 0, 2)).toBe("cd")
+
+            local n, err = array:read(buf)
+            expect(n).toBe(0)
+            expect(err).toBeNil()
+            expect(array.offset).toBe(4)
+        end)
+
+        test("readPositional reports an offset past the end", function()
+            local array = io.createBufferArray({ limit = 8 })
+            expect(array:append("ab")).toBe(2)
+
+            local buf = buffer.create(2)
+            local at_end, at_end_err = array:readPositional(2, buf)
+            expect(at_end).toBe(0)
+            expect(at_end_err).toBeNil()
+
+            local n, err = array:readPositional(3, buf)
+            expect(n).toBe(0)
+            expect(err).toBe("out of bounds")
+            expect(array.len).toBe(2)
+        end)
+
+        test("seekTo clamps and clear resets", function()
+            local array = io.createBufferArray({ limit = 8 })
+            expect(array:write("abcd")).toBe(4)
+
+            array:seekTo(100)
+            expect(array.offset).toBe(4)
+
+            array:clear()
+            expect(array.len).toBe(0)
+            expect(array.offset).toBe(0)
+
+            local n, err = array:read(buffer.create(1))
+            expect(n).toBe(0)
+            expect(err).toBeNil()
+        end)
+
+        test("size cannot exceed the limit", function()
+            expect(function()
+                io.createBufferArray({
+                    limit = 4,
+                    size = 5,
+                })
+            end).toThrow("size cannot be larger than limit")
+        end)
+
+        test("positional writer grows", function()
+            local array = io.createBufferArray({ limit = 16 })
+            local writer = wrapped.createWriter(array, { positional = true })
+
+            expect(writer:writeAll("hello")).toBeNil()
+            expect(writer:writeAll("!")).toBeNil()
+
+            expect(array.len).toBe(6)
+            expect(array.offset).toBe(0)
+            expect(contents(array)).toBe("hello!")
+        end)
     end)
 end)

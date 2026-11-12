@@ -20,6 +20,10 @@ export fn add_ptr_ptr(a_ptr_ptr: **i32, b: i32) void {
     a_ptr_ptr.*.* += b;
 }
 
+export fn num_check(a: i32) bool {
+    return a == 123;
+}
+
 export fn fire_callback(callback: *const fn (i32) callconv(.c) i8) bool {
     return callback(123) == -1;
 }

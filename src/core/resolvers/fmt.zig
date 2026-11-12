@@ -59,10 +59,10 @@ pub fn printValue(
     idx: i32,
     depth: usize,
     asKey: bool,
-    map: ?*std.AutoArrayHashMapUnmanaged(usize, bool),
+    map: ?*std.array_hash_map.Auto(usize, bool),
     max_depth: usize,
 ) anyerror!void {
-    const allocator = Scheduler.fromState(L).allocator;
+    const allocator = Scheduler.fromState(L).allocator();
     if (depth > max_depth) {
         try writer.print("{s}", .{"{...}"});
         return;
@@ -188,7 +188,7 @@ pub fn writeIdx(allocator: std.mem.Allocator, L: *VM.lua.State, writer: *std.Io.
         },
         else => {
             if (!Zune.State.options.format.recursive_table) {
-                var map: std.AutoArrayHashMapUnmanaged(usize, bool) = .empty;
+                var map: std.array_hash_map.Auto(usize, bool) = .empty;
                 defer map.deinit(allocator);
                 try printValue(L, writer, idx, 0, false, &map, max_depth);
             } else try printValue(L, writer, idx, 0, false, null, max_depth);
@@ -207,7 +207,7 @@ fn writeBuffer(L: *VM.lua.State, allocator: std.mem.Allocator, writer: *std.Io.W
 
 pub fn args(L: *VM.lua.State) !i32 {
     const top = L.gettop();
-    const allocator = Scheduler.fromState(L).allocator;
+    const allocator = Scheduler.fromState(L).allocator();
     if (top == 0) {
         try L.pushlstring("");
         return 1;
@@ -226,7 +226,7 @@ pub fn args(L: *VM.lua.State) !i32 {
 
 pub fn print(L: *VM.lua.State) !i32 {
     const top = L.gettop();
-    const allocator = Scheduler.fromState(L).allocator;
+    const allocator = Scheduler.fromState(L).allocator();
     if (top == 0) {
         std.debug.print("\n", .{});
         return 0;

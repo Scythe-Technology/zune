@@ -5,225 +5,111 @@ const tls = @import("tls");
 const Zune = @import("zune");
 
 const Scheduler = Zune.Runtime.Scheduler;
+const Scripting = Zune.Runtime.Scripting;
 
 const LuaHelper = Zune.Utils.LuaHelper;
 
-const Socket = @import("../../objects/network/Socket.zig");
-
-const TAG_NET_SOCKET = Zune.Tags.get("NET_SOCKET").?;
-const TAG_CRYPTO_TLS_CERTBUNDLE = Zune.Tags.get("CRYPTO_TLS_CERTBUNDLE").?;
-const TAG_CRYPTO_TLS_CERTKEYPAIR = Zune.Tags.get("CRYPTO_TLS_CERTKEYPAIR").?;
+const CryptoTls = Zune.objects.CryptoTls;
+const CryptoTlsCertBundle = Zune.objects.CryptoTlsCertBundle;
+const CryptoTlsCertKeyPair = Zune.objects.CryptoTlsCertKeyPair;
 
 const VM = luau.VM;
 
-const BundleMapContext = struct {
-    const der = std.crypto.Certificate.der;
-
-    cb: *const tls.config.cert.Bundle,
-
-    pub fn hash(ctx: BundleMapContext, k: der.Element.Slice) u64 {
-        return std.hash_map.hashString(ctx.cb.bytes.items[k.start..k.end]);
-    }
-
-    pub fn eql(ctx: BundleMapContext, a: der.Element.Slice, b: der.Element.Slice) bool {
-        const bytes = ctx.cb.bytes.items;
-        return std.mem.eql(
-            u8,
-            bytes[a.start..a.end],
-            bytes[b.start..b.end],
-        );
-    }
-};
-
-pub fn cloneCertBundle(allocator: std.mem.Allocator, bundle: tls.config.cert.Bundle) !tls.config.cert.Bundle {
-    var bytes = try bundle.bytes.clone(allocator);
-    errdefer bytes.deinit(allocator);
-
-    var b: tls.config.cert.Bundle = .{
-        .bytes = bytes,
-        .map = .empty,
-    };
-    const context: BundleMapContext = .{ .cb = @ptrCast(&b) };
-
-    const map = try bundle.map.cloneContext(allocator, context);
-    b.map = @as(*const @TypeOf(b.map), @ptrCast(&map)).*;
-
-    return b;
-}
-
-pub fn cloneCertKeyPair(allocator: std.mem.Allocator, pair: tls.config.CertKeyPair) !tls.config.CertKeyPair {
-    return .{
-        .bundle = try cloneCertBundle(allocator, pair.bundle),
-        .key = pair.key,
-    };
-}
+pub const lua_MAX_RECORD_SIZE = tls.max_ciphertext_record_len;
 
 pub fn lua_bundleFromSystem(L: *VM.lua.State) !i32 {
-    const allocator = Scheduler.fromState(L).allocator;
+    const allocator = Scheduler.fromState(L).allocator();
 
-    const self = try L.newuserdatatagged(tls.config.cert.Bundle, TAG_CRYPTO_TLS_CERTBUNDLE);
+    var bundle = try tls.config.cert.fromSystem(allocator, Zune.io());
+    errdefer bundle.deinit(allocator);
 
-    self.* = try tls.config.cert.fromSystem(allocator, Zune.io());
+    _ = try CryptoTlsCertBundle.create(L, bundle);
 
     return 1;
 }
 
 pub fn lua_bundleFromFile(L: *VM.lua.State) !i32 {
-    const allocator = Scheduler.fromState(L).allocator;
+    const allocator = Scheduler.fromState(L).allocator();
 
     const path = try L.Zcheckvalue([]const u8, 1, null);
     const dir = std.Io.Dir.cwd();
 
-    const self = try L.newuserdatatagged(tls.config.cert.Bundle, TAG_CRYPTO_TLS_CERTBUNDLE);
+    var bundle = try tls.config.cert.fromFilePath(allocator, Zune.io(), dir, path);
+    errdefer bundle.deinit(allocator);
 
-    self.* = try tls.config.cert.fromFilePath(allocator, Zune.io(), dir, path);
+    _ = try CryptoTlsCertBundle.create(L, bundle);
 
     return 1;
 }
 
 pub fn lua_keyPairFromFile(L: *VM.lua.State) !i32 {
-    const allocator = Scheduler.fromState(L).allocator;
+    const allocator = Scheduler.fromState(L).allocator();
 
     const cert_path = try L.Zcheckvalue([]const u8, 1, null);
     const key_path = try L.Zcheckvalue([]const u8, 2, null);
 
     const dir = std.Io.Dir.cwd();
 
-    const self = try L.newuserdatatagged(tls.config.CertKeyPair, TAG_CRYPTO_TLS_CERTKEYPAIR);
+    var key_pair = try tls.config.CertKeyPair.fromFilePath(allocator, Zune.io(), dir, cert_path, key_path);
+    errdefer key_pair.deinit(allocator);
 
-    self.* = try tls.config.CertKeyPair.fromFilePath(allocator, Zune.io(), dir, cert_path, key_path);
+    _ = try CryptoTlsCertKeyPair.create(L, key_pair);
 
     return 1;
 }
 
-pub fn lua_setupClient(L: *VM.lua.State) !i32 {
-    const socket = L.touserdatatagged(Socket, 1, TAG_NET_SOCKET) orelse return L.Zerror("argument #1 must be a Socket");
-
-    if (socket.tls != .none)
-        return L.Zerror("socket already has a TLS context");
-
-    switch (socket.open) {
-        .created => {},
-        .accepted => return L.Zerror("socket is server accepted"),
-        .closed => return L.Zerror("socket is closed"),
-    }
-
+threadlocal var rng: std.Random.IoSource = .{ .io = undefined };
+pub fn lua_createClient(L: *VM.lua.State) !i32 {
     const options = try L.Zcheckvalue(struct {
         host: [:0]const u8,
     }, 2, null);
 
-    if (L.rawgetfield(2, "ca") != .Userdata or L.userdatatag(-1) != TAG_CRYPTO_TLS_CERTBUNDLE)
+    if (L.rawgetfield(2, "ca") != .Userdata or L.userdatatag(-1) != CryptoTlsCertBundle.OBJECT_TAG)
         return L.Zerror("argument #2 field 'ca' must be a CertBundle");
 
-    const allocator = Scheduler.fromState(L).allocator;
+    const ca_bundle = L.touserdatatagged(CryptoTlsCertBundle, -1, CryptoTlsCertBundle.OBJECT_TAG).?;
 
-    const ca_bundle = try cloneCertBundle(allocator, L.touserdatatagged(tls.config.cert.Bundle, -1, TAG_CRYPTO_TLS_CERTBUNDLE).?.*);
-    L.pop(1);
-
-    const client_context = try allocator.create(Socket.TlsContext.Client);
-    errdefer allocator.destroy(client_context);
+    const allocator = Scheduler.fromState(L).allocator();
 
     const host = try allocator.dupe(u8, options.host);
     errdefer allocator.free(host);
 
-    client_context.* = .{
-        .record = .{
-            .buffer = &client_context.record_buffer,
-            .end = 0,
-            .seek = 0,
-            .vtable = &.{
-                .stream = Socket.TlsContext.endingStream,
-            },
-        },
-        .cleartext = .{
-            .buffer = &client_context.cleartext_buffer,
-            .end = 0,
-            .seek = 0,
-            .vtable = &.{
-                .stream = Socket.TlsContext.endingStream,
-            },
-        },
-        .ciphertext = .{
-            .buffer = &client_context.ciphertext_buffer,
-            .end = 0,
-            .seek = 0,
-            .vtable = &.{
-                .stream = Socket.TlsContext.endingStream,
-            },
-        },
-        .connection = .{
-            .handshake = .{
-                .client = .init(.{
-                    .rng = blk: {
-                        const S = struct {
-                            var src: std.Random.IoSource = .{ .io = undefined };
-                        };
-                        S.src.io = Zune.io();
-                        break :blk S.src.interface();
-                    },
-                    .now = std.Io.Clock.now(.real, Zune.io()),
-                    .host = host,
-                    .root_ca = ca_bundle,
-                    .cipher_suites = tls.config.cipher_suites.secure,
-                }),
-            },
-        },
-    };
+    var ref: Scripting.Reference = .init(L, -1);
+    errdefer ref.deref(L);
 
-    socket.tls = .{
-        .client = client_context,
-    };
+    rng = .{ .io = Zune.io() };
+    _ = try CryptoTls.create(L, ref, .{
+        .client = .init(.{
+            .rng = rng.interface(),
+            .now = std.Io.Clock.now(.real, Zune.io()),
+            .host = host,
+            .root_ca = ca_bundle.bundle,
+            .cipher_suites = tls.config.cipher_suites.secure,
+        }),
+    });
 
-    return 0;
+    return 1;
 }
 
-pub fn lua_setupServer(L: *VM.lua.State) !i32 {
-    const socket = L.touserdatatagged(Socket, 1, TAG_NET_SOCKET) orelse return L.Zerror("argument #1 must be a Socket");
-
-    if (socket.tls != .none)
-        return L.Zerror("socket already has a TLS context");
-
-    switch (socket.open) {
-        .created => {},
-        .accepted => return L.Zerror("socket is server accepted"),
-        .closed => return L.Zerror("socket is closed"),
-    }
-
+pub fn lua_createServer(L: *VM.lua.State) !i32 {
     try L.Zchecktype(2, .Table);
 
-    if (L.rawgetfield(2, "auth") != .Userdata or L.userdatatag(-1) != TAG_CRYPTO_TLS_CERTKEYPAIR)
-        return L.Zerror("argument #2 field 'ca' must be a CertBundle");
+    if (L.rawgetfield(2, "auth") != .Userdata or L.userdatatag(-1) != CryptoTlsCertKeyPair.OBJECT_TAG)
+        return L.Zerror("argument #2 field 'auth' must be a CertKeyPair");
 
-    const allocator = Scheduler.fromState(L).allocator;
+    const ca_keypair = L.touserdatatagged(CryptoTlsCertKeyPair, -1, CryptoTlsCertKeyPair.OBJECT_TAG).?;
 
-    var ca_keypair = try cloneCertKeyPair(allocator, L.touserdatatagged(tls.config.CertKeyPair, -1, TAG_CRYPTO_TLS_CERTKEYPAIR).?.*);
-    errdefer ca_keypair.deinit(allocator);
+    var ref: Scripting.Reference = .init(L, -1);
+    errdefer ref.deref(L);
 
-    L.pop(1);
+    rng = .{ .io = Zune.io() };
+    _ = try CryptoTls.create(L, ref, .{
+        .server = .init(.{
+            .rng = rng.interface(),
+            .now = std.Io.Clock.now(.real, Zune.io()),
+            .auth = &ca_keypair.key_pair,
+        }),
+    });
 
-    const context = try allocator.create(Socket.TlsContext.ServerRef);
-    errdefer allocator.destroy(context);
-
-    context.* = .{
-        .server = ca_keypair,
-    };
-
-    socket.tls = .{
-        .server_ref = context,
-    };
-
-    return 0;
-}
-
-pub fn certbundle_dtor(L: *VM.lua.State, self: *tls.config.cert.Bundle) void {
-    self.deinit(Scheduler.fromState(L).allocator);
-}
-
-pub fn certkeypair_dtor(L: *VM.lua.State, self: *tls.config.CertKeyPair) void {
-    self.deinit(Scheduler.fromState(L).allocator);
-}
-
-pub fn load(L: *VM.lua.State) void {
-    L.setuserdatadtor(tls.config.cert.Bundle, TAG_CRYPTO_TLS_CERTBUNDLE, certbundle_dtor);
-    L.setuserdatadtor(tls.config.CertKeyPair, TAG_CRYPTO_TLS_CERTKEYPAIR, certkeypair_dtor);
+    return 1;
 }

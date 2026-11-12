@@ -18,7 +18,7 @@ jobs:
     - name: Setup Zig
       uses: mlugg/setup-zig@v2
       with:
-        version: 0.16.0
+        version: 0.17.1
         use-cache: false
 
     - name: Run fmt
@@ -36,7 +36,7 @@ jobs:
       - name: Setup Zig
         uses: mlugg/setup-zig@v2
         with:
-          version: 0.16.0
+          version: 0.17.1
           use-cache: false
 
       - name: Get Zune Version
@@ -53,30 +53,24 @@ jobs:
           - os: ubuntu-latest
             name: Linux x86_64
             target: x86_64-linux-gnu
-            artifact: zune-${{ needs.prep.outputs.version }}-linux-x86_64
           - os: windows-latest
             name: Windows x86_64
             target: x86_64-windows
-            artifact: zune-${{ needs.prep.outputs.version }}-windows-x86_64
             ext: .exe
           - os: macos-15-intel
             name: macOS x86_64
             target: x86_64-macos
             llvm: true
-            artifact: zune-${{ needs.prep.outputs.version }}-macos-x86_64
-          - os: macos-14
-            name: macOS Arm64
+          - os: macos-26
+            name: macOS aarch64
             target: aarch64-macos
-            artifact: zune-${{ needs.prep.outputs.version }}-macos-aarch64
           - os: ubuntu-22.04-arm
-            name: Linux Arm64
-            target: aarch64-linux
-            artifact: zune-${{ needs.prep.outputs.version }}-linux-aarch64
+            name: Linux aarch64
+            target: aarch64-linux-gnu
           - os: ubuntu-latest
-            name: Linux Risc-v64
+            name: Linux riscv64
             target: riscv64-linux
             qemu-platform: riscv64
-            artifact: zune-${{ needs.prep.outputs.version }}-linux-riscv64
 
     name: ${{ matrix.name }}
     timeout-minutes: 20
@@ -88,7 +82,7 @@ jobs:
     - name: Setup Zig
       uses: mlugg/setup-zig@v2
       with:
-        version: 0.16.0
+        version: 0.17.1
         use-cache: false
 
     - name: Setup QEMU

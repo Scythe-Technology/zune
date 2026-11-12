@@ -1,39 +1,28 @@
-const xev = @import("xev");
+const zio = @import("zio");
 const std = @import("std");
 const luau = @import("luau");
 const json = @import("json");
 const toml = @import("toml");
 const builtin = @import("builtin");
 
-pub const glob = @import("libraries/glob.zig");
-
 pub const cli = @import("cli.zig");
 
-pub const corelib = @import("core/standard/lib.zig");
+pub const standard = @import("core/standard/lib.zig");
 pub const objects = @import("core/objects/lib.zig");
 
-const mimalloc = @import("mimalloc");
-
 var DEBUG_ALLOCATOR = switch (builtin.mode) {
-    .Debug => std.heap.DebugAllocator(.{}).init,
+    .Debug => std.heap.SafeAllocator.init(std.heap.c_allocator, .{
+        .stack_trace_frames = 12,
+    }),
     else => @as(void, undefined),
 };
 pub const DEFAULT_ALLOCATOR = switch (builtin.mode) {
     .Debug => DEBUG_ALLOCATOR.allocator(),
-    else => mimalloc.basic_allocator,
+    else => std.heap.c_allocator,
 };
 
 const ThreadedIo = struct {
     var backend: std.Io.Threaded = .init_single_threaded;
-    var upgraded: bool = false;
-
-    pub inline fn upgrade() void {
-        if (!upgraded) {
-            @branchHint(.unlikely);
-            backend = .init(DEFAULT_ALLOCATOR, .{});
-            upgraded = true;
-        }
-    }
 };
 
 pub fn io() std.Io {
@@ -41,56 +30,23 @@ pub fn io() std.Io {
 }
 
 pub const options: std.Options = .{
-    .enable_segfault_handler = builtin.mode == .Debug,
+    .enable_segfault_handler = builtin.mode == .debug,
 };
 
-pub const Runtime = struct {
-    pub const Engine = @import("core/runtime/engine.zig");
-    pub const Scheduler = @import("core/runtime/scheduler.zig");
-    pub const Profiler = @import("core/runtime/profiler.zig");
-    pub const Debugger = @import("core/runtime/debugger.zig");
-    pub const Debug = @import("core/runtime/debug.zig");
-    test {
-        _ = Engine;
-        _ = Scheduler;
-        _ = Profiler;
-        _ = Debugger;
-    }
-};
-
-pub const Resolvers = struct {
-    pub const File = @import("core/resolvers/file.zig");
-    pub const Fmt = @import("core/resolvers/fmt.zig");
-    pub const Config = @import("core/resolvers/config.zig");
-    pub const Require = @import("core/resolvers/require.zig");
-    pub const Navigator = @import("core/resolvers/navigator.zig");
-    pub const Bundle = @import("core/resolvers/bundle.zig");
-    test {
-        _ = File;
-        _ = Fmt;
-        _ = Config;
-        _ = Require;
-        _ = Navigator;
-        _ = Bundle;
-    }
-};
+pub const Runtime = @import("core/runtime/lib.zig");
+pub const Resolvers = @import("core/resolvers/lib.zig");
 
 pub const Utils = struct {
     pub const Lists = @import("core/utils/lists.zig");
-    pub const EnumMap = @import("core/utils/enum_map.zig");
-    pub const MethodMap = @import("core/utils/method_map.zig");
-    pub const LuaHelper = @import("core/utils/luahelper.zig");
     test {
         _ = Lists;
-        _ = EnumMap;
-        _ = MethodMap;
-        _ = LuaHelper;
     }
 };
 
 pub const debug = struct {
     pub const print = Runtime.Debug.print;
     pub const writerPrint = Runtime.Debug.writerPrint;
+    pub const useColors = Runtime.Debug.useColors;
 };
 
 pub const Tags = @import("tagged.zig").Tags;
@@ -98,21 +54,23 @@ pub const info = @import("zune-info");
 
 const VM = luau.VM;
 
-pub const RunMode = enum {
-    Run,
-    Test,
-    Debug,
-};
-
 pub const Flags = struct {
     limbo: bool = false,
+};
+
+pub const PlatformSupportKind = enum {
+    Full,
+    Limited,
 };
 
 pub const VERSION_STR = std.fmt.comptimePrint("{d}.{d}.{d}{s}", .{
     info.version.major,
     info.version.minor,
     info.version.patch,
-    if (info.commit_hash) |hash| std.fmt.comptimePrint("-dev.{s}", .{hash[0..7]}) else "",
+    if (info.commit_hash) |hash|
+        std.fmt.comptimePrint("-dev.{s}", .{hash[0..7]})
+    else
+        "",
 });
 
 pub const VERSION_FULL_STR = std.fmt.comptimePrint("{s}+{d}.{d}", .{
@@ -123,10 +81,10 @@ pub const VERSION_FULL_STR = std.fmt.comptimePrint("{s}+{d}.{d}", .{
 
 pub const ZuneState = struct {
     env_map: std.process.Environ.Map = undefined,
-    run_mode: RunMode = .Run,
-    config_cache: std.array_hash_map.String(Resolvers.Config) = .empty,
     main_thread_id: ?std.Thread.Id = null,
     bundle: ?Resolvers.Bundle.Map = null,
+    bin_arg: [:0]const u8 = &.{},
+    args: []const [:0]const u8 = &[_][:0]const u8{},
     options: Options = .{},
 
     pub const Options = struct {
@@ -138,7 +96,6 @@ pub const ZuneState = struct {
 
         pub const Workspace = struct {
             run_path: ?[]const u8 = null,
-            test_path: ?[]const u8 = null,
             scripts: StringMap = .empty,
 
             pub fn cwd(value: []const u8) void {
@@ -158,21 +115,28 @@ pub const ZuneState = struct {
             luau: Luau = .{},
 
             pub const Features = struct {
-                fs: bool = true,
                 io: bool = true,
-                net: bool = true,
-                process: bool = true,
-                task: bool = true,
+                mem: bool = true,
+                fmt: bool = true,
                 luau: bool = true,
+                task: bool = true,
+                debug: bool = true,
+                ascii: bool = true,
                 serde: bool = true,
-                crypto: bool = true,
-                datetime: bool = true,
                 regex: bool = true,
-                sqlite: bool = true,
-                require: bool = true,
+                config: bool = true,
+                crypto: bool = true,
                 random: bool = true,
-                thread: bool = true,
+                require: bool = true,
+                testing: bool = true,
+                process: bool = true,
+                platform: bool = true,
+                fs: bool = true,
                 c: bool = true,
+                gpio: bool = true,
+                net: bool = true,
+                time: bool = true,
+                thread: bool = true,
             };
 
             pub const Luau = struct {
@@ -214,7 +178,7 @@ pub var State: ZuneState = .{};
 pub fn init(environ: std.process.Environ) !void {
     const allocator = DEFAULT_ALLOCATOR;
 
-    ThreadedIo.upgrade();
+    ThreadedIo.backend = .init(DEFAULT_ALLOCATOR, .{});
 
     State.env_map = try environ.createMap(allocator);
 
@@ -222,88 +186,66 @@ pub fn init(environ: std.process.Environ) !void {
         @import("./core/runtime/crash.zig").init();
     }
 
-    switch (comptime builtin.os.tag) {
-        .linux => {
-            const backend = State.env_map.get("ZUNE_ASYNC_BACKEND");
-            if (backend) |perferred| {
-                @branchHint(.unlikely);
-                var success = false;
-                if (std.mem.eql(u8, perferred, "epoll")) {
-                    success = xev.Dynamic.prefer(.epoll);
-                } else if (std.mem.eql(u8, perferred, "io_uring")) {
-                    success = xev.Dynamic.prefer(.io_uring);
-                } else {
-                    try xev.Dynamic.detect();
-                    debug.print("<blue>configuration warning:<clear> unknown async backend '{s}', falling back to default '{t}'.\n", .{ perferred, xev.Dynamic.backend });
-                    success = true;
-                }
-                if (!success) {
-                    try xev.Dynamic.detect();
-                    debug.print("<blue>configuration warning:<clear> failed to initialize preferred async backend '{s}', falling back to default '{t}'.\n", .{ perferred, xev.Dynamic.backend });
-                }
-            } else try xev.Dynamic.detect();
-        }, // multiple backends
-        else => {},
-    }
+    standard.libraries.io.terminal.init(std.Io.File.stdin(), std.Io.File.stdout());
+    standard.libraries.io.terminal.setOutputMode() catch debug.print("<blue>setup error<clear> failed to set output codepoint\n", .{});
 }
 
 pub fn loadConfigurationFromToml(comptime T: type, target: *T, allocator: std.mem.Allocator, table: toml.Table) void {
     const ti = @typeInfo(T);
     std.debug.assert(ti == .@"struct");
-    inline for (ti.@"struct".fields) |field| {
-        const field_type = @TypeOf(@field(target, field.name));
+    inline for (ti.@"struct".field_names, ti.@"struct".field_types) |field_name, field_type| {
         const field_ti = @typeInfo(field_type);
         switch (field_ti) {
-            .@"struct" => if (table.contains(field.name)) {
-                const item = table.table.get(field.name) orelse unreachable;
+            .@"struct" => if (table.contains(field_name)) {
+                const item = table.table.get(field_name) orelse unreachable;
                 if (item != .table)
-                    quitMsg("<red>configuration error:<clear> '{s}' must be a table\n", .{field.name});
+                    quitMsg("<red>configuration error:<clear> '{s}' must be a table\n", .{field_name});
                 if (field_type == ZuneState.Options.StringMap) {
                     var iter = item.table.table.iterator();
                     while (iter.next()) |entry| {
                         const key = entry.key_ptr.*;
                         const value = entry.value_ptr.*;
                         if (value != .string)
-                            quitMsg("<red>configuration error:<clear> '{s}.{s}' must be a string\n", .{ field.name, key });
+                            quitMsg("<red>configuration error:<clear> '{s}.{s}' must be a string\n", .{ field_name, key });
                         const string_value = value.string;
                         if (string_value.len == 0)
-                            quitMsg("<red>configuration error:<clear> '{s}.{s}' cannot be empty\n", .{ field.name, key });
+                            quitMsg("<red>configuration error:<clear> '{s}.{s}' cannot be empty\n", .{ field_name, key });
                         if (std.mem.indexOfNone(u8, key, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-+#&$!@")) |_|
-                            quitMsg("<red>configuration error:<clear> '{s}.{s}' contains invalid characters\n", .{ field.name, key });
-                        if (@field(target, field.name).contains(key))
+                            quitMsg("<red>configuration error:<clear> '{s}.{s}' contains invalid characters\n", .{ field_name, key });
+                        if (@field(target, field_name).contains(key))
                             quitMsg("<red>configuration error:<clear> duplicate key '{s}' found\n", .{key});
                         const key_copy = DEFAULT_ALLOCATOR.dupe(u8, key) catch |err| quitMsg("{}\n", .{err});
                         const value_copy = DEFAULT_ALLOCATOR.dupe(u8, string_value) catch |err| quitMsg("{}\n", .{err});
-                        @field(target, field.name).put(allocator, key_copy, value_copy) catch |err| quitMsg("{}\n", .{err});
+                        @field(target, field_name).put(allocator, key_copy, value_copy) catch |err| quitMsg("{}\n", .{err});
                     }
-                } else loadConfigurationFromToml(field_type, &@field(target, field.name), allocator, item.table);
+                } else loadConfigurationFromToml(field_type, &@field(target, field_name), allocator, item.table);
             },
-            .int => |int| if (table.contains(field.name)) {
-                const item = table.table.get(field.name) orelse unreachable;
+            .int => |int| if (table.contains(field_name)) {
+                const item = table.table.get(field_name) orelse unreachable;
                 if (item != .integer)
-                    quitMsg("<red>configuration error:<clear> '{s}' must be an integer\n", .{field.name});
+                    quitMsg("<red>configuration error:<clear> '{s}' must be an integer\n", .{field_name});
                 if (int.signedness == .unsigned) switch (int.bits) {
-                    2 => @field(target, field.name) = @truncate(@min(2, @as(u64, @bitCast(item.integer)))),
-                    else => @field(target, field.name) = @truncate(@as(u64, @bitCast(item.integer))),
-                } else @field(target, field.name) = @truncate(item.integer);
+                    2 => @field(target, field_name) = @truncate(@min(2, @as(u64, @bitCast(item.integer)))),
+                    else => @field(target, field_name) = @truncate(@as(u64, @bitCast(item.integer))),
+                } else @field(target, field_name) = @truncate(item.integer);
             },
-            .bool => if (table.contains(field.name)) {
-                const item = table.table.get(field.name) orelse unreachable;
+            .bool => if (table.contains(field_name)) {
+                const item = table.table.get(field_name) orelse unreachable;
                 if (item != .boolean)
-                    quitMsg("<red>configuration error:<clear> '{s}' must be a boolean\n", .{field.name});
-                @field(target, field.name) = item.boolean;
+                    quitMsg("<red>configuration error:<clear> '{s}' must be a boolean\n", .{field_name});
+                @field(target, field_name) = item.boolean;
             },
             .optional => |opt| {
                 switch (@typeInfo(opt.child)) {
-                    .pointer => |ptr| if (table.contains(field.name)) {
+                    .pointer => |ptr| if (table.contains(field_name)) {
                         comptime std.debug.assert(ptr.size == .slice);
                         comptime std.debug.assert(ptr.child == u8);
-                        const item = table.table.get(field.name) orelse unreachable;
+                        const item = table.table.get(field_name) orelse unreachable;
                         if (item != .string)
-                            quitMsg("<red>configuration error:<clear> '{s}' must be a string\n", .{field.name});
-                        if (@field(target, field.name)) |existing|
+                            quitMsg("<red>configuration error:<clear> '{s}' must be a string\n", .{field_name});
+                        if (@field(target, field_name)) |existing|
                             allocator.free(existing);
-                        @field(target, field.name) = allocator.dupe(u8, item.string) catch |err| quitMsg("{}\n", .{err});
+                        @field(target, field_name) = allocator.dupe(u8, item.string) catch |err| quitMsg("{}\n", .{err});
                     },
                     else => |e| @compileError("unsupported type: " ++ @tagName(e)),
                 }
@@ -311,29 +253,29 @@ pub fn loadConfigurationFromToml(comptime T: type, target: *T, allocator: std.me
             else => @compileError("unsupported type: " ++ @tagName(field_ti)),
         }
     }
-    inline for (ti.@"struct".decls) |decl| {
-        const decl_value = @field(T, decl.name);
+    inline for (ti.@"struct".decl_names) |decl_name| {
+        const decl_value = @field(T, decl_name);
         const decl_ti = @typeInfo(@TypeOf(decl_value));
         switch (decl_ti) {
             .@"fn" => |func| {
-                const arg_type = func.params[0].type orelse @compileError("function missing argument type");
+                const arg_type = func.param_types[0] orelse @compileError("function missing argument type");
                 switch (@typeInfo(arg_type)) {
                     .@"struct" => {
                         if (arg_type == toml.Table) {
-                            if (table.contains(decl.name)) {
-                                const item = table.table.get(decl.name) orelse unreachable;
+                            if (table.contains(decl_name)) {
+                                const item = table.table.get(decl_name) orelse unreachable;
                                 if (item != .table)
-                                    quitMsg("<red>configuration error:<clear> '{s}' must be a table\n", .{decl.name});
+                                    quitMsg("<red>configuration error:<clear> '{s}' must be a table\n", .{decl_name});
                                 @call(.always_inline, decl_value, .{item.table});
                             }
                         }
                     },
-                    .pointer => |ptr| if (table.contains(decl.name)) {
+                    .pointer => |ptr| if (table.contains(decl_name)) {
                         comptime std.debug.assert(ptr.size == .slice);
                         comptime std.debug.assert(ptr.child == u8);
-                        const item = table.table.get(decl.name) orelse unreachable;
+                        const item = table.table.get(decl_name) orelse unreachable;
                         if (item != .string)
-                            quitMsg("<red>configuration error:<clear> '{s}' must be a string\n", .{decl.name});
+                            quitMsg("<red>configuration error:<clear> '{s}' must be a string\n", .{decl_name});
                         @call(.always_inline, decl_value, .{item.string});
                     },
                     else => @compileError("unsupported type: " ++ @tagName(arg_type)),
@@ -344,17 +286,12 @@ pub fn loadConfigurationFromToml(comptime T: type, target: *T, allocator: std.me
     }
 }
 
-pub fn loadConfiguration(dir: std.Io.Dir) void {
+pub fn loadConfiguration(dir: std.Io.Dir) !void {
     const allocator = DEFAULT_ALLOCATOR;
-    const config_content = dir.readFileAlloc(io(), "zune.toml", allocator, .unlimited) catch |err| switch (err) {
-        error.FileNotFound => return,
-        else => return debug.print("<blue>configuration warning:<clear> failed to read <underline>zune.toml<clear>: {t}\n", .{err}),
-    };
+    const config_content = try dir.readFileAlloc(io(), "zune.toml", allocator, .unlimited);
     defer allocator.free(config_content);
 
-    var zune_config = toml.parse(allocator, config_content) catch |err| {
-        return debug.print("<blue>configuration warning:<clear> failed to parse <underline>zune.toml<clear>: {t}\n", .{err});
-    };
+    var zune_config = toml.parse(allocator, config_content) catch return error.ParseFailed;
     defer zune_config.deinit(allocator);
 
     loadConfigurationFromToml(ZuneState.Options, &State.options, allocator, zune_config);
@@ -367,57 +304,76 @@ pub fn quitMsg(comptime format: []const u8, args: anytype) noreturn {
 
 pub fn initState(L: *VM.lua.State, allocator: std.mem.Allocator) !void {
     try Resolvers.Require.init(allocator);
-    if (State.options.runtime.features.c and comptime corelib.c.PlatformSupported())
-        try corelib.c.init(L);
+    standard.libraries.testing.init();
+    if (State.options.runtime.features.c and comptime (standard.libraries.c.PlatformSupported() != null))
+        try standard.libraries.c.init(L);
 }
 
 pub fn deinitState(L: *VM.lua.State, allocator: std.mem.Allocator) void {
     Resolvers.Require.deinit(allocator);
-    if (State.options.runtime.features.c and comptime corelib.c.PlatformSupported())
-        corelib.c.deinit(L);
+    if (State.options.runtime.features.c and comptime standard.libraries.c.PlatformSupported() != null)
+        standard.libraries.c.deinit(L);
+    if (comptime standard.libraries.thread.PlatformSupported() != null) {
+        standard.libraries.thread.MUTEX_REGISTRY.deinit(L);
+        standard.libraries.thread.HARD_MUTEX_REGISTRY.deinit(L);
+        standard.libraries.thread.LANE_REGISTRY.deinit(L);
+        standard.libraries.thread.VALUE_REGISTRY.deinit(L);
+    }
 }
 
-pub fn openZune(L: *VM.lua.State, args: []const []const u8, flags: Flags) !void {
-    if (State.main_thread_id == null) {
-        @branchHint(.unlikely);
-        State.main_thread_id = std.Thread.getCurrentId();
-    }
-
+pub fn openZune(L: *VM.lua.State, flags: Flags) !void {
     try Resolvers.Require.load(L);
 
-    try objects.load(L);
-
-    try L.createtable(0, @typeInfo(corelib).@"struct".decls.len + 1);
-    L.pushvalue(-1);
-    try L.rawsetfield(VM.lua.REGISTRYINDEX, "_LIBS");
-    try L.rawsetglobal("zune");
-
     if (State.options.format.enabled) {
-        try L.Zpushfunction(Resolvers.Fmt.print, "fmt_print");
+        try L.Zpushfunction(Runtime.Scripting.toCFn(Resolvers.Fmt.print), "fmt_print");
         try L.rawsetglobal("print");
     }
 
     try L.Zsetglobal("_VERSION", std.fmt.comptimePrint("zune {s}", .{VERSION_FULL_STR}));
+    try L.Zsetglobal("_RUNTIME", .{
+        .name = "zune",
+        .version = .{
+            .display = std.fmt.comptimePrint("{s}", .{VERSION_FULL_STR}),
+            .semantic = .{
+                .major = info.version.major,
+                .minor = info.version.minor,
+                .patch = info.version.patch,
+                .build = if (info.commit_hash) |hash|
+                    std.fmt.comptimePrint("dev.{s}", .{hash[0..7]})
+                else
+                    null,
+            },
+        },
+    });
+    try L.Zsetglobal("_LUAU", .{
+        .version = .{
+            .display = std.fmt.comptimePrint("{d}.{d}", .{ luau.LUAU_VERSION.major, luau.LUAU_VERSION.minor }),
+            .major = luau.LUAU_VERSION.major,
+            .minor = luau.LUAU_VERSION.minor,
+        },
+    });
 
     if (!flags.limbo) {
-        inline for (@typeInfo(corelib).@"struct".decls) |decl| {
-            comptime if (std.mem.eql(u8, decl.name, "process") or std.mem.eql(u8, decl.name, "testing"))
-                continue;
-            const lib = @field(corelib, decl.name);
-            const enabled = if (comptime @hasField(@TypeOf(State.options.runtime.features), decl.name))
-                @field(State.options.runtime.features, decl.name)
+        inline for (@typeInfo(objects).@"struct".decl_names) |decl| {
+            const impl = @field(objects, decl);
+            if (@hasDecl(impl, "PlatformSupported")) {
+                if (comptime impl.PlatformSupported()) |_|
+                    try standard.ResolveObject(impl, L);
+            } else try standard.ResolveObject(impl, L);
+        }
+        try L.createtable(0, @typeInfo(standard.libraries).@"struct".decl_names.len + 1);
+        inline for (@typeInfo(standard.libraries).@"struct".decl_names) |decl_name| {
+            const lib = @field(standard.libraries, decl_name);
+            const enabled = if (comptime @hasField(@TypeOf(State.options.runtime.features), decl_name))
+                @field(State.options.runtime.features, decl_name)
             else
                 true;
             if (@hasDecl(lib, "PlatformSupported")) {
-                if (enabled and comptime lib.PlatformSupported())
-                    try lib.loadLib(L);
+                if (enabled and comptime lib.PlatformSupported() != null)
+                    try standard.loadLibrary(lib, L);
             } else if (enabled)
-                try lib.loadLib(L);
+                try standard.loadLibrary(lib, L);
         }
-        if (State.options.runtime.features.process and comptime corelib.process.PlatformSupported())
-            try corelib.process.loadLib(L, args);
-
-        try corelib.testing.loadLib(L, State.run_mode == .Test);
 
         if (State.bundle) |b| {
             try L.Zpushvalue(.{
@@ -425,27 +381,40 @@ pub fn openZune(L: *VM.lua.State, args: []const []const u8, flags: Flags) !void 
                 .debug = State.options.runtime.luau.debug_level,
                 .mode = @tagName(b.mode.compiled),
             });
-            try Utils.LuaHelper.registerModule(L, "compiled");
+            try L.rawsetfield(-2, "compiled");
         }
+
+        L.pushvalue(-1);
+        try L.setreadonly(-1, true);
+        try L.rawsetfield(VM.lua.REGISTRYINDEX, "_LIBS");
+        try L.rawsetglobal("zune");
     }
 
-    std.debug.assert(L.rawgetfield(VM.lua.REGISTRYINDEX, "_LIBS") == .Table);
-    L.setreadonly(-1, true);
-    L.pop(1); // drop: _LIBS
+    if (comptime builtin.mode == .debug) {
+        std.debug.assert(L.rawgetfield(VM.lua.REGISTRYINDEX, "_LIBS") == .Table);
+        L.pop(1); // drop: _LIBS
+    }
 }
 
 pub fn main(i: std.process.Init.Minimal) !void {
     switch (comptime builtin.os.tag) {
         .windows => {
-            const handle = struct {
-                fn handler(dwCtrlType: std.os.windows.DWORD) callconv(.winapi) std.os.windows.BOOL {
-                    if (dwCtrlType == std.os.windows.CTRL_C_EVENT) {
+            const WinApi = struct {
+                const w = std.os.windows;
+
+                pub extern "kernel32" fn SetConsoleCtrlHandler(
+                    HandlerRoutine: ?*const fn (w.DWORD) callconv(.winapi) w.BOOL,
+                    Add: w.BOOL,
+                ) callconv(.winapi) w.BOOL;
+
+                fn handler(dwCtrlType: w.DWORD) callconv(.winapi) w.BOOL {
+                    if (dwCtrlType == 0) { // CTRL_C_EVENT
                         shutdown();
-                        return std.os.windows.TRUE;
-                    } else return std.os.windows.FALSE;
+                        return .TRUE;
+                    } else return .FALSE;
                 }
-            }.handler;
-            try std.os.windows.SetConsoleCtrlHandler(handle, true);
+            };
+            _ = WinApi.SetConsoleCtrlHandler(WinApi.handler, .TRUE);
         },
         .linux, .macos => {
             const handle = struct {
@@ -461,106 +430,106 @@ pub fn main(i: std.process.Init.Minimal) !void {
         },
         else => {},
     }
+    defer switch (builtin.mode) {
+        .Debug => {
+            State.env_map.deinit();
+            _ = DEBUG_ALLOCATOR.deinit();
+        },
+        else => {},
+    };
 
     try init(i.environ);
 
     const allocator = DEFAULT_ALLOCATOR;
-    const args = try i.args.toSlice(allocator);
-    defer allocator.free(args);
 
-    if (comptime Resolvers.Bundle.PlatformSupported()) {
-        if (try Resolvers.Bundle.get(allocator)) |b| {
-            State.bundle = b;
+    var arena: std.heap.ArenaAllocator = .init(allocator);
+    defer arena.deinit();
 
-            var L = try luau.VM.lstate.Lnewstate();
-            defer L.deinit();
-            var scheduler = try Runtime.Scheduler.init(allocator);
-            defer scheduler.deinit();
+    const args = try i.args.toSlice(arena.allocator());
 
-            scheduler.setup(L);
+    if (args.len > 0) State.bin_arg = args[0];
+    State.args = args;
 
-            try initState(L, allocator);
-            defer deinitState(L, allocator);
+    if (Resolvers.Bundle.get()) |bundled| {
+        State.bundle = Resolvers.Bundle.open(allocator, bundled) catch |err| switch (err) {
+            error.CorruptBundle => quitMsg("<red>error<clear>: bundled executable is corrupt\n", .{}),
+            else => |e| return e,
+        };
+        defer if (State.bundle) |*bundle| {
+            bundle.deinit();
+            State.bundle = null;
+        };
 
-            try Runtime.Engine.prep(L);
-            try openZune(L, args, .{ .limbo = b.mode.limbo });
+        const bundle = &State.bundle.?;
 
-            L.setsafeenv(VM.lua.GLOBALSINDEX, true);
+        var L = try luau.VM.lstate.Lnewstate();
+        defer L.deinit();
 
-            const ML = try L.newthread();
+        var scheduler = try Runtime.Scheduler.init(allocator);
+        defer scheduler.deinit();
 
-            try ML.Lsandboxthread();
+        scheduler.setup(L);
 
-            try Runtime.Engine.setLuaFileContext(ML, .{
-                .main = true,
-            });
+        try initState(L, allocator);
+        defer deinitState(L, allocator);
 
-            ML.setsafeenv(VM.lua.GLOBALSINDEX, true);
+        try Runtime.Engine.prep(L);
+        try openZune(L, .{ .limbo = bundle.mode.limbo });
 
-            switch (b.mode.compiled) {
-                .debug => Runtime.Engine.loadModule(ML, b.entry.name, b.entry.data, null) catch |err| switch (err) {
-                    error.Syntax => unreachable, // should not happen
-                },
-                .release => {
-                    ML.load(b.entry.name, b.entry.data, 0) catch unreachable; // should not error
-                    Runtime.Engine.loadNative(ML);
-                },
-            }
+        L.setsafeenv(VM.lua.GLOBALSINDEX, true);
 
-            Runtime.Engine.runAsync(ML, &scheduler, .{ .cleanUp = true }) catch std.process.exit(1);
-            return;
+        const ML = try L.newthread();
+
+        try ML.Lsandboxthread();
+
+        try Runtime.Engine.setLuaFileContext(ML, .{
+            .main = true,
+        });
+
+        ML.setsafeenv(VM.lua.GLOBALSINDEX, true);
+
+        switch (bundle.mode.compiled) {
+            .debug => Runtime.Engine.loadModule(ML, bundle.entry.name, bundle.entry.data, null) catch |err| switch (err) {
+                error.Syntax => quitMsg("<red>syntax error<clear>: {s}\n", .{ML.tostring(-1) orelse "unknown"}),
+            },
+            .release => {
+                ML.load(bundle.entry.name, bundle.entry.data, 0) catch
+                    quitMsg("<red>error<clear>: {s}\n", .{ML.tostring(-1) orelse "unknown"});
+                Runtime.Engine.loadNative(ML);
+            },
         }
+
+        Runtime.Engine.runAsync(ML, &scheduler, .{}) catch std.process.exit(1);
+        return;
     }
 
     try cli.start(args);
 }
 
 fn shutdown() void {
-    const Repl = @import("commands/repl/lib.zig");
-
-    if (Repl.REPL_STATE > 0) {
-        if (Repl.SigInt())
-            return;
-    } else if (corelib.process.SIGINT_LUA) |handler| {
-        const L = handler.state;
-        if (L.rawgeti(luau.VM.lua.REGISTRYINDEX, handler.ref) == .Function) {
-            const ML = L.newthread() catch |err| std.debug.panic("{}", .{err});
-            L.xpush(ML, -2);
-            if (ML.pcall(0, 0, 0).check()) |_| {
-                L.pop(2); // drop: thread, function
-                return; // User will handle process close.
-            } else |err| Runtime.Debug.dumpErrorTrace(ML, err, false);
-            L.pop(1); // drop: thread
+    if (standard.libraries.process.SIGINT_LUA) |handler| {
+        if (Runtime.Scripting.callSyncGlobalFunction(handler.state, handler.ref, @as(void, undefined)) catch |err| std.debug.panic("{}", .{err})) |res| {
+            switch (res) {
+                .none => return, // User will handle process close.
+                .boolean => |v| if (!v) return, // User decided runtime should handle closure
+                .number => return,
+            }
         }
-        L.pop(1); // drop: ?function
     }
     Runtime.Debugger.SigInt();
     Runtime.Engine.stateCleanUp();
     std.process.exit(0);
 }
 
-test "Zune" {
-    const TestRunner = @import("./core/utils/testrunner.zig");
-
-    const testResult = try TestRunner.runTest(
-        TestRunner.newTestFile("zune.test.luau"),
-        &.{},
-        .{},
-    );
-
-    try std.testing.expect(testResult.failed == 0);
-}
-
 test {
     _ = cli;
 
     _ = toml;
-    _ = glob;
 
     _ = Runtime;
     _ = Resolvers;
     _ = Utils;
 
     _ = objects;
-    _ = corelib;
+    _ = standard;
 }

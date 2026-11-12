@@ -23,13 +23,13 @@ const SegfaultCase = enum {
 };
 
 fn dumpLuauStackTrace(L: *VM.lua.State, stderr: *std.Io.Writer) !void {
-    const allocator = Scheduler.fromState(L).allocator;
+    const allocator = Scheduler.fromState(L).allocator();
 
-    var list = try Runtime.Debug.getStackTrace(L, allocator);
+    var list = try Runtime.Debug.getStackTrace(L, allocator, 0, null);
     defer list.deinit(allocator);
     defer Runtime.Debug.freeStackTrace(allocator, list.items);
 
-    try Runtime.Debug.dumpStackTrace(stderr, list.items, 1);
+    try Runtime.Debug.dumpStackTrace(stderr, list.items, .first);
 }
 
 fn dumpSegfaultInfo(case: SegfaultCase, addr: usize, stderr: *std.Io.Writer) !void {
@@ -44,7 +44,7 @@ fn dumpSegfaultInfo(case: SegfaultCase, addr: usize, stderr: *std.Io.Writer) !vo
         .UnalignedMemoryAccess => Runtime.Debug.writerPrint(stderr, "Unaligned memory access\n", .{}),
     };
 
-    if (Zune.corelib.c.CALLING_STATE) |L| {
+    if (Zune.standard.libraries.c.CALLING_STATE) |L| {
         jmp: {
             if (Zune.State.bundle) |b|
                 if (b.mode.compiled == .release)
@@ -68,10 +68,24 @@ fn dumpSegfaultInfo(case: SegfaultCase, addr: usize, stderr: *std.Io.Writer) !vo
 }
 
 // Based on Zig, lib/std/debug.zig
+
+const WinApi = struct {
+    const w = std.os.windows;
+
+    extern "kernel32" fn AddVectoredExceptionHandler(
+        First: w.ULONG,
+        Handler: ?*const fn (*w.EXCEPTION_POINTERS) callconv(.winapi) c_long,
+    ) callconv(.winapi) ?*anyopaque;
+
+    extern "kernel32" fn RemoveVectoredExceptionHandler(
+        Handle: ?*anyopaque,
+    ) callconv(.winapi) w.ULONG;
+};
+
 var windows_segfault_handle: ?std.os.windows.HANDLE = null;
 fn attachSegfaultHandler() void {
     if (comptime builtin.os.tag == .windows) {
-        windows_segfault_handle = std.os.windows.kernel32.AddVectoredExceptionHandler(0, handleSegfaultWindows);
+        windows_segfault_handle = WinApi.AddVectoredExceptionHandler(0, handleSegfaultWindows);
         return;
     }
     const act = std.posix.Sigaction{
@@ -85,7 +99,7 @@ fn attachSegfaultHandler() void {
 fn resetSegfaultHandler() void {
     if (builtin.os.tag == .windows) {
         if (windows_segfault_handle) |handle| {
-            std.debug.assert(std.os.windows.kernel32.RemoveVectoredExceptionHandler(handle) != 0);
+            std.debug.assert(WinApi.RemoveVectoredExceptionHandler(handle) != 0);
             windows_segfault_handle = null;
         }
         return;
@@ -207,7 +221,7 @@ fn handleSegfaultWindows(info: *std.os.windows.EXCEPTION_POINTERS) callconv(.win
                     else => unreachable,
                 };
 
-                dumpSegfaultInfo(case, addr, &stderr.file_writer.interface) catch std.posix.abort();
+                dumpSegfaultInfo(case, addr, &stderr.file_writer.interface) catch std.process.abort();
             }
 
             waitForOtherThreadToFinishPanicking();
@@ -218,7 +232,7 @@ fn handleSegfaultWindows(info: *std.os.windows.EXCEPTION_POINTERS) callconv(.win
         },
         else => {},
     };
-    std.posix.abort();
+    std.process.abort();
 }
 
 pub fn init() void {

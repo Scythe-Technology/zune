@@ -1,20 +1,22 @@
 local task = zune.task;
-local testing = zune.testing;
+
+local testing = require("@zune/testing");
+local fs = require("@zune/fs");
 
 local describe = testing.describe;
 local expect = testing.expect;
 local test = testing.test;
 
-describe("Require", function()
-    describe("Good", function()
-        test("Known File", function()
+describe("require", function()
+    describe("good", function()
+        test("known file", function()
             local ok, res = pcall(require, "./samples/simpleLib");
             expect(ok).toBeTruthy();
             expect(res).toBe(expect.any("table"));
             expect(res.size).toBe(32);
             expect(res.buffer).toBe(expect.any("buffer"));
         end)
-        test("Known File", function()
+        test("known file", function()
             local ok, res = pcall(require, ".\\samples\\simpleLib");
             expect(ok).toBeTruthy();
             expect(res).toBe(expect.any("table"));
@@ -23,91 +25,97 @@ describe("Require", function()
         end)
     end)
 
-    describe("Bad", function()
-        test("Bad Syntax", function()
+    describe("bad", function()
+        test("bad syntax", function()
             local ok, res = pcall(require, "samples/simpleLib2");
             expect(ok).toBeFalsy();
             expect(res).toBe(`must have either "@", "./", or "../" prefix`);
         end)
 
-        test("Bad Syntax #2", function()
+        test("bad syntax #2", function()
             local ok, res = pcall(require, "./samples/simpleLib2.luau");
             expect(ok).toBeFalsy();
             expect(res).toBe(`redundant file extension, remove '.luau'`);
         end)
 
-        test("Bad Syntax #3", function()
+        test("bad syntax #3", function()
             local ok, res = pcall(require, "./samples/simpleLib2.lua");
             expect(ok).toBeFalsy();
             expect(res).toBe(`redundant file extension, remove '.lua'`);
         end)
 
         local SEP = if zune.platform.os == "windows" then "\\" else "/"
-        test("Name Conflict", function()
+        test("name conflict", function()
             local ok, res = pcall(require, "./generated/duplicate");
             expect(ok).toBeFalsy();
             expect(res).toBe(`module name conflicted.\n├─ test{SEP}engine{SEP}generated{SEP}duplicate.luau\n└─ test{SEP}engine{SEP}generated{SEP}duplicate.lua`);
         end)
 
-        test("Name Conflict #2", function()
+        test("name conflict #2", function()
             local ok, res = pcall(require, "./generated/duplicate2");
             expect(ok).toBeFalsy();
             expect(res).toBe(`module name conflicted.\n├─ test{SEP}engine{SEP}generated{SEP}duplicate2.luau\n├─ test{SEP}engine{SEP}generated{SEP}duplicate2.lua\n└─ test{SEP}engine{SEP}generated{SEP}duplicate2{SEP}init.luau`);
         end)
 
-        test("Name Conflict #3", function()
+        test("name conflict #3", function()
             local ok, res = pcall(require, "./generated/duplicate3");
             expect(ok).toBeFalsy();
             expect(res).toBe(`module name conflicted.\n├─ test{SEP}engine{SEP}generated{SEP}duplicate3.luau\n└─ test{SEP}engine{SEP}generated{SEP}duplicate3{SEP}init.luau`);
         end)
 
-        test("Unknown File", function()
+        test("unknown file", function()
             local ok, res = pcall(require, "./samples/simpleLib2");
             expect(ok).toBeFalsy();
             expect(res:match("%w+ %w+ %w+:")).toBe("module not found:");
         end)
 
-        test("Unknown File #2", function()
+        test("unknown file #2", function()
             local ok, res = pcall(require, "./simpleLib");
             expect(ok).toBeFalsy();
             expect(res:match("%w+ %w+ %w+:")).toBe("module not found:");
         end)
 
-        test("Unknown Alias", function()
+        test("unknown alias", function()
             local ok, res = pcall(require, "@unknown/module");
             expect(ok).toBeFalsy();
             expect(res).toBe("@unknown is not a valid alias");
         end)
+
+        test("config require", function()
+            local ok, res = pcall(require, "./.config");
+            expect(ok).toBeFalsy();
+            expect(res).toBe("not allowed");
+        end)
     end)
 end)
 
-describe("Require Many Value", function()
-    test("Validating Require Context", function()
+describe("require many value", function()
+    test("validating require context", function()
         expect(_FILE).never.toBeNil();
         expect(debug.info(1, "s"):find("require%.test%.luau")).never.toBeNil();
     end)
     
-    test("Require Buffer", function()
+    test("require buffer", function()
         expect(require("./generated/v1")).toBe(expect.type("buffer"));
     end)
     
-    test("Require Number", function()
+    test("require number", function()
         expect(require("./generated/v2")).toBe(1);
     end)
     
-    test("Require String", function()
+    test("require string", function()
         expect(require("./generated/v3")).toBe("Hello, World!");
     end)
     
-    test("Require Boolean", function()
+    test("require boolean", function()
         expect(require("./generated/v4")).toBe(true);
     end)
 
-    test("Require Async", function()
+    test("require async", function()
         expect(require("./generated/v5")).toBe(true);
     end)
 
-    test("Require Async Queue", function()
+    test("require async queue", function()
         local a, b, c;
         local start = os.clock();
         task.spawn(function()
@@ -128,54 +136,96 @@ describe("Require Many Value", function()
         task.wait(0.2);
     end)
 
-    test("Require Async Error", function()
+    test("require async error", function()
         local ok, err = pcall(require, ("./generated/yielderror"));
         expect(ok).toBe(false);
         expect(err).toBe("requested module failed to load");
         task.wait(0.2);
     end)
     
-    test("Require Blank", function()
+    test("require blank", function()
         local ok, err = pcall(require, ("./generated/blank"));
         expect(ok).toBe(false);
         expect(err).toBe("module did not exactly return one value");
     end)
     
-    test("Require TooMany", function()
+    test("require tooMany", function()
         local ok, err = pcall(require, ("./generated/toomany"));
         expect(ok).toBeFalsy();
         assert((string.find(err, "module must return one value")) ~= nil);
     end)
 
-    test("Require Yield TooMany", function()
+    test("require yield tooMany", function()
         local ok, err = pcall(require, ("./generated/yieldtoomany"));
         expect(ok).toBeFalsy();
         assert((string.find(err, "module must return one value")) ~= nil);
         task.wait(0.2);
     end)
 
-    test("Require Cyclic Dependency", function()
+    test("require cyclic dependency", function()
         local ok, err = pcall(require, ("./samples/cyclic"));
         expect(ok).toBeFalsy();
         -- Cyclic dependency error message is printed in console.
         expect(err).toBe("requested module failed to load");
         task.wait(0.2);
     end)
+
+    test("large require dependency", function()
+        local DEPTH = 100;
+        local path = zune.require.navigate("./generated/.large");
+        fs.makeDir(path, true);
+        local function createModule(num: number, stops: boolean?)
+            local src = if (stops) then
+                `return \{n = {num}\}`
+            else
+                `local _ = require("./lr{num + 1}")\nreturn \{n = {num}\}`;
+            fs.writeFile(fs.path.join(path, `lr{num}.luau`), src);
+        end
+        fs.writeFile(fs.path.join(path, "entry.luau"), `require("./lr1") return nil`);
+        for i = 1, DEPTH do
+            createModule(i, i == DEPTH);
+        end
+
+        local ok, res = pcall(require, "./generated/.large/entry");
+        expect(ok).toBeTruthy();
+        expect(res).toBe(nil);
+    end)
+
+    test("large async require dependency", function()
+        local DEPTH = 100;
+        local path = zune.require.navigate("./generated/.large-async");
+        fs.makeDir(path, true);
+        local function createModule(num: number, stops: boolean?)
+            local src = if (stops) then
+                `zune.task.wait()\nreturn \{n = {num}\}`
+            else
+                `local _ = require("./lr{num + 1}")\nzune.task.wait()\nreturn \{n = {num}\}`;
+            fs.writeFile(fs.path.join(path, `lr{num}.luau`), src);
+        end
+        fs.writeFile(fs.path.join(path, "entry.luau"), `require("./lr1") return nil`);
+        for i = 1, DEPTH do
+            createModule(i, i == DEPTH);
+        end
+
+        local ok, res = pcall(require, "./generated/.large-async/entry");
+        expect(ok).toBeTruthy();
+        expect(res).toBe(nil);
+    end)
 end)
 
-describe("Require .lua", function()
-    test("Require Module", function()
+describe("require .lua", function()
+    test("require module", function()
         expect(require("./legacy")).toBe(expect.similar({
             "Legacy"
         }));
     end)
-    test("Require A", function()
+    test("require a", function()
         expect(require("./legacy/A")).toBe("A-Legacy");
     end)
 end)
 
-describe("Aliases", function()
-    test("@Dev", function()
+describe("aliases", function()
+    test("@dev", function()
         local dev = require("@dev")::any;
         expect(dev).toBe(expect.similar({
             Boolean = true,
@@ -184,13 +234,13 @@ describe("Aliases", function()
         }));
     end)
     
-    test("@Module", function()
+    test("@module", function()
         local module = require("@module")::any;
         expect(module).toBe(expect.type("string"));
         expect(module).toBe("FullModule");
     end)
 
-    test("@Module/sub", function()
+    test("@module/sub", function()
         local module = require("@module/sub")::any;
         expect(module).toBe(expect.similar({
             foo = expect.type("function"),
@@ -200,62 +250,62 @@ describe("Aliases", function()
         expect(module.bar()).toBe("bar");
     end)
 
-    test("@Sub/kool (overrides sub)", function()
+    test("@sub/kool (overrides sub)", function()
         local module = require("@sub/kool")::any;
         expect(module).toBe("Sub library");
     end)
 
-    test("@Sub/subdir/foo", function()
+    test("@sub/subdir/foo", function()
         local module = require("@sub/subdir/foo")::any;
         expect(module).toBe("The bar exam");
     end)
 
-    test("@Subd/foo", function()
+    test("@subd/foo", function()
         local module = require("@subd/foo")::any;
         expect(module).toBe("The bar exam");
     end)
 
-    test("@Alias_path, @alias path", function()
+    test("@alias_path, @alias path", function()
         local ok, err = pcall(require, "@alias_path");
         expect(ok).toBeFalsy();
         expect(err).toBe("alias \"@alias_path\" cannot point to an aliased path (\"@test\")");
     end)
 
-    test("@Unknown_path, no prefix path", function()
+    test("@unknown_path, no prefix path", function()
         local ok, err = pcall(require, "@unknown_path");
         expect(ok).toBeFalsy();
         expect(err).toBe("could not jump to alias \"test\"");
     end)
 
     local HOME = zune.process.env.HOME or zune.process.env.USERPROFILE
-    test("@Home", function()
+    test("@home", function()
         local ok, err = pcall(require, "@home");
         expect(ok).toBeFalsy();
         expect(err).toBe(`module not found: "{HOME}"`);
     end)
 
-     test("@Home_Sub", function()
+     test("@home_sub", function()
         local ok, err = pcall(require, "@home_sub");
         expect(ok).toBeFalsy();
         expect(err).toBe(`module not found: "{zune.fs.path.join(HOME, "sub_path")}"`);
     end)
 end)
 
-describe("Require with Context", function()
-    test("Require Module", function()
+describe("require with context", function()
+    test("require module", function()
         local func = require("./generated/relative");
         expect(func).toBe(expect.type("function"));
         expect(func()).toBe(expect.type("buffer"));
     end)
 end)
 
-describe("Amended Requires in Init Files", function()
-    test("Require Child", function()
+describe("amended requires in init files", function()
+    test("require child", function()
         local withinit = require("./module/withinit")
         expect(withinit.child.t).toBe("child")
     end)
     
-    test("Require Sibling", function()
+    test("require sibling", function()
         local withinit = require("./module/withinit")
         expect(withinit.sibling).toBe(expect.similar({
             foo = expect.type("function"),
@@ -263,7 +313,7 @@ describe("Amended Requires in Init Files", function()
         }))
     end)
     
-    test("Require Parent Sibling", function()
+    test("require parent sibling", function()
         local desc = require("./module/withinit/descendant")
         expect(desc.parent_sibling).toBe(expect.similar({
             foo = expect.type("function"),
@@ -271,7 +321,7 @@ describe("Amended Requires in Init Files", function()
         }))
     end)
     
-    test("Bad Require", function()
+    test("bad require", function()
         local ok, err = pcall(require, "./module/withinit_bad")
         expect(ok).toBeFalsy();
         -- No alias error message will be printed in console

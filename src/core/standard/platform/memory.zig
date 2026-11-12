@@ -60,11 +60,11 @@ pub fn getTotalSystemMemory() SystemMemoryError!u64 {
             return @as(u64, @bitCast(physmem));
         },
         .windows => {
-            var sbi: windows.SYSTEM_BASIC_INFORMATION = undefined;
+            var sbi: windows.SYSTEM.BASIC_INFORMATION = undefined;
             const rc = windows.ntdll.NtQuerySystemInformation(
-                .SystemBasicInformation,
+                .Basic,
                 &sbi,
-                @sizeOf(windows.SYSTEM_BASIC_INFORMATION),
+                @sizeOf(windows.SYSTEM.BASIC_INFORMATION),
                 null,
             );
             if (rc != .SUCCESS) {
@@ -112,11 +112,11 @@ pub fn getFreeMemory() SystemMemoryError!u64 {
             return @as(u64, stats.free_count + stats.inactive_count) * std.heap.pageSize();
         },
         .windows => {
-            var sbi: windows.SYSTEM_BASIC_INFORMATION = undefined;
+            var sbi: windows.SYSTEM.BASIC_INFORMATION = undefined;
             const rc = windows.ntdll.NtQuerySystemInformation(
-                .SystemBasicInformation,
+                .Basic,
                 &sbi,
-                @sizeOf(windows.SYSTEM_BASIC_INFORMATION),
+                @sizeOf(windows.SYSTEM.BASIC_INFORMATION),
                 null,
             );
             if (rc != .SUCCESS) {

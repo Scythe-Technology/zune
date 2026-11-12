@@ -6,49 +6,59 @@ const Flate = @import("../utils/flate.zig");
 
 const Zune = @import("zune");
 
-pub fn PlatformSupported() bool {
-    return switch (comptime builtin.cpu.arch) {
-        // 64-bit architectures
-        .aarch64,
-        .aarch64_be,
-        .amdgcn,
-        .bpfel,
-        .bpfeb,
-        .loongarch64,
-        .mips64,
-        .mips64el,
-        .nvptx64,
-        .powerpc64,
-        .powerpc64le,
-        .riscv64,
-        .s390x,
-        .sparc64,
-        .spirv64,
-        .ve,
-        .wasm64,
-        .x86_64,
-        => true,
-        else => false,
-    };
-}
+pub const Image = extern struct {
+    magic: [8]u8,
+    sections: [4]u8,
+    flags: u8,
+    reserved: [3]u8,
+    size: [8]u8,
+    offset: [8]u8,
 
-pub const TAG = "\x5b\x4b\x1bBUNDLE\x1d\x4d\x5d";
+    pub const magic_bytes = [8]u8{ 0x5b, 0x5a, 0x4c, 0x42, 0x44, 0x30, 0x31, 0x5d }; // "[ZLBD01]"
+    pub const enabled: u8 = 1;
 
-pub const SEED: u64 = 0x62756E646C65; // "bundle"
-
-pub const ExeHeader = packed struct(u64) {
-    sections: u20, // ~1M sections
-    size: u37, // ~128 GiB of data
-    _: u7 = 0, // reserved bits
-
-    pub fn maxValue(comptime field: enum { sections, size }) comptime_int {
-        return std.math.maxInt(@typeInfo(ExeHeader).@"struct".fields[@intFromEnum(field)].type);
-    }
-
-    pub fn write(writer: anytype, header: ExeHeader) !void {
-        try writer.writeInt(u64, @bitCast(header), .big);
+    comptime {
+        std.debug.assert(@sizeOf(Image) == 32);
     }
 };
+
+export var zune_bundle_image: Image = .{
+    .magic = Image.magic_bytes,
+    .sections = .{ 0, 0, 0, 0 },
+    .flags = 0,
+    .reserved = .{ 0, 0, 0 },
+    .size = .{ 0, 0, 0, 0, 0, 0, 0, 0 },
+    .offset = .{ 0, 0, 0, 0, 0, 0, 0, 0 },
+};
+
+pub const Bundled = struct {
+    sections: u32,
+    size: u64,
+    offset: u64,
+};
+
+var cached: ?Bundled = null;
+
+pub fn get() ?Bundled {
+    std.mem.doNotOptimizeAway(&zune_bundle_image);
+
+    const image = @as(*volatile Image, &zune_bundle_image).*;
+    if (!std.mem.eql(u8, &image.magic, &Image.magic_bytes))
+        return null;
+    if (image.flags & Image.enabled == 0)
+        return null;
+
+    if (cached) |c|
+        return c;
+
+    cached = .{
+        .sections = std.mem.readInt(u32, &image.sections, .big),
+        .size = std.mem.readInt(u64, &image.size, .big),
+        .offset = std.mem.readInt(u64, &image.offset, .big),
+    };
+
+    return cached;
+}
 
 pub const Section = union(enum) {
     script: Script,
@@ -75,7 +85,7 @@ pub const Section = union(enum) {
             return error.NameTooLong;
         if (data.len > std.math.maxInt(u37))
             return error.DataTooLarge;
-        try writer.writeInt(u56, @bitCast(Header{
+        try writer.writeInt(u56, @bitCast(Section.Header{
             .kind = .script,
             .compression = .none,
             .name_size = @intCast(name.len),
@@ -98,7 +108,7 @@ pub const Section = union(enum) {
         if (data.len > std.math.maxInt(u37))
             return error.DataTooLarge;
         if (compression == .none) {
-            try writer.writeInt(u56, @bitCast(Header{
+            try writer.writeInt(u56, @bitCast(Section.Header{
                 .kind = .file,
                 .compression = .none,
                 .name_size = @intCast(name.len),
@@ -118,6 +128,7 @@ pub const Section = union(enum) {
                     array = .{
                         .capacity = compressed_bytes.len,
                         .items = compressed_bytes,
+                        .pointer_stability = .{},
                     };
                 },
                 .gzip => {
@@ -125,6 +136,7 @@ pub const Section = union(enum) {
                     array = .{
                         .capacity = compressed_bytes.len,
                         .items = compressed_bytes,
+                        .pointer_stability = .{},
                     };
                 },
                 .flate => {
@@ -132,6 +144,7 @@ pub const Section = union(enum) {
                     array = .{
                         .capacity = compressed_bytes.len,
                         .items = compressed_bytes,
+                        .pointer_stability = .{},
                     };
                 },
                 .lz4 => {
@@ -139,6 +152,7 @@ pub const Section = union(enum) {
                     array = .{
                         .capacity = compressed_bytes.len,
                         .items = compressed_bytes,
+                        .pointer_stability = .{},
                     };
                 },
                 .zstd => {
@@ -146,6 +160,7 @@ pub const Section = union(enum) {
                     array = .{
                         .capacity = compressed_bytes.len,
                         .items = @constCast(compressed_bytes),
+                        .pointer_stability = .{},
                     };
                 },
                 else => unreachable,
@@ -153,7 +168,7 @@ pub const Section = union(enum) {
             const block_size: usize = array.items.len + 5; // 5 bytes for u40
             if (block_size > std.math.maxInt(u37))
                 return error.DataTooLarge;
-            try writer.writeInt(u56, @bitCast(Header{
+            try writer.writeInt(u56, @bitCast(Section.Header{
                 .kind = .file,
                 .compression = compression,
                 .name_size = @intCast(name.len),
@@ -167,33 +182,47 @@ pub const Section = union(enum) {
     }
 };
 
-pub const Features = packed struct(u16) {
-    fs: bool = true,
+pub const Features = packed struct(u32) {
     io: bool = true,
-    net: bool = true,
-    process: bool = true,
-    task: bool = true,
+    mem: bool = true,
+    fmt: bool = true,
     luau: bool = true,
+    task: bool = true,
+    debug: bool = true,
+    ascii: bool = true,
     serde: bool = true,
-    crypto: bool = true,
-    datetime: bool = true,
     regex: bool = true,
-    sqlite: bool = true,
-    require: bool = true,
+    config: bool = true,
+    crypto: bool = true,
     random: bool = true,
-    thread: bool = true,
+    require: bool = true,
+    testing: bool = true,
+    process: bool = true,
+    platform: bool = true,
+    fs: bool = true,
     c: bool = true,
-    _: u1 = 0, // reserved bit
+    gpio: bool = true,
+    net: bool = true,
+    time: bool = true,
+    thread: bool = true,
+    _: u10 = 0,
 
     pub fn write(writer: anytype, features: Features) !void {
-        try writer.writeInt(u16, @bitCast(features), .big);
+        try writer.writeInt(u32, @bitCast(features), .big);
     }
 
     comptime {
-        std.debug.assert(@typeInfo(@TypeOf(Zune.State.options.runtime.features)).@"struct".fields.len == @typeInfo(Features).@"struct".fields.len - 1);
-        for (@typeInfo(@TypeOf(Zune.State.options.runtime.features)).@"struct".fields) |field| {
-            std.debug.assert(@hasField(Features, field.name));
-        }
+        const runtime_fields = @typeInfo(@TypeOf(Zune.State.options.runtime.features)).@"struct".field_names;
+        const packed_fields = @typeInfo(Features).@"struct".field_names;
+        std.debug.assert(packed_fields.len == runtime_fields.len + 1);
+        std.debug.assert(std.mem.eql(u8, packed_fields[packed_fields.len - 1], "_"));
+        for (runtime_fields, 0..) |field_name, index|
+            std.debug.assert(std.mem.eql(u8, field_name, packed_fields[index]));
+
+        const library_names = @typeInfo(Zune.standard.libraries).@"struct".decl_names;
+        std.debug.assert(library_names.len == runtime_fields.len);
+        for (library_names, 0..) |decl_name, index|
+            std.debug.assert(std.mem.eql(u8, decl_name, runtime_fields[index]));
     }
 };
 
@@ -232,67 +261,121 @@ pub const PackedState = packed struct(u40) {
 pub const Map = struct {
     allocator: std.mem.Allocator,
     mode: PackedState.Mode,
+    exe: std.Io.File,
     map: std.hash_map.StringHashMapUnmanaged(Section),
+    home_dir: []const u8,
+    locators: std.hash_map.StringHashMapUnmanaged(Locator) = .empty,
+    owned: std.ArrayList([]const u8) = .empty,
     entry: struct {
         name: [:0]const u8,
         data: Section.Script,
     },
-    home_dir: []const u8,
-    allocated: []const u8,
+
+    const Locator = struct {
+        offset: u64,
+        size: u64,
+        loaded: bool = false,
+    };
 
     pub fn deinit(self: *Map) void {
+        self.locators.deinit(self.allocator);
+        for (self.owned.items) |block|
+            self.allocator.free(block);
+
+        self.owned.deinit(self.allocator);
+
+        var names = self.map.keyIterator();
+        while (names.next()) |key|
+            self.allocator.free(key.*);
+
+        self.allocator.free(self.home_dir);
+
+        self.exe.close(Zune.io());
+
         self.map.deinit(self.allocator);
         self.allocator.free(self.entry.name);
-        self.allocator.free(self.allocated);
     }
 
-    fn unpackFile(self: *Map, file: *Section.File) ![]const u8 {
-        if (file.compression == .none)
-            return file.data;
-        defer file.compression = .none;
-        switch (file.compression) {
-            .zlib => {
-                const decompressed_bytes = try self.allocator.alloc(u8, file.size);
-                try Flate.decompressInto(decompressed_bytes, file.data, .zlib);
-                file.data = decompressed_bytes;
-                return decompressed_bytes;
+    fn readExact(self: *Map, offset: u64, buf: []u8) !void {
+        const n = try self.exe.readPositionalAll(Zune.io(), buf, offset);
+        if (n != buf.len)
+            return error.CorruptBundle;
+    }
+
+    fn take(self: *Map, offset: u64, size: usize) ![]const u8 {
+        if (size == 0)
+            return &.{};
+        const bytes = try self.allocator.alloc(u8, size);
+        errdefer self.allocator.free(bytes);
+        try self.readExact(offset, bytes);
+        try self.owned.append(self.allocator, bytes);
+        return bytes;
+    }
+
+    fn inflate(self: *Map, file: *const Section.File, container: std.compress.flate.Container) ![]u8 {
+        const bytes = try self.allocator.alloc(u8, @intCast(file.size));
+        errdefer self.allocator.free(bytes);
+
+        _ = try Flate.decompressInto(bytes, file.data, container);
+
+        return bytes;
+    }
+
+    pub fn unpackFile(self: *Map, file: *Section.File) ![]const u8 {
+        if (file.compression == .none) return file.data;
+
+        const bytes = switch (file.compression) {
+            .none => unreachable,
+            .zlib => try self.inflate(file, .zlib),
+            .gzip => try self.inflate(file, .gzip),
+            .flate => try self.inflate(file, .raw),
+            .lz4 => try lz4.Standard.decompress(self.allocator, file.data, file.size),
+            .zstd => try zstd.decompressAlloc(self.allocator, file.data),
+        };
+        errdefer self.allocator.free(bytes);
+
+        try self.owned.append(self.allocator, bytes);
+
+        file.data = bytes;
+        file.compression = .none;
+
+        return bytes;
+    }
+
+    fn materialize(self: *Map, path: []const u8) !void {
+        const locator = self.locators.getPtr(path) orelse return error.CorruptBundle;
+        if (locator.loaded) return;
+
+        const section = self.map.getPtr(path) orelse return error.CorruptBundle;
+        const bytes = try self.take(locator.offset, @intCast(locator.size));
+        switch (section.*) {
+            .script => section.script = bytes,
+            .file => |*file| {
+                if (file.compression == .none) {
+                    file.data = bytes;
+                    file.size = bytes.len;
+                } else {
+                    if (bytes.len < 5)
+                        return error.CorruptBundle;
+                    file.size = std.mem.readVarInt(u40, bytes[0..5], .big);
+                    file.data = bytes[5..];
+                }
             },
-            .gzip => {
-                const decompressed_bytes = try self.allocator.alloc(u8, file.size);
-                try Flate.decompressInto(decompressed_bytes, file.data, .gzip);
-                file.data = decompressed_bytes;
-                return decompressed_bytes;
-            },
-            .flate => {
-                const decompressed_bytes = try self.allocator.alloc(u8, file.size);
-                try Flate.decompressInto(decompressed_bytes, file.data, .raw);
-                file.data = decompressed_bytes;
-                return decompressed_bytes;
-            },
-            .lz4 => {
-                const decompressed_bytes = try lz4.Standard.decompress(self.allocator, file.data, file.size);
-                file.data = decompressed_bytes;
-                return decompressed_bytes;
-            },
-            .zstd => {
-                const decompressed_bytes = try zstd.decompressAlloc(self.allocator, file.data);
-                file.data = decompressed_bytes;
-                return decompressed_bytes;
-            },
-            else => unreachable,
         }
+        locator.loaded = true;
     }
 
     pub fn loadFile(self: *Map, path: []const u8) ![]const u8 {
         const entry = self.map.getEntry(path) orelse return error.FileNotFound;
-        const section = entry.value_ptr;
-        if (section.* != .file)
-            return error.NotFile;
-        const file = &section.file;
+        if (entry.value_ptr.* != .file) return error.NotFile;
+
+        try self.materialize(path);
+        const file = &self.map.getPtr(path).?.file;
+
         return try self.unpackFile(file);
     }
 
-    fn shortResolve(path: []const u8) []const u8 {
+    pub fn shortResolve(path: []const u8) []const u8 {
         var resolved = path;
         while (std.mem.startsWith(u8, resolved, "./") or std.mem.startsWith(u8, resolved, ".\\"))
             resolved = std.mem.trimStart(u8, resolved[1..], "\\/");
@@ -303,84 +386,31 @@ pub const Map = struct {
         return try allocator.dupe(u8, try self.load(shortResolve(path)));
     }
 
-    pub fn loadScript(self: *const Map, path: []const u8) !Section.Script {
+    pub fn loadScript(self: *Map, path: []const u8) !Section.Script {
         const entry = self.map.getEntry(path) orelse return error.FileNotFound;
-        const section = entry.value_ptr;
-        if (section.* != .script)
+        if (entry.value_ptr.* != .script)
             return error.NotScript;
-        return section.script;
+        try self.materialize(path);
+        return self.map.get(path).?.script;
     }
 
-    pub fn loadScriptAlloc(self: *const Map, allocator: std.mem.Allocator, path: []const u8) ![]u8 {
+    pub fn loadScriptAlloc(self: *Map, allocator: std.mem.Allocator, path: []const u8) ![]u8 {
         return try allocator.dupe(u8, try self.loadScript(path));
     }
 
     pub fn load(self: *Map, path: []const u8) ![]const u8 {
-        const entry = self.map.getEntry(path) orelse return error.FileNotFound;
-        const section = entry.value_ptr;
+        if (self.map.getPtr(path) == null)
+            return error.FileNotFound;
+        try self.materialize(path);
+        const section = self.map.getPtr(path) orelse return error.CorruptBundle;
         return switch (section.*) {
-            .file => try self.unpackFile(&section.file),
-            .script => |s| s,
+            .file => |*file| try self.unpackFile(file),
+            .script => |script| script,
         };
     }
 };
 
-pub fn loadBundle(allocator: std.mem.Allocator, exe_header: ExeHeader, bundle: []const u8) !Map {
-    var map: std.hash_map.StringHashMapUnmanaged(Section) = .empty;
-    try map.ensureTotalCapacity(allocator, @intCast(exe_header.sections));
-    errdefer map.deinit(allocator);
-
-    const state: PackedState = @bitCast(std.mem.readVarInt(u40, bundle[0..@divExact(@bitSizeOf(PackedState), 8)], .big));
-    var pos: usize = @divExact(@bitSizeOf(PackedState), 8);
-
-    const features: Features = @bitCast(std.mem.readVarInt(u16, bundle[pos..][0..2], .big));
-    pos += 2;
-
-    const home_dir_len = std.mem.readInt(u16, bundle[pos..][0..2], .big);
-    pos += 2;
-    const home_dir = bundle[pos..][0..home_dir_len];
-    pos += home_dir_len;
-
-    var entry: ?struct {
-        name: [:0]const u8,
-        data: Section.Script,
-    } = null;
-
-    for (0..exe_header.sections) |_| {
-        const header: Section.Header = @bitCast(std.mem.readVarInt(u56, bundle[pos..][0..@divExact(@bitSizeOf(Section.Header), 8)], .big));
-        pos += @divExact(@bitSizeOf(Section.Header), 8);
-        const name = bundle[pos..][0..header.name_size :0];
-        pos += header.name_size + 1;
-        const data = bundle[pos..][0..header.size];
-        pos += header.size;
-        const section: Section = switch (header.kind) {
-            .file => .{
-                .file = switch (header.compression) {
-                    .none => .{
-                        .data = data,
-                        .size = 0,
-                        .compression = .none,
-                    },
-                    else => .{
-                        .data = data[5..],
-                        .size = std.mem.readVarInt(u40, data[0..5], .big),
-                        .compression = header.compression,
-                    },
-                },
-            },
-            .script => .{
-                .script = data,
-            },
-        };
-        if (entry == null) {
-            entry = .{
-                .name = try std.mem.concatWithSentinel(allocator, u8, &.{ "@", name }, 0),
-                .data = data,
-            };
-        }
-        map.putAssumeCapacity(name, section);
-    }
-
+fn applyPacked(state: PackedState, features: Features) void {
     Zune.State.options.runtime.luau.jit_enabled = state.luau.jit_enabled;
     Zune.State.options.runtime.luau.default_ncg = state.luau.default_ncg;
     Zune.State.options.runtime.luau.debug_level = state.luau.debug_level;
@@ -393,59 +423,173 @@ pub fn loadBundle(allocator: std.mem.Allocator, exe_header: ExeHeader, bundle: [
     Zune.State.options.format.max_depth = state.format.max_depth;
     Zune.State.options.format.buffer_max_display = state.format.buffer_max_display;
 
-    inline for (@typeInfo(@TypeOf(Zune.State.options.runtime.features)).@"struct".fields) |field| {
-        @field(Zune.State.options.runtime.features, field.name) = @field(features, field.name);
+    inline for (@typeInfo(@TypeOf(Zune.State.options.runtime.features)).@"struct".field_names) |field_name|
+        @field(Zune.State.options.runtime.features, field_name) = @field(features, field_name);
+}
+
+pub fn open(allocator: std.mem.Allocator, bundled: Bundled) !Map {
+    if (bundled.offset == 0 or bundled.sections == 0)
+        return error.CorruptBundle;
+
+    const file = try std.process.openExecutable(Zune.io(), .{ .mode = .read_only });
+    errdefer file.close(Zune.io());
+
+    var map: std.hash_map.StringHashMapUnmanaged(Section) = .empty;
+    try map.ensureTotalCapacity(allocator, @intCast(bundled.sections));
+    errdefer {
+        var names = map.keyIterator();
+        while (names.next()) |key|
+            allocator.free(key.*);
+        map.deinit(allocator);
     }
+
+    var locators: std.hash_map.StringHashMapUnmanaged(Map.Locator) = .empty;
+    try locators.ensureTotalCapacity(allocator, @intCast(bundled.sections));
+    errdefer locators.deinit(allocator);
+
+    var owned: std.ArrayList([]const u8) = .empty;
+    errdefer {
+        for (owned.items) |block|
+            allocator.free(block);
+        owned.deinit(allocator);
+    }
+
+    const end = bundled.offset + bundled.size;
+    var pos: u64 = bundled.offset;
+
+    var prefix: [11]u8 = undefined;
+    if (pos + prefix.len > end)
+        return error.CorruptBundle;
+
+    const prefix_n = try file.readPositionalAll(Zune.io(), &prefix, pos);
+    if (prefix_n != prefix.len)
+        return error.CorruptBundle;
+    pos += prefix.len;
+
+    const state: PackedState = @bitCast(std.mem.readVarInt(u40, prefix[0..5], .big));
+    const features: Features = @bitCast(std.mem.readInt(u32, prefix[5..9], .big));
+
+    const home_len = std.mem.readInt(u16, prefix[9..11], .big);
+    if (pos + home_len > end)
+        return error.CorruptBundle;
+
+    const home_dir: []const u8 = if (home_len == 0) &.{} else blk: {
+        const bytes = try allocator.alloc(u8, @intCast(home_len));
+        errdefer allocator.free(bytes);
+
+        const n = try file.readPositionalAll(Zune.io(), bytes, pos);
+        if (n != bytes.len)
+            return error.CorruptBundle;
+
+        break :blk bytes;
+    };
+    errdefer if (home_len > 0) allocator.free(home_dir);
+    pos += home_len;
+
+    var entry_name: ?[:0]const u8 = null;
+    errdefer if (entry_name) |name| allocator.free(name);
+
+    var entry_data: []const u8 = &.{};
+
+    for (0..bundled.sections) |index| {
+        var header_bytes: [7]u8 = undefined;
+        if (pos + @as(u64, header_bytes.len) > end)
+            return error.CorruptBundle;
+        const header_n = try file.readPositionalAll(Zune.io(), &header_bytes, pos);
+        if (header_n != header_bytes.len)
+            return error.CorruptBundle;
+        pos += @as(u64, header_bytes.len);
+
+        const header: Section.Header = @bitCast(std.mem.readVarInt(u56, &header_bytes, .big));
+        const name_len: u64 = header.name_size;
+        const body_len: u64 = header.size;
+        if (pos + name_len + 1 > end)
+            return error.CorruptBundle;
+
+        const name: []const u8 = if (header.name_size == 0) &.{} else blk: {
+            const bytes = try allocator.alloc(u8, @intCast(header.name_size));
+            errdefer allocator.free(bytes);
+
+            const n = try file.readPositionalAll(Zune.io(), bytes, pos);
+            if (n != bytes.len)
+                return error.CorruptBundle;
+
+            break :blk bytes;
+        };
+        pos += name_len;
+        var name_in_map = false;
+        errdefer if (!name_in_map and header.name_size > 0) allocator.free(name);
+
+        var nul: [1]u8 = undefined;
+        const nul_n = try file.readPositionalAll(Zune.io(), &nul, pos);
+        if (nul_n != 1 or nul[0] != 0)
+            return error.CorruptBundle;
+        pos += 1;
+
+        if (pos + body_len > end)
+            return error.CorruptBundle;
+        const data_offset = pos;
+        pos += body_len;
+
+        if (map.getPtr(name) != null)
+            return error.CorruptBundle;
+
+        const section: Section = switch (header.kind) {
+            .script => .{ .script = &.{} },
+            .file => .{
+                .file = .{
+                    .data = &.{},
+                    .size = 0,
+                    .compression = header.compression,
+                },
+            },
+        };
+        map.putAssumeCapacity(name, section);
+        name_in_map = true;
+        locators.putAssumeCapacity(name, .{
+            .offset = data_offset,
+            .size = header.size,
+        });
+
+        if (index == 0) {
+            if (header.kind != .script)
+                return error.CorruptBundle;
+            const data: []const u8 = if (header.size == 0) &.{} else blk: {
+                const bytes = try allocator.alloc(u8, @intCast(header.size));
+                errdefer allocator.free(bytes);
+
+                const n = try file.readPositionalAll(Zune.io(), bytes, data_offset);
+                if (n != bytes.len)
+                    return error.CorruptBundle;
+
+                try owned.append(allocator, bytes);
+
+                break :blk bytes;
+            };
+
+            map.getPtr(name).?.script = data;
+            locators.getPtr(name).?.loaded = true;
+
+            entry_name = try std.mem.concatWithSentinel(allocator, u8, &.{ "@", name }, 0);
+            entry_data = data;
+        }
+    }
+
+    const entry = entry_name orelse return error.CorruptBundle;
+
+    applyPacked(state, features);
 
     return .{
         .allocator = allocator,
         .mode = state.mode,
         .map = map,
         .entry = .{
-            .name = entry.?.name,
-            .data = entry.?.data,
+            .name = entry,
+            .data = entry_data,
         },
         .home_dir = home_dir,
-        .allocated = bundle,
+        .exe = file,
+        .locators = locators,
+        .owned = owned,
     };
-}
-
-pub fn getFromFile(allocator: std.mem.Allocator, exe: std.Io.File) !?Map {
-    const HEADER_SIZE = @sizeOf(ExeHeader) + @sizeOf(u64) + TAG.len;
-    const io = Zune.io();
-
-    const end = try exe.length(io);
-    if (end < HEADER_SIZE)
-        return null;
-    var pos: u64 = end - HEADER_SIZE;
-
-    var header_bytes: [HEADER_SIZE]u8 = undefined;
-    const amt = try exe.readPositionalAll(io, &header_bytes, pos);
-    std.debug.assert(amt == HEADER_SIZE);
-    if (!std.mem.eql(u8, header_bytes[@sizeOf(ExeHeader) + @sizeOf(u64) ..], TAG))
-        return null;
-
-    const header: ExeHeader = @bitCast(std.mem.readVarInt(u64, header_bytes[0..8], .big));
-    const hash: u64 = std.mem.readVarInt(u64, header_bytes[@sizeOf(ExeHeader)..][0..8], .big);
-
-    if (pos <= header.size)
-        return error.CorruptBundle;
-
-    pos -= header.size;
-
-    const allocated = try allocator.alloc(u8, header.size);
-    const amt_read = try exe.readPositionalAll(io, allocated, pos);
-    std.debug.assert(amt_read == header.size);
-
-    if (std.hash.XxHash3.hash(SEED, allocated) != hash)
-        return error.CorruptBundle;
-
-    return try loadBundle(allocator, header, allocated);
-}
-
-pub fn get(allocator: std.mem.Allocator) !?Map {
-    const exe = try std.process.openExecutable(Zune.io(), .{ .mode = .read_only });
-    defer exe.close(Zune.io());
-
-    return try getFromFile(allocator, exe);
 }

@@ -3,16 +3,12 @@ const luau = @import("luau");
 
 const Zune = @import("zune");
 
-const common = @import("common.zig");
-
 const VM = luau.VM;
 
+pub threadlocal var rng: std.Random.IoSource = .{ .io = undefined };
+
 fn csprng() std.Random {
-    const S = struct {
-        var src: std.Random.IoSource = .{ .io = undefined };
-    };
-    S.src.io = Zune.io();
-    return S.src.interface();
+    return rng.interface();
 }
 
 pub fn lua_boolean(L: *VM.lua.State) i32 {
@@ -20,7 +16,7 @@ pub fn lua_boolean(L: *VM.lua.State) i32 {
     return 1;
 }
 
-pub fn lua_nextinteger(L: *VM.lua.State) !i32 {
+pub fn lua_nextInteger(L: *VM.lua.State) !i32 {
     const min = L.tointeger(1) orelse {
         L.pushinteger(csprng().int(i32));
         return 1;
@@ -32,7 +28,7 @@ pub fn lua_nextinteger(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-pub fn lua_nextnumber(L: *VM.lua.State) !i32 {
+pub fn lua_nextNumber(L: *VM.lua.State) !i32 {
     const min = L.tonumber(1) orelse {
         L.pushnumber(csprng().float(f64));
         return 1;

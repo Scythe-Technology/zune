@@ -1,779 +1,795 @@
 --!strict
-local TEMP_DIR = _G.__test_tempdir::string;
+local TEMP_DIR = zune.process.env.TEMP_PATH or error("TEMP_PATH environment variable is not set")
 
-local fs = zune.fs;
-local task = zune.task;
-local platform = zune.platform;
-local testing = zune.testing;
+local fs = zune.fs
+if not fs then
+    return
+end
+local luau = zune.luau
+local platform = zune.platform
 
-local describe = testing.describe;
-local expect = testing.expect;
-local test = testing.test;
+local cwd = zune.io.cwd()
 
-local function isDir(path: string): boolean
-    return fs.stat(path).kind == "directory";
+local testing = require("@zune/testing")
+
+local describe = testing.describe
+local expect = testing.expect
+local test = testing.test
+
+local function statKind(dir: any, name: string): string
+    local ok, result = pcall(dir.statFile, dir, name)
+    if not ok then
+        if result == "FileNotFound" then
+            return "none"
+        end
+        error(result)
+    end
+    return result.kind
 end
 
-local function isFile(path: string): boolean
-    return fs.stat(path).kind == "file";
+local function isDir(dir: any, name: string): boolean
+    return statKind(dir, name) == "directory"
 end
 
-assert(isDir(TEMP_DIR), `TEMP_DIR is not a directory, {TEMP_DIR}`);
-
-local function path(dir: string)
-    return `{TEMP_DIR}/{dir}`;
+local function isFile(dir: any, name: string): boolean
+    return statKind(dir, name) == "file"
 end
 
-describe("Binary", function()
-    local binaryData = buffer.fromstring("Some binary\n");
-    local binaryDataLarge = buffer.fromstring(string.rep("ABC\n", 600));
-    describe("WriteFile", function()
-        test("Small Write", function()
-            fs.writeFile(path("sample"), binaryData);
+local function writeAll(file: any, content: string | buffer)
+    local len = if type(content) == "string" then #content else buffer.len(content :: buffer)
+    local written = 0
+    while written < len do
+        local n = file:writePositional(written, content, written)
+        if n == 0 then
+            error("short write")
+        end
+        written += n
+    end
+end
+
+local function readAll(file: any, len: number): string
+    local buf = buffer.create(len)
+    local read = 0
+    while read < len do
+        local n = file:readPositional(read, buf, read, len - read)
+        if n == 0 then
+            break
+        end
+        read += n
+    end
+    return buffer.readstring(buf, 0, read)
+end
+
+local function writeFile(dir: any, name: string, content: string | buffer)
+    local file = dir:createFile(name, {
+        read = true,
+        truncate = true,
+        nonblocking = true,
+    })
+    writeAll(file, content)
+    file:close()
+end
+
+local function readFile(dir: any, name: string): string
+    local file = dir:openFile(name, {
+        mode = "r",
+    })
+    local text = readAll(file, file:size())
+    file:close()
+    return text
+end
+
+local function realPathOf(dir: any): string
+    local buf = buffer.create(fs.path.max_path_bytes)
+    local n = dir:realPath(buf)
+    return buffer.readstring(buf, 0, n)
+end
+
+assert(isDir(cwd, TEMP_DIR), `TEMP_DIR is not a directory, {TEMP_DIR}`)
+
+local root = cwd:openDir(TEMP_DIR, {
+    iterate = true,
+})
+
+describe("cwd", function()
+    test("does not iterate", function()
+        local function check()
+            expect(function()
+                cwd:entries()
+            end).toThrow("directory not opened for iteration")
 
             expect(function()
-                fs.writeFile(path("unknown/sample2"), binaryData);
-            end).toThrow("FileNotFound");
-        end)
-        test("Large Write", function()
-            fs.writeFile(path("sample2"), binaryDataLarge);
+                cwd:close()
+            end).toThrow("directory not owned")
 
+            local plain = cwd:openDir(TEMP_DIR)
             expect(function()
-                fs.writeFile(path("unknown/sample2"), binaryDataLarge);
-            end).toThrow("FileNotFound");
-        end)
-    end)
-
-    describe("ReadFile", function()
-        test("Small Read (Buffer)", function()
-            local result = fs.readFile(path("sample"), true);
-            expect(result).toBe(expect.any("buffer"));
-            expect(buffer.tostring(result::buffer)).toBe(buffer.tostring(binaryData));
-        end)
-        test("Large Read (Buffer)", function()
-            local result = fs.readFile(path("sample2"), true);
-            expect(result).toBe(expect.any("buffer"));
-            expect(buffer.tostring(result::buffer)).toBe(buffer.tostring(binaryDataLarge));
-        end)
-        test("Small Read (String)", function()
-            local result = fs.readFile(path("sample"));
-            expect(result).toBe(expect.any("string"));
-            expect(result).toBe(buffer.tostring(binaryData));
-        end)
-        test("Large Read (String)", function()
-            local result = fs.readFile(path("sample2"));
-            expect(result).toBe(expect.any("string"));
-            expect(result).toBe(buffer.tostring(binaryDataLarge));
-        end)
-        test("Unknown File", function()
-            expect(function()
-                fs.readFile(path("unknown/sample"), true);
-            end).toThrow("FileNotFound");
-
-            expect(function()
-                fs.readFile(path("unknown/sample"));
-            end).toThrow("FileNotFound");
-
-            expect(function()
-                fs.readFile(path("unknown/sample2"), true);
-            end).toThrow("FileNotFound");
-
-            expect(function()
-                fs.readFile(path("unknown/sample2"));
-            end).toThrow("FileNotFound");
-        end)
-    end)
-
-    test("DeleteFile", function()
-        fs.deleteFile(path("sample"));
-        fs.deleteFile(path("sample2"));
-
-        expect(function()
-            fs.deleteFile(path("unknown/sample"))
-        end).toThrow("FileNotFound");
-        expect(function()
-            fs.deleteFile(path("unknown/sample2"))
-        end).toThrow("FileNotFound");
+                plain:entries()
+            end).toThrow("directory not opened for iteration")
+            plain:close()
+        end
+        check()
+        luau.sync(check)
     end)
 end)
 
-assert(not isFile(path("sample")), "File should be removed");
-assert(not isFile(path("sample.txt")), "File should not exist");
+describe("binary", function()
+    local binaryData = buffer.fromstring("Some binary\n")
+    local binaryDataLarge = buffer.fromstring(string.rep("ABC\n", 600))
 
-describe("Text", function()
-    local textData = "Some text\n";
-    local textDataLarge = string.rep("ABC\n", 600);
-    describe("WriteFile", function()
-        test("Small Write", function()
-            fs.writeFile(path("sample.txt"), textData);
+    describe("writeFile", function()
+        test("small write", function()
+            local function write(name: string)
+                writeFile(root, name, binaryData)
 
-            expect(function()
-                fs.writeFile(path("unknown/sample.txt"), textData);
-            end).toThrow("FileNotFound");
+                expect(function()
+                    writeFile(root, `unknown/{name}`, binaryData)
+                end).toThrow("FileNotFound")
+            end
+            write("sample")
+            luau.sync(function()
+                write("sample-sync")
+            end)
         end)
-        test("Large Write", function()
-            fs.writeFile(path("sample2.txt"), textDataLarge);
+        test("large write", function()
+            local function write(name: string)
+                writeFile(root, name, binaryDataLarge)
 
-            expect(function()
-                fs.writeFile(path("unknown/sample2.txt"), textDataLarge);
-            end).toThrow("FileNotFound");
-        end)
-    end)
-
-    describe("ReadFile", function()
-        test("Small Read (Buffer)", function()
-            local result = fs.readFile(path("sample.txt"), true);
-            expect(result).toBe(expect.any("buffer"));
-            expect(buffer.tostring(result::buffer)).toBe(textData);
-        end)
-        test("Large Read (Buffer)", function()
-            local result = fs.readFile(path("sample2.txt"), true);
-            expect(result).toBe(expect.any("buffer"));
-            expect(buffer.tostring(result::buffer)).toBe(textDataLarge);
-        end)
-        test("Small Read (String)", function()
-            local result = fs.readFile(path("sample.txt"));
-            expect(result).toBe(expect.any("string"));
-            expect(result).toBe(textData);
-        end)
-        test("Large Read (String)", function()
-            local result = fs.readFile(path("sample2.txt"));
-            expect(result).toBe(expect.any("string"));
-            expect(result).toBe(textDataLarge);
-        end)
-        test("Unknown File", function()
-            expect(function()
-                fs.readFile(path("unknown/sample.txt"), true);
-            end).toThrow("FileNotFound");
-
-            expect(function()
-                fs.readFile(path("unknown/sample.txt"));
-            end).toThrow("FileNotFound");
-
-            expect(function()
-                fs.readFile(path("unknown/sample2.txt"), true);
-            end).toThrow("FileNotFound");
-
-            expect(function()
-                fs.readFile(path("unknown/sample2.txt"));
-            end).toThrow("FileNotFound");
+                expect(function()
+                    writeFile(root, `unknown/{name}`, binaryDataLarge)
+                end).toThrow("FileNotFound")
+            end
+            write("sample2")
+            luau.sync(function()
+                write("sample2-sync")
+            end)
         end)
     end)
 
-    test("IsFile", function()
-        expect(isFile(path("sample.txt"))).toBeTruthy();
-        expect(isDir(path("sample.txt"))).toBeFalsy();
-        expect(isFile(path("sample2.txt"))).toBeTruthy();
-        expect(isDir(path("sample2.txt"))).toBeFalsy();
-        expect(isFile(path("unknown/sample.txt"))).toBeFalsy();
-        expect(isFile(path("unknown/sample2.txt"))).toBeFalsy();
+    describe("readFile", function()
+        test("small read", function()
+            local function read(name: string)
+                local file = root:openFile(name, {
+                    mode = "r",
+                })
+                local result = buffer.fromstring(readAll(file, file:size()))
+                file:close()
+                expect(result).toBe(expect.any("buffer"))
+                expect(buffer.tostring(result)).toBe(buffer.tostring(binaryData))
+            end
+            read("sample")
+            luau.sync(function()
+                read("sample-sync")
+            end)
+        end)
+        test("large read", function()
+            local function read(name: string)
+                local file = root:openFile(name, {
+                    mode = "r",
+                })
+                local result = buffer.fromstring(readAll(file, file:size()))
+                file:close()
+                expect(result).toBe(expect.any("buffer"))
+                expect(buffer.tostring(result)).toBe(buffer.tostring(binaryDataLarge))
+            end
+            read("sample2")
+            luau.sync(function()
+                read("sample2-sync")
+            end)
+        end)
+        test("unknown file", function()
+            local function read(name: string)
+                expect(function()
+                    root:openFile(`unknown/{name}`, {
+                        mode = "r",
+                    })
+                end).toThrow("FileNotFound")
+            end
+            read("sample")
+            luau.sync(function()
+                read("sample-sync")
+            end)
+        end)
     end)
 
-    test("DeleteFile", function()
-        fs.deleteFile(path("sample.txt"));
-        fs.deleteFile(path("sample2.txt"));
-
-        expect(function()
-            fs.deleteFile(path("unknown/sample.txt"))
-        end).toThrow("FileNotFound");
-        expect(function()
-            fs.deleteFile(path("unknown/sample2.txt"))
-        end).toThrow("FileNotFound");
+    test("deleteFile", function()
+        local function remove(name: string)
+            root:deleteFile(name)
+            expect(function()
+                root:deleteFile(`unknown/{name}`)
+            end).toThrow("FileNotFound")
+        end
+        remove("sample")
+        remove("sample2")
+        luau.sync(function()
+            remove("sample-sync")
+            remove("sample2-sync")
+        end)
     end)
 end)
 
-describe("Dir", function()
-    test("MakeDir", function()
-        fs.makeDir(path("foo"));
+assert(not isFile(root, "sample"), "File should be removed")
+assert(not isFile(root, "sample.txt"), "File should not exist")
 
-        -- Recursive
-        fs.makeDir(path("foo/bar/luau"), true);
+describe("text", function()
+    local textData = "Some text\n"
+    local textDataLarge = string.rep("ABC\n", 600)
 
-        expect(function()
-            fs.makeDir(path("unknown/foo"));
-        end).toThrow("FileNotFound");
+    describe("writeFile", function()
+        test("small write", function()
+            local function write(name: string)
+                writeFile(root, name, textData)
+
+                expect(function()
+                    writeFile(root, `unknown/{name}`, textData)
+                end).toThrow("FileNotFound")
+            end
+            write("sample.txt")
+            luau.sync(function()
+                write("sample-sync.txt")
+            end)
+        end)
+        test("large write", function()
+            local function write(name: string)
+                writeFile(root, name, textDataLarge)
+
+                expect(function()
+                    writeFile(root, `unknown/{name}`, textDataLarge)
+                end).toThrow("FileNotFound")
+            end
+            write("sample2.txt")
+            luau.sync(function()
+                write("sample2-sync.txt")
+            end)
+        end)
     end)
 
-    test("Entries", function()
-        local result = fs.entries(path(""));
-        expect(result).toBe(expect.any("table"));
-        expect(result).toBe(expect.similar({{name = "foo", kind = "directory"}}));
-        
-        local result2 = fs.entries(TEMP_DIR);
-        expect(result2).toBe(expect.any("table"));
-        expect(result2).toHaveLength(1);
-        expect(result2).toBe(expect.similar({{name = "foo", kind = "directory"}}));
-
-        local result3 = fs.entries(path("foo/bar/luau"));
-        expect(result3).toBe(expect.any("table"));
-        expect(result3).toBe(expect.similar({}));
-
-        expect(function()
-            fs.entries(path("unknown"));
-        end).toThrow("FileNotFound");
+    describe("readFile", function()
+        test("small read", function()
+            local function read(name: string)
+                local result = readFile(root, name)
+                expect(result).toBe(expect.any("string"))
+                expect(result).toBe(textData)
+            end
+            read("sample.txt")
+            luau.sync(function()
+                read("sample-sync.txt")
+            end)
+        end)
+        test("large read", function()
+            local function read(name: string)
+                local result = readFile(root, name)
+                expect(result).toBe(expect.any("string"))
+                expect(result).toBe(textDataLarge)
+            end
+            read("sample2.txt")
+            luau.sync(function()
+                read("sample2-sync.txt")
+            end)
+        end)
+        test("unknown file", function()
+            local function read(name: string)
+                expect(function()
+                    readFile(root, `unknown/{name}`)
+                end).toThrow("FileNotFound")
+            end
+            read("sample.txt")
+            luau.sync(function()
+                read("sample-sync.txt")
+            end)
+        end)
     end)
 
-    test("IsDir", function()
-        expect(isDir(path("foo"))).toBeTruthy();
-        expect(isFile(path("foo"))).toBeFalsy();
-        expect(isDir(path("unknown/foo"))).toBeFalsy();
+    test("isFile", function()
+        local function check(name: string)
+            expect(isFile(root, name)).toBeTruthy()
+            expect(isDir(root, name)).toBeFalsy()
+            expect(isFile(root, `unknown/{name}`)).toBeFalsy()
+        end
+        check("sample.txt")
+        check("sample2.txt")
+        luau.sync(function()
+            check("sample-sync.txt")
+            check("sample2-sync.txt")
+        end)
     end)
 
-    test("DeleteDir", function()
-        fs.deleteDir(path("foo/bar/luau"));
-        expect(isDir(path("foo/bar/luau"))).toBeFalsy();
-
-        expect(function()
-            fs.deleteDir(path("foo"));
-        end).toThrow("DirNotEmpty");
-
-        -- Recursive
-        fs.deleteDir(path("foo"), true);
-        expect(isDir(path("foo"))).toBeFalsy();
+    test("deleteFile", function()
+        local function remove(name: string)
+            root:deleteFile(name)
+            expect(function()
+                root:deleteFile(`unknown/{name}`)
+            end).toThrow("FileNotFound")
+        end
+        remove("sample.txt")
+        remove("sample2.txt")
+        luau.sync(function()
+            remove("sample-sync.txt")
+            remove("sample2-sync.txt")
+        end)
     end)
 end)
 
-test("Metadata", function()
-    fs.makeDir(path("metadata"));
+describe("dir", function()
+    test("makeDir", function()
+        local function make(name: string)
+            root:createDir(name)
+            root:createDirPath(`{name}/bar/luau`)
 
-    local metadata = fs.metadata(path("metadata"));
-    expect(metadata).toBe(expect.any("table"));
-    expect(metadata).toBe(expect.similar({
-        created_at = expect.any("number"),
+            expect(function()
+                root:createDir(`unknown/{name}`)
+            end).toThrow("FileNotFound")
+        end
+        make("foo")
+        luau.sync(function()
+            make("foo-sync")
+        end)
+    end)
+
+    test("entries", function()
+        local function list(name: string)
+            local dir = root:openDir(name, {
+                iterate = true,
+            })
+            local result = dir:entries()
+            dir:close()
+            expect(result).toBe(expect.any("table"))
+            expect(result).toBe(expect.similar({ { name = "bar", kind = "directory" } }))
+
+            local nested = root:openDir(`{name}/bar/luau`, {
+                iterate = true,
+            })
+            local empty = nested:entries()
+            nested:close()
+            expect(empty).toBe(expect.any("table"))
+            expect(empty).toBe(expect.similar({}))
+
+            expect(function()
+                root:openDir(`{name}/unknown`, {
+                    iterate = true,
+                })
+            end).toThrow("FileNotFound")
+        end
+        list("foo")
+        luau.sync(function()
+            list("foo-sync")
+        end)
+    end)
+
+    test("isDir", function()
+        local function check(name: string)
+            expect(isDir(root, name)).toBeTruthy()
+            expect(isFile(root, name)).toBeFalsy()
+            expect(isDir(root, `unknown/{name}`)).toBeFalsy()
+        end
+        check("foo")
+        luau.sync(function()
+            check("foo-sync")
+        end)
+    end)
+
+    test("deleteDir", function()
+        local function remove(name: string)
+            root:deleteDir(`{name}/bar/luau`)
+            expect(isDir(root, `{name}/bar/luau`)).toBeFalsy()
+
+            expect(function()
+                root:deleteDir(name)
+            end).toThrow("DirNotEmpty")
+
+            root:deleteTree(name)
+            expect(isDir(root, name)).toBeFalsy()
+        end
+        remove("foo")
+        luau.sync(function()
+            remove("foo-sync")
+        end)
+    end)
+end)
+
+local function expectStat(stat: any, kind: string)
+    expect(stat).toBe(expect.any("table"))
+    expect(stat).toBe(expect.similar({
+        changed_at = expect.any("number"),
         modified_at = expect.any("number"),
         accessed_at = expect.any("number"),
+        block_size = expect.any("number"),
         size = expect.any("number"),
-        symlink = false,
-        kind = "directory",
-        permissions = {
-            read_only = false,
-        },
-    }));
-    fs.deleteDir(path("metadata"));
-end)
-
-test("Stat", function()
-    fs.makeDir(path("stat"));
-    fs.writeFile(path("stat/sample.txt"), "Some text sample\n");
-
-    do
-        local stat = fs.stat(path("stat"));
-        expect(stat).toBe(expect.any("table"));
-        expect(stat).toBe(expect.similar({
-            changed_at = expect.any("number"),
-            modified_at = expect.any("number"),
-            accessed_at = expect.any("number"),
-            size = expect.any("number"),
-            mode = expect.any("number"),
-            kind = "directory",
-        }));
-    end
-
-    do
-        local stat = fs.stat(path("stat/sample.txt"));
-        expect(stat).toBe(expect.any("table"));
-        expect(stat).toBe(expect.similar({
-            changed_at = expect.any("number"),
-            modified_at = expect.any("number"),
-            accessed_at = expect.any("number"),
-            size = expect.any("number"),
-            mode = expect.any("number"),
-            kind = "file",
-        }));
-    end
-
-    do
-        local stat = fs.stat(path("stat/unknown.txt"));
-        expect(stat).toBe(expect.any("table"));
-        expect(stat).toBe(expect.similar({
-            kind = "none",
-        }));
-    end
-
-    fs.deleteFile(path("stat/sample.txt")); 
-    fs.deleteDir(path("stat"));
-end)
-
-test("Move", function()
-    fs.makeDir(path("metadata"));
-    fs.writeFile(path("metadata/sample.txt"), "Some text sample\n");
-    fs.writeFile(path("metadata/sample2.txt"), "Some text sample number 2\n");
-
-    fs.move(path("metadata/sample.txt"), path("sample.txt"));
-    expect(isFile(path("sample.txt"))).toBeTruthy();
-    expect(isFile(path("metadata/sample.txt"))).toBeFalsy();
-
-    local resultRead = fs.readFile(path("sample.txt"));
-    expect(resultRead).toBe("Some text sample\n");
-
-    expect(function()
-        fs.move(path("metadata/sample2.txt"), path("sample.txt"));
-    end).toThrow("PathAlreadyExists");
-    expect(isFile(path("sample.txt"))).toBeTruthy();
-
-    fs.move(path("metadata/sample2.txt"), path("sample.txt"), true);
-    expect(isFile(path("sample.txt"))).toBeTruthy();
-    expect(isFile(path("metadata/sample2.txt"))).toBeFalsy();
-
-    local resultRead2 = fs.readFile(path("sample.txt"));
-    expect(resultRead2).toBe("Some text sample number 2\n");
-
-    fs.deleteFile(path("sample.txt"));
-    fs.deleteDir(path("metadata"));
-
-    expect(isFile(path("sample.txt"))).toBeFalsy();
-    expect(isDir(path("metadata"))).toBeFalsy();
-end)
-
-test("Copy", function()
-    fs.makeDir(path("metadata"));
-    fs.writeFile(path("metadata/sample.txt"), "Some text sample\n");
-    fs.writeFile(path("metadata/sample2.txt"), "Some text sample number 2\n");
-
-    fs.copy(path("metadata/sample.txt"), path("sample.txt"));
-    expect(isFile(path("sample.txt"))).toBeTruthy();
-    expect(isFile(path("metadata/sample.txt"))).toBeTruthy();
-
-    expect(function()
-        fs.copy(path("metadata/sample3.txt"), path("sample3"));
-    end).toThrow("FileNotFound");
-    expect(isFile(path("sample3"))).toBeFalsy();
-
-    fs.copy(path("metadata"), path("metadata2"));
-    expect(isDir(path("metadata2"))).toBeTruthy();
-    expect(isFile(path("metadata2/sample.txt"))).toBeTruthy();
-    expect(isFile(path("metadata2/sample2.txt"))).toBeTruthy();
-
-    expect(function()
-        fs.copy(path("metadata"), path("metadata2"));
-    end).toThrow("PathAlreadyExists");
-    expect(isDir(path("metadata2"))).toBeTruthy();
-    expect(isFile(path("metadata2/sample.txt"))).toBeTruthy();
-    expect(isFile(path("metadata2/sample2.txt"))).toBeTruthy();
-
-    fs.copy(path("metadata"), path("metadata2"), true);
-    expect(isDir(path("metadata2"))).toBeTruthy();
-    expect(isFile(path("metadata2/sample.txt"))).toBeTruthy();
-    expect(isFile(path("metadata2/sample2.txt"))).toBeTruthy();
-
-    fs.deleteFile(path("sample.txt"));
-    fs.deleteDir(path("metadata"), true);
-    fs.deleteDir(path("metadata2"), true);
-
-    expect(isFile(path("sample.txt"))).toBeFalsy();
-    expect(isDir(path("metadata"))).toBeFalsy();
-    expect(isDir(path("metadata2"))).toBeFalsy();
-end)
-
-test("Symlink", function()
-    if (platform.os ~= "windows") then
-        fs.makeDir(path("metadata"));
-        fs.writeFile(path("metadata/sample.txt"), "Some text sample\n");
-        fs.writeFile(path("metadata/sample2.txt"), "Some text sample number 2\n");
-
-        fs.symlink(path("metadata/sample.txt"), path("sample.txt"));
-        expect(isFile(path("sample.txt"))).toBeTruthy();
-        expect(isFile(path("metadata/sample.txt"))).toBeTruthy();
-        local metadata = fs.metadata(path("sample.txt"));
-        expect(metadata).toBe(expect.any("table"));
-        expect(metadata).toBe(expect.similar({
-            created_at = expect.any("number"),
-            modified_at = expect.any("number"),
-            accessed_at = expect.any("number"),
-            size = expect.any("number"),
-            symlink = true,
-            kind = "file",
-            permissions = {
-                read_only = false,
-            },
-        }));
-
-        expect(function()
-            fs.symlink(path("metadata/sample3.txt"), path("sample3"))
-        end).toThrow("FileNotFound");
-        expect(isFile(path("sample3"))).toBeFalsy();
-
-        fs.symlink(path("metadata"), path("metadata2"));
-        expect(isDir(path("metadata2"))).toBeTruthy();
-        expect(isFile(path("metadata2/sample.txt"))).toBeTruthy();
-        expect(isFile(path("metadata2/sample2.txt"))).toBeTruthy();
-        local metadata2 = fs.metadata(path("metadata2"));
-        expect(metadata2).toBe(expect.any("table"));
-        expect(metadata2).toBe(expect.similar({
-            created_at = expect.any("number"),
-            modified_at = expect.any("number"),
-            accessed_at = expect.any("number"),
-            size = expect.any("number"),
-            symlink = true,
-            kind = "directory",
-            permissions = {
-                read_only = false,
-            },
-        }));
-
-        expect(function()
-            fs.symlink(path("metadata"), path("metadata2"));
-        end).toThrow("PathAlreadyExists");
-        expect(isDir(path("metadata2"))).toBeTruthy();
-        expect(isFile(path("metadata2/sample.txt"))).toBeTruthy();
-        expect(isFile(path("metadata2/sample2.txt"))).toBeTruthy();
-
-        fs.deleteFile(path("sample.txt"));
-        fs.deleteDir(path("metadata"), true);
-        fs.deleteDir(path("metadata2"), true);
-
-        expect(isFile(path("sample.txt"))).toBeFalsy();
-        expect(isDir(path("metadata"))).toBeFalsy();
-        expect(isDir(path("metadata2"))).toBeFalsy();
-    end
-end)
-
-describe("File Object/Handle", function()
-    local textData = "Some text\n";
-    test("Open Unknown File", function()
-        expect(function()
-            fs.openFile(path("sample.txt"))
-        end).toThrow("FileNotFound");
-    end)
-    
-    test("Create File", function()
-        do
-            local result = fs.createFile(path("sample.txt"));
-            expect(result).toBe(expect.type("userdata"));
-
-            expect(result:read()).toBe(""); -- Should have no data
-
-            expect(result:getSize()).toBe(0);
-
-            result:write(textData); -- Write data
-
-            expect(result:getSize()).toBe(#textData);
-
-            result:seekFromEnd(-#textData); -- Go back to amount of textData
-            expect(result:getSize()).toBe(#textData); -- Confirm size
-            expect(result:read()).toBe(textData); -- Confirm data
-
-            result:sync(); -- Sync data to disk
-
-            result:close(); -- Close file (also syncs data)
-
-            expect(function()
-                result:read();
-            end).toThrow()
-        end
-        do
-            local result = fs.createFile(path("sample2.txt"));
-            expect(result).toBe(expect.type("userdata"));
-
-            expect(result:readSync()).toBe(""); -- Should have no data
-
-            expect(result:getSize()).toBe(0);
-
-            result:writeSync(textData); -- Write data
-
-            expect(result:getSize()).toBe(#textData);
-
-            result:seekFromEnd(-#textData); -- Go back to amount of textData
-            
-            expect(result:getSize()).toBe(#textData); -- Confirm size
-            expect(result:readSync()).toBe(textData); -- Confirm data
-
-            result:sync(); -- Sync data to disk
-
-            result:close(); -- Close file (also syncs data)
-
-            expect(function()
-                result:readSync();
-            end).toThrow()
-        end
-    end)
-
-    test("Create File Execlusive", function()
-        expect(function()
-            local _ = fs.createFile(path("sample.txt"), {
-                exclusive = true,
-            });
-        end).toThrow("PathAlreadyExists");
-    end)
-
-    test("Open File Read Mode", function()
-        do
-            local result = fs.openFile(path("sample.txt"), {
-                mode = "r",
-            });
-            expect(result).toBe(expect.type("userdata"));
-
-            expect(result:getSize()).toBe(#textData);
-            expect(result:read()).toBe(textData);
-            result:seekTo(0);
-            local b = result:read(nil, true);
-            expect(b).toBe(expect.type("buffer"));
-            expect(buffer.tostring(b)).toBe(textData);
-
-            expect(function()
-                result:write("Some text");
-            end).toThrow();
-        end
-        do
-            local result = fs.openFile(path("sample2.txt"), {
-                mode = "r",
-            });
-            expect(result).toBe(expect.type("userdata"));
-
-            expect(result:getSize()).toBe(#textData);
-            expect(result:readSync()).toBe(textData);
-            result:seekTo(0);
-            local b = result:readSync(nil, true);
-            expect(b).toBe(expect.type("buffer"));
-            expect(buffer.tostring(b)).toBe(textData);
-
-            expect(function()
-                result:write("Some text");
-            end).toThrow();
-        end
-    end)
-
-    test("Open File Write Mode", function()
-        do
-            local result = fs.openFile(path("sample.txt"), {
-                mode = "w",
-            });
-            expect(result).toBe(expect.type("userdata"));
-
-            expect(result:getSize()).toBe(#textData);
-            result:seekFromEnd();
-            result:write("Append text");
-            expect(result:getSize()).toBe(#textData + #("Append text"));
-            
-            expect(function()
-                result:read();
-            end).toThrow();
-
-            result:close();
-        end
-        do
-            local result = fs.openFile(path("sample2.txt"), {
-                mode = "w",
-            });
-            expect(result).toBe(expect.type("userdata"));
-
-            expect(result:getSize()).toBe(#textData);
-            result:seekFromEnd();
-            result:writeSync("Append text");
-            expect(result:getSize()).toBe(#textData + #("Append text"));
-            
-            expect(function()
-                result:readSync();
-            end).toThrow();
-
-            result:close();
-        end
-    end)
-
-    test("Open File Both Mode", function()
-        do
-            local result = fs.openFile(path("sample.txt"), {
-                mode = "rw",
-            });
-            expect(result).toBe(expect.type("userdata"));
-
-            expect(result:read()).toBe(textData .. "Append text");
-
-            result:write("Some text");
-
-            result:close();
-        end
-        do
-            local result = fs.openFile(path("sample2.txt"), {
-                mode = "rw",
-            });
-            expect(result).toBe(expect.type("userdata"));
-
-            expect(result:readSync()).toBe(textData .. "Append text");
-
-            result:writeSync("Some text");
-
-            result:close();
-        end
-    end)
-
-    fs.deleteFile(path("sample.txt"));
-    fs.deleteFile(path("sample2.txt"));
-end)
-
-describe("Path", function()
-    local SEP = if (zune.platform.os == "windows") then "\\" else "/";
-    test("getExePath", function()
-        local result = fs.getExePath();
-        expect(result).toBe(expect.any("string"));
-        expect(#result).toBeGreaterThan(0);
-    end)
-    test("realPath", function()
-        local result = fs.realPath(".");
-        expect(result).toBe(expect.any("string"));
-        expect(#result).toBeGreaterThan(0);
-    end)
-    test("join", function()
-        do
-            local result = fs.path.join("foo", "bar", "luau");
-            expect(result).toBe(expect.any("string"));
-            expect(result).toBe(`foo{SEP}bar{SEP}luau`);
-        end
-        do
-            local result = fs.path.join("foo", "bar", "..", "luau");
-            expect(result).toBe(expect.any("string"));
-            expect(result).toBe(`foo{SEP}bar{SEP}..{SEP}luau`);
-        end
-    end)
-    test("relative", function()
-        do
-            local result = fs.path.relative("foo/bar/luau", "foo");
-            expect(result).toBe(expect.any("string"));
-            expect(result).toBe(`..{SEP}..`);
-        end
-        do
-            local result = fs.path.relative("foo", "foo/bar/luau");
-            expect(result).toBe(expect.any("string"));
-            expect(result).toBe(`bar{SEP}luau`);
-        end
-    end)
-    test("resolve", function()
-        do
-            local result = fs.path.resolve("foo", "bar", "luau");
-            expect(result).toBe(expect.any("string"));
-            expect(result).toBe(`foo{SEP}bar{SEP}luau`);
-        end
-        do
-            local result = fs.path.resolve("foo", "bar", "..", "luau");
-            expect(result).toBe(expect.any("string"));
-            expect(result).toBe(`foo{SEP}luau`);
-        end
-    end)
-    test("dirname", function()
-        do
-            local result = fs.path.dirname("foo/bar/luau");
-            expect(result).toBe(expect.any("string"));
-            expect(result).toBe("foo/bar");
-        end
-        do
-            local result = fs.path.dirname("foo/bar/luau.txt");
-            expect(result).toBe(expect.any("string"));
-            expect(result).toBe("foo/bar");
-        end
-        do
-            local result = fs.path.dirname("foo");
-            expect(result).toBe(nil);
-        end
-    end)
-    test("basename", function()
-        do
-            local result = fs.path.basename("foo/bar/luau");
-            expect(result).toBe(expect.any("string"));
-            expect(result).toBe("luau");
-        end
-        do
-            local result = fs.path.basename("foo/bar/luau.txt");
-            expect(result).toBe(expect.any("string"));
-            expect(result).toBe("luau.txt");
-        end
-    end)
-    test("stem", function()
-        do
-            local result = fs.path.stem("foo/bar/luau");
-            expect(result).toBe(expect.any("string"));
-            expect(result).toBe("luau");
-        end
-        do
-            local result = fs.path.stem("foo/bar/luau.txt");
-            expect(result).toBe(expect.any("string"));
-            expect(result).toBe("luau");
-        end
-    end)
-    test("extension", function()
-        do
-            local result = fs.path.extension("foo/bar/luau");
-            expect(result).toBe(expect.any("string"));
-            expect(result).toBe("");
-        end
-        do
-            local result = fs.path.extension("foo/bar/luau.txt");
-            expect(result).toBe(expect.any("string"));
-            expect(result).toBe(".txt");
-        end
-    end)
-    test("isAbsolute", function()
-        do
-            local result = fs.path.isAbsolute(fs.realPath("."));
-            expect(result).toBe(expect.any("boolean"));
-            expect(result).toBe(true);
-        end
-        do
-            local result = fs.path.isAbsolute(`foo{SEP}bar{SEP}luau`);
-            expect(result).toBe(expect.any("boolean"));
-            expect(result).toBe(false);
-        end
-    end)
-end)
-
-test("Glob Match", function()
-    expect(fs.path.globMatch("foo/bar/luau", "foo/bar/luau")).toBeTruthy();
-    expect(fs.path.globMatch("foo/bar/luau", "foo/*/luau")).toBeTruthy();
-    expect(fs.path.globMatch("foo/bar/luau", "foo/bar/*")).toBeTruthy();
-    expect(fs.path.globMatch("foo/bar/luau", "foo/bar/luau.txt")).toBeFalsy();
-end)
-
-local function watch()
-    local changes = {};
-    task.wait(0.5);
-    local watcher = fs.watch(TEMP_DIR, function(path, events)
-        table.insert(changes, {
-            path = path,
-            events = events,
-        });
-    end)
-
-    testing.defer(function()
-        watcher:stop();
-    end)
-
-    local h = fs.createFile(path("sample2.txt"));
-    task.wait(0.5);
-    h:write("Some text\n");
-    h:sync();
-    h:close();
-    task.wait(0.5);
-    fs.deleteFile(path("sample2.txt"));
-    task.wait(0.5);
-    fs.makeDir(path("foo"));
-    task.wait(0.5);
-    fs.deleteDir(path("foo"));
-    task.wait(0.5);
-
-    -- TODO: Check tests for windows, tests for windows are inconsistent
-    expect(changes).toBe(expect.similar(if (platform.os ~= "windows") then {
-        {path = "sample2.txt", events = {"created"}},
-        {path = "sample2.txt", events = {"modified"}},
-        {path = "sample2.txt", events = {"deleted"}},
-        {path = "foo", events = {"created"}},
-        {path = "foo", events = {"deleted"}},
-    } else {
-        {path = "sample2.txt", events = {"modified"}},
-        {path = "sample2.txt", events = {"deleted"}},
-        {path = "foo", events = {"created"}},
-        {path = "foo", events = {"deleted"}},
-    }));
+        mode = expect.any("number"),
+        kind = kind,
+    }))
 end
 
-test("Embedded", function()
-    local contents = fs.embedFile("fs.test.luau");
-    expect(contents).toBe(expect.any("buffer"));
-    expect(buffer.readstring(contents, 0, 9)).toBe("--!strict");
+test("stat", function()
+    local function check(name: string)
+        root:createDir(name)
+        writeFile(root, `{name}/sample.txt`, "Some text sample\n")
 
-    local files = fs.embeddedFiles();
-    expect(files).toBe(expect.any("table"));
-    expect(files).toHaveLength(0);
+        local dir = root:openDir(name)
+        expectStat(dir:stat(), "directory")
+        dir:close()
 
-    local scripts = fs.embeddedScripts();
-    expect(scripts).toBe(expect.any("table"));
-    expect(scripts).toHaveLength(0);
+        expectStat(root:statFile(`{name}/sample.txt`), "file")
+
+        expect(function()
+            root:statFile(`{name}/unknown.txt`)
+        end).toThrow("FileNotFound")
+
+        root:deleteFile(`{name}/sample.txt`)
+        root:deleteDir(name)
+    end
+    check("stat")
+    luau.sync(function()
+        check("stat-sync")
+    end)
 end)
+
+test("move", function()
+    local function move(name: string)
+        root:createDir(name)
+        writeFile(root, `{name}/sample.txt`, "Some text sample\n")
+        writeFile(root, `{name}/sample2.txt`, "Some text sample number 2\n")
+
+        root:renamePreserve(`{name}/sample.txt`, root, `{name}.txt`)
+        expect(isFile(root, `{name}.txt`)).toBeTruthy()
+        expect(isFile(root, `{name}/sample.txt`)).toBeFalsy()
+        expect(readFile(root, `{name}.txt`)).toBe("Some text sample\n")
+
+        expect(function()
+            root:renamePreserve(`{name}/sample2.txt`, root, `{name}.txt`)
+        end).toThrow("PathAlreadyExists")
+        expect(isFile(root, `{name}.txt`)).toBeTruthy()
+
+        root:rename(`{name}/sample2.txt`, root, `{name}.txt`)
+        expect(isFile(root, `{name}.txt`)).toBeTruthy()
+        expect(isFile(root, `{name}/sample2.txt`)).toBeFalsy()
+        expect(readFile(root, `{name}.txt`)).toBe("Some text sample number 2\n")
+
+        root:deleteFile(`{name}.txt`)
+        root:deleteDir(name)
+
+        expect(isFile(root, `{name}.txt`)).toBeFalsy()
+        expect(isDir(root, name)).toBeFalsy()
+    end
+    move("metadata")
+    luau.sync(function()
+        move("metadata-sync")
+    end)
+end)
+
+test("copy", function()
+    local function copyTree(srcName: string, destName: string, replace: boolean)
+        local src = root:openDir(srcName, {
+            iterate = true,
+        })
+        if statKind(root, destName) ~= "directory" then
+            root:createDir(destName)
+        elseif not replace then
+            src:close()
+            error("PathAlreadyExists", 0)
+        end
+        local dest = root:openDir(destName)
+        for _, entry in src:entries() do
+            src:copyFile(entry.name, dest, entry.name, {
+                replace = replace,
+            })
+        end
+        src:close()
+        dest:close()
+    end
+
+    local function copy(name: string)
+        root:createDir(name)
+        writeFile(root, `{name}/sample.txt`, "Some text sample\n")
+        writeFile(root, `{name}/sample2.txt`, "Some text sample number 2\n")
+
+        root:copyFile(`{name}/sample.txt`, root, `{name}.txt`, {
+            replace = false,
+        })
+        expect(isFile(root, `{name}.txt`)).toBeTruthy()
+        expect(isFile(root, `{name}/sample.txt`)).toBeTruthy()
+
+        expect(function()
+            root:copyFile(`{name}/sample3.txt`, root, `{name}-missing`, {
+                replace = false,
+            })
+        end).toThrow("FileNotFound")
+        expect(isFile(root, `{name}-missing`)).toBeFalsy()
+
+        expect(function()
+            root:copyFile(`{name}/sample.txt`, root, `{name}.txt`, {
+                replace = false,
+            })
+        end).toThrow("PathAlreadyExists")
+
+        root:copyFile(`{name}/sample2.txt`, root, `{name}.txt`, {
+            replace = true,
+        })
+        expect(readFile(root, `{name}.txt`)).toBe("Some text sample number 2\n")
+
+        copyTree(name, `{name}2`, false)
+        expect(isDir(root, `{name}2`)).toBeTruthy()
+        expect(isFile(root, `{name}2/sample.txt`)).toBeTruthy()
+        expect(isFile(root, `{name}2/sample2.txt`)).toBeTruthy()
+
+        expect(function()
+            copyTree(name, `{name}2`, false)
+        end).toThrow("PathAlreadyExists")
+
+        copyTree(name, `{name}2`, true)
+        expect(isDir(root, `{name}2`)).toBeTruthy()
+        expect(isFile(root, `{name}2/sample.txt`)).toBeTruthy()
+        expect(isFile(root, `{name}2/sample2.txt`)).toBeTruthy()
+
+        root:deleteFile(`{name}.txt`)
+        root:deleteTree(name)
+        root:deleteTree(`{name}2`)
+
+        expect(isFile(root, `{name}.txt`)).toBeFalsy()
+        expect(isDir(root, name)).toBeFalsy()
+        expect(isDir(root, `{name}2`)).toBeFalsy()
+    end
+    copy("copied")
+    luau.sync(function()
+        copy("copied-sync")
+    end)
+end)
+
+test("symLink", function()
+    if platform.os ~= "windows" then
+        local function link(name: string)
+            root:createDir(name)
+            writeFile(root, `{name}/sample.txt`, "Some text sample\n")
+            writeFile(root, `{name}/sample2.txt`, "Some text sample number 2\n")
+
+            root:symLink(`{name}/sample.txt`, `{name}.txt`, {})
+            expect(isFile(root, `{name}.txt`)).toBeTruthy()
+            expect(isFile(root, `{name}/sample.txt`)).toBeTruthy()
+            expect(root:statFile(`{name}.txt`, {
+                follow_symlinks = false,
+            }).kind).toBe("sym_link")
+
+            root:symLink(`{name}/missing.txt`, `{name}-dangling`, {})
+            expect(root:statFile(`{name}-dangling`, {
+                follow_symlinks = false,
+            }).kind).toBe("sym_link")
+            expect(function()
+                root:statFile(`{name}-dangling`)
+            end).toThrow("FileNotFound")
+
+            root:symLink(name, `{name}2`, {
+                is_directory = true,
+            })
+            expect(isDir(root, `{name}2`)).toBeTruthy()
+            expect(isFile(root, `{name}2/sample.txt`)).toBeTruthy()
+            expect(isFile(root, `{name}2/sample2.txt`)).toBeTruthy()
+            expect(root:statFile(`{name}2`, {
+                follow_symlinks = false,
+            }).kind).toBe("sym_link")
+
+            expect(function()
+                root:symLink(name, `{name}2`, {
+                    is_directory = true,
+                })
+            end).toThrow("PathAlreadyExists")
+
+            root:deleteFile(`{name}.txt`)
+            root:deleteFile(`{name}-dangling`)
+            root:deleteTree(name)
+            root:deleteFile(`{name}2`)
+
+            expect(isFile(root, `{name}.txt`)).toBeFalsy()
+            expect(isDir(root, name)).toBeFalsy()
+            expect(isDir(root, `{name}2`)).toBeFalsy()
+        end
+        link("linked")
+        luau.sync(function()
+            link("linked-sync")
+        end)
+    end
+end)
+
+describe("file object/handle", function()
+    local textData = "Some text\n"
+
+    test("open unknown file", function()
+        local function open(name: string)
+            expect(function()
+                root:openFile(name)
+            end).toThrow("FileNotFound")
+        end
+        open("sample.txt")
+        luau.sync(function()
+            open("sample-sync.txt")
+        end)
+    end)
+
+    test("create file", function()
+        local function create(name: string)
+            local result = root:createFile(name, {
+                read = true,
+                nonblocking = true,
+            })
+            expect(result).toBe(expect.type("userdata"))
+
+            local b = buffer.create(#textData)
+            expect(result:readPositional(0, b)).toBe(0)
+
+            expect(result:size()).toBe(0)
+
+            result:writePositional(0, textData)
+
+            expect(result:size()).toBe(#textData)
+            expect(result:readPositional(0, b)).toBe(#textData)
+
+            result:sync()
+            result:close()
+
+            expect(function()
+                result:read(b)
+            end).toThrow("file closed")
+        end
+        create("sample.txt")
+        luau.sync(function()
+            create("sample-sync.txt")
+        end)
+    end)
+
+    test("create file exclusive", function()
+        local function create(name: string)
+            expect(function()
+                local _ = root:createFile(name, {
+                    exclusive = true,
+                })
+            end).toThrow("PathAlreadyExists")
+        end
+        create("sample.txt")
+        luau.sync(function()
+            create("sample-sync.txt")
+        end)
+    end)
+
+    test("open file read mode", function()
+        local function open(name: string)
+            local result = root:openFile(name, {
+                mode = "r",
+            })
+            expect(result).toBe(expect.type("userdata"))
+
+            expect(result:size()).toBe(#textData)
+            local b = buffer.create(#textData)
+            expect(result:readPositional(0, b)).toBe(#textData)
+            expect(b).toBe(expect.type("buffer"))
+            expect(buffer.tostring(b)).toBe(textData)
+
+            expect(function()
+                result:write("Some text")
+            end).toThrow("file not open for writing")
+
+            result:close()
+        end
+        open("sample.txt")
+        luau.sync(function()
+            open("sample-sync.txt")
+        end)
+    end)
+
+    test("open file write mode", function()
+        local function open(name: string)
+            local result = root:openFile(name, {
+                mode = "w",
+            })
+            expect(result).toBe(expect.type("userdata"))
+
+            local len = result:size()
+            expect(len).toBe(#textData)
+            result:writePositional(#textData, "Append text")
+            expect(result:size()).toBe(len + #"Append text")
+
+            expect(function()
+                result:readPositional(len + #"Append text", buffer.create(1))
+            end).toThrow("file not open for reading")
+
+            result:close()
+        end
+        open("sample.txt")
+        luau.sync(function()
+            open("sample-sync.txt")
+        end)
+    end)
+
+    test("open file both mode", function()
+        local function open(name: string)
+            local result = root:openFile(name, {
+                mode = "rw",
+            })
+            expect(result).toBe(expect.type("userdata"))
+
+            local len = #(textData .. "Append text")
+            local b = buffer.create(len)
+            expect(result:readPositional(0, b)).toBe(len)
+
+            result:writePositional(len, "Some text")
+            result:close()
+        end
+        open("sample.txt")
+        luau.sync(function()
+            open("sample-sync.txt")
+        end)
+    end)
+
+    root:deleteFile("sample.txt")
+    root:deleteFile("sample-sync.txt")
+end)
+
+describe("tempDir", function()
+    local function pathOfClosed(cleanup: boolean): string
+        local temp = fs.createTempDir({
+            cleanup = cleanup,
+            iterate = true,
+        })
+        expect(temp).toBe(expect.type("userdata"))
+
+        local file = temp:createFile("inside.txt", {
+            read = true,
+            truncate = true,
+            nonblocking = true,
+        })
+        writeAll(file, "temp")
+        file:close()
+
+        local entries = temp:entries()
+        expect(entries).toBe(expect.similar({ { name = "inside.txt", kind = "file" } }))
+
+        local path = realPathOf(temp)
+        if cleanup then
+            return path
+        end
+        temp:close()
+        return path
+    end
+
+    test("keeps the directory without cleanup", function()
+        local function check()
+            local path = pathOfClosed(false)
+            expect(cwd:statFile(path).kind).toBe("directory")
+            cwd:deleteTree(path)
+            expect(function()
+                cwd:statFile(path)
+            end).toThrow("FileNotFound")
+        end
+        check()
+        luau.sync(check)
+    end)
+
+    test("deletes the directory on close", function()
+        local function check()
+            local temp = fs.createTempDir({
+                cleanup = true,
+                iterate = true,
+            })
+            local file = temp:createFile("inside.txt", {
+                read = true,
+                truncate = true,
+            })
+            file:close()
+            local path = realPathOf(temp)
+            temp:close()
+            expect(function()
+                cwd:statFile(path)
+            end).toThrow("FileNotFound")
+        end
+        check()
+        luau.sync(check)
+    end)
+
+    test("deletes the directory on collect", function()
+        local path = pathOfClosed(true)
+        luau.garbagecollect()
+        expect(function()
+            cwd:statFile(path)
+        end).toThrow("FileNotFound")
+    end)
+end)
+
+root:close()

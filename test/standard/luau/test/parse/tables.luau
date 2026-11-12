@@ -20,12 +20,12 @@ local mixed = {
 local general = {
     [{}] = "empty_table_key",
     [function() end] = "function_key",
-    [vector.create(1,2,3)] = "vector_key",
+    [vector.create(1, 2, 3)] = "vector_key",
 }
 
 --[[ @result {
     lines = 24,
-    line_offsets = {0, 15, 30, 45, 60, 62, 63, 78, 99, 120, 141, 143, 144, 160, 179, 195, 214, 230, 232, 233, 251, 281, 320, 363, 365},
+    line_offsets = {0, 15, 30, 45, 60, 62, 63, 78, 99, 120, 141, 143, 144, 160, 179, 195, 214, 230, 232, 233, 251, 281, 320, 365, 367},
     lines = 24,
     eof = {
         position = vector.create(0, 24),
@@ -1028,7 +1028,7 @@ local general = {
                                 text = "}",
                                 leading_trivia = {
                                     {
-                                        span_start = vector.create(42, 22),
+                                        span_start = vector.create(44, 22),
                                         text = "\n",
                                         span_stop = vector.create(0, 23),
                                         tag = "whitespace",
@@ -1238,14 +1238,15 @@ local general = {
                                         trailing_trivia = {},
                                         text = "]",
                                         leading_trivia = {},
-                                        position = vector.create(25, 22),
+                                        position = vector.create(27, 22),
                                     },
                                     key = {
                                         self = false,
                                         arg_span_start = vector.create(19, 22),
-                                        arg_span_stop = vector.create(25, 22),
+                                        arg_span_stop = vector.create(27, 22),
                                         span_start = vector.create(5, 22),
                                         func = {
+                                            private_access = false,
                                             index = {
                                                 trailing_trivia = {},
                                                 text = "create",
@@ -1275,6 +1276,7 @@ local general = {
                                             },
                                             tag = "indexname",
                                         },
+                                        table_call = false,
                                         arguments = {
                                             {
                                                 node = {
@@ -1297,30 +1299,44 @@ local general = {
                                             {
                                                 node = {
                                                     value = 2,
-                                                    span_stop = vector.create(22, 22),
+                                                    span_stop = vector.create(23, 22),
                                                     tag = "number",
-                                                    position = vector.create(21, 22),
-                                                    span_start = vector.create(21, 22),
+                                                    position = vector.create(22, 22),
+                                                    span_start = vector.create(22, 22),
                                                     text = "2",
-                                                    leading_trivia = {},
+                                                    leading_trivia = {
+                                                        {
+                                                            span_start = vector.create(21, 22),
+                                                            text = " ",
+                                                            span_stop = vector.create(22, 22),
+                                                            tag = "whitespace",
+                                                        },
+                                                    },
                                                     trailing_trivia = {},
                                                 },
                                                 separator = {
                                                     trailing_trivia = {},
                                                     text = ",",
                                                     leading_trivia = {},
-                                                    position = vector.create(22, 22),
+                                                    position = vector.create(23, 22),
                                                 },
                                             },
                                             {
                                                 node = {
                                                     value = 3,
-                                                    span_stop = vector.create(24, 22),
+                                                    span_stop = vector.create(26, 22),
                                                     tag = "number",
-                                                    position = vector.create(23, 22),
-                                                    span_start = vector.create(23, 22),
+                                                    position = vector.create(25, 22),
+                                                    span_start = vector.create(25, 22),
                                                     text = "3",
-                                                    leading_trivia = {},
+                                                    leading_trivia = {
+                                                        {
+                                                            span_start = vector.create(24, 22),
+                                                            text = " ",
+                                                            span_stop = vector.create(25, 22),
+                                                            tag = "whitespace",
+                                                        },
+                                                    },
                                                     trailing_trivia = {},
                                                 },
                                             },
@@ -1329,9 +1345,9 @@ local general = {
                                             trailing_trivia = {},
                                             text = ")",
                                             leading_trivia = {},
-                                            position = vector.create(24, 22),
+                                            position = vector.create(26, 22),
                                         },
-                                        span_stop = vector.create(25, 22),
+                                        span_stop = vector.create(27, 22),
                                         open_parens = {
                                             trailing_trivia = {},
                                             text = "(",
@@ -1345,27 +1361,27 @@ local general = {
                                         text = "=",
                                         leading_trivia = {
                                             {
-                                                span_start = vector.create(26, 22),
-                                                text = " ",
-                                                span_stop = vector.create(27, 22),
-                                                tag = "whitespace",
-                                            },
-                                        },
-                                        position = vector.create(27, 22),
-                                    },
-                                    value = {
-                                        block_depth = 0,
-                                        span_start = vector.create(29, 22),
-                                        text = "vector_key",
-                                        trailing_trivia = {},
-                                        position = vector.create(29, 22),
-                                        quote_style = "double",
-                                        span_stop = vector.create(41, 22),
-                                        leading_trivia = {
-                                            {
                                                 span_start = vector.create(28, 22),
                                                 text = " ",
                                                 span_stop = vector.create(29, 22),
+                                                tag = "whitespace",
+                                            },
+                                        },
+                                        position = vector.create(29, 22),
+                                    },
+                                    value = {
+                                        block_depth = 0,
+                                        span_start = vector.create(31, 22),
+                                        text = "vector_key",
+                                        trailing_trivia = {},
+                                        position = vector.create(31, 22),
+                                        quote_style = "double",
+                                        span_stop = vector.create(43, 22),
+                                        leading_trivia = {
+                                            {
+                                                span_start = vector.create(30, 22),
+                                                text = " ",
+                                                span_stop = vector.create(31, 22),
                                                 tag = "whitespace",
                                             },
                                         },
@@ -1376,7 +1392,7 @@ local general = {
                                         trailing_trivia = {},
                                         text = ",",
                                         leading_trivia = {},
-                                        position = vector.create(41, 22),
+                                        position = vector.create(43, 22),
                                     },
                                     indexer_open = {
                                         trailing_trivia = {},
