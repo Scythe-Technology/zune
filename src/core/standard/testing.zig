@@ -135,7 +135,7 @@ pub fn consumeTestingResults(L: *VM.lua.State) !TestResult {
     total += scheduler.sleeping.items.len;
     total += scheduler.deferred.count();
     total += scheduler.awaiting;
-    total += if (!scheduler.loop.done()) scheduler.loop.state.loadActive() else 0;
+    total += if (!Scheduler.loopDone(&scheduler.loop)) @as(usize, 1) else @as(usize, 0);
 
     _ = L.gc(.Collect, 0);
 
