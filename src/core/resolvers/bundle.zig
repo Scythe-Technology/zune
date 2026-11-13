@@ -230,15 +230,16 @@ pub const PackedState = packed struct(u40) {
     mode: Mode,
     luau: Luau,
     format: Format,
-    _: u5 = 0, // reserved bits
+    _: u3 = 0, // reserved bits
 
     pub const Mode = packed struct(u2) {
         compiled: enum(u1) { debug, release },
         limbo: bool = false,
     };
 
-    const Format = packed struct(u27) {
+    const Format = packed struct(u29) {
         enabled: bool = true,
+        indent: u2 = @backingInt(Zune.Resolvers.Fmt.Indent.FourSpaces),
         use_color: bool = true,
         table_address: bool = true,
         recursive_table: bool = false,
@@ -417,6 +418,7 @@ fn applyPacked(state: PackedState, features: Features) void {
     Zune.State.options.runtime.luau.optimization_level = state.luau.optimization_level;
 
     Zune.State.options.format.enabled = state.format.enabled;
+    Zune.State.options.format.indent = @fromBackingInt(state.format.indent);
     Zune.State.options.format.use_color = state.format.use_color;
     Zune.State.options.format.table_address = state.format.table_address;
     Zune.State.options.format.recursive_table = state.format.recursive_table;

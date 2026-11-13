@@ -7,6 +7,8 @@ const Scheduler = Zune.Runtime.Scheduler;
 
 const VM = luau.VM;
 
+pub const Indent = enum(u2) { TwoSpaces, FourSpaces, Tabs };
+
 fn tostring(allocator: std.mem.Allocator, L: *VM.lua.State, idx: i32) !?[]const u8 {
     switch (L.typeOf(idx)) {
         else => |t| {
@@ -74,8 +76,8 @@ pub fn printValue(
                 try Zune.debug.writerPrint(writer, "<bold><yellow>{s}<clear>", .{if (b) "true" else "false"});
             },
             .Number => {
-                const n = L.tonumber(idx) orelse unreachable;
-                try Zune.debug.writerPrint(writer, "<bcyan>{d}<clear>", .{n});
+                var buf: [VM.zapi.STR_BUF_SIZE]u8 = undefined;
+                try Zune.debug.writerPrint(writer, "<bcyan>{s}<clear>", .{VM.zapi.Ztolstringkc(L, idx, &buf)});
             },
             .String => {
                 const s = L.tostring(idx) orelse unreachable;
@@ -121,7 +123,11 @@ pub fn printValue(
                 var i: i32 = L.rawiter(idx, 0);
                 while (i >= 0) : (i = L.rawiter(idx, i)) {
                     for (0..depth + 1) |_|
-                        try writer.print("    ", .{});
+                        switch (Zune.State.options.format.indent) {
+                            .TwoSpaces => try writer.print("  ", .{}),
+                            .FourSpaces => try writer.print("    ", .{}),
+                            .Tabs => try writer.print("\t", .{}),
+                        };
                     const n = L.gettop();
                     if (L.typeOf(@intCast(n - 1)) == .String) {
                         try printValue(L, writer, @intCast(n - 1), depth + 1, true, null, max_depth);
@@ -136,7 +142,11 @@ pub fn printValue(
                     L.pop(2);
                 }
                 for (0..depth) |_|
-                    try writer.print("    ", .{});
+                    switch (Zune.State.options.format.indent) {
+                        .TwoSpaces => try writer.print("  ", .{}),
+                        .FourSpaces => try writer.print("    ", .{}),
+                        .Tabs => try writer.print("\t", .{}),
+                    };
                 try Zune.debug.writerPrint(writer, "<dim>}}<clear>", .{});
             },
             .Buffer => {
@@ -156,11 +166,8 @@ pub fn printValue(
                 try Zune.debug.writerPrint(writer, ">><clear>", .{});
             },
             .Vector => {
-                const v = L.tovector(idx) orelse unreachable;
-                if (comptime luau.VM.lua.config.VECTOR_SIZE == 3)
-                    try Zune.debug.writerPrint(writer, "<bmagenta><<vector ({d}, {d}, {d})>><clear>", .{ v[0], v[1], v[2] })
-                else
-                    try Zune.debug.writerPrint(writer, "<bmagenta><<vector ({d}, {d}, {d}, {d})>><clear>", .{ v[0], v[1], v[2], v[3] });
+                var buf: [VM.zapi.STR_BUF_SIZE]u8 = undefined;
+                try Zune.debug.writerPrint(writer, "<bmagenta><<vector ({s})>><clear>", .{VM.zapi.Ztolstringkc(L, idx, &buf)});
             },
             else => {
                 if (try writeMetamethod__tostring(L, writer, -1))

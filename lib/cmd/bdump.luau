@@ -177,6 +177,7 @@ local optimization = buffer.readbits(prefix, 4, 2)
 local native = buffer.readbits(prefix, 6, 1) == 1
 local jit = buffer.readbits(prefix, 7, 1) == 1
 local format_on = buffer.readbits(prefix, 8, 1) == 1
+local indent = buffer.readbits(prefix, 9, 2)
 
 mem.reverse(prefix, 5, 4)
 local feature_names = {
@@ -325,6 +326,7 @@ print(`  optimization_level: {optimization}`)
 print(`  native: {tostring(native)}`)
 print(`  jit: {tostring(jit)}`)
 print(`  format: {tostring(format_on)}`)
+print(`  indent: {indent}`)
 if #disabled > 0 then
     print(`  disabled: {table.concat(disabled, ",")}`)
 end

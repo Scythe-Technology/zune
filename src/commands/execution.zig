@@ -382,6 +382,12 @@ pub const DebugCmd: command.Command = .{
 };
 
 test cmdRun {
+    try Zune.init(std.testing.environ);
+    defer {
+        Zune.State.env_map.deinit();
+        Zune.State.env_map = .init(.failing);
+    }
+
     const allocator = std.testing.allocator;
     try cmdRun(allocator, &.{"test/cli/run"});
 }

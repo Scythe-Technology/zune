@@ -273,9 +273,14 @@ pub const Policy = struct {
         if (entry.seconds <= 0)
             return;
 
+        const scheduler = Scheduler.fromState(L);
+        if (resumed) |current| {
+            if (current != entry and current.running)
+                scheduler.policy.stop(scheduler, current);
+        }
+
         const now = VM.lperf.clock();
         if (!entry.running) {
-            const scheduler = Scheduler.fromState(L);
             scheduler.policy.start(scheduler, entry);
             return;
         }

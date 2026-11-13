@@ -437,47 +437,63 @@ describe("task", function()
         end)
 
         test("loop", function()
-            local ok, err = pcall(function()
-                task.limit(0.2, function()
+            local caught = nil
+            local thread = task.limit(0.2, function()
+                local ok, err = pcall(function()
                     while true do
                     end
                 end)
+                if not ok then
+                    caught = tostring(err)
+                end
             end)
-            expect(ok).toBe(false)
-            expect(err).toBe("execution timeout")
+            expect(coroutine.status(thread)).toBe("dead")
+            expect(caught).toBe("execution timeout")
         end)
 
         test("wait", function()
             local done = false
             local thread = task.limit(0.2, function()
-                task.wait(0.5)
+                task.wait(0.05)
                 done = true
             end)
-            task.wait(0.7)
+            expect(done).toBe(false)
+            task.wait(0.1)
             expect(done).toBe(true)
+            expect(coroutine.status(thread)).toBe("dead")
+        end)
+
+        test("wait spin", function()
+            local caught = nil
+            local thread = task.limit(0.2, function()
+                task.wait()
+                local ok, err = pcall(function()
+                    while true do
+                    end
+                end)
+                if not ok then
+                    caught = tostring(err)
+                end
+            end)
+            expect(caught).toBeNil()
+            task.wait(0.4)
+            expect(caught).toBe("execution timeout")
             expect(coroutine.status(thread)).toBe("dead")
         end)
 
         test("child", function()
             local child_err = nil
-            local ok, err = pcall(function()
-                task.limit(0.2, function()
-                    local co = coroutine.create(function()
-                        while true do
-                        end
-                    end)
-                    local resumed, resume_err = coroutine.resume(co)
-                    if not resumed then
-                        child_err = tostring(resume_err)
+            task.limit(0.2, function()
+                local co = coroutine.create(function()
+                    while true do
                     end
                 end)
+                local resumed, resume_err = coroutine.resume(co)
+                if not resumed then
+                    child_err = tostring(resume_err)
+                end
             end)
-            if child_err ~= nil then
-                expect(child_err).toBe("execution timeout")
-            else
-                expect(ok).toBe(false)
-                expect(err).toBe("execution timeout")
-            end
+            expect(child_err).toBe("execution timeout")
         end)
 
         test("native", function()
@@ -486,11 +502,14 @@ describe("task", function()
                 native_code_gen = true,
                 chunk_name = "spin",
             })
-            local ok, err = pcall(function()
-                task.limit(0.2, fn)
+            local caught = nil
+            task.limit(0.2, function()
+                local ok, err = pcall(fn)
+                if not ok then
+                    caught = tostring(err)
+                end
             end)
-            expect(ok).toBe(false)
-            expect(err).toBe("execution timeout")
+            expect(caught).toBe("execution timeout")
         end)
     end)
 end)

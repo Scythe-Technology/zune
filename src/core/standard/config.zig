@@ -51,6 +51,9 @@ pub fn pushFromConfiguration(comptime T: type, value: *T, L: *VM.lua.State) !voi
                     else => |e| @compileError("unsupported type: " ++ @tagName(e)),
                 }
             },
+            .@"enum" => {
+                try L.Zpushvalue(@backingInt(@field(value, field_name)));
+            },
             else => @compileError("unsupported type: " ++ @tagName(field_ti)),
         }
         try L.rawsetfield(-2, field_name);

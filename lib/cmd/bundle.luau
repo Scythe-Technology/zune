@@ -56,6 +56,7 @@ local state = {
     home = process.env.HOME or process.env.USERPROFILE or "",
     format = {
         enabled = true,
+        indent = 1,
         max_depth = 4,
         use_color = true,
         table_address = true,
@@ -447,6 +448,7 @@ do
             `  jit_enabled: {ansi.cyan}{if state.jit then 1 else 0}{ansi.reset}`,
             `  format:`,
             `    enabled: {ansi.cyan}{if state.format.enabled then 1 else 0}{ansi.reset}`,
+            `    indent: {ansi.cyan}{state.format.indent}{ansi.reset}`,
             `    use_color: {ansi.cyan}{if state.format.use_color then 1 else 0}{ansi.reset}`,
             `    table_address: {ansi.cyan}{if state.format.table_address then 1 else 0}{ansi.reset}`,
             `    recursive_table: {ansi.cyan}{if state.format.recursive_table then 1 else 0}{ansi.reset}`,
@@ -462,12 +464,13 @@ do
     bit_at = writeBits(buf, bit_at, if state.ncg then 1 else 0, 1)
     bit_at = writeBits(buf, bit_at, if state.jit then 1 else 0, 1)
     bit_at = writeBits(buf, bit_at, if state.format.enabled then 1 else 0, 1)
+    bit_at = writeBits(buf, bit_at, state.format.indent, 2)
     bit_at = writeBits(buf, bit_at, if state.format.use_color then 1 else 0, 1)
     bit_at = writeBits(buf, bit_at, if state.format.table_address then 1 else 0, 1)
     bit_at = writeBits(buf, bit_at, if state.format.recursive_table then 1 else 0, 1)
     bit_at = writeBits(buf, bit_at, state.format.max_depth, 8)
     bit_at = writeBits(buf, bit_at, state.format.buffer_max_display, 15)
-    bit_at = writeBits(buf, bit_at, 0, 5) -- reserved
+    bit_at = writeBits(buf, bit_at, 0, 3) -- reserved
     mem.reverse(buf, bit_at // 8 - 5, 5)
 
     local feature_names = {

@@ -1860,8 +1860,15 @@
     "code_sample": "",
     "documentation": "A helper library to simplify string formatting, dedicated to formatting in the way zune does.",
     "keys": {
+      "setRecursiveTable": "@zune/globaltype/_zune_fmt.setRecursiveTable",
+      "setUseColor": "@zune/globaltype/_zune_fmt.setUseColor",
       "useColors": "@zune/globaltype/_zune_fmt.useColors",
-      "format": "@zune/globaltype/_zune_fmt.format"
+      "setBufferMaxDisplay": "@zune/globaltype/_zune_fmt.setBufferMaxDisplay",
+      "setIndent": "@zune/globaltype/_zune_fmt.setIndent",
+      "setTableAddress": "@zune/globaltype/_zune_fmt.setTableAddress",
+      "format": "@zune/globaltype/_zune_fmt.format",
+      "setEnabled": "@zune/globaltype/_zune_fmt.setEnabled",
+      "setMaxDepth": "@zune/globaltype/_zune_fmt.setMaxDepth"
     },
     "learn_more_link": "https://zune.sh/docs/v0.6.x/api/fmt"
   },
@@ -1889,6 +1896,83 @@
       "@zune/globaltype/_zune_fmt.useColors/return/0"
     ],
     "params": []
+  },
+  "@zune/globaltype/_zune_fmt.setEnabled": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [],
+    "params": [
+      {
+        "name": "enabled",
+        "documentation": "@zune/globaltype/_zune_fmt.setEnabled/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_fmt.setIndent": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [],
+    "params": [
+      {
+        "name": "indent",
+        "documentation": "@zune/globaltype/_zune_fmt.setIndent/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_fmt.setMaxDepth": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [],
+    "params": [
+      {
+        "name": "depth",
+        "documentation": "@zune/globaltype/_zune_fmt.setMaxDepth/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_fmt.setUseColor": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [],
+    "params": [
+      {
+        "name": "enabled",
+        "documentation": "@zune/globaltype/_zune_fmt.setUseColor/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_fmt.setTableAddress": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [],
+    "params": [
+      {
+        "name": "enabled",
+        "documentation": "@zune/globaltype/_zune_fmt.setTableAddress/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_fmt.setRecursiveTable": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [],
+    "params": [
+      {
+        "name": "enabled",
+        "documentation": "@zune/globaltype/_zune_fmt.setRecursiveTable/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_fmt.setBufferMaxDisplay": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [],
+    "params": [
+      {
+        "name": "max",
+        "documentation": "@zune/globaltype/_zune_fmt.setBufferMaxDisplay/param/0"
+      }
+    ]
   },
   "@zune/globaltype/_zune_crypto_aead": {
     "code_sample": "",

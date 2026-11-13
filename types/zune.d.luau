@@ -1166,16 +1166,18 @@ export type _zune_config = {
 --[[ fmt ]]
 export type _zune_fmt = {
     format: (...any) -> string,
-    useColors: () -> boolean, 
+    useColors: () -> boolean,
+    setEnabled: (enabled: boolean) -> (),
+    setIndent: (indent: number) -> (),
+    setMaxDepth: (depth: number) -> (),
+    setUseColor: (enabled: boolean) -> (),
+    setTableAddress: (enabled: boolean) -> (),
+    setRecursiveTable: (enabled: boolean) -> (),
+    setBufferMaxDisplay: (max: number) -> (), 
 }
 --[[ require ]]
-export type _zune_require_config = {
-    luau: {
-        aliases: { [string]: string }?,
-    }?,
-}
 export type _zune_require = {
-    navigate: (path: string | buffer, from: (string | buffer)?, config: (number | _zune_require_config)?) -> string,
+    navigate: (path: string | buffer, from: (string | buffer)?, config: string | buffer?) -> string,
     getCached: (resolvedPath: string) -> any?, 
 }
 --[[ mem ]]

@@ -80,7 +80,7 @@ pub const VERSION_FULL_STR = std.fmt.comptimePrint("{s}+{d}.{d}", .{
 });
 
 pub const ZuneState = struct {
-    env_map: std.process.Environ.Map = undefined,
+    env_map: std.process.Environ.Map = .init(.failing),
     main_thread_id: ?std.Thread.Id = null,
     bundle: ?Resolvers.Bundle.Map = null,
     bin_arg: [:0]const u8 = &.{},
@@ -164,6 +164,7 @@ pub const ZuneState = struct {
         };
         pub const Format = struct {
             enabled: bool = true,
+            indent: Resolvers.Fmt.Indent = .FourSpaces,
             max_depth: u8 = 4,
             use_color: bool = true,
             table_address: bool = true,
@@ -248,6 +249,26 @@ pub fn loadConfigurationFromToml(comptime T: type, target: *T, allocator: std.me
                         @field(target, field_name) = allocator.dupe(u8, item.string) catch |err| quitMsg("{}\n", .{err});
                     },
                     else => |e| @compileError("unsupported type: " ++ @tagName(e)),
+                }
+            },
+            .@"enum" => |enm| {
+                if (table.contains(field_name)) {
+                    const item = table.table.get(field_name) orelse unreachable;
+                    switch (item) {
+                        .integer => {
+                            @field(target, field_name) = @fromBackingInt(@truncate(@as(u64, @bitCast(item.integer))));
+                        },
+                        .string => blk: {
+                            inline for (enm.field_names, enm.field_values) |enum_field_name, enum_field_value| {
+                                if (std.mem.eql(u8, enum_field_name, item.string)) {
+                                    @field(target, field_name) = @fromBackingInt(enum_field_value);
+                                    break :blk;
+                                }
+                            }
+                            quitMsg("<red>configuration error:<clear> '{s}' must be an valid option\n", .{field_name});
+                        },
+                        else => quitMsg("<red>configuration error:<clear> '{s}' must be an integer or string\n", .{field_name}),
+                    }
                 }
             },
             else => @compileError("unsupported type: " ++ @tagName(field_ti)),

@@ -180,16 +180,7 @@ pub fn lua_limit(L: *VM.lua.State) !i32 {
     }
 
     Scheduler.fromState(L).policy.limit(thread, seconds);
-
-    switch (Scheduler.resumeThread(thread, L, @intCast(args))) {
-        .Ok, .Yield, .Break => return 1,
-        .ErrMem => return error.OutOfMemory,
-        else => {
-            const msg = thread.tostring(-1) orelse "execution timeout";
-            try L.pushlstring(msg);
-            return error.RaiseLuauError;
-        },
-    }
+    _ = Scheduler.resumeState(thread, L, @intCast(args)) catch {};
 
     return 1;
 }
