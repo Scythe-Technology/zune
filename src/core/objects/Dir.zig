@@ -459,7 +459,7 @@ pub fn lua_copyFile(self: *Dir, L: *VM.lua.State) !i32 {
     try self.dir.copyFile(path, new_dir.dir, new_path, Zune.io(), .{
         .replace = opts.replace,
         .make_path = opts.make_path,
-        .permissions = if (opts.permissions) |p| @fromBackingInt(p) else null,
+        .permissions = if (opts.permissions) |p| @fromBackingInt(@truncate(p)) else null,
     });
 
     return 0;
@@ -475,7 +475,7 @@ pub fn lua_setPermissions(self: *Dir, L: *VM.lua.State) !i32 {
 
     if (!L.isyieldable()) {
         // [SYNC]
-        try self.dir.setPermissions(Zune.io(), @fromBackingInt(mode));
+        try self.dir.setPermissions(Zune.io(), @fromBackingInt(@truncate(mode)));
         return 0;
     }
 
@@ -486,7 +486,7 @@ pub fn lua_setPermissions(self: *Dir, L: *VM.lua.State) !i32 {
         .ref = .init(L),
         .op = .{
             .dir_set_permissions = .{
-                .op = .init(self.dir.handle, mode),
+                .op = .init(self.dir.handle, @truncate(mode)),
             },
         },
     };
@@ -544,7 +544,7 @@ pub fn lua_setFilePermissions(self: *Dir, L: *VM.lua.State) !i32 {
 
     if (!L.isyieldable()) {
         // [SYNC]
-        try self.dir.setFilePermissions(Zune.io(), path, @fromBackingInt(mode), .{
+        try self.dir.setFilePermissions(Zune.io(), path, @fromBackingInt(@truncate(mode)), .{
             .follow_symlinks = opts.follow_symlinks,
         });
         return 0;
@@ -562,7 +562,7 @@ pub fn lua_setFilePermissions(self: *Dir, L: *VM.lua.State) !i32 {
         .ref = .init(L),
         .op = .{
             .dir_set_file_permissions = .{
-                .op = .init(self.dir.handle, copy_path, mode, .{
+                .op = .init(self.dir.handle, copy_path, @truncate(mode), .{
                     .follow_symlinks = opts.follow_symlinks,
                 }),
             },
@@ -1003,7 +1003,7 @@ pub fn lua_createDir(self: *Dir, L: *VM.lua.State) !i32 {
 
     if (!L.isyieldable()) {
         // [SYNC]
-        try self.dir.createDir(Zune.io(), path, @fromBackingInt(mode));
+        try self.dir.createDir(Zune.io(), path, @fromBackingInt(@truncate(mode)));
         return 0;
     }
     const allocator = scheduler.allocator();
@@ -1018,7 +1018,7 @@ pub fn lua_createDir(self: *Dir, L: *VM.lua.State) !i32 {
         .ref = .init(L),
         .op = .{
             .dir_create_dir = .{
-                .op = .init(self.dir.handle, copy_path, mode),
+                .op = .init(self.dir.handle, copy_path, @truncate(mode)),
             },
         },
     };
@@ -1052,7 +1052,7 @@ pub fn lua_createFile(self: *Dir, L: *VM.lua.State) !i32 {
         .truncate = opts.truncate,
         .exclusive = opts.exclusive,
         .resolve_beneath = opts.resolve_beneath,
-        .mode = opts.permissions,
+        .mode = @truncate(opts.permissions),
     });
 
     if (!L.isyieldable()) {

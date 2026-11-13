@@ -88,11 +88,14 @@ pub fn build(b: *std.Build) !void {
     mod_zune.addImport("toml", dep_toml.module("root"));
     mod_zune.addImport("wire", dep_wire.module("root"));
 
+    // LLD cannot link macho with zig 0.17+.
+    const use_lld: ?bool = if (target.result.ofmt == .macho) false else use_llvm;
+
     const exe = b.addExecutable(.{
         .name = "zune",
         .root_module = mod_zune,
         .use_llvm = use_llvm,
-        .use_lld = use_llvm,
+        .use_lld = use_lld,
     });
 
     exe.lto = switch (optimize) {
@@ -149,6 +152,7 @@ pub fn build(b: *std.Build) !void {
         .filters = if (rt_test_filter) |filter| &.{filter} else &.{},
         .root_module = mod_zune,
         .use_llvm = use_llvm,
+        .use_lld = use_lld,
     });
 
     exe_unit_tests.step.dependOn(&install_sample_dylib.step);

@@ -23,10 +23,11 @@ pub fn getTotalSystemMemory() SystemMemoryError!u64 {
         .freebsd => {
             var physmem: c_ulong = undefined;
             var len: usize = @sizeOf(c_ulong);
-            posix.sysctlbynameZ("hw.physmem", &physmem, &len, null, 0) catch |err| switch (err) {
-                error.NameTooLong, error.UnknownName => unreachable,
+            switch (posix.errno(posix.system.sysctlbyname("hw.physmem", &physmem, &len, null, 0))) {
+                .SUCCESS => {},
+                .FAULT, .PERM, .NOMEM, .NOENT => unreachable,
                 else => return error.UnknownTotalSystemMemory,
-            };
+            }
             return @as(usize, @intCast(physmem));
         },
         // whole Darwin family
@@ -34,12 +35,11 @@ pub fn getTotalSystemMemory() SystemMemoryError!u64 {
             // "hw.memsize" returns uint64_t
             var physmem: u64 = undefined;
             var len: usize = @sizeOf(u64);
-            posix.sysctlbynameZ("hw.memsize", &physmem, &len, null, 0) catch |err| switch (err) {
-                error.PermissionDenied => unreachable, // only when setting values,
-                error.SystemResources => unreachable, // memory already on the stack
-                error.UnknownName => unreachable, // constant, known good value
+            switch (posix.errno(posix.system.sysctlbyname("hw.memsize", &physmem, &len, null, 0))) {
+                .SUCCESS => {},
+                .FAULT, .PERM, .NOMEM, .NOENT => unreachable,
                 else => return error.UnknownTotalSystemMemory,
-            };
+            }
             return physmem;
         },
         .openbsd => {
@@ -89,10 +89,11 @@ pub fn getFreeMemory() SystemMemoryError!u64 {
         .freebsd => {
             var free: c_int = undefined;
             var len: usize = @sizeOf(c_int);
-            posix.sysctlbynameZ("vm.stats.vm.v_free_count", &free, &len, null, 0) catch |err| switch (err) {
-                error.NameTooLong, error.UnknownName => unreachable,
+            switch (posix.errno(posix.system.sysctlbyname("vm.stats.vm.v_free_count", &free, &len, null, 0))) {
+                .SUCCESS => {},
+                .FAULT, .PERM, .NOMEM, .NOENT => unreachable,
                 else => return error.UnknownFreeSystemMemory,
-            };
+            }
             return @as(usize, @intCast(free)) * std.heap.pageSize();
         },
         // whole Darwin family

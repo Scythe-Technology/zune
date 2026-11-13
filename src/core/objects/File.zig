@@ -247,7 +247,7 @@ pub fn lua_setPermissions(self: *File, L: *VM.lua.State) !i32 {
 
     if (!L.isyieldable()) {
         // [SYNC]
-        try self.file.setPermissions(Zune.io(), @fromBackingInt(mode));
+        try self.file.setPermissions(Zune.io(), @fromBackingInt(@truncate(mode)));
         return 0;
     }
 
@@ -258,7 +258,7 @@ pub fn lua_setPermissions(self: *File, L: *VM.lua.State) !i32 {
         .ref = .init(L),
         .op = .{
             .file_set_permissions = .{
-                .op = .init(self.file.handle, mode),
+                .op = .init(self.file.handle, @truncate(mode)),
             },
         },
     };

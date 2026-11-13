@@ -629,7 +629,7 @@ pub const KqueueImpl = struct {
                 addChild(self, allocator, idx, name);
         }
 
-        var gone: std.ArrayList([]u8) = .empty;
+        var gone: std.ArrayList([]const u8) = .empty;
         defer gone.deinit(allocator);
 
         const current = nodeAt(self, idx) orelse return;

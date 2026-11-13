@@ -88,9 +88,10 @@ pub fn lua_getKernelVersion(L: *VM.lua.State) !i32 {
         .driverkit, .ios, .macos, .tvos, .visionos, .watchos => {
             var version: [256:0]u8 = undefined;
             var len: usize = @sizeOf(@TypeOf(version));
-            std.posix.sysctlbynameZ("kern.osrelease", &version, &len, null, 0) catch |err| switch (err) {
+            switch (std.posix.errno(std.posix.system.sysctlbyname("kern.osrelease", &version, &len, null, 0))) {
+                .SUCCESS => {},
                 else => return error.UnknownKernelVersion,
-            };
+            }
             const b: [*:0]u8 = &version;
             const str: []const u8 = std.mem.span(b);
             try L.pushfstring("Darwin {s}", .{str});
@@ -98,9 +99,10 @@ pub fn lua_getKernelVersion(L: *VM.lua.State) !i32 {
         .freebsd => {
             var version: [256:0]u8 = undefined;
             var len: usize = @sizeOf(@TypeOf(version));
-            std.posix.sysctlbynameZ("kern.osrelease", &version, &len, null, 0) catch |err| switch (err) {
+            switch (std.posix.errno(std.posix.system.sysctlbyname("kern.osrelease", &version, &len, null, 0))) {
+                .SUCCESS => {},
                 else => return error.UnknownKernelVersion,
-            };
+            }
             const b: [*:0]u8 = &version;
             const str: []const u8 = std.mem.span(b);
             try L.pushfstring("FreeBSD {s}", .{str});
