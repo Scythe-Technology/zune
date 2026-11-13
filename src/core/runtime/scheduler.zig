@@ -893,7 +893,7 @@ pub fn setup(self: *Scheduler, L: *VM.lua.State) void {
 
     if (comptime builtin.os.tag == .windows) {
         if (Zune.State.env_map.get("SystemRoot") == null) {
-            Zune.quitMsg("<red>error<clear>: 'SystemRoot' environment variable is not set, this is required on Windows (event loop will not start)");
+            Zune.quitMsg("<red>error<clear>: 'SystemRoot' environment variable is not set, this is required on Windows (event loop will not start)", .{});
         }
     }
     self.loop.init(.{

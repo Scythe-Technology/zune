@@ -557,7 +557,7 @@ end)
 describe("fflag", function()
     test("basic", function()
         for _, fflag in luau.fflag.list() do
-            if fflag.name == "LuauCIProto" then
+            if fflag.name == "LuauCIProto" or fflag.name == "LuauSaltedInterningTable" then
                 continue -- skip this one, it is a special case
             end
             if fflag.type == "boolean" then

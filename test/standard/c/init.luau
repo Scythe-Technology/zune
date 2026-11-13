@@ -182,7 +182,7 @@ describe("c", function()
                 expect(ptr == located_ptr).toBe(true)
                 expect(function()
                     mem.len(ptr)
-                end).toThrow("unknown size")
+                end).toThrow("unknown pointer size")
             end
         end)
 
@@ -681,16 +681,13 @@ describe("c", function()
             for k, v in definitions do
                 entries[k] = c.fn(v.returns, v.args, lib:getSymbol(k))
             end
-            return setmetatable(
-                entries,
-                {
-                    __index = {
-                        getSymbol = function(_, name)
-                            return lib:getSymbol(name)
-                        end,
-                    },
-                }
-            )
+            return setmetatable(entries, {
+                __index = {
+                    getSymbol = function(_, name)
+                        return lib:getSymbol(name)
+                    end,
+                },
+            })
         end
 
         local lib = loadWith(`./zig-out/lib/{c.prefix}sample.{static_suffix}`, {
