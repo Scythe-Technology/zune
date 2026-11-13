@@ -19,7 +19,6 @@ pub const OBJECT_TAG = Zune.Tags.get("C_DYNLIB").?;
 pub const PlatformSupported = Zune.standard.libraries.c.PlatformSupported;
 
 lib: if (builtin.os.tag == .windows) WinApi.HMODULE else std.DynLib,
-open: bool,
 
 const WinApi = struct {
     const w = std.os.windows;
@@ -34,7 +33,6 @@ const WinApi = struct {
         dwFlags: u32,
     ) callconv(.winapi) ?HMODULE;
 
-    pub extern "kernel32" fn FreeLibrary(hLibModule: HMODULE) callconv(.winapi) i32;
     pub extern "kernel32" fn GetProcAddress(hModule: HMODULE, lpProcName: [*:0]const u8) callconv(.winapi) ?w.FARPROC;
 };
 
@@ -68,7 +66,6 @@ pub fn openLibrary(L: *VM.lua.State, path: [:0]const u8) !*DynamicLibrary {
 
     ptr.* = .{
         .lib = lib,
-        .open = true,
     };
 
     return ptr;
@@ -92,11 +89,5 @@ pub fn lua_getSymbol(self: *DynamicLibrary, L: *VM.lua.State) !i32 {
 
 pub fn __dtor(L: *VM.lua.State, self: *DynamicLibrary) void {
     _ = L;
-    if (self.open) {
-        switch (comptime builtin.os.tag) {
-            .windows => _ = WinApi.FreeLibrary(self.lib),
-            else => self.lib.close(),
-        }
-    }
-    self.open = false;
+    _ = self;
 }
