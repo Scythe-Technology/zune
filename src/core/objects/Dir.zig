@@ -256,10 +256,10 @@ fn asyncCallback(loop: *zio.ev.Loop, completion: *zio.ev.Completion) void {
             _ = Scheduler.resumeState(L, null, 1) catch {};
         },
         .dir_close => |*e| {
-            e.op.getResult() catch |err|
-                return Scheduler.resumeStateError(L, null, err) catch {};
+            e.op.getResult() catch |err| switch (err) {
+                error.Canceled => dir.dir.close(Zune.io()),
+            };
 
-            dir.mode = .closed;
             if (e.canceled)
                 _ = scheduler.deferThread(.take(&async.ref), null, 0) catch {}
             else
@@ -1327,6 +1327,8 @@ pub fn lua_close(self: *Dir, L: *VM.lua.State) !i32 {
 
         // [ASYNC]
         const async = try scheduler.createAsync();
+
+        self.mode = .closed;
 
         async.* = .{
             .ref = .init(L),
