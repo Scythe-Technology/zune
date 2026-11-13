@@ -16,8 +16,8 @@
             .hash = "json-0.4.0-yTw8kwuOAQCJ-7m4aJEbvWY2kMi8Kq-ML9Zulrb_kpuo",
         },
         .yaml = .{
-            .url = "git+https://codeberg.org/kubkon/zig-yaml#de1b56d1174d05bb8625fad22df26a7fd29a3046",
-            .hash = "zig_yaml-0.3.0-C1161onbAgAbQSJ0zsn3fzQCjlXiesqUksi9HLXlhGdq",
+            .url = "git+https://github.com/Scythe-Technology//zig-yaml#fa20c9955c1f38684b022b1fde715edcb558e9ec",
+            .hash = "zig_yaml-0.3.0-C1161t_eAgBGR0MvnQ-ltXzflvBnY_wfAwfnIem2LutZ",
         },
         .lz4 = .{
             .url = "git+https://github.com/Scythe-Technology/zig-lz4#06e4e5569b39026b5307d9db5c4e0a350da1f6e0",
