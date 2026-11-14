@@ -62,6 +62,10 @@ export fn check_struct2(foo: Foo2) bool {
     return foo.x == 1.1 and foo.y == 2.2;
 }
 
+export fn check_struct2ec(foo: extern struct { first: extern struct { second: Foo2 } }) bool {
+    return foo.first.second.x == 1.1 and foo.first.second.y == 2.2;
+}
+
 const Foo3 = extern struct {
     x: f64,
 };
@@ -79,6 +83,10 @@ export fn check_vec2_32(foo: Vec2_32) bool {
     return foo.x == 1.23 and foo.y == 2.34;
 }
 
+export fn check_vec2e_32(foo: extern struct { second: Vec2_32 }) bool {
+    return foo.second.x == 1.23 and foo.second.y == 2.34;
+}
+
 const Vec3_32 = extern struct {
     x: f32,
     y: f32,
@@ -87,6 +95,10 @@ const Vec3_32 = extern struct {
 
 export fn check_vec3_32(foo: Vec3_32) bool {
     return foo.x == 1.23 and foo.y == 2.34 and foo.z == 3.45;
+}
+
+export fn check_vec3e_32(foo: extern struct { second: Vec3_32 }) bool {
+    return foo.second.x == 1.23 and foo.second.y == 2.34 and foo.second.z == 3.45;
 }
 
 export fn new_vec2_32(x: f32, y: f32) Vec2_32 {

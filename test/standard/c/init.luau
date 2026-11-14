@@ -1142,7 +1142,7 @@ describe("c", function()
                 local check_struct2ec = c.fn(
                     check_struct2ec_defintion.returns,
                     check_struct2ec_defintion.args,
-                    lib:getSymbol("check_struct2") or error("Symbol 'check_struct2ec' not found")
+                    lib:getSymbol("check_struct2ec") or error("Symbol 'check_struct2ec' not found")
                 )
 
                 do
@@ -1388,7 +1388,7 @@ describe("c", function()
                 local check_vec2e_32 = c.fn(
                     check_vec2e_32_defintion.returns,
                     check_vec2e_32_defintion.args,
-                    lib:getSymbol("check_vec2_32") or error("Symbol 'check_vec2_32' not found")
+                    lib:getSymbol("check_vec2e_32") or error("Symbol 'check_vec2e_32' not found")
                 )
 
                 do
@@ -1587,7 +1587,7 @@ describe("c", function()
                 local check_vec3e_32 = c.fn(
                     check_vec3e_32_defintion.returns,
                     check_vec3e_32_defintion.args,
-                    lib:getSymbol("check_vec3_32") or error("Symbol 'check_vec3_32' not found")
+                    lib:getSymbol("check_vec3e_32") or error("Symbol 'check_vec3e_32' not found")
                 )
 
                 do
@@ -1730,6 +1730,9 @@ describe("c", function()
             describe("library", function()
                 local ptr = nil
                 test("symbol<*int32 new_i32()>", function()
+                    if platform.abi == "musl" and platform.cpu.arch == "riscv64" then
+                        error("SkipTest", 0) -- linking issue with musl build
+                    end
                     ptr = lib.new_i32()
 
                     ptr:size(c.types.int32:size())
@@ -1749,6 +1752,9 @@ describe("c", function()
                 end)
 
                 test("symbol<void free_i32(*int32)>", function()
+                    if platform.abi == "musl" and platform.cpu.arch == "riscv64" then
+                        error("SkipTest", 0) -- linking issue with musl build
+                    end
                     assert(ptr, "Pointer is nil")
                     lib.free_i32(ptr)
                 end)
@@ -1756,6 +1762,9 @@ describe("c", function()
             describe("dynamic", function()
                 local ptr = nil
                 test("symbol<*int32 new_i32()>", function()
+                    if platform.abi == "musl" and platform.cpu.arch == "riscv64" then
+                        error("SkipTest", 0) -- linking issue with musl build
+                    end
                     ptr = c.fn(
                         new_i32_defintion.returns,
                         new_i32_defintion.args,
@@ -1778,6 +1787,9 @@ describe("c", function()
                 end)
 
                 test("symbol<void free_i32(*int32)>", function()
+                    if platform.abi == "musl" and platform.cpu.arch == "riscv64" then
+                        error("SkipTest", 0) -- linking issue with musl build
+                    end
                     assert(ptr, "Pointer is nil")
                     c.fn(
                         free_i32_defintion.returns,
