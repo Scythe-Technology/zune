@@ -113,7 +113,7 @@ jobs:
       run: zig build -Doptimize=ReleaseFast -Drelease-ver -Dtarget=${{ matrix.target }}
 
     - name: Pack Artifact
-      run: cd ./zig-out/bin && zip ../../${{ matrix.artifact }}.zip ./zune${{ matrix.ext }} ./lib ./types
+      run: cd ./zig-out/bin && zip -r ../../${{ matrix.artifact }}.zip ./zune${{ matrix.ext }} ./lib ./types
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
