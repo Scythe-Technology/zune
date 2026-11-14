@@ -2024,7 +2024,7 @@ const AstSerializer = struct {
         return false;
     }
     pub fn visitTypeTable(self: *@This(), node: *Ast.TypeTable) !bool {
-        comptime Used(Ast.TypeTable, &.{ "location", "indexer", "props", "isExact" });
+        comptime Used(Ast.TypeTable, &.{ "location", "indexer", "props" });
         comptime Used(Cst.TypeTable, &.{ "items", "isArray" });
         const cstNode = self.cst_node_map.find(@ptrCast(node)).?.second.*.as(.type_table).?;
         try self.L.rawcheckstack(2);
@@ -2053,9 +2053,7 @@ const AstSerializer = struct {
             try self.L.rawsetfield(-2, "close_brace");
             return false;
         }
-        try self.L.createtable(0, 6);
-
-        try self.L.Zsetfield("is_exact", node.isExact);
+        try self.L.createtable(0, 5);
 
         try self.L.Zsetfield("tag", "table");
         try setSpanLocation(self.L, node.location, "span");

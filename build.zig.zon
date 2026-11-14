@@ -4,8 +4,8 @@
     .minimum_zig_version = "0.17.0",
     .dependencies = .{
         .luau = .{
-            .url = "git+https://github.com/Scythe-Technology/zig-luau#21f42c66aabf460b8c579aed9e75aaff6ec86e8f",
-            .hash = "luau-0.0.0+746-uDAGpxZdCwAtc8qj9fB7_LpVZSWn3kc_eGfZVIpLlFqs",
+            .url = "git+https://github.com/Scythe-Technology/zig-luau#e2803f3b65716c48a327b644dbd96af16a99e4d6",
+            .hash = "luau-0.0.0+747-uDAGp-1ZCwBEs-r92QHGaMoYbDUJBgJFlgj69KwvsDkM",
         },
         .zio = .{
             .url = "git+https://github.com/lalinsky/zio.git#v0.20.0",
