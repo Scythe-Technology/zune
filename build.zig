@@ -98,7 +98,7 @@ pub fn build(b: *std.Build) !void {
         .use_lld = use_lld,
     });
 
-    if (target.result.ofmt != .macho) {
+    if (target.result.ofmt != .macho and target.result.os.tag != .windows) {
         exe.lto = switch (optimize) {
             .debug => null,
             .small => .thin,
