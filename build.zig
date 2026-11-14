@@ -98,11 +98,13 @@ pub fn build(b: *std.Build) !void {
         .use_lld = use_lld,
     });
 
-    exe.lto = switch (optimize) {
-        .debug => null,
-        .small => .thin,
-        else => .full,
-    };
+    if (target.result.ofmt != .macho) {
+        exe.lto = switch (optimize) {
+            .debug => null,
+            .small => .thin,
+            else => .full,
+        };
+    }
 
     exe.link_function_sections = true;
     exe.link_data_sections = true;
