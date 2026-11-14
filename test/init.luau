@@ -76,6 +76,9 @@ local function runTest(path: string, args: { string }?)
         TEMP_PATH = RUN_TEMP_PATH,
         PATH = process.env.PATH,
         SystemRoot = process.env.SystemRoot, -- windows
+        TEMP = process.env.TEMP, -- windows
+        TMP = process.env.TMP, -- windows
+        PATHEXT = process.env.PATHEXT, -- windows
     }
 
     if PARALLEL then

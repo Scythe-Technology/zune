@@ -187,7 +187,7 @@ pub fn init(environ: std.process.Environ) !void {
         @import("./core/runtime/crash.zig").init();
     }
 
-    standard.libraries.io.terminal.init(std.Io.File.stdin(), std.Io.File.stdout());
+    standard.libraries.io.terminal.init(std.Io.File.stdin(), std.Io.File.stdout(), std.Io.File.stderr());
     standard.libraries.io.terminal.setOutputMode() catch debug.print("<blue>setup error<clear> failed to set output codepoint\n", .{});
 }
 

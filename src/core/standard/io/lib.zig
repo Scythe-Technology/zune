@@ -214,9 +214,7 @@ pub const lua_terminal = if (terminal.SupportedPlatform()) struct {
     }
 
     pub fn lua_isTty(L: *VM.lua.State) !i32 {
-        terminal.probeTtyStdIn();
-        terminal.probeTtyStdOut();
-        L.pushboolean(terminal.state.stdin_istty.? and terminal.state.stdout_istty.?);
+        L.pushboolean(terminal.isStdInTty() and terminal.isStdOutTty() and terminal.isStdErrTty());
         return 1;
     }
 } else null;

@@ -147,7 +147,7 @@ pub fn lua_kill(self: *Child, L: *VM.lua.State) !i32 {
 
     switch (comptime builtin.os.tag) {
         .windows => switch (std.os.windows.ntdll.NtTerminateProcess(handle, @fromBackingInt(1))) {
-            .SUCCESS => {},
+            .SUCCESS => self.status = .{ .exited = .{ .code = 0, .signal = 1 } },
             .ACCESS_DENIED => return error.AlreadyTerminated,
             else => return error.Unexpected,
         },

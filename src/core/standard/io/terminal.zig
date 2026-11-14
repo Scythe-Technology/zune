@@ -17,9 +17,11 @@ const Modes = enum {
 pub const State = struct {
     stdin_istty: ?bool = null,
     stdout_istty: ?bool = null,
+    stderr_istty: ?bool = null,
 
     stdin_file: std.Io.File,
     stdout_file: std.Io.File,
+    stderr_file: std.Io.File,
     settings: ?if (builtin.os.tag == .windows) WindowsSettings else std.posix.termios = null,
     current_settings: if (builtin.os.tag == .windows) WindowsSettings else void = if (builtin.os.tag == .windows) .{
         .stdin_mode = 0,
@@ -69,12 +71,14 @@ const WinApi = struct {
 };
 
 pub threadlocal var state: State = undefined;
-pub fn init(stdin_file: std.Io.File, stdout_file: std.Io.File) void {
+pub fn init(stdin_file: std.Io.File, stdout_file: std.Io.File, stderr_file: std.Io.File) void {
     state = .{
         .stdin_istty = null,
         .stdout_istty = null,
+        .stderr_istty = null,
         .stdin_file = stdin_file,
         .stdout_file = stdout_file,
+        .stderr_file = stderr_file,
         .mode = .Plain, // prob best to assume plain text.
     };
 }
@@ -89,20 +93,30 @@ pub fn probeTtyStdOut() void {
         state.stdout_istty = state.stdout_file.isTty(Zune.io()) catch false;
 }
 
-pub fn validateInteractive() !void {
-    comptime std.debug.assert(SupportedPlatform());
+pub fn probeTtyStdErr() void {
+    if (state.stderr_istty == null)
+        state.stderr_istty = state.stderr_file.isTty(Zune.io()) catch false;
+}
+
+pub fn isStdInTty() bool {
     probeTtyStdIn();
+    return state.stdin_istty.?;
+}
+
+pub fn isStdOutTty() bool {
     probeTtyStdOut();
-    if (!state.stdin_istty.?)
-        return std.posix.TIOCError.NotATerminal;
-    if (!state.stdout_istty.?)
-        return std.posix.TIOCError.NotATerminal;
+    return state.stdout_istty.?;
+}
+
+pub fn isStdErrTty() bool {
+    probeTtyStdErr();
+    return state.stderr_istty.?;
 }
 
 pub fn getSize() !struct { u16, u16 } {
     comptime std.debug.assert(SupportedPlatform());
-    probeTtyStdOut();
-    if (!state.stdout_istty.?) return std.posix.TIOCError.NotATerminal;
+    if (!isStdOutTty())
+        return std.posix.TIOCError.NotATerminal;
     if (comptime builtin.os.tag == .windows) {
         var console_info = std.os.windows.CONSOLE.USER_IO.GET_SCREEN_BUFFER_INFO;
         switch (try console_info.operate(Zune.io(), state.stdout_file)) {
@@ -128,16 +142,14 @@ pub fn saveSettings() !void {
         .freebsd, .openbsd, .netbsd, .dragonfly => {},
         else => return error.UnsupportedPlatform,
     }
-    probeTtyStdIn();
-    probeTtyStdOut();
-    if (!state.stdin_istty.? or !state.stdout_istty.?)
+    if (!isStdInTty() or !isStdOutTty())
         return;
     if (state.settings != null)
         return;
     if (builtin.os.tag != .windows) {
         state.settings = try std.posix.tcgetattr(state.stdin_file.handle);
     } else {
-        var settings = WindowsSettings{
+        var settings: WindowsSettings = .{
             .stdin_mode = 0,
             .stdout_mode = 0,
             .codepoint = 0,
@@ -179,9 +191,7 @@ pub fn restoreOutputMode() !void {
 
 pub fn setRawMode() !void {
     comptime std.debug.assert(SupportedPlatform());
-    probeTtyStdIn();
-    probeTtyStdOut();
-    if (!state.stdin_istty.? or !state.stdout_istty.?)
+    if (!isStdInTty() or !isStdOutTty())
         return;
     try saveSettings();
     state.mode = .Virtual;

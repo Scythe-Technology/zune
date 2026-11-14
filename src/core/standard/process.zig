@@ -444,7 +444,7 @@ pub fn lua_run(L: *VM.lua.State) !i32 {
     var child = try process.spawn(Zune.io(), .{
         .argv = options.args.items,
         .cwd = if (options.cwd) |cwd| .{ .path = cwd } else .inherit,
-        .environ_map = if (options.env != null) &options.env.? else null,
+        .environ_map = if (options.env != null) &options.env.? else &Zune.State.env_map,
         .expand_arg0 = .no_expand,
         .stdin = if (options.stdin == .inherit) .inherit else .ignore,
         .stdout = switch (options.stdout) {
@@ -457,7 +457,15 @@ pub fn lua_run(L: *VM.lua.State) !i32 {
             .pipe => .pipe,
             .ignore => .ignore,
         },
-        .create_no_window = true,
+        .create_no_window = if (comptime builtin.os.tag != .windows) false else blk: {
+            if (options.stdin == .inherit and Zune.standard.libraries.io.terminal.isStdInTty())
+                break :blk false;
+            if (options.stdout == .inherit and Zune.standard.libraries.io.terminal.isStdOutTty())
+                break :blk false;
+            if (options.stderr == .inherit and Zune.standard.libraries.io.terminal.isStdErrTty())
+                break :blk false;
+            break :blk true;
+        },
     });
     errdefer child.kill(Zune.io());
 
@@ -523,7 +531,7 @@ pub fn lua_create(L: *VM.lua.State) !i32 {
     var child = try process.spawn(Zune.io(), .{
         .argv = options.args.items,
         .cwd = if (options.cwd) |cwd| .{ .path = cwd } else .inherit,
-        .environ_map = if (options.env != null) &options.env.? else null,
+        .environ_map = if (options.env != null) &options.env.? else &Zune.State.env_map,
         .expand_arg0 = .no_expand,
         .stdin = switch (options.stdin) {
             .inherit => .inherit,
