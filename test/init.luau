@@ -74,7 +74,7 @@ local function runTest(path: string, args: { string }?)
         USERPROFILE = process.env.USERPROFILE,
         NO_COLOR = process.env.NO_COLOR,
         TEMP_PATH = RUN_TEMP_PATH,
-        PATH = process.env.PATH,
+        PATH = process.env.PATH or process.env.Path, -- (Path) windows
         SystemRoot = process.env.SystemRoot, -- windows
         TEMP = process.env.TEMP, -- windows
         TMP = process.env.TMP, -- windows
@@ -157,6 +157,29 @@ local function runTest(path: string, args: { string }?)
             end
         end)
     else
+        -- local source = fs.readFile(path)
+        -- local bytecode = zune.luau.compile(source)
+
+        -- local virtual_args = table.clone(args or {})
+
+        -- table.insert(virtual_args, 1, path)
+
+        -- local chunk = zune.luau.load(bytecode :: buffer, {
+        --     chunk_name = `@{zune.fs.path.resolve(path)}`,
+        --     env = setmetatable({
+        --         zune = table.freeze(setmetatable({
+        --             process = table.freeze(setmetatable({
+        --                 args = virtual_args,
+        --                 env = env,
+        --             }, { __index = zune.process })),
+        --         }, { __index = zune })),
+        --     }, { __index = _G }),
+        -- })
+
+        -- print(env, getfenv(chunk).zune.process.env)
+
+        -- chunk()
+
         local res = process.run(process.getExePath(), { "run", path, unpack(args or {}) }, {
             stderr = "inherit",
             stdout = "inherit",
