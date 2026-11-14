@@ -437,7 +437,7 @@ pub fn main(i: std.process.Init.Minimal) !void {
             };
             _ = WinApi.SetConsoleCtrlHandler(WinApi.handler, .TRUE);
         },
-        .linux, .macos => {
+        .linux, .macos, .freebsd, .openbsd, .netbsd => {
             const handle = struct {
                 fn handler(_: std.posix.SIG) callconv(.c) void {
                     shutdown();

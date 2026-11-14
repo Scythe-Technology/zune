@@ -107,6 +107,30 @@ pub fn lua_getKernelVersion(L: *VM.lua.State) !i32 {
             const str: []const u8 = std.mem.span(b);
             try L.pushfstring("FreeBSD {s}", .{str});
         },
+        .openbsd => {
+            var version: [256]u8 = undefined;
+            var len: usize = version.len;
+            const mib = [_]c_int{
+                std.posix.CTL.KERN,
+                std.posix.KERN.OSRELEASE,
+            };
+            std.posix.sysctl(&mib, &version, &len, null, 0) catch return error.UnknownKernelVersion;
+            if (len > version.len)
+                return error.UnknownKernelVersion;
+            const str = std.mem.sliceTo(version[0..len], 0);
+            try L.pushfstring("OpenBSD {s}", .{str});
+        },
+        .netbsd => {
+            var version: [256:0]u8 = undefined;
+            var len: usize = @sizeOf(@TypeOf(version));
+            switch (std.posix.errno(std.posix.system.sysctlbyname("kern.osrelease", &version, &len, null, 0))) {
+                .SUCCESS => {},
+                else => return error.UnknownKernelVersion,
+            }
+            const b: [*:0]u8 = &version;
+            const str: []const u8 = std.mem.span(b);
+            try L.pushfstring("NetBSD {s}", .{str});
+        },
         .linux => {
             var info: std.c.utsname = undefined;
             if (std.c.uname(&info) != 0) {

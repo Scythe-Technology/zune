@@ -59,6 +59,26 @@ pub fn getTotalSystemMemory() SystemMemoryError!u64 {
             std.debug.assert(physmem >= 0);
             return @as(u64, @bitCast(physmem));
         },
+        .netbsd => {
+            const CTL_HW: c_int = 6;
+            const HW_PHYSMEM64: c_int = 13;
+            const mib: [2]c_int = .{
+                CTL_HW,
+                HW_PHYSMEM64,
+            };
+            var physmem: i64 = undefined;
+            var len: usize = @sizeOf(@TypeOf(physmem));
+            posix.sysctl(&mib, &physmem, &len, null, 0) catch |err| switch (err) {
+                error.NameTooLong => unreachable, // constant, known good value
+                error.PermissionDenied => unreachable, // only when setting values
+                error.SystemResources => unreachable, // memory already on the stack
+                error.UnknownName => unreachable, // constant, known good value
+                else => return error.UnknownTotalSystemMemory,
+            };
+            if (physmem < 0)
+                return error.UnknownTotalSystemMemory;
+            return @as(u64, @intCast(physmem));
+        },
         .windows => {
             var sbi: windows.SYSTEM.BASIC_INFORMATION = undefined;
             const rc = windows.ntdll.NtQuerySystemInformation(
@@ -95,6 +115,65 @@ pub fn getFreeMemory() SystemMemoryError!u64 {
                 else => return error.UnknownFreeSystemMemory,
             }
             return @as(usize, @intCast(free)) * std.heap.pageSize();
+        },
+        .openbsd => {
+            const VM_UVMEXP: c_int = 4;
+            const UVMEXP_BUFFER = 1024;
+            const mib: [2]c_int = .{
+                posix.CTL.VM,
+                VM_UVMEXP,
+            };
+            const Header = extern struct {
+                page_size: c_int,
+                page_mask: c_int,
+                page_shift: c_int,
+                npages: c_int,
+                free: c_int,
+            };
+            var buf: [UVMEXP_BUFFER]u8 align(@alignOf(Header)) = undefined;
+            var len: usize = buf.len;
+            posix.sysctl(&mib, &buf, &len, null, 0) catch |err| switch (err) {
+                error.NameTooLong => unreachable, // constant, known good value
+                error.PermissionDenied => unreachable, // only when setting values
+                error.UnknownName => unreachable, // constant, known good value
+                else => return error.UnknownFreeSystemMemory,
+            };
+            if (len < @sizeOf(Header))
+                return error.UnknownFreeSystemMemory;
+            const header: *const Header = @ptrCast(&buf);
+            if (header.page_size <= 0 or header.free < 0)
+                return error.UnknownFreeSystemMemory;
+            return @as(u64, @intCast(header.free)) * @as(u64, @intCast(header.page_size));
+        },
+        .netbsd => {
+            const CTL_VM: c_int = 2;
+            const VM_UVMEXP2: c_int = 5;
+            const UVMEXP_BUFFER = 1024;
+            const mib: [2]c_int = .{
+                CTL_VM,
+                VM_UVMEXP2,
+            };
+            const Header = extern struct {
+                page_size: i64,
+                page_mask: i64,
+                page_shift: i64,
+                npages: i64,
+                free: i64,
+            };
+            var buf: [UVMEXP_BUFFER]u8 align(@alignOf(Header)) = undefined;
+            var len: usize = buf.len;
+            posix.sysctl(&mib, &buf, &len, null, 0) catch |err| switch (err) {
+                error.NameTooLong => unreachable, // constant, known good value
+                error.PermissionDenied => unreachable, // only when setting values
+                error.UnknownName => unreachable, // constant, known good value
+                else => return error.UnknownFreeSystemMemory,
+            };
+            if (len < @sizeOf(Header))
+                return error.UnknownFreeSystemMemory;
+            const header: *const Header = @ptrCast(&buf);
+            if (header.page_size <= 0 or header.free < 0)
+                return error.UnknownFreeSystemMemory;
+            return @as(u64, @intCast(header.free)) * @as(u64, @intCast(header.page_size));
         },
         // whole Darwin family
         .driverkit, .ios, .macos, .tvos, .visionos, .watchos => {

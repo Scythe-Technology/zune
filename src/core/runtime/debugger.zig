@@ -18,7 +18,7 @@ const VM = luau.VM;
 pub fn PlatformSupported() ?Zune.PlatformSupportKind {
     return switch (comptime builtin.os.tag) {
         .linux, .macos, .windows => .Full,
-        .freebsd => .Full,
+        .freebsd, .openbsd, .netbsd => .Full,
         else => null,
     };
 }

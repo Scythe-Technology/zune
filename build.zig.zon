@@ -40,8 +40,8 @@
             .hash = "zstd-1.7.0-Z4uSuttBAACrx173YvnnxQ7r8etvlC6x8OMHm7-Mov5l",
         },
         .tls = .{
-            .url = "git+https://github.com/Scythe-Technology/tls.zig#5990bb996092ead7b6e050da0dd3c7592cdac018",
-            .hash = "tls-0.1.0-ER2e0gKtBQB7qTGIeZ-Odzqr7BiRplew3tCmVkKp0ZW5",
+            .url = "git+https://github.com/ianic/tls.zig#bd22bcb73f423389441a1de80bf031ef1b623cce",
+            .hash = "tls-0.1.0-ER2e0l6qBgDEYo6RBkVZw5UrxOqtI6-OqLwyFJvEr3RK",
         },
         .wire = .{
             .url = "git+https://github.com/Scythe-Technology/libwire#66c7559e5433904470a2dbadfe67c9476d52441a",

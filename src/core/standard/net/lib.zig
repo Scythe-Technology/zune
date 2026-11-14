@@ -16,7 +16,7 @@ pub const LIB_NAME = "net";
 pub fn PlatformSupported() ?Zune.PlatformSupportKind {
     return switch (comptime builtin.os.tag) {
         .linux, .macos, .windows => .Full,
-        .freebsd => .Full,
+        .freebsd, .openbsd, .netbsd => .Full,
         else => null,
     };
 }
@@ -156,7 +156,22 @@ pub fn lua_getAddressList(L: *VM.lua.State) !i32 {
 }
 
 pub const lua_forced_ADDRF = std.posix.AF;
-pub const lua_forced_SOCK = std.posix.SOCK;
+pub const lua_forced_SOCK = switch (builtin.os.tag) {
+    .netbsd => struct {
+        pub const STREAM = std.posix.SOCK.STREAM;
+        pub const DGRAM = std.posix.SOCK.DGRAM;
+        pub const RAW = std.posix.SOCK.RAW;
+        pub const RDM = std.posix.SOCK.RDM;
+        pub const SEQPACKET = std.posix.SOCK.SEQPACKET;
+        pub const CONN_DGRAM = std.posix.SOCK.CONN_DGRAM;
+        pub const DCCP = std.posix.SOCK.DCCP;
+        pub const CLOEXEC = std.posix.SOCK.CLOEXEC;
+        pub const NONBLOCK = std.posix.SOCK.NONBLOCK;
+        pub const NOSIGPIPE = std.posix.SOCK.NOSIGPIPE;
+        pub const FLAGS_MASK: u32 = std.posix.SOCK.FLAGS_MASK;
+    },
+    else => std.posix.SOCK,
+};
 pub const lua_forced_IPPROTO = std.posix.IPPROTO;
 
 pub const lua_HAS_UNIX_SOCKETS = zio.os.net.has_unix_sockets;

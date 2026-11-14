@@ -237,7 +237,7 @@ fn handleSegfaultWindows(info: *std.os.windows.EXCEPTION_POINTERS) callconv(.win
 
 pub fn init() void {
     switch (comptime builtin.os.tag) {
-        .windows, .macos, .linux => attachSegfaultHandler(),
+        .windows, .macos, .linux, .freebsd, .openbsd, .netbsd => attachSegfaultHandler(),
         else => @compileError("TODO"),
     }
 }

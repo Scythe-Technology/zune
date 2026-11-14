@@ -18,7 +18,7 @@ pub const OBJECT_TAG = Zune.Tags.get("FS_DIR").?;
 pub fn PlatformSupported() ?Zune.PlatformSupportKind {
     return switch (comptime builtin.os.tag) {
         .linux, .macos, .windows, .wasi => .Full,
-        .freebsd => .Full,
+        .freebsd, .openbsd, .netbsd => .Full,
         else => null,
     };
 }

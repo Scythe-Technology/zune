@@ -26,7 +26,7 @@ pub fn PlatformSupported() ?Zune.PlatformSupportKind {
                 else => return null,
             } else return null,
             .windows => if (!arch.isAARCH64()) return .Full else return null,
-            .freebsd => return .Full,
+            .freebsd, .openbsd, .netbsd => return .Full,
             else => return null,
         },
         else => return null,
@@ -1178,7 +1178,7 @@ pub const lua_prefix = switch (builtin.os.tag) {
 };
 
 pub const lua_suffix = switch (builtin.os.tag) {
-    .linux, .freebsd => "so",
+    .linux, .freebsd, .openbsd, .netbsd => "so",
     .macos => "dylib",
     .windows => "dll",
     else => "",

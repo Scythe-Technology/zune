@@ -77,6 +77,24 @@ jobs:
           - name: FreeBSD powerpc64le
             target: powerpc64le-freebsd
             artifact: zune-freebsd-powerpc64le
+          - name: OpenBSD x86_64
+            target: x86_64-openbsd
+            artifact: zune-openbsd-x86_64
+          - name: OpenBSD aarch64
+            target: aarch64-openbsd
+            artifact: zune-openbsd-aarch64
+          - name: OpenBSD riscv64
+            target: riscv64-openbsd
+            artifact: zune-openbsd-riscv64
+          - name: NetBSD x86_64
+            target: x86_64-netbsd
+            artifact: zune-netbsd-x86_64
+          - name: NetBSD aarch64
+            target: aarch64-netbsd
+            artifact: zune-netbsd-aarch64
+          - name: NetBSD riscv64
+            target: riscv64-netbsd
+            artifact: zune-netbsd-riscv64
 
     name: ${{ matrix.name }}
     timeout-minutes: 20
