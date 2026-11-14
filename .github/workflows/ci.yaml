@@ -92,11 +92,11 @@ jobs:
 
     - name: Run info
       continue-on-error: ${{ matrix.qemu-platform != '' }}
-      run: zig build run -Dtarget=${{ matrix.target }} -Doptimize=${matrix.optimize:-debug}${{ matrix.llvm != '' && ' -Dllvm' || '' }}${{ matrix.qemu-platform != '' && ' -fqemu' || '' }} -- info all
+      run: zig build run -Dtarget=${{ matrix.target }} -Doptimize=${{ matrix.optimize || 'debug' }}${{ matrix.llvm != '' && ' -Dllvm' || '' }}${{ matrix.qemu-platform != '' && ' -fqemu' || '' }} -- info all
 
     - name: Run tests
       continue-on-error: ${{ matrix.qemu-platform != '' }}
-      run: zig build test -Dtarget=${{ matrix.target }} -Doptimize=${matrix.optimize:-debug}${{ matrix.llvm != '' && ' -Dllvm' || '' }}${{ matrix.qemu-platform != '' && ' -fqemu' || '' }} --verbose
+      run: zig build test -Dtarget=${{ matrix.target }} -Doptimize=${{ matrix.optimize || 'debug' }}${{ matrix.llvm != '' && ' -Dllvm' || '' }}${{ matrix.qemu-platform != '' && ' -fqemu' || '' }} --verbose
    
     - name: Build debug
       run: zig build -Dtarget=${{ matrix.target }} --verbose
