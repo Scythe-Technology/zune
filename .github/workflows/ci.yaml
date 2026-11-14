@@ -66,10 +66,12 @@ jobs:
           - os: ubuntu-22.04-arm
             name: Linux aarch64
             target: aarch64-linux-gnu
+            optimize: ReleaseSafe
           - os: ubuntu-latest
             name: Linux riscv64
             target: riscv64-linux
             qemu-platform: riscv64
+            optimize: ReleaseSafe
 
     name: ${{ matrix.name }}
     timeout-minutes: 20
@@ -90,11 +92,11 @@ jobs:
 
     - name: Run info
       continue-on-error: ${{ matrix.qemu-platform != '' }}
-      run: zig build run -Dtarget=${{ matrix.target }}${{ matrix.llvm != '' && ' -Dllvm' || '' }}${{ matrix.qemu-platform != '' && ' -fqemu' || '' }} -- info all
+      run: zig build run -Dtarget=${{ matrix.target }} -Doptimize=${matrix.optimize:-debug}${{ matrix.llvm != '' && ' -Dllvm' || '' }}${{ matrix.qemu-platform != '' && ' -fqemu' || '' }} -- info all
 
     - name: Run tests
       continue-on-error: ${{ matrix.qemu-platform != '' }}
-      run: zig build test -Dtarget=${{ matrix.target }}${{ matrix.llvm != '' && ' -Dllvm' || '' }}${{ matrix.qemu-platform != '' && ' -fqemu' || '' }} --verbose
+      run: zig build test -Dtarget=${{ matrix.target }} -Doptimize=${matrix.optimize:-debug}${{ matrix.llvm != '' && ' -Dllvm' || '' }}${{ matrix.qemu-platform != '' && ' -fqemu' || '' }} --verbose
    
     - name: Build debug
       run: zig build -Dtarget=${{ matrix.target }} --verbose

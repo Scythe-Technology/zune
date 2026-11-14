@@ -44,8 +44,8 @@
             .hash = "tls-0.1.0-ER2e0gKtBQB7qTGIeZ-Odzqr7BiRplew3tCmVkKp0ZW5",
         },
         .wire = .{
-            .url = "git+https://github.com/Scythe-Technology/libwire#ca8a74775c3c62f70d31c3e37643b413f8e25118",
-            .hash = "wire-0.0.3-BGToRWPdBwArGlXu9CQQd5QZG7G6U9m-3-By8FrifeRE",
+            .url = "git+https://github.com/Scythe-Technology/libwire#66c7559e5433904470a2dbadfe67c9476d52441a",
+            .hash = "wire-0.0.4-BGToRY_8BwDapg7EAlmusJ5BVeLTs12OroXnHP9uJ3kN",
         },
     },
     .paths = .{""},
