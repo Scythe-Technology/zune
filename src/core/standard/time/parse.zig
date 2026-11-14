@@ -2,7 +2,9 @@ const std = @import("std");
 const luau = @import("luau");
 const time = @import("datetime");
 
-const LuaDatetime = @import("lib.zig").LuaDatetime;
+const Zune = @import("zune");
+
+const Datetime = Zune.objects.Datetime;
 
 const Month = enum {
     Jan,
@@ -36,7 +38,7 @@ const MonthMap = std.StaticStringMap(Month).initComptime(.{
 
 // in the format "<day-name>, <day> <month> <year> <hour>:<minute>:<second> ±HHMM"
 // eg, "Wed, 21 Oct 2015 07:28:00 GMT"
-pub fn parseModified(self: *LuaDatetime, allocator: std.mem.Allocator, timestring: []const u8) !void {
+pub fn parseModified(self: *Datetime, allocator: std.mem.Allocator, timestring: []const u8) !void {
     const value = std.mem.trim(u8, timestring, " ");
     if (value.len < 29)
         return error.InvalidFormat;
@@ -83,7 +85,7 @@ pub fn parseModified(self: *LuaDatetime, allocator: std.mem.Allocator, timestrin
         else => {
             if (tz.len != 3)
                 return error.InvalidFormat;
-            self.timezone = try time.Timezone.fromTzdata(tz, allocator);
+            self.timezone = try time.Timezone.fromTzdata(Zune.io(), tz, allocator);
         },
     }
     errdefer if (self.timezone) |*t| {
@@ -103,7 +105,7 @@ pub fn parseModified(self: *LuaDatetime, allocator: std.mem.Allocator, timestrin
 
 // in the format "<day-name>, <day> <month> <year> <hour>:<minute>:<second> ±HHMM"
 // eg, "21 Oct 2015 07:28:00 GMT"
-pub fn parseModifiedShort(self: *LuaDatetime, allocator: std.mem.Allocator, timestring: []const u8) !void {
+pub fn parseModifiedShort(self: *Datetime, allocator: std.mem.Allocator, timestring: []const u8) !void {
     const value = std.mem.trim(u8, timestring, " ");
     if (value.len < 24)
         return error.InvalidFormat;
@@ -149,7 +151,7 @@ pub fn parseModifiedShort(self: *LuaDatetime, allocator: std.mem.Allocator, time
         else => {
             if (tz.len != 3)
                 return error.InvalidFormat;
-            self.timezone = try time.Timezone.fromTzdata(tz, allocator);
+            self.timezone = try time.Timezone.fromTzdata(Zune.io(), tz, allocator);
         },
     }
     errdefer if (self.timezone) |*t| {
@@ -167,8 +169,8 @@ pub fn parseModifiedShort(self: *LuaDatetime, allocator: std.mem.Allocator, time
     });
 }
 
-pub fn parse(self: *LuaDatetime, allocator: std.mem.Allocator, str: []const u8) !void {
-    const trimmed = std.mem.trimLeft(u8, std.mem.trimRight(u8, str, " "), " ");
+pub fn parse(self: *Datetime, allocator: std.mem.Allocator, str: []const u8) !void {
+    const trimmed = std.mem.trimStart(u8, std.mem.trimEnd(u8, str, " "), " ");
     if ((std.mem.indexOfScalar(u8, trimmed, '-') orelse 9) > 8) {
         if (str.len < 29)
             return parseModifiedShort(self, allocator, trimmed);
@@ -184,9 +186,9 @@ pub fn parse(self: *LuaDatetime, allocator: std.mem.Allocator, str: []const u8) 
 const testing = std.testing;
 test "Timeparse" {
     {
-        var result: LuaDatetime = undefined;
+        var result: Datetime = undefined;
         try parse(&result, testing.allocator, "Wed, 21 Oct 2015 07:28:00 GMT");
-        defer LuaDatetime.__dtor(undefined, &result);
+        defer Datetime.__dtor(undefined, &result);
         const datetime = result.datetime;
         try testing.expectEqual(2015, datetime.year);
         try testing.expectEqual(10, datetime.month);
@@ -199,9 +201,9 @@ test "Timeparse" {
         try testing.expectEqualStrings("GMT", result.timezone.?.name());
     }
     {
-        var result: LuaDatetime = undefined;
+        var result: Datetime = undefined;
         try parse(&result, testing.allocator, "Wed, 21 Oct 2015 07:28:00 +0600");
-        defer LuaDatetime.__dtor(undefined, &result);
+        defer Datetime.__dtor(undefined, &result);
         const datetime = result.datetime;
         try testing.expectEqual(2015, datetime.year);
         try testing.expectEqual(10, datetime.month);
@@ -215,9 +217,9 @@ test "Timeparse" {
         try testing.expectEqual(21600, datetime.utc_offset.?.seconds_east);
     }
     {
-        var result: LuaDatetime = undefined;
+        var result: Datetime = undefined;
         try parse(&result, testing.allocator, "Wed, 1 Oct 2015 07:28:00 +0600");
-        defer LuaDatetime.__dtor(undefined, &result);
+        defer Datetime.__dtor(undefined, &result);
         const datetime = result.datetime;
         try testing.expectEqual(2015, datetime.year);
         try testing.expectEqual(10, datetime.month);
@@ -231,9 +233,9 @@ test "Timeparse" {
         try testing.expectEqual(21600, datetime.utc_offset.?.seconds_east);
     }
     {
-        var result: LuaDatetime = undefined;
+        var result: Datetime = undefined;
         try parse(&result, testing.allocator, "Wed, 21 Oct 2015 07:28:00 UTC");
-        defer LuaDatetime.__dtor(undefined, &result);
+        defer Datetime.__dtor(undefined, &result);
         const datetime = result.datetime;
         try testing.expectEqual(2015, datetime.year);
         try testing.expectEqual(10, datetime.month);
@@ -246,7 +248,7 @@ test "Timeparse" {
         try testing.expectEqualStrings("UTC", result.timezone.?.name());
     }
     {
-        var result: LuaDatetime = undefined;
+        var result: Datetime = undefined;
         try testing.expectError(error.DayOutOfRange, parse(&result, testing.allocator, "Wed, 33 Oct 2015 07:28:00 GMT"));
         try testing.expectError(error.InvalidFormat, parse(&result, testing.allocator, "Wed, 21 Abc 2015 07:28:00 GMT"));
         try testing.expectError(error.InvalidFormat, parse(&result, testing.allocator, "Wed, 21 Oct 2015 07:28:00 ++0600"));
@@ -254,9 +256,9 @@ test "Timeparse" {
     }
 
     {
-        var result: LuaDatetime = undefined;
+        var result: Datetime = undefined;
         try parse(&result, testing.allocator, "21 Oct 2015 07:28:00 GMT");
-        defer LuaDatetime.__dtor(undefined, &result);
+        defer Datetime.__dtor(undefined, &result);
         const datetime = result.datetime;
         try testing.expectEqual(2015, datetime.year);
         try testing.expectEqual(10, datetime.month);
@@ -269,9 +271,9 @@ test "Timeparse" {
         try testing.expectEqualStrings("GMT", result.timezone.?.name());
     }
     {
-        var result: LuaDatetime = undefined;
+        var result: Datetime = undefined;
         try parse(&result, testing.allocator, "21 Oct 2015 07:28:00 +0600");
-        defer LuaDatetime.__dtor(undefined, &result);
+        defer Datetime.__dtor(undefined, &result);
         const datetime = result.datetime;
         try testing.expectEqual(2015, datetime.year);
         try testing.expectEqual(10, datetime.month);
@@ -285,9 +287,9 @@ test "Timeparse" {
         try testing.expectEqual(21600, datetime.utc_offset.?.seconds_east);
     }
     {
-        var result: LuaDatetime = undefined;
+        var result: Datetime = undefined;
         try parse(&result, testing.allocator, "1 Oct 2015 07:28:00 +0600");
-        defer LuaDatetime.__dtor(undefined, &result);
+        defer Datetime.__dtor(undefined, &result);
         const datetime = result.datetime;
         try testing.expectEqual(2015, datetime.year);
         try testing.expectEqual(10, datetime.month);
@@ -301,9 +303,9 @@ test "Timeparse" {
         try testing.expectEqual(21600, datetime.utc_offset.?.seconds_east);
     }
     {
-        var result: LuaDatetime = undefined;
+        var result: Datetime = undefined;
         try parse(&result, testing.allocator, "21 Oct 2015 07:28:00 UTC");
-        defer LuaDatetime.__dtor(undefined, &result);
+        defer Datetime.__dtor(undefined, &result);
         const datetime = result.datetime;
         try testing.expectEqual(2015, datetime.year);
         try testing.expectEqual(10, datetime.month);
@@ -317,7 +319,7 @@ test "Timeparse" {
     }
 
     {
-        var result: LuaDatetime = undefined;
+        var result: Datetime = undefined;
         try testing.expectError(error.DayOutOfRange, parse(&result, testing.allocator, "33 Oct 2015 07:28:00 GMT"));
         try testing.expectError(error.InvalidFormat, parse(&result, testing.allocator, "21 Abc 2015 07:28:00 GMT"));
         try testing.expectError(error.InvalidFormat, parse(&result, testing.allocator, "21 Oct 2015 07:28:00 ++0600"));
@@ -325,9 +327,9 @@ test "Timeparse" {
     }
 
     {
-        var result: LuaDatetime = undefined;
+        var result: Datetime = undefined;
         try parse(&result, testing.allocator, "2015-10-21T07:28:00Z");
-        defer LuaDatetime.__dtor(undefined, &result);
+        defer Datetime.__dtor(undefined, &result);
         const datetime = result.datetime;
         try testing.expectEqual(2015, datetime.year);
         try testing.expectEqual(10, datetime.month);
@@ -340,9 +342,9 @@ test "Timeparse" {
         try testing.expectEqualStrings("UTC", datetime.tz.?.name());
     }
     {
-        var result: LuaDatetime = undefined;
+        var result: Datetime = undefined;
         try parse(&result, testing.allocator, "2015-10-21T07:28:00");
-        defer LuaDatetime.__dtor(undefined, &result);
+        defer Datetime.__dtor(undefined, &result);
         const datetime = result.datetime;
         try testing.expectEqual(2015, datetime.year);
         try testing.expectEqual(10, datetime.month);
@@ -354,7 +356,7 @@ test "Timeparse" {
         try testing.expect(datetime.tz == null);
     }
     {
-        var result: LuaDatetime = undefined;
+        var result: Datetime = undefined;
         try testing.expectError(error.InvalidFormat, parse(&result, testing.allocator, "2015-10-21T07:28:00B"));
         try testing.expectError(error.InvalidFormat, parse(&result, testing.allocator, "2015-10-21T"));
     }

@@ -20,8 +20,8 @@ const Config = @This();
 mode: Mode = .Nonstrict,
 lintErrors: bool = false,
 typeErrors: bool = true,
-aliases: std.StringArrayHashMapUnmanaged([]const u8) = .empty,
-globals: std.ArrayListUnmanaged([]const u8) = .empty,
+aliases: std.array_hash_map.String([]const u8) = .empty,
+globals: std.ArrayList([]const u8) = .empty,
 
 const Mode = enum {
     NoCheck,

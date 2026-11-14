@@ -1,7 +1,0 @@
-# test configuration
-
-[runtime.debug]
-detailedError = true
-
-[features.builtins]
-sqlite = true

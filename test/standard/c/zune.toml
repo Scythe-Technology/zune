@@ -1,0 +1,7 @@
+# test configuration
+
+[runtime]
+use_detailed_error = true
+
+[runtime.features]
+c = true

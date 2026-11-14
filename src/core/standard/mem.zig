@@ -6,67 +6,39 @@ const Zune = @import("zune");
 
 const Engine = Zune.Runtime.Engine;
 const Scheduler = Zune.Runtime.Scheduler;
-
-const LuaHelper = Zune.Utils.LuaHelper;
+const Scripting = Zune.Runtime.Scripting;
 
 const VM = luau.VM;
 
-const ffi = @import("ffi.zig");
+const CPointer = Zune.objects.CPointer;
 
-pub const MAX_LUAU_SIZE = 1073741824; // 1 GB
+pub const lua_MAX_SIZE = Scripting.MAX_LUAU_SIZE; // 1 GB
 
 pub const LIB_NAME = "mem";
 
 inline fn isOutOfBounds(offset: u32, len: usize, access: usize) bool {
-    return offset + access > len;
+    return access + offset > len;
 }
 
-fn getWritableSlice(L: *VM.lua.State, idx: i32) ![]u8 {
-    switch (L.typeOf(idx)) {
-        .Buffer => return L.tobuffer(idx).?,
-        .Userdata => {
-            const ptr = ffi.LuaPointer.value(L, idx) orelse return L.Zerror("expected a buffer or userdata");
-            if (ptr.owner == .none or ptr.ptr == null)
-                return L.Zerror("unavailable address");
-            return @as([*]u8, @ptrCast(@alignCast(ptr.ptr.?)))[0 .. ptr.size orelse return L.Zerror("unknown size")];
-        },
-        else => return L.Zerror("expected a buffer or userdata"),
-    }
-}
-
-fn getReadableSlice(L: *VM.lua.State, idx: i32) ![]const u8 {
-    switch (L.typeOf(idx)) {
-        .Buffer => return L.tobuffer(idx).?,
-        .String => return L.tolstring(idx).?,
-        .Userdata => {
-            const ptr = ffi.LuaPointer.value(L, idx) orelse return L.Zerror("expected a buffer or userdata");
-            if (ptr.owner == .none or ptr.ptr == null)
-                return L.Zerror("unavailable address");
-            return @as([*]u8, @ptrCast(@alignCast(ptr.ptr.?)))[0 .. ptr.size orelse return L.Zerror("unknown size")];
-        },
-        else => return L.Zerror("expected a buffer, string, or userdata"),
-    }
-}
-
-fn lua_len(L: *VM.lua.State) !i32 {
-    const slice = try getReadableSlice(L, 1);
+pub fn lua_len(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getReadable(L, 1);
     L.pushnumber(@floatFromInt(slice.len));
     return 1;
 }
 
-fn lua_copy(L: *VM.lua.State) !i32 {
-    const dst = try getWritableSlice(L, 1);
-    const dst_offset = try L.Zcheckvalue(u32, 2, null);
-    const src = try getReadableSlice(L, 3);
+pub fn lua_copy(L: *VM.lua.State) !i32 {
+    const dest = try Scripting.getWritable(L, 1);
+    const dest_offset = try L.Zcheckvalue(u32, 2, null);
+    const src = try Scripting.getReadable(L, 3);
     const src_offset = try L.Zcheckvalue(u32, 4, null);
     const len = try L.Zcheckvalue(?u32, 5, null);
 
     if (isOutOfBounds(src_offset, src.len, len orelse 0) or
-        isOutOfBounds(dst_offset, dst.len, len orelse 0))
+        isOutOfBounds(dest_offset, dest.len, len orelse 0))
         return L.Zerror("access out of bounds");
 
-    const new_len = len orelse @min(src.len - src_offset, dst.len - dst_offset);
-    const a = dst[dst_offset..][0..new_len];
+    const new_len = len orelse @min(src.len - src_offset, dest.len - dest_offset);
+    const a = dest[dest_offset..][0..new_len];
     const b = src[src_offset..][0..new_len];
 
     std.mem.copyForwards(u8, a, b);
@@ -74,23 +46,23 @@ fn lua_copy(L: *VM.lua.State) !i32 {
     return 0;
 }
 
-fn lua_slice(L: *VM.lua.State) !i32 {
-    const a = try getReadableSlice(L, 1);
+pub fn lua_slice(L: *VM.lua.State) !i32 {
+    const a = try Scripting.getReadable(L, 1);
     const offset = try L.Zcheckvalue(u32, 2, null);
     const count = try L.Zcheckvalue(?u32, 3, null);
 
     if (isOutOfBounds(offset, a.len, count orelse 0))
         return L.Zerror("access out of bounds");
 
-    try L.Zpushbuffer(if (count) |c| a[offset .. c + offset] else a[offset..]);
+    try L.Zpushbuffer(if (count) |n| a[offset .. n + offset] else a[offset..]);
 
     return 1;
 }
 
-fn lua_eqlSlice(L: *VM.lua.State) !i32 {
-    const a = try getReadableSlice(L, 1);
+pub fn lua_eqlSlice(L: *VM.lua.State) !i32 {
+    const a = try Scripting.getReadable(L, 1);
     const a_offset = try L.Zcheckvalue(u32, 2, null);
-    const b = try getReadableSlice(L, 3);
+    const b = try Scripting.getReadable(L, 3);
     const b_offset = try L.Zcheckvalue(u32, 4, null);
     const count = try L.Zcheckvalue(?u32, 5, null);
 
@@ -99,60 +71,60 @@ fn lua_eqlSlice(L: *VM.lua.State) !i32 {
 
     L.pushboolean(std.mem.eql(
         u8,
-        if (count) |c| a[a_offset .. c + a_offset] else a[a_offset..],
-        if (count) |c| b[b_offset .. c + b_offset] else b[b_offset..],
+        if (count) |n| a[a_offset .. n + a_offset] else a[a_offset..],
+        if (count) |n| b[b_offset .. n + b_offset] else b[b_offset..],
     ));
 
     return 1;
 }
 
-fn lua_eql(L: *VM.lua.State) !i32 {
-    const a = try getReadableSlice(L, 1);
-    const b = try getReadableSlice(L, 2);
+pub fn lua_eql(L: *VM.lua.State) !i32 {
+    const a = try Scripting.getReadable(L, 1);
+    const b = try Scripting.getReadable(L, 2);
 
     L.pushboolean(std.mem.eql(u8, a, b));
 
     return 1;
 }
 
-fn lua_startsWith(L: *VM.lua.State) !i32 {
-    const slice = try getReadableSlice(L, 1);
-    const needle = try getReadableSlice(L, 2);
+pub fn lua_startsWith(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getReadable(L, 1);
+    const needle = try Scripting.getReadable(L, 2);
     L.pushboolean(std.mem.startsWith(u8, slice, needle));
     return 1;
 }
 
-fn lua_endsWith(L: *VM.lua.State) !i32 {
-    const slice = try getReadableSlice(L, 1);
-    const needle = try getReadableSlice(L, 2);
+pub fn lua_endsWith(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getReadable(L, 1);
+    const needle = try Scripting.getReadable(L, 2);
     L.pushboolean(std.mem.endsWith(u8, slice, needle));
     return 1;
 }
 
-fn lua_trim(L: *VM.lua.State) !i32 {
-    const slice = try getReadableSlice(L, 1);
-    const values_to_strip = try getReadableSlice(L, 2);
+pub fn lua_trim(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getReadable(L, 1);
+    const values_to_strip = try Scripting.getReadable(L, 2);
     try L.Zpushbuffer(std.mem.trim(u8, slice, values_to_strip));
     return 1;
 }
 
-fn lua_trimLeft(L: *VM.lua.State) !i32 {
-    const slice = try getReadableSlice(L, 1);
-    const values_to_strip = try getReadableSlice(L, 2);
-    try L.Zpushbuffer(std.mem.trimLeft(u8, slice, values_to_strip));
+pub fn lua_trimStart(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getReadable(L, 1);
+    const values_to_strip = try Scripting.getReadable(L, 2);
+    try L.Zpushbuffer(std.mem.trimStart(u8, slice, values_to_strip));
     return 1;
 }
 
-fn lua_trimRight(L: *VM.lua.State) !i32 {
-    const slice = try getReadableSlice(L, 1);
-    const values_to_strip = try getReadableSlice(L, 2);
-    try L.Zpushbuffer(std.mem.trimRight(u8, slice, values_to_strip));
+pub fn lua_trimEnd(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getReadable(L, 1);
+    const values_to_strip = try Scripting.getReadable(L, 2);
+    try L.Zpushbuffer(std.mem.trimEnd(u8, slice, values_to_strip));
     return 1;
 }
 
-fn lua_find(L: *VM.lua.State) !i32 {
-    const slice = try getReadableSlice(L, 1);
-    const needle = try getReadableSlice(L, 2);
+pub fn lua_find(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getReadable(L, 1);
+    const needle = try Scripting.getReadable(L, 2);
     if (std.mem.indexOf(u8, slice, needle)) |pos|
         L.pushunsigned(@truncate(pos))
     else
@@ -160,22 +132,24 @@ fn lua_find(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn lua_findPos(L: *VM.lua.State) !i32 {
-    const slice = try getReadableSlice(L, 1);
+pub fn lua_findPos(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getReadable(L, 1);
     const offset = try L.Zcheckvalue(u32, 2, null);
-    const needle = try getReadableSlice(L, 3);
-    if (isOutOfBounds(offset, slice.len, 0))
+    const needle = try Scripting.getReadable(L, 3);
+    const count = try L.Zcheckvalue(?u32, 4, null);
+    if (isOutOfBounds(offset, slice.len, count orelse 0))
         return L.Zerror("access out of bounds");
-    if (std.mem.indexOfPos(u8, slice, offset, needle)) |pos|
-        L.pushunsigned(@truncate(pos))
+    const buf = if (count) |n| slice[offset .. offset + n] else slice[offset..];
+    if (std.mem.indexOf(u8, buf, needle)) |pos|
+        L.pushunsigned(@as(u32, @truncate(pos)) + offset)
     else
         L.pushnil();
     return 1;
 }
 
-fn lua_findLast(L: *VM.lua.State) !i32 {
-    const slice = try getReadableSlice(L, 1);
-    const needle = try getReadableSlice(L, 2);
+pub fn lua_findLast(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getReadable(L, 1);
+    const needle = try Scripting.getReadable(L, 2);
     if (std.mem.lastIndexOf(u8, slice, needle)) |pos|
         L.pushunsigned(@truncate(pos))
     else
@@ -183,8 +157,8 @@ fn lua_findLast(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn lua_findScalar(L: *VM.lua.State) !i32 {
-    const slice = try getReadableSlice(L, 1);
+pub fn lua_findScalar(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getReadable(L, 1);
     const scalar: u8 = @truncate(try L.Zcheckvalue(u32, 2, null));
     if (std.mem.indexOfScalar(u8, slice, scalar)) |pos|
         L.pushunsigned(@truncate(pos))
@@ -193,21 +167,23 @@ fn lua_findScalar(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn lua_findScalarPos(L: *VM.lua.State) !i32 {
-    const slice = try getReadableSlice(L, 1);
+pub fn lua_findScalarPos(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getReadable(L, 1);
     const offset = try L.Zcheckvalue(u32, 2, null);
     const scalar: u8 = @truncate(try L.Zcheckvalue(u32, 3, null));
-    if (isOutOfBounds(offset, slice.len, 0))
+    const count = try L.Zcheckvalue(?u32, 4, null);
+    if (isOutOfBounds(offset, slice.len, count orelse 0))
         return L.Zerror("access out of bounds");
-    if (std.mem.indexOfScalarPos(u8, slice, offset, scalar)) |pos|
-        L.pushunsigned(@truncate(pos))
+    const buf = if (count) |n| slice[offset .. offset + n] else slice[offset..];
+    if (std.mem.indexOfScalar(u8, buf, scalar)) |pos|
+        L.pushunsigned(@as(u32, @truncate(pos)) + offset)
     else
         L.pushnil();
     return 1;
 }
 
-fn lua_findScalarLast(L: *VM.lua.State) !i32 {
-    const slice = try getReadableSlice(L, 1);
+pub fn lua_findScalarLast(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getReadable(L, 1);
     const scalar: u8 = @truncate(try L.Zcheckvalue(u32, 2, null));
     if (std.mem.lastIndexOfScalar(u8, slice, scalar)) |pos|
         L.pushunsigned(@truncate(pos))
@@ -216,9 +192,9 @@ fn lua_findScalarLast(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn lua_findAny(L: *VM.lua.State) !i32 {
-    const slice = try getReadableSlice(L, 1);
-    const values = try getReadableSlice(L, 2);
+pub fn lua_findAny(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getReadable(L, 1);
+    const values = try Scripting.getReadable(L, 2);
     if (std.mem.indexOfAny(u8, slice, values)) |pos|
         L.pushunsigned(@truncate(pos))
     else
@@ -226,22 +202,24 @@ fn lua_findAny(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn lua_findAnyPos(L: *VM.lua.State) !i32 {
-    const slice = try getReadableSlice(L, 1);
+pub fn lua_findAnyPos(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getReadable(L, 1);
     const offset = try L.Zcheckvalue(u32, 2, null);
-    const values = try getReadableSlice(L, 3);
-    if (isOutOfBounds(offset, slice.len, 0))
+    const values = try Scripting.getReadable(L, 3);
+    const count = try L.Zcheckvalue(?u32, 4, null);
+    if (isOutOfBounds(offset, slice.len, count orelse 0))
         return L.Zerror("access out of bounds");
-    if (std.mem.indexOfAnyPos(u8, slice, offset, values)) |pos|
-        L.pushunsigned(@truncate(pos))
+    const buf = if (count) |n| slice[offset .. offset + n] else slice[offset..];
+    if (std.mem.indexOfAny(u8, buf, values)) |pos|
+        L.pushunsigned(@as(u32, @truncate(pos)) + offset)
     else
         L.pushnil();
     return 1;
 }
 
-fn lua_findAnyLast(L: *VM.lua.State) !i32 {
-    const slice = try getReadableSlice(L, 1);
-    const values = try getReadableSlice(L, 2);
+pub fn lua_findAnyLast(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getReadable(L, 1);
+    const values = try Scripting.getReadable(L, 2);
     if (std.mem.lastIndexOfAny(u8, slice, values)) |pos|
         L.pushunsigned(@truncate(pos))
     else
@@ -249,9 +227,9 @@ fn lua_findAnyLast(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn lua_findNone(L: *VM.lua.State) !i32 {
-    const slice = try getReadableSlice(L, 1);
-    const values = try getReadableSlice(L, 2);
+pub fn lua_findNone(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getReadable(L, 1);
+    const values = try Scripting.getReadable(L, 2);
     if (std.mem.indexOfNone(u8, slice, values)) |pos|
         L.pushunsigned(@truncate(pos))
     else
@@ -259,22 +237,24 @@ fn lua_findNone(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn lua_findNonePos(L: *VM.lua.State) !i32 {
-    const slice = try getReadableSlice(L, 1);
+pub fn lua_findNonePos(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getReadable(L, 1);
     const offset = try L.Zcheckvalue(u32, 2, null);
-    const values = try getReadableSlice(L, 3);
-    if (isOutOfBounds(offset, slice.len, 0))
+    const values = try Scripting.getReadable(L, 3);
+    const count = try L.Zcheckvalue(?u32, 4, null);
+    if (isOutOfBounds(offset, slice.len, count orelse 0))
         return L.Zerror("access out of bounds");
-    if (std.mem.indexOfNonePos(u8, slice, offset, values)) |pos|
-        L.pushunsigned(@truncate(pos))
+    const buf = if (count) |n| slice[offset .. offset + n] else slice[offset..];
+    if (std.mem.indexOfNone(u8, buf, values)) |pos|
+        L.pushunsigned(@as(u32, @truncate(pos)) + offset)
     else
         L.pushnil();
     return 1;
 }
 
-fn lua_findNoneLast(L: *VM.lua.State) !i32 {
-    const slice = try getReadableSlice(L, 1);
-    const values = try getReadableSlice(L, 2);
+pub fn lua_findNoneLast(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getReadable(L, 1);
+    const values = try Scripting.getReadable(L, 2);
     if (std.mem.lastIndexOfNone(u8, slice, values)) |pos|
         L.pushunsigned(@truncate(pos))
     else
@@ -282,9 +262,9 @@ fn lua_findNoneLast(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn lua_findDiff(L: *VM.lua.State) !i32 {
-    const a = try getReadableSlice(L, 1);
-    const b = try getReadableSlice(L, 2);
+pub fn lua_findDiff(L: *VM.lua.State) !i32 {
+    const a = try Scripting.getReadable(L, 1);
+    const b = try Scripting.getReadable(L, 2);
     if (std.mem.indexOfDiff(u8, a, b)) |pos|
         L.pushunsigned(@truncate(pos))
     else
@@ -292,53 +272,58 @@ fn lua_findDiff(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn lua_findDiffPos(L: *VM.lua.State) !i32 {
-    const a = try getReadableSlice(L, 1);
-    const offset = try L.Zcheckvalue(u32, 2, null);
-    const b = try getReadableSlice(L, 3);
-    if (isOutOfBounds(offset, a.len, 0))
+pub fn lua_findDiffPos(L: *VM.lua.State) !i32 {
+    const a = try Scripting.getReadable(L, 1);
+    const a_offset = try L.Zcheckvalue(u32, 2, null);
+    const b = try Scripting.getReadable(L, 3);
+    const b_offset = try L.Zcheckvalue(u32, 4, null);
+    const count = try L.Zcheckvalue(?u32, 5, null);
+    if (isOutOfBounds(a_offset, a.len, count orelse 0))
         return L.Zerror("access out of bounds");
-    const search = a[offset..];
-    if (std.mem.indexOfDiff(u8, search, b)) |pos|
-        L.pushunsigned(@as(u32, @truncate(pos)) + offset)
+    if (isOutOfBounds(b_offset, b.len, count orelse 0))
+        return L.Zerror("access out of bounds");
+    const search_a = if (count) |n| a[a_offset .. a_offset + n] else a[a_offset..];
+    const search_b = if (count) |n| b[b_offset .. b_offset + n] else b[b_offset..];
+    if (std.mem.indexOfDiff(u8, search_a, search_b)) |pos|
+        L.pushunsigned(@as(u32, @truncate(pos)) + a_offset)
     else
         L.pushnil();
     return 1;
 }
 
-fn lua_findMax(L: *VM.lua.State) !i32 {
-    const slice = try getReadableSlice(L, 1);
+pub fn lua_findMax(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getReadable(L, 1);
     const offset = try L.Zcheckvalue(?u32, 2, null) orelse 0;
     const count = try L.Zcheckvalue(?u32, 3, null);
     if (isOutOfBounds(offset, slice.len, count orelse 0))
         return L.Zerror("access out of bounds");
-    const buf = if (count) |c| slice[offset .. offset + c] else slice[offset..];
+    const buf = if (count) |n| slice[offset .. offset + n] else slice[offset..];
     if (buf.len == 0)
         return L.Zerror("cannot find max of empty slice");
     L.pushunsigned(@as(u32, @truncate(std.mem.indexOfMax(u8, buf))) + offset);
     return 1;
 }
 
-fn lua_findMin(L: *VM.lua.State) !i32 {
-    const slice = try getReadableSlice(L, 1);
+pub fn lua_findMin(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getReadable(L, 1);
     const offset = try L.Zcheckvalue(?u32, 2, null) orelse 0;
     const count = try L.Zcheckvalue(?u32, 3, null);
     if (isOutOfBounds(offset, slice.len, count orelse 0))
         return L.Zerror("access out of bounds");
-    const buf = if (count) |c| slice[offset .. offset + c] else slice[offset..];
+    const buf = if (count) |n| slice[offset .. offset + n] else slice[offset..];
     if (buf.len == 0)
         return L.Zerror("cannot find min of empty slice");
     L.pushunsigned(@as(u32, @truncate(std.mem.indexOfMin(u8, buf))) + offset);
     return 1;
 }
 
-fn lua_findMinMax(L: *VM.lua.State) !i32 {
-    const slice = try getReadableSlice(L, 1);
+pub fn lua_findMinMax(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getReadable(L, 1);
     const offset = try L.Zcheckvalue(?u32, 2, null) orelse 0;
     const count = try L.Zcheckvalue(?u32, 3, null);
     if (isOutOfBounds(offset, slice.len, count orelse 0))
         return L.Zerror("access out of bounds");
-    const buf = if (count) |c| slice[offset .. offset + c] else slice[offset..];
+    const buf = if (count) |n| slice[offset .. offset + n] else slice[offset..];
     if (buf.len == 0)
         return L.Zerror("cannot find min/max of empty slice");
     const min, const max = std.mem.indexOfMinMax(u8, buf);
@@ -347,9 +332,9 @@ fn lua_findMinMax(L: *VM.lua.State) !i32 {
     return 2;
 }
 
-fn lua_cutPrefix(L: *VM.lua.State) !i32 {
-    const slice = try getReadableSlice(L, 1);
-    const prefix = try getReadableSlice(L, 2);
+pub fn lua_cutPrefix(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getReadable(L, 1);
+    const prefix = try Scripting.getReadable(L, 2);
     if (std.mem.startsWith(u8, slice, prefix))
         try L.Zpushbuffer(slice[prefix.len..])
     else
@@ -357,9 +342,9 @@ fn lua_cutPrefix(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn lua_cutSuffix(L: *VM.lua.State) !i32 {
-    const slice = try getReadableSlice(L, 1);
-    const suffix = try getReadableSlice(L, 2);
+pub fn lua_cutSuffix(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getReadable(L, 1);
+    const suffix = try Scripting.getReadable(L, 2);
     if (std.mem.endsWith(u8, slice, suffix))
         try L.Zpushbuffer(slice[0 .. slice.len - suffix.len])
     else
@@ -367,9 +352,9 @@ fn lua_cutSuffix(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn lua_cut(L: *VM.lua.State) !i32 {
-    const slice = try getReadableSlice(L, 1);
-    const needle = try getReadableSlice(L, 2);
+pub fn lua_cut(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getReadable(L, 1);
+    const needle = try Scripting.getReadable(L, 2);
     if (std.mem.indexOf(u8, slice, needle)) |index| {
         try L.Zpushbuffer(slice[0..index]);
         try L.Zpushbuffer(slice[index + needle.len ..]);
@@ -380,9 +365,9 @@ fn lua_cut(L: *VM.lua.State) !i32 {
     return 2;
 }
 
-fn lua_cutLast(L: *VM.lua.State) !i32 {
-    const slice = try getReadableSlice(L, 1);
-    const needle = try getReadableSlice(L, 2);
+pub fn lua_cutLast(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getReadable(L, 1);
+    const needle = try Scripting.getReadable(L, 2);
     if (std.mem.lastIndexOf(u8, slice, needle)) |index| {
         try L.Zpushbuffer(slice[0..index]);
         try L.Zpushbuffer(slice[index + needle.len ..]);
@@ -393,8 +378,8 @@ fn lua_cutLast(L: *VM.lua.State) !i32 {
     return 2;
 }
 
-fn lua_cutScalar(L: *VM.lua.State) !i32 {
-    const slice = try getReadableSlice(L, 1);
+pub fn lua_cutScalar(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getReadable(L, 1);
     const scalar: u8 = @truncate(try L.Zcheckvalue(u32, 2, null));
     if (std.mem.indexOfScalar(u8, slice, scalar)) |index| {
         try L.Zpushbuffer(slice[0..index]);
@@ -406,8 +391,8 @@ fn lua_cutScalar(L: *VM.lua.State) !i32 {
     return 2;
 }
 
-fn lua_cutScalarLast(L: *VM.lua.State) !i32 {
-    const slice = try getReadableSlice(L, 1);
+pub fn lua_cutScalarLast(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getReadable(L, 1);
     const scalar: u8 = @truncate(try L.Zcheckvalue(u32, 2, null));
     if (std.mem.lastIndexOfScalar(u8, slice, scalar)) |index| {
         try L.Zpushbuffer(slice[0..index]);
@@ -419,70 +404,70 @@ fn lua_cutScalarLast(L: *VM.lua.State) !i32 {
     return 2;
 }
 
-fn lua_replaceScalar(L: *VM.lua.State) !i32 {
-    const slice = try getWritableSlice(L, 1);
+pub fn lua_replaceScalar(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getWritable(L, 1);
     const scalar: u8 = @truncate(try L.Zcheckvalue(u32, 2, null));
     const replacement: u8 = @truncate(try L.Zcheckvalue(u32, 3, null));
     const offset = try L.Zcheckvalue(?u32, 4, null) orelse 0;
     const count = try L.Zcheckvalue(?u32, 5, null);
     if (isOutOfBounds(offset, slice.len, count orelse 0))
         return L.Zerror("access out of bounds");
-    const buf = if (count) |c| slice[offset .. offset + c] else slice[offset..];
+    const buf = if (count) |n| slice[offset .. offset + n] else slice[offset..];
     std.mem.replaceScalar(u8, buf, scalar, replacement);
     return 0;
 }
 
-fn lua_max(L: *VM.lua.State) !i32 {
-    const slice = try getReadableSlice(L, 1);
+pub fn lua_max(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getReadable(L, 1);
     const offset = try L.Zcheckvalue(?u32, 2, null) orelse 0;
     const count = try L.Zcheckvalue(?u32, 3, null);
     if (isOutOfBounds(offset, slice.len, count orelse 0))
         return L.Zerror("access out of bounds");
-    const buf = if (count) |c| slice[offset .. offset + c] else slice[offset..];
+    const buf = if (count) |n| slice[offset .. offset + n] else slice[offset..];
     if (buf.len == 0)
         return L.Zerror("cannot find max of empty slice");
     L.pushunsigned(std.mem.max(u8, buf));
     return 1;
 }
 
-fn lua_min(L: *VM.lua.State) !i32 {
-    const slice = try getReadableSlice(L, 1);
+pub fn lua_min(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getReadable(L, 1);
     const offset = try L.Zcheckvalue(?u32, 2, null) orelse 0;
     const count = try L.Zcheckvalue(?u32, 3, null);
     if (isOutOfBounds(offset, slice.len, count orelse 0))
         return L.Zerror("access out of bounds");
-    const buf = if (count) |c| slice[offset .. offset + c] else slice[offset..];
+    const buf = if (count) |n| slice[offset .. offset + n] else slice[offset..];
     if (buf.len == 0)
         return L.Zerror("cannot find min of empty slice");
     L.pushunsigned(std.mem.min(u8, buf));
     return 1;
 }
 
-fn lua_reverse(L: *VM.lua.State) !i32 {
-    const slice = try getWritableSlice(L, 1);
+pub fn lua_reverse(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getWritable(L, 1);
     const offset = try L.Zcheckvalue(?u32, 2, null) orelse 0;
     const count = try L.Zcheckvalue(?u32, 3, null);
     if (isOutOfBounds(offset, slice.len, count orelse 0))
         return L.Zerror("access out of bounds");
-    const buf = if (count) |c| slice[offset .. offset + c] else slice[offset..];
+    const buf = if (count) |n| slice[offset .. offset + n] else slice[offset..];
     std.mem.reverse(u8, buf);
     return 0;
 }
 
-fn lua_rotate(L: *VM.lua.State) !i32 {
-    const slice = try getWritableSlice(L, 1);
+pub fn lua_rotate(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getWritable(L, 1);
     const amount = try L.Zcheckvalue(u32, 2, null);
     const offset = try L.Zcheckvalue(?u32, 3, null) orelse 0;
     const count = try L.Zcheckvalue(?u32, 4, null);
     if (isOutOfBounds(offset, slice.len, count orelse 0))
         return L.Zerror("access out of bounds");
-    const buf = if (count) |c| slice[offset .. offset + c] else slice[offset..];
+    const buf = if (count) |n| slice[offset .. offset + n] else slice[offset..];
     std.mem.rotate(u8, buf, amount);
     return 0;
 }
 
-fn lua_set(L: *VM.lua.State) !i32 {
-    const slice = try getWritableSlice(L, 1);
+pub fn lua_set(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getWritable(L, 1);
     const value: u8 = @truncate(try L.Zcheckvalue(u32, 2, null));
     const offset = try L.Zcheckvalue(?u32, 3, null) orelse 0;
     const count = try L.Zcheckvalue(?u32, 4, null);
@@ -490,7 +475,7 @@ fn lua_set(L: *VM.lua.State) !i32 {
     if (isOutOfBounds(offset, slice.len, count orelse 0))
         return L.Zerror("access out of bounds");
 
-    const buf = if (count) |c| slice[offset .. offset + c] else slice[offset..];
+    const buf = if (count) |n| slice[offset .. offset + n] else slice[offset..];
 
     @memset(buf, value);
 
@@ -501,8 +486,8 @@ comptime {
     std.debug.assert(@sizeOf(f32) == @sizeOf(u32));
 }
 
-fn lua_toVector2(L: *VM.lua.State) !i32 {
-    const slice = try getReadableSlice(L, 1);
+pub fn lua_readvectorf32x2(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getReadable(L, 1);
     const offset = try L.Zcheckvalue(?u32, 2, null) orelse 0;
 
     const F32_SIZE = @sizeOf(f32);
@@ -517,14 +502,13 @@ fn lua_toVector2(L: *VM.lua.State) !i32 {
         @as(f32, @bitCast(x)),
         @as(f32, @bitCast(y)),
         0,
-        null,
     );
 
     return 1;
 }
 
-fn lua_toVector3(L: *VM.lua.State) !i32 {
-    const slice = try getReadableSlice(L, 1);
+pub fn lua_readvectorf32x3(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getReadable(L, 1);
     const offset = try L.Zcheckvalue(?u32, 2, null) orelse 0;
 
     const F32_SIZE = @sizeOf(f32);
@@ -540,14 +524,13 @@ fn lua_toVector3(L: *VM.lua.State) !i32 {
         @as(f32, @bitCast(x)),
         @as(f32, @bitCast(y)),
         @as(f32, @bitCast(z)),
-        null,
     );
 
     return 1;
 }
 
-fn lua_writeVector2(L: *VM.lua.State) !i32 {
-    const slice = try getWritableSlice(L, 1);
+pub fn lua_writevectorf32x2(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getWritable(L, 1);
     const offset = try L.Zcheckvalue(?u32, 2, null) orelse 0;
 
     const F32_SIZE = @sizeOf(f32);
@@ -566,8 +549,8 @@ fn lua_writeVector2(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn lua_writeVector3(L: *VM.lua.State) !i32 {
-    const slice = try getWritableSlice(L, 1);
+pub fn lua_writevectorf32x3(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getWritable(L, 1);
     const offset = try L.Zcheckvalue(?u32, 2, null) orelse 0;
 
     const F32_SIZE = @sizeOf(f32);
@@ -588,67 +571,76 @@ fn lua_writeVector3(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-pub fn loadLib(L: *VM.lua.State) !void {
-    try L.Zpushvalue(.{
-        .MAX_SIZE = MAX_LUAU_SIZE,
-        .len = lua_len,
-        .copy = lua_copy,
-        .slice = lua_slice,
-        .eqlSlice = lua_eqlSlice,
-        .eql = lua_eql,
-        .startsWith = lua_startsWith,
-        .endsWith = lua_endsWith,
-        .trim = lua_trim,
-        .trimLeft = lua_trimLeft,
-        .trimRight = lua_trimRight,
-        .find = lua_find,
-        .findPos = lua_findPos,
-        .findLast = lua_findLast,
-        .findScalar = lua_findScalar,
-        .findScalarPos = lua_findScalarPos,
-        .findScalarLast = lua_findScalarLast,
-        .findAny = lua_findAny,
-        .findAnyPos = lua_findAnyPos,
-        .findAnyLast = lua_findAnyLast,
-        .findNone = lua_findNone,
-        .findNonePos = lua_findNonePos,
-        .findNoneLast = lua_findNoneLast,
-        .findDiff = lua_findDiff,
-        .findDiffPos = lua_findDiffPos,
-        .findMax = lua_findMax,
-        .findMin = lua_findMin,
-        .findMinMax = lua_findMinMax,
-        .cutPrefix = lua_cutPrefix,
-        .cutSuffix = lua_cutSuffix,
-        .cut = lua_cut,
-        .cutLast = lua_cutLast,
-        .cutScalar = lua_cutScalar,
-        .cutScalarLast = lua_cutScalarLast,
-        .replaceScalar = lua_replaceScalar,
-        .max = lua_max,
-        .min = lua_min,
-        .reverse = lua_reverse,
-        .rotate = lua_rotate,
-        .set = lua_set,
-        .toVector2 = lua_toVector2,
-        .toVector3 = lua_toVector3,
-        .writeVector2 = lua_writeVector2,
-        .writeVector3 = lua_writeVector3,
-    });
-    L.setreadonly(-1, true);
+pub fn lua_readu64(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getWritable(L, 1);
+    const offset = try L.Zcheckvalue(?u32, 2, null) orelse 0;
 
-    try LuaHelper.registerModule(L, LIB_NAME);
+    const U64_SIZE = @sizeOf(u64);
+
+    if (isOutOfBounds(offset, slice.len, U64_SIZE))
+        return L.Zerror("access out of bounds");
+
+    var bytes: [U64_SIZE]u8 = undefined;
+    @memcpy(bytes[0..], slice[offset..][0..U64_SIZE]);
+    const value = std.mem.readInt(u64, &bytes, .little);
+
+    L.Zpushvalue(value) catch |err| switch (err) {
+        error.IntegerOverflow => return L.Zerror("integer overflow"),
+    };
+
+    return 1;
 }
 
-test "mem" {
-    const TestRunner = @import("../utils/testrunner.zig");
+pub fn lua_writeu64(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getWritable(L, 1);
+    const offset = try L.Zcheckvalue(?u32, 2, null) orelse 0;
 
-    const testResult = try TestRunner.runTest(
-        TestRunner.newTestFile("standard/mem.test.luau"),
-        &.{},
-        .{},
-    );
+    const U64_SIZE = @sizeOf(u64);
 
-    try std.testing.expect(testResult.failed == 0);
-    try std.testing.expect(testResult.total > 0);
+    if (isOutOfBounds(offset, slice.len, U64_SIZE))
+        return L.Zerror("access out of bounds");
+
+    const value = try L.Zcheckvalue(u53, 3, null);
+
+    const bytes: [U64_SIZE]u8 = @bitCast(@as(u64, @intCast(value)));
+    @memcpy(slice[offset..][0..U64_SIZE], bytes[0..]);
+
+    return 1;
+}
+
+pub fn lua_readi64(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getWritable(L, 1);
+    const offset = try L.Zcheckvalue(?u32, 2, null) orelse 0;
+
+    const I64_SIZE = @sizeOf(i64);
+
+    if (isOutOfBounds(offset, slice.len, I64_SIZE))
+        return L.Zerror("access out of bounds");
+
+    var bytes: [I64_SIZE]u8 = undefined;
+    @memcpy(bytes[0..], slice[offset..][0..I64_SIZE]);
+    const value = std.mem.readInt(i64, &bytes, .little);
+
+    L.Zpushvalue(value) catch |err| switch (err) {
+        error.IntegerOverflow => return L.Zerror("integer overflow"),
+    };
+
+    return 1;
+}
+
+pub fn lua_writei64(L: *VM.lua.State) !i32 {
+    const slice = try Scripting.getWritable(L, 1);
+    const offset = try L.Zcheckvalue(?u32, 2, null) orelse 0;
+
+    const I64_SIZE = @sizeOf(i64);
+
+    if (isOutOfBounds(offset, slice.len, I64_SIZE))
+        return L.Zerror("access out of bounds");
+
+    const value = try L.Zcheckvalue(i54, 3, null);
+
+    const bytes: [I64_SIZE]u8 = @bitCast(@as(i64, @intCast(value)));
+    @memcpy(slice[offset..][0..I64_SIZE], bytes[0..]);
+
+    return 1;
 }

@@ -10,16 +10,16 @@ const Scheduler = Zune.Runtime.Scheduler;
 
 const Fmt = Zune.Resolvers.Fmt;
 
-const History = @import("../../commands/repl/History.zig");
-const Terminal = @import("../../commands/repl/Terminal.zig");
+// const History = @import("../../commands/repl/History.zig");
+// const Terminal = @import("../../commands/repl/Terminal.zig");
 
 const VM = luau.VM;
 
-pub fn PlatformSupported() bool {
+pub fn PlatformSupported() ?Zune.PlatformSupportKind {
     return switch (comptime builtin.os.tag) {
-        .linux, .macos, .windows => true,
-        .freebsd => true,
-        else => false,
+        .linux, .macos, .windows => .Full,
+        .freebsd, .openbsd, .netbsd => .Full,
+        else => null,
     };
 }
 
@@ -31,27 +31,27 @@ const LuaBreakpoint = struct {
 
 const BreakpointState = struct {
     changes: u32 = 0,
-    list: std.ArrayListUnmanaged(LuaBreakpoint),
+    list: std.ArrayList(LuaBreakpoint),
 };
 
 pub var ACTIVE = false;
 
-pub var HISTORY: ?*History = null;
+// pub var HISTORY: ?*History = null;
 
-pub var BREAKPOINTS = std.StringHashMap(BreakpointState).init(Zune.DEFAULT_ALLOCATOR);
-pub var MAPPED_SOURCES = std.StringHashMap([]const u8).init(Zune.DEFAULT_ALLOCATOR);
+pub var BREAKPOINTS = std.hash_map.StringHashMap(BreakpointState).init(Zune.DEFAULT_ALLOCATOR);
+pub var MAPPED_SOURCES = std.hash_map.StringHashMap([]const u8).init(Zune.DEFAULT_ALLOCATOR);
 var CHANGES_COUNT: u32 = 0;
 
 const DEBUG_TAG = "\x1b[0m(dbg) ";
 const DEBUG_RESULT_TAG = "\x1b[0m(dbg): ";
 
-var MAIN_MUTEX: std.Thread.Mutex = .{};
+var MAIN_MUTEX: std.Io.Mutex = .init;
 
 pub fn SigInt() void {
-    if (HISTORY) |history| {
-        history.deinit();
-        HISTORY = null;
-    }
+    // if (HISTORY) |history| {
+    //     history.deinit();
+    //     HISTORY = null;
+    // }
 }
 
 pub fn DebuggerExit() void {
@@ -99,7 +99,9 @@ pub fn updateBreakpoints(L: *VM.lua.State) !void {
         try MAPPED_SOURCES.put(path, file_path);
         break :blk file_path;
     } else blk: {
-        const real_path = try std.fs.cwd().realpathAlloc(MAPPED_SOURCES.allocator, path[1..]);
+        var buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+        const len = try std.Io.Dir.cwd().realPathFile(Zune.io(), path[1..], &buf);
+        const real_path = try MAPPED_SOURCES.allocator.dupe(u8, buf[0..len]);
         try MAPPED_SOURCES.put(path, real_path);
         break :blk real_path;
     };
@@ -147,7 +149,7 @@ pub fn updateBreakpoints(L: *VM.lua.State) !void {
     }
 }
 
-pub fn getExactBreakpoint(breakpoints: *std.ArrayListUnmanaged(LuaBreakpoint), line: i32) ?struct { *LuaBreakpoint, usize } {
+pub fn getExactBreakpoint(breakpoints: *std.ArrayList(LuaBreakpoint), line: i32) ?struct { *LuaBreakpoint, usize } {
     for (breakpoints.items, 0..) |*bp, i| {
         if (bp.line == line)
             return .{ bp, i };
@@ -360,7 +362,7 @@ fn tostring(L: *VM.lua.State, idx: i32) []const u8 {
 }
 
 fn getNextArg(buf: []const u8) struct { []const u8, []const u8 } {
-    const trimmed = std.mem.trimLeft(u8, buf, " ");
+    const trimmed = std.mem.trimStart(u8, buf, " ");
     const idx = std.mem.indexOf(u8, trimmed, " ") orelse trimmed.len;
     return .{ trimmed[0..idx], trimmed[idx..] };
 }
@@ -370,7 +372,7 @@ fn toBase64(allocator: std.mem.Allocator, input: []const u8) !struct { []u8, []c
     return .{ base64_buf, std.base64.standard.Encoder.encode(base64_buf, input) };
 }
 
-fn promptOpBreak(allocator: std.mem.Allocator, break_args: []const u8) !void {
+fn promptOpBreak(break_args: []const u8) !void {
     if (break_args.len <= 0) {
         printResult("<red>usage<clear>: break <<command>>\n", .{});
         printResult("  <dim>try 'break help'<clear>\n", .{});
@@ -391,7 +393,7 @@ fn promptOpBreak(allocator: std.mem.Allocator, break_args: []const u8) !void {
         .add, .remove => |k| {
             if (rest.len <= 0)
                 return printResult("<red>usage<clear>: break {s} <<file>>:<<line>>\n", .{command_input});
-            const dir = std.fs.cwd();
+            const dir = std.Io.Dir.cwd();
             var args = std.mem.splitBackwardsScalar(u8, rest, ':');
             const line_str = std.mem.trim(u8, args.first(), " ");
             const file_str = std.mem.trim(u8, args.rest(), " ");
@@ -400,12 +402,12 @@ fn promptOpBreak(allocator: std.mem.Allocator, break_args: []const u8) !void {
             const line = std.fmt.parseInt(i32, line_str, 10) catch |err| {
                 return printResult("Line Parse Error: {}\n", .{err});
             };
-            const file_path = dir.realpathAlloc(allocator, file_str) catch |err| switch (err) {
+            var buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+            const len = dir.realPathFile(Zune.io(), file_str, &buf) catch |err| switch (err) {
                 error.FileNotFound => return printResult("file not found: {s}\n", .{file_str}),
                 else => return printResult("failed to resolve file '{s}': {}\n", .{ file_str, err }),
             };
-            defer allocator.free(file_path);
-
+            const file_path = buf[0..len];
             if (k == .remove) {
                 if (removeBreakpoint(file_path, line)) {
                     if (DEBUG.output == .Readable)
@@ -549,7 +551,7 @@ fn variableJsonDisassemble(allocator: std.mem.Allocator, writer: *std.Io.Writer,
 
 fn listLocalsJson(L: *VM.lua.State, allocator: std.mem.Allocator, writer: *std.Io.Writer, level: i32, args: []const u8) !void {
     try L.rawcheckstack(6);
-    var iter = std.mem.splitScalar(u8, std.mem.trimLeft(u8, args, " "), ',');
+    var iter = std.mem.splitScalar(u8, std.mem.trimStart(u8, args, " "), ',');
 
     try writer.writeByte('[');
     const first_iter = iter.first();
@@ -646,7 +648,7 @@ fn promptOpLocals(L: *VM.lua.State, allocator: std.mem.Allocator, locals_args: [
 
                             const writer = &allocating.writer;
 
-                            try Fmt.writeIdx(allocator, L, writer, @intCast(L.gettop()), Zune.STATE.FORMAT.MAX_DEPTH);
+                            try Fmt.writeIdx(allocator, L, writer, @intCast(L.gettop()), Zune.State.options.format.max_depth);
                             var iter = std.mem.splitScalar(u8, allocating.written(), '\n');
                             printResult(" | Value: {s}\n", .{iter.first()});
                             while (iter.next()) |line|
@@ -676,7 +678,7 @@ fn listParamsJson(L: *VM.lua.State, allocator: std.mem.Allocator, writer: *std.I
     try L.rawcheckstack(6);
     if (!L.getinfo(level, "a", ar))
         return writer.writeAll("[]"); // nothing
-    var iter = std.mem.splitScalar(u8, std.mem.trimLeft(u8, args, " "), ',');
+    var iter = std.mem.splitScalar(u8, std.mem.trimStart(u8, args, " "), ',');
 
     try writer.writeByte('[');
     const first_iter = iter.first();
@@ -797,7 +799,7 @@ fn promptOpParams(L: *VM.lua.State, allocator: std.mem.Allocator, params_args: [
 
                             const writer = &allocating.writer;
 
-                            try Fmt.writeIdx(allocator, L, writer, @intCast(L.gettop()), Zune.STATE.FORMAT.MAX_DEPTH);
+                            try Fmt.writeIdx(allocator, L, writer, @intCast(L.gettop()), Zune.State.options.format.max_depth);
                             var iter = std.mem.splitScalar(u8, allocating.written(), '\n');
                             printResult(" | Value: {s}\n", .{iter.first()});
                             while (iter.next()) |line|
@@ -829,7 +831,7 @@ fn listUpvaluesJson(L: *VM.lua.State, allocator: std.mem.Allocator, writer: *std
         return writer.writeAll("[]"); // nothing
     defer L.pop(1); // remove function
     const fn_idx = L.gettop();
-    var iter = std.mem.splitScalar(u8, std.mem.trimLeft(u8, args, " "), ',');
+    var iter = std.mem.splitScalar(u8, std.mem.trimStart(u8, args, " "), ',');
 
     try writer.writeByte('[');
     const first_iter = iter.first();
@@ -931,7 +933,7 @@ fn promptOpUpvalues(L: *VM.lua.State, allocator: std.mem.Allocator, params_args:
 
                             const writer = &allocating.writer;
 
-                            try Fmt.writeIdx(allocator, L, writer, @intCast(L.gettop()), Zune.STATE.FORMAT.MAX_DEPTH);
+                            try Fmt.writeIdx(allocator, L, writer, @intCast(L.gettop()), Zune.State.options.format.max_depth);
                             var iter = std.mem.splitScalar(u8, allocating.written(), '\n');
                             printResult(" | Value: {s}\n", .{iter.first()});
                             while (iter.next()) |line|
@@ -966,7 +968,7 @@ fn listGlobalsJson(L: *VM.lua.State, allocator: std.mem.Allocator, writer: *std.
     L.remove(-2); // remove function
     if (L.typeOf(-1) != .Table)
         return try writer.writeAll("[]"); // invalid
-    var iter = std.mem.splitScalar(u8, std.mem.trimLeft(u8, args, " "), ',');
+    var iter = std.mem.splitScalar(u8, std.mem.trimStart(u8, args, " "), ',');
 
     try writer.writeByte('[');
     const first_iter = iter.first();
@@ -1073,7 +1075,7 @@ fn promptOpGlobals(L: *VM.lua.State, allocator: std.mem.Allocator, globals_args:
 
                         const writer = &allocating.writer;
 
-                        try Fmt.writeIdx(allocator, L, writer, @intCast(L.gettop()), Zune.STATE.FORMAT.MAX_DEPTH);
+                        try Fmt.writeIdx(allocator, L, writer, @intCast(L.gettop()), Zune.State.options.format.max_depth);
                         var iter = std.mem.splitScalar(u8, allocating.written(), '\n');
                         printResult(" | Value: {s}\n", .{iter.first()});
                         while (iter.next()) |line|
@@ -1128,8 +1130,8 @@ const DebugState = struct {
 pub var DEBUG: DebugState = .{};
 
 pub var COMM: union(enum) {
-    io: std.fs.File.Reader,
-    stream: std.net.Stream,
+    io: std.Io.File.Reader,
+    stream: std.Io.net.Stream,
 } = undefined;
 
 const MessageOpcode = enum(u8) {
@@ -1140,12 +1142,12 @@ const MessageOpcode = enum(u8) {
     Continued,
 };
 
-fn sendMessage(stream: std.net.Stream, opcode: MessageOpcode, message: ?[]const u8) !void {
+fn sendMessage(stream: std.Io.net.Stream, opcode: MessageOpcode, message: ?[]const u8) !void {
     var buf: [128]u8 = undefined;
-    var stream_writer = stream.writer(&buf);
+    var stream_writer = stream.writer(Zune.io(), &buf);
     const writer = &stream_writer.interface;
 
-    try writer.writeByte(@intFromEnum(opcode));
+    try writer.writeByte(@backingInt(opcode));
     switch (opcode) {
         .Paused, .Continued => std.debug.assert(message == null),
         else => {
@@ -1158,12 +1160,12 @@ fn sendMessage(stream: std.net.Stream, opcode: MessageOpcode, message: ?[]const 
     try writer.flush();
 }
 
-fn printMessage(stream: std.net.Stream, opcode: MessageOpcode, comptime fmt: []const u8, args: anytype) !void {
+fn printMessage(stream: std.Io.net.Stream, opcode: MessageOpcode, comptime fmt: []const u8, args: anytype) !void {
     var buf: [128]u8 = undefined;
-    var stream_writer = stream.writer(&buf);
+    var stream_writer = stream.writer(Zune.io(), &buf);
     const writer = &stream_writer.interface;
 
-    try writer.writeByte(@intFromEnum(opcode));
+    try writer.writeByte(@backingInt(opcode));
     switch (opcode) {
         .Paused, .Continued => unreachable, // should not happen
         else => {
@@ -1183,33 +1185,33 @@ fn readStreamInput(reader: *std.Io.Reader, allocator: std.mem.Allocator) !std.Io
     return input;
 }
 
-fn promptSocket(stream: std.net.Stream, L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c.lua_Debug) !void {
-    const allocator = luau.getallocator(L);
+fn promptSocket(stream: std.Io.net.Stream, L: *VM.lua.State, kind: BreakKind, debug_info: ?*VM.lua.c.lua_Debug) !void {
+    const allocator = Scheduler.fromState(L).allocator();
 
     var read_buf: [128]u8 = undefined;
-    var stream_reader = stream.reader(&read_buf);
-    const reader: *std.Io.Reader = stream_reader.interface();
+    var stream_reader = stream.reader(Zune.io(), &read_buf);
+    const reader: *std.Io.Reader = &stream_reader.interface;
 
     switch (kind) {
         .None => {},
         .Breakpoint, .Stepped => |k| {
             const ar = debug_info orelse std.debug.panic(DEBUG_RESULT_TAG ++ "Debugger crashed, missing debug info for breakpoint", .{});
-            try printMessage(stream, .Break, "{{\"break\":{d},\"line\":{d}}}", .{ @intFromEnum(k), ar.currentline });
+            try printMessage(stream, .Break, "{{\"break\":{d},\"line\":{d}}}", .{ @backingInt(k), ar.currentline });
         },
-        .HandledException, .UnhandledException => try printMessage(stream, .Break, "{{\"break\":{d},\"line\":null}}", .{@intFromEnum(kind)}),
+        .HandledException, .UnhandledException => try printMessage(stream, .Break, "{{\"break\":{d},\"line\":null}}", .{@backingInt(kind)}),
     }
 
     try sendMessage(stream, .Paused, null);
 
     while (true) {
-        const cmd: COMMAND_ENUM = @enumFromInt(try reader.takeByte());
+        const cmd: COMMAND_ENUM = @fromBackingInt(@intCast(try reader.takeByte()));
         switch (cmd) {
             .exit => {
                 DebuggerExit();
                 std.process.exit(0);
             },
             .@"break" => out: {
-                switch (@as(BREAK_COMMAND_ENUM, @enumFromInt(try reader.takeByte()))) {
+                switch (@as(BREAK_COMMAND_ENUM, @fromBackingInt(@intCast(try reader.takeByte())))) {
                     .add, .remove => |o| {
                         var input = try readStreamInput(reader, allocator);
                         defer input.deinit();
@@ -1220,12 +1222,13 @@ fn promptSocket(stream: std.net.Stream, L: *VM.lua.State, comptime kind: BreakKi
                         const line = std.fmt.parseInt(i32, line_str, 10) catch |err| {
                             break :out try printMessage(stream, .Error, "Line Parse Error: {}", .{err});
                         };
-                        const dir = std.fs.cwd();
-                        const file_path = dir.realpathAlloc(allocator, file_str) catch |err| switch (err) {
+                        const dir = std.Io.Dir.cwd();
+                        var buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+                        const len = dir.realPathFile(Zune.io(), file_str, &buf) catch |err| switch (err) {
                             error.FileNotFound => break :out try printMessage(stream, .Error, "file not found: {s}", .{file_str}),
                             else => break :out try printMessage(stream, .Error, "failed to resolve file '{s}': {}", .{ file_str, err }),
                         };
-                        defer allocator.free(file_path);
+                        const file_path = buf[0..len];
                         if (o == .remove) {
                             _ = removeBreakpoint(file_path, line);
                             try sendMessage(stream, .Result, "removed");
@@ -1267,13 +1270,13 @@ fn promptSocket(stream: std.net.Stream, L: *VM.lua.State, comptime kind: BreakKi
                             fn_name,
                             base64_src,
                             ar.currentline orelse ar.linedefined orelse 0,
-                            @intFromEnum(ar.what),
+                            @backingInt(ar.what),
                         })
                     else
                         try writer.print("{{\"name\":null,\"src\":\"{s}\",\"line\":{d},\"context\":{d}}}", .{
                             base64_src,
                             ar.currentline orelse ar.linedefined orelse 0,
-                            @intFromEnum(ar.what),
+                            @backingInt(ar.what),
                         });
                 }
                 try writer.writeByte(']');
@@ -1313,7 +1316,7 @@ fn promptSocket(stream: std.net.Stream, L: *VM.lua.State, comptime kind: BreakKi
                 break;
             },
             .locals => out: {
-                switch (@as(LOCALS_COMMAND_ENUM, @enumFromInt(try reader.takeByte()))) {
+                switch (@as(LOCALS_COMMAND_ENUM, @fromBackingInt(@intCast(try reader.takeByte())))) {
                     .list => {
                         var input = try readStreamInput(reader, allocator);
                         defer input.deinit();
@@ -1339,7 +1342,7 @@ fn promptSocket(stream: std.net.Stream, L: *VM.lua.State, comptime kind: BreakKi
                 }
             },
             .params => out: {
-                switch (@as(LOCALS_COMMAND_ENUM, @enumFromInt(try reader.takeByte()))) {
+                switch (@as(LOCALS_COMMAND_ENUM, @fromBackingInt(@intCast(try reader.takeByte())))) {
                     .list => {
                         var input = try readStreamInput(reader, allocator);
                         defer input.deinit();
@@ -1366,7 +1369,7 @@ fn promptSocket(stream: std.net.Stream, L: *VM.lua.State, comptime kind: BreakKi
                 }
             },
             .upvalues => out: {
-                switch (@as(LOCALS_COMMAND_ENUM, @enumFromInt(try reader.takeByte()))) {
+                switch (@as(LOCALS_COMMAND_ENUM, @fromBackingInt(@intCast(try reader.takeByte())))) {
                     .list => {
                         var input = try readStreamInput(reader, allocator);
                         defer input.deinit();
@@ -1393,7 +1396,7 @@ fn promptSocket(stream: std.net.Stream, L: *VM.lua.State, comptime kind: BreakKi
                 }
             },
             .globals => out: {
-                switch (@as(LOCALS_COMMAND_ENUM, @enumFromInt(try reader.takeByte()))) {
+                switch (@as(LOCALS_COMMAND_ENUM, @fromBackingInt(@intCast(try reader.takeByte())))) {
                     .list => {
                         var input = try readStreamInput(reader, allocator);
                         defer input.deinit();
@@ -1425,13 +1428,12 @@ fn promptSocket(stream: std.net.Stream, L: *VM.lua.State, comptime kind: BreakKi
                 break;
             },
             .restart => out: {
-                if (Zune.corelib.thread.THREADS.len > 0) {
+                if (Zune.standard.libraries.thread.THREADS.first != null) {
                     break :out try sendMessage(stream, .Error, "cannot restart while threads are running");
                 }
                 // force a break, ignoring yield status
-                L.curr_status = @intFromEnum(VM.lua.Status.Break);
+                L.curr_status = @backingInt(VM.lua.Status.Break);
                 DEBUG.dead = true;
-                Scheduler.KillSchedulers();
                 return;
             },
             .exception => {
@@ -1439,7 +1441,7 @@ fn promptSocket(stream: std.net.Stream, L: *VM.lua.State, comptime kind: BreakKi
                 defer input.deinit();
 
                 const option, const args_rest = getNextArg(input.written());
-                const enabled = std.mem.eql(u8, std.mem.trimLeft(u8, args_rest, " "), "true");
+                const enabled = std.mem.eql(u8, std.mem.trimStart(u8, args_rest, " "), "true");
                 if (std.mem.eql(u8, option, "UnhandledError")) {
                     DEBUG.unhandled_exception = enabled;
                     try printMessage(stream, .Result, "{}", .{DEBUG.unhandled_exception});
@@ -1455,11 +1457,11 @@ fn promptSocket(stream: std.net.Stream, L: *VM.lua.State, comptime kind: BreakKi
                             defer L.pop(1);
                             const err_base64_buf, const base64_err = try toBase64(allocator, err);
                             defer allocator.free(err_base64_buf);
-                            try printMessage(stream, .Result, "{{\"reason\":\"{s}\",\"type\":\"{s}\",\"kind\":{d}}}", .{ base64_err, typename, @intFromEnum(kind) });
+                            try printMessage(stream, .Result, "{{\"reason\":\"{s}\",\"type\":\"{s}\",\"kind\":{d}}}", .{ base64_err, typename, @backingInt(kind) });
                             continue;
                         }
                     }
-                    try printMessage(stream, .Result, "{{\"reason\":null,\"type\":null,\"kind\":{d}}}", .{@intFromEnum(kind)});
+                    try printMessage(stream, .Result, "{{\"reason\":null,\"type\":null,\"kind\":{d}}}", .{@backingInt(kind)});
                 }
             },
             else => try sendMessage(stream, .Error, "unknown command"),
@@ -1467,16 +1469,76 @@ fn promptSocket(stream: std.net.Stream, L: *VM.lua.State, comptime kind: BreakKi
     }
 }
 
-pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c.lua_Debug) !void {
+const MODIFIER = packed struct {
+    Ctrl: bool = false,
+    Alt: bool = false,
+    Shift: bool = false,
+
+    pub fn init(ctrl: bool, alt: bool, shift: bool) MODIFIER {
+        return .{ .Ctrl = ctrl, .Alt = alt, .Shift = shift };
+    }
+
+    pub inline fn onlyCtrl(self: MODIFIER) bool {
+        return self.Ctrl and !self.Alt and !self.Shift;
+    }
+
+    pub inline fn none(self: MODIFIER) bool {
+        return !self.Ctrl and !self.Alt and !self.Shift;
+    }
+};
+
+const NON_LETTER = " `~!@#$%^&*()-_=+[]{}\\|;:'\",<.>/?";
+
+const terminal = Zune.standard.libraries.io.terminal;
+
+pub fn moveCursor(comptime action: enum { Left, Right }, amount: usize) !void {
+    var buffer: [8]u8 = undefined;
+    var writer = terminal.state.stdout_file.writer(Zune.io(), &buffer);
+    switch (amount) {
+        0 => return,
+        1 => try writer.interface.writeAll("\x1b[" ++ switch (action) {
+            .Left => "D",
+            .Right => "C",
+        }),
+        else => |d| try writer.interface.print("\x1b[{d}" ++ switch (action) {
+            .Left => "D",
+            .Right => "C",
+        }, .{d}),
+    }
+    try writer.interface.flush();
+}
+
+fn clearStyles() !void {
+    var buffer: [4]u8 = undefined;
+    var writer = terminal.state.stdout_file.writer(Zune.io(), &buffer);
+    try writer.interface.writeAll("\x1b[0m");
+    try writer.interface.flush();
+}
+
+fn clearEndToCursor() !void {
+    var buffer: [4]u8 = undefined;
+    var writer = terminal.state.stdout_file.writer(Zune.io(), &buffer);
+    try writer.interface.writeAll("\x1b[0J");
+    try writer.interface.flush();
+}
+
+fn writeAllRetainCursor(string: []const u8) !void {
+    var buffer: [64]u8 = undefined;
+    var writer = terminal.state.stdout_file.writer(Zune.io(), &buffer);
+    try writer.interface.writeAll(string);
+    try writer.interface.print("\x1b[{d}D", .{string.len});
+    try writer.interface.flush();
+}
+
+pub fn prompt(L: *VM.lua.State, kind: BreakKind, debug_info: ?*VM.lua.c.lua_Debug) !void {
     const reader = switch (COMM) {
         .io => &COMM.io.interface,
         .stream => |s| return try promptSocket(s, L, kind, debug_info),
     };
 
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator();
 
-    const terminal = &(Zune.corelib.io.TERMINAL orelse std.debug.panic("Terminal not initialized", .{}));
-    const history = HISTORY orelse std.debug.panic("History not initialized", .{});
+    // const history = HISTORY orelse std.debug.panic("History not initialized", .{});
 
     var input_buffer: std.ArrayList(u8) = .empty;
     defer input_buffer.deinit(allocator);
@@ -1504,9 +1566,9 @@ pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c
             .None => {},
             .Breakpoint, .Stepped => |k| {
                 const ar = debug_info orelse std.debug.panic(DEBUG_RESULT_TAG ++ "Debugger crashed, missing debug info for breakpoint", .{});
-                printResult("{{\"break\":{d},\"line\":{d}}}\n", .{ @intFromEnum(k), ar.currentline });
+                printResult("{{\"break\":{d},\"line\":{d}}}\n", .{ @backingInt(k), ar.currentline });
             },
-            .HandledException, .UnhandledException => printResult("{{\"break\":{d},\"line\":null}}\n", .{@intFromEnum(kind)}),
+            .HandledException, .UnhandledException => printResult("{{\"break\":{d},\"line\":null}}\n", .{@backingInt(kind)}),
         }
     }
     std.debug.print(DEBUG_TAG, .{});
@@ -1517,7 +1579,7 @@ pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c
                 if (try reader.takeByte() != '[')
                     continue;
                 var currentByte = try reader.takeByte();
-                var modifier: Terminal.MODIFIER = .{};
+                var modifier: MODIFIER = .{};
                 switch (currentByte) {
                     '1' => {
                         if (try reader.takeByte() != ';')
@@ -1536,30 +1598,30 @@ pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c
                 }
                 switch (currentByte) {
                     'A' => { // Up Arrow
-                        if (history.size() == 0)
-                            continue;
-                        if (history.isLatest())
-                            history.saveTemp(input_buffer.items);
-                        if (history.previous()) |line| {
-                            input_buffer.clearRetainingCapacity();
-                            try input_buffer.appendSlice(allocator, line);
-                            position = line.len;
+                        // if (history.size() == 0)
+                        //     continue;
+                        // if (history.isLatest())
+                        //     history.saveTemp(input_buffer.items);
+                        // if (history.previous()) |line| {
+                        //     input_buffer.clearRetainingCapacity();
+                        //     try input_buffer.appendSlice(allocator, line);
+                        //     position = line.len;
 
-                            try terminal.clearLine();
-                            print("{s}", .{input_buffer.items});
-                        }
+                        //     try terminal.clearLine();
+                        //     print("{s}", .{input_buffer.items});
+                        // }
                     },
                     'B' => { // Down Arrow
-                        if (history.next()) |line| {
-                            input_buffer.clearRetainingCapacity();
-                            try input_buffer.appendSlice(allocator, line);
-                            position = line.len;
+                        // if (history.next()) |line| {
+                        //     input_buffer.clearRetainingCapacity();
+                        //     try input_buffer.appendSlice(allocator, line);
+                        //     position = line.len;
 
-                            try terminal.clearLine();
-                            print("{s}", .{input_buffer.items});
-                        }
-                        if (history.isLatest())
-                            history.clearTemp();
+                        //     try terminal.clearLine();
+                        //     print("{s}", .{input_buffer.items});
+                        // }
+                        // if (history.isLatest())
+                        //     history.clearTemp();
                     },
                     'C' => { // Right Arrow
                         const written = input_buffer.items;
@@ -1567,20 +1629,20 @@ pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c
                             continue;
                         if (modifier.onlyCtrl()) {
                             const slice = written[position..];
-                            const front = std.mem.indexOfAny(u8, slice, Terminal.NON_LETTER) orelse {
-                                try terminal.moveCursor(.Right, slice.len);
+                            const front = std.mem.indexOfAny(u8, slice, NON_LETTER) orelse {
+                                try moveCursor(.Right, slice.len);
                                 position = written.len;
                                 continue;
                             };
-                            const index = (std.mem.indexOfNone(u8, slice[front..], Terminal.NON_LETTER) orelse {
-                                try terminal.moveCursor(.Right, slice.len);
+                            const index = (std.mem.indexOfNone(u8, slice[front..], NON_LETTER) orelse {
+                                try moveCursor(.Right, slice.len);
                                 position = written.len;
                                 continue;
                             }) + front;
-                            try terminal.moveCursor(.Right, index);
+                            try moveCursor(.Right, index);
                             position += index;
                         } else if (modifier.none()) {
-                            try terminal.moveCursor(.Right, 1);
+                            try moveCursor(.Right, 1);
                             position += 1;
                         }
                     },
@@ -1590,40 +1652,40 @@ pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c
                         const written = input_buffer.items;
                         if (modifier.onlyCtrl()) {
                             const slice = written[0..position];
-                            const back = std.mem.lastIndexOfNone(u8, slice, Terminal.NON_LETTER) orelse {
-                                try terminal.moveCursor(.Left, @intCast(position));
+                            const back = std.mem.lastIndexOfNone(u8, slice, NON_LETTER) orelse {
+                                try moveCursor(.Left, @intCast(position));
                                 position = 0;
                                 continue;
                             };
-                            const index = slice.len - (std.mem.lastIndexOfAny(u8, slice[0..back], Terminal.NON_LETTER) orelse {
-                                try terminal.moveCursor(.Left, @intCast(position));
+                            const index = slice.len - (std.mem.lastIndexOfAny(u8, slice[0..back], NON_LETTER) orelse {
+                                try moveCursor(.Left, @intCast(position));
                                 position = 0;
                                 continue;
                             }) - 1;
-                            try terminal.moveCursor(.Left, index);
+                            try moveCursor(.Left, index);
                             position -= index;
                         } else if (modifier.none()) {
-                            try terminal.moveCursor(.Left, 1);
+                            try moveCursor(.Left, 1);
                             position -= 1;
                         }
                     },
                     else => |b| std.debug.print("unknown escape sequence: {d}\n", .{b}),
                 }
             },
-            Terminal.NEW_LINE => {
+            if (builtin.os.tag == .windows) '\r' else '\n' => {
                 std.debug.print("\n", .{});
                 out: {
                     defer position = 0;
                     defer input_buffer.clearRetainingCapacity();
 
-                    defer history.reset();
+                    // defer history.reset();
 
                     const written = input_buffer.items;
 
                     if (written.len == 0)
                         break :out;
 
-                    history.save(written);
+                    // history.save(written);
 
                     const command_input, const rest = getNextArg(written);
                     switch (COMMAND_MAP.get(command_input) orelse {
@@ -1676,14 +1738,16 @@ pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c
                                 }
                                 break :out;
                             }
-                            const dir = std.fs.cwd();
-                            const path = dir.realpathAlloc(allocator, source.?[1..]) catch |err| switch (err) {
+                            const dir = std.Io.Dir.cwd();
+                            var buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+                            const len = dir.realPathFile(Zune.io(), source.?[1..], &buf) catch |err| switch (err) {
                                 error.FileNotFound => switch (DEBUG.output) {
                                     .Readable => break :out printResult("current file: {s}\n", .{source.?[1..]}),
                                     .Json => break :out printResult("null\n", .{}),
                                 },
                                 else => return err,
                             };
+                            const path = buf[0..len];
                             defer allocator.free(path);
                             switch (DEBUG.output) {
                                 .Readable => printResult("current file: {s}\n", .{path}),
@@ -1691,7 +1755,7 @@ pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c
                             }
                         },
                         .trace => {
-                            const args = std.mem.trimLeft(u8, rest, " ");
+                            const args = std.mem.trimStart(u8, rest, " ");
                             const levels_index = std.mem.indexOf(u8, args, " ") orelse args.len;
                             var levels: u32 = 0;
                             if (levels_index > 0) {
@@ -1756,13 +1820,13 @@ pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c
                                                 fn_name,
                                                 base64_src,
                                                 ar.currentline orelse ar.linedefined orelse 0,
-                                                @intFromEnum(ar.what),
+                                                @backingInt(ar.what),
                                             })
                                         else
                                             try writer.print("{{\"name\":null,\"src\":\"{s}\",\"line\":{d},\"context\":{d}}}", .{
                                                 base64_src,
                                                 ar.currentline orelse ar.linedefined orelse 0,
-                                                @intFromEnum(ar.what),
+                                                @backingInt(ar.what),
                                             });
                                     }
                                     try writer.writeByte(']');
@@ -1770,7 +1834,7 @@ pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c
                                 },
                             }
                         },
-                        .@"break" => try promptOpBreak(allocator, rest),
+                        .@"break" => try promptOpBreak(rest),
                         .modules => {
                             try L.rawcheckstack(3);
                             _ = try L.Lfindtable(VM.lua.REGISTRYINDEX, "_MODULES", 1);
@@ -1861,18 +1925,17 @@ pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c
                             break;
                         },
                         .restart => {
-                            if (Zune.corelib.thread.THREADS.len > 0) {
+                            if (Zune.standard.libraries.thread.THREADS.first != null) {
                                 printResult("<red>cannot restart while threads are running<clear>\n", .{});
                                 break :out;
                             }
                             // force a break, ignoring yield status
-                            L.curr_status = @intFromEnum(VM.lua.Status.Break);
+                            L.curr_status = @backingInt(VM.lua.Status.Break);
                             DEBUG.dead = true;
-                            Scheduler.KillSchedulers();
                             return;
                         },
                         .output_mode => {
-                            const option = std.mem.trimLeft(u8, rest, " ");
+                            const option = std.mem.trimStart(u8, rest, " ");
                             if (std.mem.eql(u8, option, "json")) {
                                 DEBUG.output = .Json;
                                 printResult("{{\"mode\":\"json\"}}\n", .{});
@@ -1883,7 +1946,7 @@ pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c
                         },
                         .exception => {
                             const option, const args_rest = getNextArg(rest);
-                            const enabled = std.mem.eql(u8, std.mem.trimLeft(u8, args_rest, " "), "true");
+                            const enabled = std.mem.eql(u8, std.mem.trimStart(u8, args_rest, " "), "true");
                             if (std.mem.eql(u8, option, "UnhandledError")) {
                                 DEBUG.unhandled_exception = enabled;
                                 switch (DEBUG.output) {
@@ -1918,10 +1981,10 @@ pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c
                                                 defer L.pop(1);
                                                 const err_base64_buf, const base64_err = try toBase64(allocator, err);
                                                 defer allocator.free(err_base64_buf);
-                                                break :out printResult("{{\"reason\":\"{s}\",\"type\":\"{s}\",\"kind\":{d}}}\n", .{ base64_err, typename, @intFromEnum(kind) });
+                                                break :out printResult("{{\"reason\":\"{s}\",\"type\":\"{s}\",\"kind\":{d}}}\n", .{ base64_err, typename, @backingInt(kind) });
                                             }
                                         }
-                                        printResult("{{\"reason\":null,\"type\":null,\"kind\":{d}}}\n", .{@intFromEnum(kind)});
+                                        printResult("{{\"reason\":null,\"type\":null,\"kind\":{d}}}\n", .{@backingInt(kind)});
                                     },
                                 }
                             }
@@ -1929,7 +1992,7 @@ pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c
                         _ => unreachable, // should not happen
                     }
                 }
-                try terminal.clearStyles();
+                try clearStyles();
                 print("", .{});
             },
             127 => {
@@ -1939,9 +2002,9 @@ pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c
                 std.debug.print("{c}", .{8});
                 position -= 1;
                 _ = input_buffer.orderedRemove(position);
-                try terminal.clearEndToCursor();
+                try clearEndToCursor();
                 if (append)
-                    try terminal.writeAllRetainCursor(input_buffer.items[position..]);
+                    try writeAllRetainCursor(input_buffer.items[position..]);
             },
             23 => { // Ctrl+Backspace
                 const slice = input_buffer.items[0..position];
@@ -1949,16 +2012,16 @@ pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c
                     continue;
                 const append = position < input_buffer.items.len;
                 const index: usize = blk: {
-                    const back = std.mem.lastIndexOfNone(u8, slice, Terminal.NON_LETTER) orelse break :blk position;
-                    break :blk slice.len - (std.mem.lastIndexOfAny(u8, slice[0..back], Terminal.NON_LETTER) orelse break :blk position) - 1;
+                    const back = std.mem.lastIndexOfNone(u8, slice, NON_LETTER) orelse break :blk position;
+                    break :blk slice.len - (std.mem.lastIndexOfAny(u8, slice[0..back], NON_LETTER) orelse break :blk position) - 1;
                 };
                 for (0..index) |_| {
                     std.debug.print("{c}", .{8});
                     position -= 1;
                     _ = input_buffer.orderedRemove(position);
-                    try terminal.clearEndToCursor();
+                    try clearEndToCursor();
                     if (append)
-                        try terminal.writeAllRetainCursor(input_buffer.items[position..]);
+                        try writeAllRetainCursor(input_buffer.items[position..]);
                 }
             },
             3, 4 => { // Ctrl+C, Ctrl+D
@@ -1979,15 +2042,15 @@ pub fn prompt(L: *VM.lua.State, comptime kind: BreakKind, debug_info: ?*VM.lua.c
                 std.debug.print("{c}", .{byte});
                 position += 1;
                 if (append)
-                    try terminal.writeAllRetainCursor(input_buffer.items[position..]);
+                    try writeAllRetainCursor(input_buffer.items[position..]);
             },
         }
     }
 }
 
 pub fn debugstep(L: *VM.lua.State, ar: *VM.lua.c.lua_Debug) callconv(.c) void {
-    MAIN_MUTEX.lock();
-    defer MAIN_MUTEX.unlock();
+    MAIN_MUTEX.lockUncancelable(Zune.io());
+    defer MAIN_MUTEX.unlock(Zune.io());
     updateBreakpoints(L) catch |err| switch (err) {
         error.NoSource => {},
         error.InvalidPath => {},
@@ -2011,8 +2074,8 @@ pub fn debugstep(L: *VM.lua.State, ar: *VM.lua.c.lua_Debug) callconv(.c) void {
 }
 
 pub fn debugbreak(L: *VM.lua.State, ar: *VM.lua.c.lua_Debug) callconv(.c) void {
-    MAIN_MUTEX.lock();
-    defer MAIN_MUTEX.unlock();
+    MAIN_MUTEX.lockUncancelable(Zune.io());
+    defer MAIN_MUTEX.unlock(Zune.io());
     if (DEBUG.dead)
         return;
     prompt(L, .Breakpoint, ar) catch |err| {
@@ -2021,8 +2084,8 @@ pub fn debugbreak(L: *VM.lua.State, ar: *VM.lua.c.lua_Debug) callconv(.c) void {
 }
 
 pub fn luau_panic(L: *VM.lua.State, errcode: i32) void {
-    MAIN_MUTEX.lock();
-    defer MAIN_MUTEX.unlock();
+    MAIN_MUTEX.lockUncancelable(Zune.io());
+    defer MAIN_MUTEX.unlock(Zune.io());
     if (DEBUG.dead or !DEBUG.unhandled_exception)
         return;
     _ = errcode;
@@ -2032,8 +2095,8 @@ pub fn luau_panic(L: *VM.lua.State, errcode: i32) void {
 }
 
 pub fn debugprotectederror(L: *VM.lua.State) callconv(.c) void {
-    MAIN_MUTEX.lock();
-    defer MAIN_MUTEX.unlock();
+    MAIN_MUTEX.lockUncancelable(Zune.io());
+    defer MAIN_MUTEX.unlock(Zune.io());
     if (DEBUG.dead or !DEBUG.handled_exception)
         return;
     prompt(L, .HandledException, null) catch |err| {

@@ -18,8 +18,8 @@ jobs:
     - name: Setup Zig
       uses: mlugg/setup-zig@v2
       with:
-        version: 0.15.1
-        use-cache: false
+        version: 0.17.1
+        use-cache: true
 
     - name: Run fmt
       run: zig fmt --check **/*.zig
@@ -36,8 +36,8 @@ jobs:
       - name: Setup Zig
         uses: mlugg/setup-zig@v2
         with:
-          version: 0.15.2
-          use-cache: false
+          version: 0.17.1
+          use-cache: true
 
       - name: Get Zune Version
         id: version
@@ -53,30 +53,25 @@ jobs:
           - os: ubuntu-latest
             name: Linux x86_64
             target: x86_64-linux-gnu
-            artifact: zune-${{ needs.prep.outputs.version }}-linux-x86_64
           - os: windows-latest
             name: Windows x86_64
             target: x86_64-windows
-            artifact: zune-${{ needs.prep.outputs.version }}-windows-x86_64
             ext: .exe
           - os: macos-15-intel
             name: macOS x86_64
             target: x86_64-macos
-            llvm: true
-            artifact: zune-${{ needs.prep.outputs.version }}-macos-x86_64
-          - os: macos-14
-            name: macOS Arm64
+          - os: macos-26
+            name: macOS aarch64
             target: aarch64-macos
-            artifact: zune-${{ needs.prep.outputs.version }}-macos-aarch64
           - os: ubuntu-22.04-arm
-            name: Linux Arm64
-            target: aarch64-linux
-            artifact: zune-${{ needs.prep.outputs.version }}-linux-aarch64
+            name: Linux aarch64
+            target: aarch64-linux-gnu
+            optimize: ReleaseSafe
           - os: ubuntu-latest
-            name: Linux Risc-v64
+            name: Linux riscv64
             target: riscv64-linux
             qemu-platform: riscv64
-            artifact: zune-${{ needs.prep.outputs.version }}-linux-riscv64
+            optimize: ReleaseSafe
 
     name: ${{ matrix.name }}
     timeout-minutes: 20
@@ -88,8 +83,8 @@ jobs:
     - name: Setup Zig
       uses: mlugg/setup-zig@v2
       with:
-        version: 0.15.2
-        use-cache: false
+        version: 0.17.1
+        use-cache: true
 
     - name: Setup QEMU
       if: matrix.qemu-platform != ''
@@ -97,11 +92,8 @@ jobs:
 
     - name: Run info
       continue-on-error: ${{ matrix.qemu-platform != '' }}
-      run: zig build run -Dtarget=${{ matrix.target }}${{ matrix.llvm != '' && ' -Dllvm' || '' }}${{ matrix.qemu-platform != '' && ' -fqemu' || '' }} -- info all
+      run: zig build run -Dtarget=${{ matrix.target }} -Doptimize=${{ matrix.optimize || 'debug' }}${{ matrix.llvm != '' && ' -Dllvm' || '' }}${{ matrix.qemu-platform != '' && ' -fqemu' || '' }} -- info all
 
     - name: Run tests
       continue-on-error: ${{ matrix.qemu-platform != '' }}
-      run: zig build test -Dtarget=${{ matrix.target }}${{ matrix.llvm != '' && ' -Dllvm' || '' }}${{ matrix.qemu-platform != '' && ' -fqemu' || '' }} --verbose
-   
-    - name: Build debug
-      run: zig build -Dtarget=${{ matrix.target }} --verbose
+      run: zig build test -Dtarget=${{ matrix.target }} -Doptimize=${{ matrix.optimize || 'debug' }}${{ matrix.llvm != '' && ' -Dllvm' || '' }}${{ matrix.qemu-platform != '' && ' -fqemu' || '' }} --verbose

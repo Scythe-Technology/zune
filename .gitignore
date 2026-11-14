@@ -10,7 +10,7 @@ zig-pkg/
 **/**.luauc
 **/**.gz
 
-# Nix Environment
-shell.nix
+test/engine/generated/.*
 
-.*
+.vscode
+.zed

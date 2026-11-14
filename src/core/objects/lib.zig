@@ -2,35 +2,34 @@ const luau = @import("luau");
 
 const VM = luau.VM;
 
-pub const filesystem = struct {
-    pub const File = @import("filesystem/File.zig");
-};
+pub const BufferArray = @import("BufferArray.zig");
 
-pub const network = struct {
-    pub const Socket = @import("network/Socket.zig");
-};
+pub const CPointer = @import("CPointer.zig");
+pub const CType = @import("CType.zig");
+pub const DynamicLibrary = @import("DynamicLibrary.zig");
 
-pub const process = struct {
-    pub const Child = @import("process/Child.zig");
-};
+pub const CryptoHasher = @import("CryptoHasher.zig");
+pub const CryptoTls = @import("CryptoTls.zig");
+pub const CryptoTlsCertBundle = @import("CryptoTlsCertBundle.zig");
+pub const CryptoTlsCertKeyPair = @import("CryptoTlsCertKeyPair.zig");
 
-fn loadNamespace(comptime ns: type, L: *VM.lua.State) !void {
-    inline for (@typeInfo(ns).@"struct".decls) |field| {
-        const object = @field(ns, field.name);
-        if (comptime !object.PlatformSupported())
-            continue;
-        if (@hasDecl(object, "load")) {
-            try object.load(L);
-        }
-    }
-}
+pub const Datetime = @import("Datetime.zig");
 
-pub fn load(L: *VM.lua.State) !void {
-    inline for (@typeInfo(@This()).@"struct".decls) |field| {
-        const ns = @field(@This(), field.name);
-        switch (@typeInfo(@TypeOf(ns))) {
-            .type => try loadNamespace(ns, L),
-            else => continue,
-        }
-    }
-}
+pub const Dir = @import("Dir.zig");
+pub const File = @import("File.zig");
+pub const FileWatcher = @import("FileWatcher.zig");
+pub const GpioLine = @import("GpioLine.zig");
+
+pub const ProcessChild = @import("ProcessChild.zig");
+
+pub const Random = @import("Random.zig");
+
+pub const Regex = @import("Regex.zig");
+
+pub const Socket = @import("Socket.zig");
+
+pub const Thread = @import("Thread.zig");
+pub const ThreadHardMutex = @import("ThreadHardMutex.zig");
+pub const ThreadLane = @import("ThreadLane.zig");
+pub const ThreadMutex = @import("ThreadMutex.zig");
+pub const ThreadValue = @import("ThreadValue.zig");

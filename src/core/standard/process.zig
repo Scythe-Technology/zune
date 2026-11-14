@@ -1,5 +1,5 @@
 const std = @import("std");
-const xev = @import("xev").Dynamic;
+const zio = @import("zio");
 const luau = @import("luau");
 const builtin = @import("builtin");
 
@@ -7,17 +7,12 @@ const Zune = @import("zune");
 
 const Engine = Zune.Runtime.Engine;
 const Scheduler = Zune.Runtime.Scheduler;
+const Scripting = Zune.Runtime.Scripting;
+
+const File = Zune.objects.File;
+const ProcessChild = Zune.objects.ProcessChild;
 
 const Parser = @import("../utils/parser.zig");
-
-const File = @import("../objects/filesystem/File.zig");
-const ProcessChild = @import("../objects/process//Child.zig");
-
-const LuaHelper = Zune.Utils.LuaHelper;
-const MethodMap = Zune.Utils.MethodMap;
-const EnumMap = Zune.Utils.EnumMap;
-
-const sysfd = @import("../utils/sysfd.zig");
 
 const VM = luau.VM;
 
@@ -25,18 +20,13 @@ const process = std.process;
 
 const native_os = builtin.os.tag;
 
-const TAG_PROCESS_CHILD = Zune.Tags.get("PROCESS_CHILD").?;
-
 pub const LIB_NAME = "process";
-pub fn PlatformSupported() bool {
-    return true;
-}
 
 pub var SIGINT_LUA: ?LuaSigHandler = null;
 
 const LuaSigHandler = struct {
     state: *VM.lua.State,
-    ref: i32,
+    ref: Scripting.Reference,
 };
 
 const ProcessArgsError = error{
@@ -51,16 +41,16 @@ const ProcessEnvError = error{
 
 fn getProcessArgs(L: *VM.lua.State, allocator: std.mem.Allocator, array: *std.ArrayList([]const u8), idx: i32) !void {
     try L.Zchecktype(idx, .Table);
-    var iter: LuaHelper.ArrayIterator = .{ .L = L, .idx = idx };
+    var iter: Scripting.ArrayIterator = .{ .L = L, .idx = idx };
     while (try iter.next()) |i| switch (i) {
         .String => try array.append(allocator, L.tostring(-1).?),
         else => return L.Zerrorf("invalid process argument type (string expected, got {s})", .{VM.lapi.typename(L.typeOf(-1))}),
     };
 }
 
-fn writeProcessEnvMap(L: *VM.lua.State, envMap: *std.process.EnvMap, idx: i32) !void {
+fn writeProcessEnvMap(L: *VM.lua.State, envMap: *std.process.Environ.Map, idx: i32) !void {
     try L.Zchecktype(idx, .Table);
-    var iter: LuaHelper.TableIterator = .{ .L = L, .idx = idx };
+    var iter: Scripting.TableIterator = .{ .L = L, .idx = idx };
     while (iter.next()) |t| switch (t) {
         .String => {
             if (L.typeOf(-1) != .String)
@@ -73,7 +63,7 @@ fn writeProcessEnvMap(L: *VM.lua.State, envMap: *std.process.EnvMap, idx: i32) !
 
 const ProcessOptions = struct {
     cwd: ?[]const u8 = null,
-    env: ?process.EnvMap = null,
+    env: ?process.Environ.Map = null,
     joined: ?[]const u8 = null,
     args: std.ArrayList([]const u8),
     stdin: Behavior = .pipe,
@@ -99,10 +89,10 @@ const ProcessOptions = struct {
             options.cwd = try L.Zcheckfield(?[]const u8, 3, "cwd");
             L.pop(1);
 
-            if (LuaHelper.maybeKnownType(L.rawgetfield(3, "env"))) |@"type"| {
+            if (Scripting.maybeKnownType(L.rawgetfield(3, "env"))) |@"type"| {
                 if (@"type" != .Table)
                     return L.Zerrorf("invalid environment (table expected, got {s})", .{VM.lapi.typename(@"type")});
-                options.env = std.process.EnvMap.init(allocator);
+                options.env = std.process.Environ.Map.init(allocator);
                 try writeProcessEnvMap(L, &options.env.?, -1);
             }
             L.pop(1);
@@ -214,221 +204,297 @@ const ProcessOptions = struct {
     }
 };
 
-const ProcessAsyncRunContext = struct {
-    completion: xev.Completion,
-    stdout_completion: xev.Completion,
-    stderr_completion: xev.Completion,
+const AsyncRunContext = struct {
+    op: zio.ev.ProcessWait,
+    stdout_read: zio.ev.FileReadStreaming,
+    stderr_read: zio.ev.FileReadStreaming,
     ref: Scheduler.ThreadRef,
-    proc: xev.Process,
-    result_type: VM.lua.Type = .String,
     state: packed struct {
         executing: bool = true,
         stderr: bool = false,
         stdout: bool = false,
     } = .{},
-    code: u32 = 0,
+    result: union(enum) {
+        none: void,
+        exited: zio.ev.ProcessWait.ExitStatus,
+        error_code: u8,
+    } = .none,
 
     stdout_writer: std.ArrayList(u8) = .empty,
     stderr_writer: std.ArrayList(u8) = .empty,
 
+    iovec: [2]zio.os.iovec = undefined,
     stdout_read_buffer: [4096]u8 = undefined,
     stderr_read_buffer: [4096]u8 = undefined,
 
-    stdout: ?std.fs.File,
-    stderr: ?std.fs.File,
+    stdout: ?std.Io.File,
+    stderr: ?std.Io.File,
 
-    pub fn cleanup(self: *ProcessAsyncRunContext, allocator: std.mem.Allocator) void {
+    pub fn cleanup(self: *AsyncRunContext, allocator: std.mem.Allocator) void {
         defer allocator.destroy(self);
         defer self.ref.deref();
-        defer self.proc.deinit();
         defer self.stdout_writer.deinit(allocator);
         defer self.stderr_writer.deinit(allocator);
     }
 
-    pub inline fn active(self: *ProcessAsyncRunContext) bool {
+    pub inline fn active(self: *AsyncRunContext) bool {
         return self.state.stdout or self.state.stderr or self.state.executing;
     }
 
-    pub fn resumeResult(self: *ProcessAsyncRunContext) !void {
+    pub fn resumeResult(self: *AsyncRunContext) !void {
         const L = self.ref.value;
-        defer self.cleanup(luau.getallocator(L));
+        const scheduler = Scheduler.fromState(L);
+        defer self.cleanup(scheduler.allocator());
 
         if (L.status() != .Yield)
             return;
 
-        try L.Zpushvalue(.{
-            .code = self.code,
-            .ok = self.code == 0,
-        });
+        switch (self.result) {
+            .none => unreachable,
+            .exited => |res| if (res.signal) |sig|
+                try L.Zpushvalue(.{
+                    .code = sig,
+                    .ok = false,
+                    .kind = "signal",
+                })
+            else
+                try L.Zpushvalue(.{
+                    .code = res.code,
+                    .ok = res.code == 0,
+                    .kind = "exited",
+                }),
+            .error_code => |err| try L.Zpushvalue(.{
+                .code = err,
+                .ok = false,
+                .kind = "error",
+            }),
+        }
 
         if (self.stdout != null) {
-            switch (self.result_type) {
-                .String => try L.pushlstring(self.stdout_writer.items),
-                .Buffer => try L.Zpushbuffer(self.stdout_writer.items),
-                else => unreachable,
-            }
+            try L.Zpushbuffer(self.stdout_writer.items);
             try L.rawsetfield(-2, "stdout");
         }
         if (self.stderr != null) {
-            switch (self.result_type) {
-                .String => try L.pushlstring(self.stderr_writer.items),
-                .Buffer => try L.Zpushbuffer(self.stderr_writer.items),
-                else => unreachable,
-            }
+            try L.Zpushbuffer(self.stderr_writer.items);
             try L.rawsetfield(-2, "stderr");
         }
 
         _ = Scheduler.resumeState(L, null, 1) catch {};
     }
 
-    pub fn complete(
-        ud: ?*ProcessAsyncRunContext,
-        _: *xev.Loop,
-        _: *xev.Completion,
-        r: xev.Process.WaitError!u32,
-    ) xev.CallbackAction {
-        const self = ud orelse unreachable;
-        const L = self.ref.value;
+    pub fn complete(_: *zio.ev.Loop, completion: *zio.ev.Completion) void {
+        const wait: *zio.ev.ProcessWait = @alignCast(@fieldParentPtr("c", completion));
+        const self: *AsyncRunContext = @alignCast(@fieldParentPtr("op", wait));
 
         self.state.executing = false;
 
         defer if (!self.active())
             self.resumeResult() catch |e| std.debug.panic("{}", .{e});
 
-        const code: u32 = r catch |err| switch (@as(anyerror, err)) {
-            error.NoSuchProcess => 0, // kqueue
-            else => blk: {
-                if (L.status() == .Yield)
-                    std.debug.print("[Process Wait Error: {}]\n", .{err});
-                break :blk 1;
+        self.result = .{
+            .exited = wait.getResult() catch |err| {
+                self.result = switch (err) {
+                    error.Canceled => .{ .error_code = 0 },
+                    error.ProcessNotFound => .{ .error_code = 1 },
+                    error.SystemResources => .{ .error_code = 2 },
+                    error.Unexpected => .{ .error_code = 3 },
+                };
+                return;
             },
         };
-
-        self.code = code;
-
-        return .disarm;
     }
 
-    pub fn stdoutComplete(
-        ud: ?*ProcessAsyncRunContext,
-        l: *xev.Loop,
-        c: *xev.Completion,
-        f: xev.File,
-        _: xev.ReadBuffer,
-        r: xev.ReadError!usize,
-    ) xev.CallbackAction {
-        const self = ud orelse unreachable;
+    pub fn stdoutComplete(loop: *zio.ev.Loop, completion: *zio.ev.Completion) void {
+        const read: *zio.ev.FileReadStreaming = @alignCast(@fieldParentPtr("c", completion));
+        const self: *AsyncRunContext = @alignCast(@fieldParentPtr("stdout_read", read));
 
         defer if (!self.active())
             self.resumeResult() catch |e| std.debug.panic("{}", .{e});
 
-        const bytes = r catch 0;
+        const bytes = read.getResult() catch 0;
         if (bytes == 0) {
             self.state.stdout = false;
-            self.stdout.?.close();
-            return .disarm;
+            self.stdout.?.close(Zune.io());
+            return;
         }
+        const scheduler = Scheduler.fromState(self.ref.value);
+        const allocator = scheduler.allocator();
 
-        const allocator = luau.getallocator(self.ref.value);
-
-        const free_space = LuaHelper.MAX_LUAU_SIZE - self.stdout_writer.items.len;
+        const free_space = Scripting.MAX_LUAU_SIZE - self.stdout_writer.items.len;
         const buffer = self.stdout_read_buffer[0..@min(bytes, free_space)];
         if (buffer.len > 0)
             self.stdout_writer.appendSlice(allocator, buffer) catch |e| std.debug.panic("{}", .{e});
-        if (free_space - buffer.len == 0 or bytes == 0) {
+        if (free_space - buffer.len == 0) {
             self.state.stdout = false;
-            self.stdout.?.close();
-            return .disarm;
+            self.stdout.?.close(Zune.io());
+            return;
         }
 
-        f.read(l, c, .{ .slice = &self.stdout_read_buffer }, ProcessAsyncRunContext, self, stdoutComplete);
-        return .disarm;
+        read.buffer = .fromSlice(&self.stdout_read_buffer, self.iovec[0..1]);
+        loop.add(&read.c);
+
+        return;
     }
 
-    pub fn stderrComplete(
-        ud: ?*ProcessAsyncRunContext,
-        l: *xev.Loop,
-        c: *xev.Completion,
-        f: xev.File,
-        _: xev.ReadBuffer,
-        r: xev.ReadError!usize,
-    ) xev.CallbackAction {
-        const self = ud orelse unreachable;
+    pub fn stderrComplete(loop: *zio.ev.Loop, completion: *zio.ev.Completion) void {
+        const read: *zio.ev.FileReadStreaming = @alignCast(@fieldParentPtr("c", completion));
+        const self: *AsyncRunContext = @alignCast(@fieldParentPtr("stderr_read", read));
 
         defer if (!self.active())
             self.resumeResult() catch |e| std.debug.panic("{}", .{e});
 
-        const bytes = r catch 0;
+        const bytes = read.getResult() catch 0;
         if (bytes == 0) {
             self.state.stderr = false;
-            self.stderr.?.close();
-            return .disarm;
+            self.stderr.?.close(Zune.io());
+            return;
         }
 
-        const allocator = luau.getallocator(self.ref.value);
+        const scheduler = Scheduler.fromState(self.ref.value);
+        const allocator = scheduler.allocator();
 
-        const free_space = LuaHelper.MAX_LUAU_SIZE - self.stderr_writer.items.len;
+        const free_space = Scripting.MAX_LUAU_SIZE - self.stderr_writer.items.len;
         const buffer = self.stderr_read_buffer[0..@min(bytes, free_space)];
         if (buffer.len > 0)
             self.stderr_writer.appendSlice(allocator, buffer) catch |e| std.debug.panic("{}", .{e});
         if (free_space - buffer.len == 0) {
             self.state.stderr = false;
-            self.stderr.?.close();
-            return .disarm;
+            self.stderr.?.close(Zune.io());
+            return;
         }
 
-        f.read(l, c, .{ .slice = &self.stderr_read_buffer }, ProcessAsyncRunContext, self, stderrComplete);
-        return .disarm;
+        read.buffer = .fromSlice(&self.stderr_read_buffer, self.iovec[1..2]);
+        loop.add(&read.c);
+
+        return;
     }
 };
 
-fn lua_run(L: *VM.lua.State) !i32 {
+pub fn lua_getExePath(L: *VM.lua.State) !i32 {
+    switch (comptime builtin.os.tag) {
+        .macos, .driverkit, .ios, .tvos, .visionos, .watchos => {}, // Darwin
+        .freebsd, .openbsd, .netbsd, .dragonfly => {}, // BSD
+        .illumos => {},
+        .haiku => {},
+        .windows, .linux => {},
+        else => return error.UnsupportedPlatform,
+    }
+
+    var buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const path = buf[0..try std.process.executablePath(Zune.io(), &buf)];
+    try L.pushlstring(path);
+    return 1;
+}
+
+pub fn lua_openExeFile(L: *VM.lua.State) !i32 {
+    var mode: std.Io.Dir.OpenFileOptions.Mode = .read_only;
+
+    const Options = struct {
+        mode: ?[:0]const u8 = null,
+        follow_symlinks: bool = true,
+        allow_directory: bool = true,
+        nonblocking: bool = true,
+        path_only: bool = false,
+        allow_ctty: bool = false,
+        resolve_beneath: bool = false,
+    };
+    const opts: Options = try L.Zcheckvalue(?Options, 1, null) orelse .{};
+    if (opts.mode) |m| {
+        const has_read = std.mem.indexOfScalar(u8, m, 'r');
+        const has_write = std.mem.indexOfScalar(u8, m, 'w');
+        if (has_read != null and has_write != null) {
+            mode = .read_write;
+        } else if (has_read != null) {
+            mode = .read_only;
+        } else if (has_write != null) {
+            mode = .write_only;
+        } else return L.Zerror("invalid mode");
+    }
+
+    const file = try std.process.openExecutable(Zune.io(), .{
+        .mode = mode,
+        .follow_symlinks = opts.follow_symlinks,
+        .allow_directory = opts.allow_directory,
+        .path_only = opts.path_only,
+        .allow_ctty = opts.allow_ctty,
+        .resolve_beneath = opts.resolve_beneath,
+    });
+    errdefer file.close(Zune.io());
+
+    _ = try File.create(L, file, .File, .{
+        .read = mode == .read_only or mode == .read_write,
+        .write = mode == .write_only or mode == .read_write,
+        .pollable = false,
+    });
+
+    return 1;
+}
+
+pub fn lua_run(L: *VM.lua.State) !i32 {
     if (comptime !std.process.can_spawn)
-        return error.UnsupportedPlatform;
+        return L.Zerror("unsupported platform");
     if (!L.isyieldable())
         return L.Zyielderror();
-    const scheduler = Scheduler.getScheduler(L);
-    const allocator = luau.getallocator(L);
+    const scheduler = Scheduler.fromState(L);
+    const allocator = scheduler.allocator();
 
     var options = try ProcessOptions.init(L, allocator);
     defer options.deinit(allocator);
 
-    var child = process.Child.init(options.args.items, allocator);
-    child.stdin_behavior = if (options.stdin == .inherit) .Inherit else .Ignore;
-    child.stdout_behavior = switch (options.stdout) {
-        .inherit => .Inherit,
-        .pipe => .Pipe,
-        .ignore => .Ignore,
-    };
-    child.stderr_behavior = switch (options.stderr) {
-        .inherit => .Inherit,
-        .pipe => .Pipe,
-        .ignore => .Ignore,
-    };
-    child.cwd = options.cwd;
-    child.env_map = if (options.env) |env|
-        &env
-    else
-        null;
-    child.expand_arg0 = .no_expand;
+    var child = try process.spawn(Zune.io(), .{
+        .argv = options.args.items,
+        .cwd = if (options.cwd) |cwd| .{ .path = cwd } else .inherit,
+        .environ_map = if (options.env != null) &options.env.? else &Zune.State.env_map,
+        .expand_arg0 = .no_expand,
+        .stdin = if (options.stdin == .inherit) .inherit else .ignore,
+        .stdout = switch (options.stdout) {
+            .inherit => .inherit,
+            .pipe => .pipe,
+            .ignore => .ignore,
+        },
+        .stderr = switch (options.stderr) {
+            .inherit => .inherit,
+            .pipe => .pipe,
+            .ignore => .ignore,
+        },
+        .create_no_window = if (comptime builtin.os.tag != .windows) false else blk: {
+            if (options.stdin == .inherit and Zune.standard.libraries.io.terminal.isStdInTty())
+                break :blk false;
+            if (options.stdout == .inherit and Zune.standard.libraries.io.terminal.isStdOutTty())
+                break :blk false;
+            if (options.stderr == .inherit and Zune.standard.libraries.io.terminal.isStdErrTty())
+                break :blk false;
+            break :blk true;
+        },
+    });
+    errdefer child.kill(Zune.io());
 
-    try child.spawn();
-    try child.waitForSpawn();
-    errdefer _ = child.kill() catch {};
+    if (comptime builtin.os.tag != .windows) {
+        if (child.stdin) |*f| jmp: {
+            zio.os.posix.setNonblocking(f.handle) catch break :jmp;
+            f.flags.nonblocking = true;
+        }
+        if (child.stdout) |*f| jmp: {
+            zio.os.posix.setNonblocking(f.handle) catch break :jmp;
+            f.flags.nonblocking = true;
+        }
+        if (child.stderr) |*f| jmp: {
+            zio.os.posix.setNonblocking(f.handle) catch break :jmp;
+            f.flags.nonblocking = true;
+        }
+    }
 
-    var proc = try xev.Process.init(child.id);
-    errdefer proc.deinit();
+    const handle = child.id orelse return L.Zerror("already terminated");
 
-    const self = try allocator.create(ProcessAsyncRunContext);
+    const self = try allocator.create(AsyncRunContext);
+    errdefer allocator.destroy(self);
 
     self.* = .{
-        .completion = .init(),
-        .stdout_completion = .init(),
-        .stderr_completion = .init(),
-        .proc = proc,
+        .op = .init(handle),
+        .stdout_read = undefined,
+        .stderr_read = undefined,
         .stdout = child.stdout,
         .stderr = child.stderr,
-        .result_type = if (L.toboolean(4)) .Buffer else .String,
         .ref = .init(L),
         .state = .{
             .executing = true,
@@ -437,88 +503,69 @@ fn lua_run(L: *VM.lua.State) !i32 {
         },
     };
 
-    proc.wait(
-        &scheduler.loop,
-        &self.completion,
-        ProcessAsyncRunContext,
-        self,
-        ProcessAsyncRunContext.complete,
-    );
+    self.op.c.callback = AsyncRunContext.complete;
+    scheduler.loop.add(&self.op.c);
 
     if (self.stdout) |stdout| {
-        var file: xev.File = .initFd(stdout.handle);
-        file.read(
-            &scheduler.loop,
-            &self.stdout_completion,
-            .{ .slice = &self.stdout_read_buffer },
-            ProcessAsyncRunContext,
-            self,
-            ProcessAsyncRunContext.stdoutComplete,
-        );
+        self.stdout_read = .init(stdout.handle, .fromSlice(&self.stdout_read_buffer, self.iovec[0..1]));
+        self.stdout_read.c.callback = AsyncRunContext.stdoutComplete;
+        scheduler.loop.add(&self.stdout_read.c);
     }
     if (self.stderr) |stderr| {
-        var file: xev.File = .initFd(stderr.handle);
-        file.read(
-            &scheduler.loop,
-            &self.stderr_completion,
-            .{ .slice = &self.stderr_read_buffer },
-            ProcessAsyncRunContext,
-            self,
-            ProcessAsyncRunContext.stderrComplete,
-        );
+        self.stderr_read = .init(stderr.handle, .fromSlice(&self.stderr_read_buffer, self.iovec[1..2]));
+        self.stderr_read.c.callback = AsyncRunContext.stderrComplete;
+        scheduler.loop.add(&self.stderr_read.c);
     }
 
-    scheduler.loop.submit() catch {};
-
-    return L.yield(0);
+    return L.yield(0) catch unreachable;
 }
 
-fn lua_create(L: *VM.lua.State) !i32 {
+pub fn lua_create(L: *VM.lua.State) !i32 {
     if (comptime !std.process.can_spawn)
-        return error.UnsupportedPlatform;
-    const allocator = luau.getallocator(L);
+        return L.Zerror("unsupported platform");
+    const allocator = Scheduler.fromState(L).allocator();
 
     var options = try ProcessOptions.init(L, allocator);
     defer options.deinit(allocator);
 
-    var child = process.Child.init(options.args.items, allocator);
-    child.expand_arg0 = .no_expand;
-    child.stdin_behavior = switch (options.stdin) {
-        .inherit => .Inherit,
-        .pipe => .Pipe,
-        .ignore => .Ignore,
-    };
-    child.stdout_behavior = switch (options.stdout) {
-        .inherit => .Inherit,
-        .pipe => .Pipe,
-        .ignore => .Ignore,
-    };
-    child.stderr_behavior = switch (options.stderr) {
-        .inherit => .Inherit,
-        .pipe => .Pipe,
-        .ignore => .Ignore,
-    };
-    child.cwd = options.cwd;
-    child.env_map = if (options.env) |env|
-        &env
-    else
-        null;
+    var child = try process.spawn(Zune.io(), .{
+        .argv = options.args.items,
+        .cwd = if (options.cwd) |cwd| .{ .path = cwd } else .inherit,
+        .environ_map = if (options.env != null) &options.env.? else &Zune.State.env_map,
+        .expand_arg0 = .no_expand,
+        .stdin = switch (options.stdin) {
+            .inherit => .inherit,
+            .pipe => .pipe,
+            .ignore => .ignore,
+        },
+        .stdout = switch (options.stdout) {
+            .inherit => .inherit,
+            .pipe => .pipe,
+            .ignore => .ignore,
+        },
+        .stderr = switch (options.stderr) {
+            .inherit => .inherit,
+            .pipe => .pipe,
+            .ignore => .ignore,
+        },
+    });
+    errdefer child.kill(Zune.io());
 
-    switch (comptime builtin.os.tag) {
-        .windows => try @import("../utils/os/windows.zig").spawnWindows(&child),
-        else => try child.spawn(),
+    if (comptime builtin.os.tag != .windows) {
+        if (child.stdin) |f| zio.os.posix.setNonblocking(f.handle) catch {};
+        if (child.stdout) |f| zio.os.posix.setNonblocking(f.handle) catch {};
+        if (child.stderr) |f| zio.os.posix.setNonblocking(f.handle) catch {};
     }
-    try child.waitForSpawn();
-    errdefer _ = child.kill() catch {};
 
-    try ProcessChild.push(L, child);
+    if (child.id == null) return L.Zerror("already terminated");
+
+    try ProcessChild.create(L, child);
 
     return 1;
 }
 
-fn lua_exit(L: *VM.lua.State) i32 {
+pub fn lua_exit(L: *VM.lua.State) i32 {
     const code = L.Lcheckunsigned(1);
-    Scheduler.KillSchedulers();
     Engine.stateCleanUp();
     std.process.exit(@truncate(code));
     return 0;
@@ -537,7 +584,7 @@ fn decodeString(L: *VM.lua.State, slice: []const u8) !usize {
         return 2;
     }
 
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator();
 
     var allocating: std.Io.Writer.Allocating = .init(allocator);
     defer allocating.deinit();
@@ -629,28 +676,29 @@ fn decodeEnvironment(L: *VM.lua.State, string: []const u8) !void {
 }
 
 fn loadEnvironment(L: *VM.lua.State, allocator: std.mem.Allocator, file: []const u8) !void {
-    const bytes: []const u8 = std.fs.cwd().readFileAlloc(allocator, file, std.math.maxInt(usize)) catch |err| switch (err) {
+    const bytes: []const u8 = std.Io.Dir.cwd().readFileAlloc(Zune.io(), file, allocator, .unlimited) catch |err| switch (err) {
         error.FileNotFound => return,
-        else => return L.Zerrorf("internal error ({s})", .{@errorName(err)}),
+        else => return err,
     };
     defer allocator.free(bytes);
 
     decodeEnvironment(L, bytes) catch {};
 }
 
-fn lua_loadEnv(L: *VM.lua.State) !i32 {
-    const allocator = luau.getallocator(L);
+pub fn lua_loadEnv(L: *VM.lua.State) !i32 {
+    const allocator = Scheduler.fromState(L).allocator();
     try L.newtable();
 
-    var iterator = Zune.STATE.ENV_MAP.iterator();
+    var iterator = Zune.State.env_map.iterator();
     while (iterator.next()) |entry| {
-        const zkey = try allocator.dupeZ(u8, entry.key_ptr.*);
-        defer allocator.free(zkey);
-        try L.Zsetfield(-1, zkey, entry.value_ptr.*);
+        const key = try allocator.dupe(u8, entry.key_ptr.*);
+        defer allocator.free(key);
+        try L.pushlstring(entry.value_ptr.*);
+        try L.rawsetfield(-2, key);
     }
 
     try loadEnvironment(L, allocator, ".env");
-    if (Zune.STATE.ENV_MAP.get("LUAU_ENV")) |value| {
+    if (Zune.State.env_map.get("LUAU_ENV")) |value| {
         if (std.mem.eql(u8, value, "PRODUCTION")) {
             try loadEnvironment(L, allocator, ".env.production");
         } else if (std.mem.eql(u8, value, "DEVELOPMENT")) {
@@ -664,42 +712,25 @@ fn lua_loadEnv(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn lua_onsignal(L: *VM.lua.State) !i32 {
+pub fn lua_onSignal(L: *VM.lua.State) !i32 {
     const sig = try L.Zcheckvalue([:0]const u8, 1, null);
     try L.Zchecktype(2, .Function);
 
     if (std.mem.eql(u8, sig, "INT")) {
-        if (Zune.STATE.MAIN_THREAD_ID != std.Thread.getCurrentId())
-            return L.Zerror("SIGINT handler can only be set in the main thread");
-        const GL = L.mainthread();
-        if (GL != L)
-            L.xpush(GL, 2);
-
-        const ref = (GL.ref(if (GL != L) -1 else 2) catch @panic("OutOfMemory")) orelse return L.Zerror("failed to create reference");
-        if (GL != L)
-            GL.pop(1);
-
-        if (SIGINT_LUA) |handler|
-            handler.state.unref(handler.ref);
+        if (Zune.State.main_thread_id) |id|
+            if (id != std.Thread.getCurrentId())
+                return L.Zerror("function can only be called in the main thread");
 
         SIGINT_LUA = .{
-            .state = GL,
-            .ref = ref,
+            .state = L.mainthread(),
+            .ref = .init(L, 2),
         };
     } else return L.Zerrorf("unknown signal: {s}", .{sig});
 
     return 0;
 }
 
-fn lua_cwd(L: *VM.lua.State) !i32 {
-    const allocator = luau.getallocator(L);
-    const path = try std.fs.cwd().realpathAlloc(allocator, ".");
-    defer allocator.free(path);
-    try L.pushlstring(path);
-    return 1;
-}
-
-fn lua_pid(L: *VM.lua.State) !i32 {
+pub fn lua_pid(L: *VM.lua.State) !i32 {
     switch (comptime builtin.os.tag) {
         .windows => L.pushunsigned(std.os.windows.GetCurrentProcessId()),
         else => L.pushinteger(std.c.getpid()),
@@ -707,43 +738,9 @@ fn lua_pid(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-pub fn loadLib(L: *VM.lua.State, args: []const []const u8) !void {
-    try L.createtable(0, 10);
-
-    try L.Zsetfield(-1, "arch", @tagName(builtin.cpu.arch));
-    try L.Zsetfield(-1, "os", @tagName(native_os));
-
-    {
-        try L.Zpushvalue(args);
-        try L.rawsetfield(-2, "args");
-    }
-
-    _ = try lua_loadEnv(L);
-    try L.rawsetfield(-2, "env");
-    try L.Zsetfieldfn(-1, "loadEnv", lua_loadEnv);
-
-    try L.Zsetfieldfn(-1, "cwd", lua_cwd);
-    try L.Zsetfieldfn(-1, "pid", lua_pid);
-
-    try L.Zsetfieldfn(-1, "exit", lua_exit);
-    try L.Zsetfieldfn(-1, "run", lua_run);
-    try L.Zsetfieldfn(-1, "create", lua_create);
-    try L.Zsetfieldfn(-1, "onSignal", lua_onsignal);
-
-    L.setreadonly(-1, true);
-
-    try LuaHelper.registerModule(L, LIB_NAME);
+pub fn lua_custom_args(L: *VM.lua.State) !void {
+    try L.Zpushvalue(Zune.State.args);
 }
-
-test "process" {
-    const TestRunner = @import("../utils/testrunner.zig");
-
-    const testResult = try TestRunner.runTest(
-        TestRunner.newTestFile("standard/process.test.luau"),
-        &.{ "Test", "someValue" },
-        .{},
-    );
-
-    try std.testing.expect(testResult.failed == 0);
-    try std.testing.expect(testResult.total > 0);
+pub fn lua_custom_env(L: *VM.lua.State) !void {
+    _ = try lua_loadEnv(L);
 }

@@ -2,6 +2,11 @@ const std = @import("std");
 const luau = @import("luau");
 const json = @import("json");
 
+const Zune = @import("zune");
+
+const Scheduler = Zune.Runtime.Scheduler;
+const Scripting = Zune.Runtime.Scripting;
+
 const VM = luau.VM;
 
 var NULL_PTR: ?*const anyopaque = null;
@@ -195,7 +200,7 @@ fn encode(
 pub fn LuaEncoder(comptime json_kind: JsonKind) fn (L: *VM.lua.State) anyerror!i32 {
     return struct {
         fn inner(L: *VM.lua.State) anyerror!i32 {
-            const allocator = luau.getallocator(L);
+            const allocator = Scheduler.fromState(L).allocator();
 
             var kind = json.JsonIndent.NO_LINE;
 
@@ -233,7 +238,7 @@ pub fn LuaEncoder(comptime json_kind: JsonKind) fn (L: *VM.lua.State) anyerror!i
     }.inner;
 }
 
-fn decodeArray(L: *VM.lua.State, array: *std.ArrayList(json.JsonValue), preserve_null: bool) !void {
+fn decodeArray(L: *VM.lua.State, array: *std.ArrayList(json.Value), preserve_null: bool) !void {
     try L.rawcheckstack(2);
     try L.createtable(@intCast(array.items.len), 0);
 
@@ -243,7 +248,7 @@ fn decodeArray(L: *VM.lua.State, array: *std.ArrayList(json.JsonValue), preserve
     }
 }
 
-fn decodeObject(L: *VM.lua.State, object: *std.StringArrayHashMap(json.JsonValue), preserve_null: bool) !void {
+fn decodeObject(L: *VM.lua.State, object: *std.array_hash_map.String(json.Value), preserve_null: bool) !void {
     try L.rawcheckstack(3);
     try L.createtable(0, @intCast(object.count()));
 
@@ -255,7 +260,7 @@ fn decodeObject(L: *VM.lua.State, object: *std.StringArrayHashMap(json.JsonValue
     }
 }
 
-pub fn decodeValue(L: *VM.lua.State, jsonValue: json.JsonValue, preserve_null: bool) anyerror!void {
+pub fn decodeValue(L: *VM.lua.State, jsonValue: json.Value, preserve_null: bool) anyerror!void {
     switch (jsonValue) {
         .nil => if (preserve_null) {
             _ = L.rawgetfield(VM.lua.REGISTRYINDEX, "_SERDE_JSON_NULL");
@@ -291,13 +296,13 @@ pub fn LuaDecoder(comptime json_kind: JsonKind) fn (L: *VM.lua.State) anyerror!i
                 L.pop(1);
             }
 
-            const allocator = luau.getallocator(L);
+            const allocator = Scheduler.fromState(L).allocator();
 
             var root = try switch (json_kind) {
                 .JSON => json.parse(allocator, string),
                 .JSON5 => json.parseJson5(allocator, string),
             };
-            defer root.deinit();
+            defer root.deinit(allocator);
 
             try decodeValue(L, root.value, preserve_null);
 
@@ -306,44 +311,32 @@ pub fn LuaDecoder(comptime json_kind: JsonKind) fn (L: *VM.lua.State) anyerror!i
     }.inner;
 }
 
-pub fn lua_setprops(L: *VM.lua.State) !void {
-    try L.createtable(0, 1);
+pub fn pushNullValue(L: *VM.lua.State) !void {
+    if (!L.rawgetfield(VM.lua.REGISTRYINDEX, "_SERDE_JSON_NULL").isnoneornil())
+        return;
+
+    L.pop(1);
 
     try L.createtable(0, 0);
 
     { // JsonNull Metatable
         try L.Zpushvalue(.{
-            .__tostring = struct {
+            .__tostring = Scripting.toCFn(struct {
                 fn inner(l: *VM.lua.State) !i32 {
                     try l.pushstring("JsonValue.Null");
                     return 1;
                 }
-            }.inner,
+            }.inner),
         });
-        L.setreadonly(-1, true);
+        try L.setreadonly(-1, true);
         _ = try L.setmetatable(-2);
     }
 
-    L.setreadonly(-1, true);
+    try L.setreadonly(-1, true);
 
     L.pushvalue(-1);
     try L.rawsetfield(VM.lua.REGISTRYINDEX, "_SERDE_JSON_NULL");
     NULL_PTR = L.topointer(-1) orelse unreachable;
-
-    try L.rawsetfield(-2, "null");
-    L.setreadonly(-1, true);
-    try L.rawsetfield(-2, "values");
-
-    try L.Zpushvalue(.{
-        .none = 0,
-        .two_spaces = 1,
-        .four_spaces = 2,
-        .tabs = 3,
-    });
-    L.setreadonly(-1, true);
-    try L.rawsetfield(-2, "indents");
-
-    L.setreadonly(-1, true);
 }
 
 test "Escaped Strings" {

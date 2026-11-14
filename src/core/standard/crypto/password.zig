@@ -1,6 +1,10 @@
 const std = @import("std");
 const luau = @import("luau");
 
+const Zune = @import("zune");
+
+const Scheduler = Zune.Runtime.Scheduler;
+
 const VM = luau.VM;
 
 const argon2 = std.crypto.pwhash.argon2;
@@ -20,7 +24,7 @@ const AlgorithmMap = std.StaticStringMap(AlgorithmUnion).initComptime(.{
 });
 
 pub fn lua_hash(L: *VM.lua.State) !i32 {
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator();
     const password = try L.Zcheckvalue([]const u8, 1, null);
 
     var algorithm = DEFAULT_ALGO;
@@ -60,7 +64,7 @@ pub fn lua_hash(L: *VM.lua.State) !i32 {
                 .allocator = allocator,
                 .params = .{ .m = cost, .t = cost2, .p = threads },
                 .mode = mode,
-            }, &buf);
+            }, &buf, Zune.io());
             try L.pushlstring(hash);
         },
         .bcrypt => {
@@ -68,7 +72,7 @@ pub fn lua_hash(L: *VM.lua.State) !i32 {
                 .allocator = allocator,
                 .params = .{ .rounds_log = @intCast(cost), .silently_truncate_password = false },
                 .encoding = .phc,
-            }, &buf);
+            }, &buf, Zune.io());
             try L.pushlstring(hash);
         },
     }
@@ -78,7 +82,7 @@ pub fn lua_hash(L: *VM.lua.State) !i32 {
 const TAG_BCRYPT: u32 = @bitCast([4]u8{ '$', 'b', 'c', 'r' });
 
 pub fn lua_verify(L: *VM.lua.State) !i32 {
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator();
     const password = try L.Zcheckvalue([]const u8, 1, null);
     const hash = try L.Zcheckvalue([]const u8, 2, null);
 
@@ -99,6 +103,7 @@ pub fn lua_verify(L: *VM.lua.State) !i32 {
             hash,
             password,
             .{ .allocator = allocator },
+            Zune.io(),
         )) true else |_| false);
 
     return 1;

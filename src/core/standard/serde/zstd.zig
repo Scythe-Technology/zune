@@ -4,65 +4,61 @@ const zstd = @import("zstd");
 
 const Zune = @import("zune");
 
+const Codec = @import("codec.zig");
+
 const VM = luau.VM;
 
+fn level(L: *VM.lua.State) !i32 {
+    if (L.typeOf(6).isnoneornil())
+        return zstd.DEFAULT_COMPRESSION_LEVEL;
+    const num = try L.Zcheckvalue(i32, 6, null);
+    if (num < zstd.MIN_COMPRESSION_LEVEL or num > zstd.MAX_COMPRESSION_LEVEL)
+        return L.Zerrorf("options 'level' must not be over {} or less than {}", .{ zstd.MAX_COMPRESSION_LEVEL, zstd.MIN_COMPRESSION_LEVEL });
+    return num;
+}
+
+pub fn lua_calcSize(L: *VM.lua.State) !i32 {
+    const len = try L.Zcheckvalue(u32, 1, null);
+    const bound = zstd.compressBound(len);
+    if (bound > std.math.maxInt(u32))
+        return L.Zerror("no space");
+
+    try L.Zpushvalue(bound);
+
+    return 1;
+}
+
 pub fn lua_compress(L: *VM.lua.State) !i32 {
-    const allocator = luau.getallocator(L);
+    const src = try Codec.sourceWindow(L);
+    const dest = try Codec.destTail(L);
 
-    const is_buffer = L.typeOf(1) == .Buffer;
+    const compressed = zstd.compress(dest, src, try level(L)) catch |err| switch (err) {
+        error.TooSmallDestSize, error.NoForwardProgressDestFull => return L.Zerror("no space"),
+        else => return err,
+    };
 
-    const string = if (is_buffer)
-        L.Lcheckbuffer(1)
-    else
-        L.Lcheckstring(1);
-
-    var level: i32 = zstd.DEFAULT_COMPRESSION_LEVEL;
-
-    if (!L.typeOf(2).isnoneornil()) {
-        try L.Zchecktype(2, .Table);
-        const levelType = L.rawgetfield(2, "level");
-        if (!levelType.isnoneornil()) {
-            if (levelType != .Number)
-                return L.Zerror("options 'level' field must be a number");
-            const num = L.tointeger(-1) orelse unreachable;
-            if (num < zstd.MIN_COMPRESSION_LEVEL or num > zstd.MAX_COMPRESSION_LEVEL)
-                return L.Zerrorf("options 'level' must not be over {} or less than {}", .{ zstd.MAX_COMPRESSION_LEVEL, zstd.MIN_COMPRESSION_LEVEL });
-            level = num;
-        }
-        L.pop(1);
-    }
-
-    const compressed = try zstd.compressAlloc(allocator, string, level);
-    defer allocator.free(compressed);
-
-    if (is_buffer)
-        try L.Zpushbuffer(compressed)
-    else
-        try L.pushlstring(compressed);
+    try L.Zpushvalue(compressed.len);
 
     return 1;
 }
 
 pub fn lua_decompress(L: *VM.lua.State) !i32 {
-    const allocator = luau.getallocator(L);
+    const allocator = Zune.Runtime.Scheduler.fromState(L).allocator();
+    const src = try Codec.sourceWindow(L);
+    const dest = try Codec.destTail(L);
 
-    const is_buffer = L.typeOf(1) == .Buffer;
+    const plain = zstd.decompressAlloc(allocator, src) catch |err| switch (err) {
+        error.TooSmallDestSize, error.NoForwardProgressDestFull => return L.Zerror("no space"),
+        else => return err,
+    };
+    defer allocator.free(plain);
 
-    const string = if (is_buffer)
-        L.Lcheckbuffer(1)
-    else
-        L.Lcheckstring(1);
+    if (plain.len > dest.len)
+        return L.Zerror("no space");
 
-    const decompressed = try zstd.decompressAlloc(allocator, string);
-    defer allocator.free(decompressed);
+    @memcpy(dest[0..plain.len], plain);
 
-    if (decompressed.len > Zune.Utils.LuaHelper.MAX_LUAU_SIZE)
-        return L.Zerror("decompressed data exceeds maximum string/buffer size");
-
-    if (is_buffer)
-        try L.Zpushbuffer(decompressed)
-    else
-        try L.pushlstring(decompressed);
+    try L.Zpushvalue(plain.len);
 
     return 1;
 }

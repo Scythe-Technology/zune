@@ -1,13 +1,27 @@
 const std = @import("std");
 
+const Zune = @import("zune");
+
 const Bundle = @import("bundle.zig");
 
 const fs = std.fs;
 
-const LuauFile = struct {
+const Extension = struct {
     ext: []const u8,
+    type: Type,
+
+    pub const Type = enum {
+        Lua,
+        Luau,
+        InitLua,
+        InitLuau,
+    };
+};
+
+const LuauFile = struct {
+    ext: Extension,
     val: union(enum) {
-        handle: std.fs.File,
+        handle: std.Io.File,
         contents: []const u8,
     },
 };
@@ -17,18 +31,18 @@ const LuaFileType = enum {
     Luau,
 };
 
-pub const POSSIBLE_EXTENSIONS = [_][]const u8{
-    ".luau",
-    ".lua",
-    fs.path.sep_str ++ "init.luau",
-    fs.path.sep_str ++ "init.lua",
+pub const POSSIBLE_EXTENSIONS = [_]Extension{
+    .{ .ext = ".luau", .type = .Luau },
+    .{ .ext = ".lua", .type = .Lua },
+    .{ .ext = fs.path.sep_str ++ "init.luau", .type = .InitLuau },
+    .{ .ext = fs.path.sep_str ++ "init.lua", .type = .InitLua },
 };
 
 pub const LARGEST_EXTENSION = blk: {
-    var largest: []const u8 = POSSIBLE_EXTENSIONS[0];
+    var largest: []const u8 = POSSIBLE_EXTENSIONS[0].ext;
     for (POSSIBLE_EXTENSIONS) |ext| {
-        if (ext.len > largest.len)
-            largest = ext;
+        if (ext.ext.len > largest.len)
+            largest = ext.ext;
     }
     break :blk largest;
 };
@@ -41,11 +55,11 @@ pub fn getLuaFileType(path: []const u8) ?LuaFileType {
     return null;
 }
 
-pub fn findLuauFile(dir: std.fs.Dir, fileName: []const u8) !?LuauFile {
+pub fn findLuauFile(dir: std.Io.Dir, fileName: []const u8) !?LuauFile {
     if (getLuaFileType(fileName)) |_|
         return error.RedundantFileExtension;
 
-    var path_buf: [std.fs.max_path_bytes]u8 = undefined;
+    var path_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
 
     if (fileName.len > path_buf.len - LARGEST_EXTENSION.len)
         return error.PathTooLong;
@@ -54,17 +68,17 @@ pub fn findLuauFile(dir: std.fs.Dir, fileName: []const u8) !?LuauFile {
     const ext_buf = path_buf[fileName.len..];
 
     for (POSSIBLE_EXTENSIONS) |ext| {
-        @memcpy(ext_buf[0..ext.len], ext);
-        const result = path_buf[0 .. fileName.len + ext.len];
+        @memcpy(ext_buf[0..ext.ext.len], ext.ext);
+        const result = path_buf[0 .. fileName.len + ext.ext.len];
 
-        const file = dir.openFile(result, .{ .mode = .read_only }) catch |err| switch (err) {
+        const file = dir.openFile(Zune.io(), result, .{ .mode = .read_only }) catch |err| switch (err) {
             else => continue,
         };
-        errdefer file.close();
+        errdefer file.close(Zune.io());
 
-        const md = try file.stat();
+        const md = try file.stat(Zune.io());
         if (md.kind != .file) {
-            file.close();
+            file.close(Zune.io());
             continue;
         }
 
@@ -93,14 +107,14 @@ pub const SearchResult = struct {
     pub fn deinit(self: SearchResult) void {
         for (self.results[0..self.count]) |file| {
             switch (file.val) {
-                .handle => |h| h.close(),
+                .handle => |h| h.close(Zune.io()),
                 .contents => {},
             }
         }
     }
 };
 
-pub fn searchLuauFile(buf: []u8, dir: std.fs.Dir, fileName: []const u8) !SearchResult {
+pub fn searchLuauFile(buf: []u8, dir: std.Io.Dir, fileName: []const u8) !SearchResult {
     if (getLuaFileType(fileName)) |_|
         return error.RedundantFileExtension;
 
@@ -114,17 +128,17 @@ pub fn searchLuauFile(buf: []u8, dir: std.fs.Dir, fileName: []const u8) !SearchR
     const ext_buf = buf[fileName.len..];
 
     for (POSSIBLE_EXTENSIONS) |ext| {
-        @memcpy(ext_buf[0..ext.len], ext);
-        const result = buf[0 .. fileName.len + ext.len];
+        @memcpy(ext_buf[0..ext.ext.len], ext.ext);
+        const result = buf[0 .. fileName.len + ext.ext.len];
 
-        const file = dir.openFile(result, .{ .mode = .read_only }) catch |err| switch (err) {
+        const file = dir.openFile(Zune.io(), result, .{ .mode = .read_only }) catch |err| switch (err) {
             else => continue,
         };
-        errdefer file.close();
+        errdefer file.close(Zune.io());
 
-        const md = try file.stat();
+        const md = try file.stat(Zune.io());
         if (md.kind != .file) {
-            file.close();
+            file.close(Zune.io());
             continue;
         }
 
@@ -138,7 +152,7 @@ pub fn searchLuauFile(buf: []u8, dir: std.fs.Dir, fileName: []const u8) !SearchR
     return results;
 }
 
-pub fn searchLuauFileBundle(buf: []u8, b: *const Bundle.Map, fileName: []const u8) !SearchResult {
+pub fn searchLuauFileBundle(buf: []u8, b: *Bundle.Map, fileName: []const u8) !SearchResult {
     if (getLuaFileType(fileName)) |_|
         return error.RedundantFileExtension;
 
@@ -152,8 +166,8 @@ pub fn searchLuauFileBundle(buf: []u8, b: *const Bundle.Map, fileName: []const u
     const ext_buf = buf[fileName.len..];
 
     for (POSSIBLE_EXTENSIONS) |ext| {
-        @memcpy(ext_buf[0..ext.len], ext);
-        const result = buf[0 .. fileName.len + ext.len];
+        @memcpy(ext_buf[0..ext.ext.len], ext.ext);
+        const result = buf[0 .. fileName.len + ext.ext.len];
 
         const contents = b.loadScript(result) catch |err| switch (err) {
             else => continue,
@@ -169,7 +183,7 @@ pub fn searchLuauFileBundle(buf: []u8, b: *const Bundle.Map, fileName: []const u
     return results;
 }
 
-pub fn getHomeDir(envMap: std.process.EnvMap) ?[]const u8 {
+pub fn getHomeDir(envMap: std.process.Environ.Map) ?[]const u8 {
     return envMap.get("HOME") orelse envMap.get("USERPROFILE");
 }
 
@@ -179,9 +193,9 @@ pub inline fn shouldFetchHomeDir(path: []const u8) bool {
 
 pub fn resolve(
     allocator: std.mem.Allocator,
-    envMap: std.process.EnvMap,
+    envMap: std.process.Environ.Map,
     paths: []const []const u8,
-) ![]u8 {
+) ![:0]u8 {
     std.debug.assert(paths.len <= 2);
     var resolvedPaths: [2][]const u8 = undefined;
     var allocated: [2]bool = undefined;
@@ -202,12 +216,19 @@ pub fn resolve(
         } else resolvedPaths[i] = path;
     }
 
-    return try fs.path.resolve(allocator, resolvedPaths[0..paths.len]);
+    var buffer: std.ArrayList(u8) = try .initCapacity(allocator, 1);
+    defer buffer.deinit(allocator);
+
+    buffer.appendAssumeCapacity('@');
+
+    try fs.path.resolveAppend(allocator, &buffer, resolvedPaths[0..paths.len]);
+
+    return buffer.toOwnedSliceSentinel(allocator, 0);
 }
 
 pub fn resolveBundled(
     allocator: std.mem.Allocator,
-    envMap: std.process.EnvMap,
+    envMap: std.process.Environ.Map,
     paths: []const []const u8,
     map: ?Bundle.Map,
 ) ![]u8 {

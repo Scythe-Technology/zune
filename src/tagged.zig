@@ -1,7 +1,10 @@
 const TagNames: []const []const u8 = &.{
     // FS
     "FS_FILE",
+    "FS_DIR",
     "FS_WATCHER",
+    // GPIO
+    "GPIO_LINE",
     // NET
     "NET_SOCKET",
     "NET_HTTP_SERVER",
@@ -9,7 +12,7 @@ const TagNames: []const []const u8 = &.{
     "NET_HTTP_CLIENTWEBSOCKET",
     // IO
     "IO_STREAM",
-    "IO_BUFFERSINK",
+    "IO_BUFFERARRAY",
     "IO_BUFFERSTREAM",
     // DATETIME
     "DATETIME",
@@ -17,21 +20,27 @@ const TagNames: []const []const u8 = &.{
     "PROCESS_CHILD",
     // CRYPTO
     "CRYPTO_HASHER",
+    "CRYPTO_TLS",
     "CRYPTO_TLS_CERTBUNDLE",
     "CRYPTO_TLS_CERTKEYPAIR",
     // RANDOM
     "RANDOM",
     // REGEX
     "REGEX_COMPILED",
-    // FFI
-    "FFI_LIBRARY",
-    "FFI_POINTER",
-    "FFI_DATATYPE",
+    // C
+    "C_LIBRARY",
+    "C_POINTER",
+    "C_TYPE",
+    "C_DYNLIB",
     // SQLITE
     "SQLITE_DATABASE",
     "SQLITE_STATEMENT",
     // THREAD
     "THREAD",
+    "THREAD_MUTEX",
+    "THREAD_HARD_MUTEX",
+    "THREAD_LANE",
+    "THREAD_VALUE",
 };
 
 pub const Tags = block_name: {

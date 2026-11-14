@@ -1,11 +1,13 @@
 const std = @import("std");
 const luau = @import("luau");
+const builtin = @import("builtin");
 
 const Zune = @import("zune");
 
 const Engine = Zune.Runtime.Engine;
 const Scheduler = Zune.Runtime.Scheduler;
 const Debugger = Zune.Runtime.Debugger;
+const Scripting = Zune.Runtime.Scripting;
 
 const File = Zune.Resolvers.File;
 const Config = Zune.Resolvers.Config;
@@ -13,37 +15,26 @@ const Navigator = Zune.Resolvers.Navigator;
 
 const VM = luau.VM;
 
-const RequireError = error{
-    ModuleNotFound,
-    NoAlias,
-};
-
-const States = enum {
-    Error,
-    Waiting,
-    Preloaded,
-    Loaded,
-};
-
-const QueueItem = struct {
-    state: Scheduler.ThreadRef,
-};
-
 const RequireItem = union(enum) {
     loading: void,
     @"error": void,
     loaded: void,
-    yielded: std.ArrayListUnmanaged(QueueItem),
+    yielded: std.ArrayList(Scheduler.ThreadRef),
 };
 
-threadlocal var REQUIRE_MAP: std.StringHashMapUnmanaged(RequireItem) = .empty;
+threadlocal var REQUIRE_MAP: std.hash_map.StringHashMapUnmanaged(RequireItem) = .empty;
+threadlocal var CONFIG_CACHE: std.hash_map.StringHashMapUnmanaged(Config) = .empty;
 
 const RequireContext = struct {
-    allocator: std.mem.Allocator,
     path: []const u8,
 };
-fn require_finished(self: *RequireContext, ML: *VM.lua.State, _: *Scheduler) void {
-    var outErr: ?[]const u8 = null;
+
+const MAX_RESUME_DEPTH: u16 = 200;
+
+fn require_finished(self: *RequireContext, ML: *VM.lua.State, scheduler: *Scheduler) void {
+    var out_err: ?[]const u8 = null;
+    const allocator = scheduler.allocator();
+    defer allocator.destroy(self);
 
     const queue = REQUIRE_MAP.getEntry(self.path) orelse std.debug.panic("require_finished: queue not found", .{});
     std.debug.assert(queue.value_ptr.* == .yielded);
@@ -53,11 +44,11 @@ fn require_finished(self: *RequireContext, ML: *VM.lua.State, _: *Scheduler) voi
     if (ML.status() == .Ok) jmp: {
         const t = ML.gettop();
         if (t > 1 or t < 0) {
-            outErr = "module must return one value";
+            out_err = "module must return one value";
             break :jmp;
         } else if (t == 0)
             ML.pushnil();
-    } else outErr = "requested module failed to load";
+    } else out_err = "requested module failed to load";
 
     const GL = ML.mainthread();
 
@@ -65,7 +56,7 @@ fn require_finished(self: *RequireContext, ML: *VM.lua.State, _: *Scheduler) voi
 
     var list = queue.value_ptr.*.yielded;
 
-    if (outErr != null)
+    if (out_err != null)
         queue.value_ptr.* = .@"error"
     else {
         _ = GL.Lfindtable(VM.lua.REGISTRYINDEX, "_MODULES", 1) catch |e| std.debug.panic("{}", .{e});
@@ -81,71 +72,249 @@ fn require_finished(self: *RequireContext, ML: *VM.lua.State, _: *Scheduler) voi
     }
 
     if (free_path) {
-        defer self.allocator.free(self.path);
+        defer allocator.free(self.path);
         _ = REQUIRE_MAP.remove(self.path);
     }
 
     for (list.items, 0..) |item, i| {
-        const L = item.state.value;
+        const L = item.value;
+        if (L.status() != .Yield)
+            continue;
         if (i == 0) {
-            if (outErr) |msg| {
+            if (out_err) |msg| {
                 L.pushlstring(msg) catch |e| std.debug.panic("{}", .{e});
-                _ = Scheduler.resumeStateError(L, null) catch {};
+                _ = Scheduler.resumeStateErrorFast(L, null) catch {};
                 continue;
             }
         }
-        if (outErr != null) {
+        if (out_err != null) {
             L.pushlstring("requested module failed to load") catch |e| std.debug.panic("{}", .{e});
-            _ = Scheduler.resumeStateError(L, null) catch {};
+            _ = Scheduler.resumeStateErrorFast(L, null) catch {};
         } else {
             ML.xpush(L, -1);
-            _ = Scheduler.resumeState(L, null, 1) catch {};
+            _ = Scheduler.resumeStateFast(L, null, 1) catch {};
         }
     }
 
     ML.pop(1);
 
     for (list.items) |*item|
-        item.state.deref();
+        item.deref();
     list.deinit(Zune.DEFAULT_ALLOCATOR);
 }
 
-fn require_dtor(self: *RequireContext, _: *VM.lua.State, _: *Scheduler) void {
-    const allocator = self.allocator;
-    defer allocator.destroy(self);
-}
-
 const RequireNavigatorContext = struct {
-    dir: std.fs.Dir,
+    dir: std.Io.Dir,
     allocator: std.mem.Allocator,
 
     const This = @This();
 
-    pub fn getConfig(self: *This, path: []const u8, out_err: ?*?[]const u8) !Config {
+    pub fn getConfig(self: *This, buf: []u8, path: []const u8, out_err: ?*?[]const u8) !Config {
         const allocator = self.allocator;
 
-        if (Zune.STATE.CONFIG_CACHE.get(path)) |cached|
+        if (CONFIG_CACHE.get(path)) |cached|
             return cached;
 
-        const contents = if (Zune.STATE.BUNDLE) |*bundle|
-            bundle.loadFileAlloc(allocator, path) catch |err| switch (err) {
-                error.FileNotFound => return error.NotPresent,
-                else => return err,
+        const Result = union(enum) {
+            file: []const u8,
+            script: []const u8,
+        };
+
+        const contents: Result = blk: {
+            const luaurc_path = Navigator.getLuaurcPath(buf, path);
+            if (Zune.State.bundle) |*bundle| {
+                const luaurc_key = Zune.Resolvers.Bundle.Map.shortResolve(luaurc_path);
+                const key = if (bundle.map.contains(luaurc_key)) luaurc_key else alt: {
+                    const config_luau_path = Navigator.getConfigLuauPath(buf, path);
+                    const config_key = Zune.Resolvers.Bundle.Map.shortResolve(config_luau_path);
+                    if (!bundle.map.contains(config_key))
+                        return error.NotPresent;
+                    break :alt config_key;
+                };
+                const bytes = try bundle.load(key);
+                break :blk switch (bundle.map.get(key).?) {
+                    .file => .{ .file = bytes },
+                    .script => .{ .script = bytes },
+                };
             }
-        else
-            self.dir.readFileAlloc(allocator, path, std.math.maxInt(usize)) catch |err| switch (err) {
-                error.AccessDenied, error.FileNotFound => return error.NotPresent,
+            const luaurc_file: ?std.Io.File = self.dir.openFile(Zune.io(), luaurc_path, .{
+                .allow_directory = false,
+            }) catch |err| switch (err) {
+                error.AccessDenied, error.FileNotFound => null,
+                error.IsDir => null,
                 else => return err,
             };
-        defer allocator.free(contents);
+            defer if (luaurc_file) |f| f.close(Zune.io());
+            const config_luau_path = Navigator.getConfigLuauPath(buf, path);
+            const config_luau_file: ?std.Io.File = self.dir.openFile(Zune.io(), config_luau_path, .{
+                .allow_directory = false,
+            }) catch |err| switch (err) {
+                error.AccessDenied, error.FileNotFound => null,
+                error.IsDir => null,
+                else => return err,
+            };
+            defer if (config_luau_file) |f| f.close(Zune.io());
 
-        var config = try Config.parse(Zune.DEFAULT_ALLOCATOR, contents, out_err);
+            if (luaurc_file != null and config_luau_file != null)
+                return error.Ambiguous;
+
+            const file = luaurc_file orelse config_luau_file orelse return error.NotPresent;
+            const is_file = luaurc_file != null;
+
+            var file_reader = file.reader(Zune.io(), &.{});
+            const data = file_reader.interface.allocRemainingAlignedSentinel(allocator, .unlimited, .of(u8), null) catch |err| switch (err) {
+                error.ReadFailed => return file_reader.err.?,
+                error.OutOfMemory, error.StreamTooLong => |e| return e,
+            };
+            if (is_file)
+                break :blk .{ .file = data }
+            else
+                break :blk .{ .script = data };
+        };
+
+        defer if (Zune.State.bundle == null)
+            allocator.free(switch (contents) {
+                .file => |b| b,
+                .script => |b| b,
+            });
+
+        var config = switch (contents) {
+            .file => |b| try Config.parse(Zune.DEFAULT_ALLOCATOR, b, out_err),
+            .script => |b| blk: {
+                const gpa = Zune.DEFAULT_ALLOCATOR;
+
+                var L = try luau.VM.lstate.Lnewstate();
+                defer L.deinit();
+
+                try L.Lopenlibs();
+                try L.Lsandbox();
+
+                const compileOptions: luau.CompileOptions = .{};
+
+                if (Zune.State.bundle == null or Zune.State.bundle.?.mode.compiled == .debug) {
+                    luau.Compiler.Compiler.compileLoad(L, "=config", b, compileOptions, 0) catch {
+                        if (out_err) |ptr_out| {
+                            const err = L.tostring(-1) orelse "syntax error";
+                            ptr_out.* = try allocator.dupe(u8, err);
+                        }
+                        return error.SyntaxError;
+                    };
+                } else {
+                    L.load("=config", b, 0) catch unreachable; // should not error
+                }
+
+                const time = std.Io.Clock.now(.awake, Zune.io()).addDuration(.fromMilliseconds(2000));
+                L.userdata = @ptrCast(@alignCast(@constCast(&time)));
+                L.callbacks().interrupt = struct {
+                    fn interrupt(l: *VM.lua.State, _: c_int) callconv(.c) void {
+                        const time_ptr: *const std.Io.Timestamp = @ptrCast(@alignCast(l.userdata));
+                        const now = std.Io.Clock.now(.awake, Zune.io());
+                        if (time_ptr.compare(.lte, now)) {
+                            l.pushlstring("configuration execution timed out") catch @panic("OOM");
+                            l.raiseerror();
+                        }
+                    }
+                }.interrupt;
+
+                switch (L.resumethread(null, 0)) {
+                    .Ok => {},
+                    .Break, .Yield => {
+                        if (out_err) |ptr_out|
+                            ptr_out.* = try allocator.dupe(u8, "configuration execution cannot yield");
+                        return error.Runtime;
+                    },
+                    .ErrErr, .ErrRun => {
+                        if (out_err) |ptr_out| {
+                            const err = L.tostring(-1) orelse "bad config error type";
+                            ptr_out.* = try allocator.dupe(u8, err);
+                        }
+                        return error.Runtime;
+                    },
+                    .ErrMem => {
+                        if (out_err) |ptr_out|
+                            ptr_out.* = try allocator.dupe(u8, "configuration out of memory error");
+                        return error.Runtime;
+                    },
+                    .ErrSyntax => {
+                        if (out_err) |ptr_out|
+                            ptr_out.* = try allocator.dupe(u8, "configuration syntax error");
+                        return error.SyntaxError;
+                    },
+                }
+
+                if (L.gettop() != 1) {
+                    if (out_err) |ptr_out|
+                        ptr_out.* = try allocator.dupe(u8, "configuration must return exactly one value");
+                    return error.Runtime;
+                }
+
+                if (L.typeOf(-1) != .Table) {
+                    if (out_err) |ptr_out|
+                        ptr_out.* = try allocator.dupe(u8, "configuration did not return a table");
+                    return error.Runtime;
+                }
+
+                var config: Config = .{};
+                errdefer config.deinit(Zune.DEFAULT_ALLOCATOR);
+
+                const luau_type = L.rawgetfield(-1, "luau");
+                if (luau_type.isnoneornil())
+                    break :blk config;
+                if (luau_type != .Table) {
+                    if (out_err) |ptr_out|
+                        ptr_out.* = try allocator.dupe(u8, "configuration 'luau' must be a table");
+                    return error.Runtime;
+                }
+
+                const aliases_type = L.rawgetfield(-1, "aliases");
+                if (aliases_type.isnoneornil())
+                    break :blk config;
+                if (aliases_type != .Table) {
+                    if (out_err) |ptr_out|
+                        ptr_out.* = try allocator.dupe(u8, "configuration 'aliases' must be a table");
+                    return error.Runtime;
+                }
+
+                var iter: Scripting.TableIterator = .{ .L = L, .idx = -1 };
+                while (iter.next()) |key_type| {
+                    switch (key_type) {
+                        .String => {
+                            const alias = L.tostring(-2).?;
+                            if (L.typeOf(-1) != .String) {
+                                if (out_err) |ptr_out|
+                                    ptr_out.* = try std.fmt.allocPrint(allocator, "configuration 'aliases.{s}' value must be a string", .{alias});
+                                return error.Runtime;
+                            }
+                            if (!Config.isValidAlias(alias)) {
+                                if (out_err) |ptr_out|
+                                    ptr_out.* = try std.fmt.allocPrint(allocator, "invalid alias '{s}'", .{alias});
+                                return error.Runtime;
+                            }
+                            const value_str = L.tostring(-1).?;
+                            const key = try std.ascii.allocLowerString(gpa, alias);
+                            errdefer gpa.free(key);
+                            const copy = try gpa.dupe(u8, value_str);
+                            errdefer gpa.free(copy);
+                            const result = try config.aliases.getOrPut(gpa, key);
+                            if (result.found_existing) {
+                                defer gpa.free(key);
+                                gpa.free(result.value_ptr.*);
+                            }
+                            result.value_ptr.* = copy;
+                        },
+                        else => {},
+                    }
+                }
+
+                break :blk config;
+            },
+        };
         errdefer config.deinit(Zune.DEFAULT_ALLOCATOR);
 
         const copy = try Zune.DEFAULT_ALLOCATOR.dupe(u8, path);
         errdefer Zune.DEFAULT_ALLOCATOR.free(copy);
 
-        try Zune.STATE.CONFIG_CACHE.put(Zune.DEFAULT_ALLOCATOR, copy, config);
+        try CONFIG_CACHE.put(Zune.DEFAULT_ALLOCATOR, copy, config);
 
         return config;
     }
@@ -153,7 +322,7 @@ const RequireNavigatorContext = struct {
         // the config is stored in cache.
     }
     pub fn resolvePathAlloc(_: *This, allocator: std.mem.Allocator, from: []const u8, to: []const u8) ![]u8 {
-        return try Zune.Resolvers.File.resolveBundled(allocator, Zune.STATE.ENV_MAP, &.{ from, to }, Zune.STATE.BUNDLE);
+        return try Zune.Resolvers.File.resolveBundled(allocator, Zune.State.env_map, &.{ from, to }, Zune.State.bundle);
     }
 };
 
@@ -170,7 +339,7 @@ pub fn resolveScriptPath(
     allocator: std.mem.Allocator,
     L: *VM.lua.State,
     moduleName: []const u8,
-    dir: std.fs.Dir,
+    dir: std.Io.Dir,
 ) ![]const u8 {
     var ar: VM.lua.Debug = .{ .ssbuf = undefined };
     {
@@ -192,8 +361,16 @@ pub fn resolveScriptPath(
         var err_msg: ?[]const u8 = null;
         defer if (err_msg) |err| allocator.free(err);
         break :blk Navigator.navigate(allocator, &nav_context, getFilePath(ar.source), moduleName, &err_msg) catch |err| switch (err) {
-            error.SyntaxError, error.AliasNotFound, error.AliasPathNotSupported, error.AliasJumpFail => return L.Zerrorf("{s}", .{err_msg.?}),
+            error.SyntaxError,
+            error.AliasNotFound,
+            error.AliasPathNotSupported,
+            error.AliasJumpFail,
+            error.Runtime,
+            error.Ambiguous,
+            => return L.Zerrorf("{s}", .{err_msg.?}),
             error.PathUnsupported => return L.Zerror("must have either \"@\", \"./\", or \"../\" prefix"),
+            error.HomeDirNotFound => return L.Zerror("alias could not resolve home directory"),
+            error.NotAllowed => return L.Zerror("not allowed"),
             else => return err,
         };
     };
@@ -211,10 +388,10 @@ pub fn checkSearchResult(
     if (res.count > 1) {
         @branchHint(.unlikely);
 
-        var buf: std.ArrayListUnmanaged(u8) = .empty;
-        defer buf.deinit(allocator);
+        var buf: std.Io.Writer.Allocating = .init(allocator);
+        defer buf.deinit();
 
-        const writer = buf.writer(allocator);
+        const writer = &buf.writer;
 
         try writer.writeAll("module name conflicted.");
 
@@ -224,21 +401,26 @@ pub fn checkSearchResult(
                 try writer.writeAll("\n└─ ")
             else
                 try writer.writeAll("\n├─ ");
-            try writer.print("{s}{s}", .{ path, entry.ext });
+            try writer.print("{s}{s}", .{ path, entry.ext.ext });
         }
 
-        try L.pushlstring(buf.items);
+        try L.pushlstring(buf.written());
         return error.RaiseLuauError;
     }
 }
 
 pub fn zune_require(L: *VM.lua.State) !i32 {
-    const allocator = luau.getallocator(L);
-    const scheduler = Scheduler.getScheduler(L);
+    const scheduler = Scheduler.fromState(L);
+    const allocator = scheduler.allocator();
+
+    if (L.nCcalls >= MAX_RESUME_DEPTH) {
+        @branchHint(.cold);
+        return L.Zerror("C stack overflow");
+    }
 
     const moduleName = L.Lcheckstring(1);
 
-    const cwd = std.fs.cwd();
+    const cwd = std.Io.Dir.cwd();
 
     const script_path = try resolveScriptPath(allocator, L, moduleName, cwd);
     jmp: {
@@ -268,9 +450,7 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
                 if (!L.isyieldable())
                     return L.Zyielderror();
 
-                try arr.append(Zune.DEFAULT_ALLOCATOR, .{
-                    .state = Scheduler.ThreadRef.init(L),
-                });
+                try arr.append(Zune.DEFAULT_ALLOCATOR, .init(L));
                 return L.yield(0);
             },
         }
@@ -282,13 +462,13 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
     const search_result = blk: {
         errdefer allocator.free(script_path);
 
-        std.debug.assert(script_path.len <= std.fs.max_path_bytes);
+        std.debug.assert(script_path.len <= std.Io.Dir.max_path_bytes);
 
         module_src_buf[0] = '@';
         @memcpy(module_src_buf[1..][0..script_path.len], script_path);
 
         const input_buf = module_src_buf[1..][0 .. script_path.len + File.LARGEST_EXTENSION.len];
-        const result = (if (Zune.STATE.BUNDLE) |*bundle|
+        const result = (if (Zune.State.bundle) |*bundle|
             File.searchLuauFileBundle(input_buf, bundle, script_path)
         else
             File.searchLuauFile(input_buf, cwd, script_path)) catch |err| switch (err) {
@@ -305,11 +485,15 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
 
     const file = search_result.first();
 
-    const extended = module_src_buf[1 + script_path.len ..];
-    @memcpy(extended[0..file.ext.len], file.ext);
-    extended[file.ext.len] = 0;
+    if (file.ext.type == .Luau and std.mem.eql(u8, std.fs.path.basename(script_path), ".config")) {
+        return L.Zerror("cannot require configuration file");
+    }
 
-    const module_src: [:0]u8 = module_src_buf[0 .. 1 + script_path.len + file.ext.len :0];
+    const extended = module_src_buf[1 + script_path.len ..];
+    @memcpy(extended[0..file.ext.ext.len], file.ext.ext);
+    extended[file.ext.ext.len] = 0;
+
+    const module_src: [:0]u8 = module_src_buf[0 .. 1 + script_path.len + file.ext.ext.len :0];
 
     var entry: @TypeOf(REQUIRE_MAP).Entry = blk: {
         errdefer allocator.free(script_path);
@@ -328,9 +512,12 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
     {
         const file_content: []const u8 = switch (file.val) {
             .contents => |c| c,
-            .handle => |h| h.readToEndAlloc(allocator, std.math.maxInt(usize)) catch |err| {
-                entry.value_ptr.* = .@"error";
-                return L.Zerrorf("could not read file: {}", .{err});
+            .handle => |h| blk: {
+                var reader = h.reader(Zune.io(), &.{});
+                break :blk reader.interface.allocRemaining(allocator, .unlimited) catch |err| {
+                    entry.value_ptr.* = .@"error";
+                    return L.Zerrorf("could not read file: {}", .{err});
+                };
             },
         };
         defer if (file.val == .handle) allocator.free(file_content);
@@ -343,7 +530,7 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
 
         ML.setsafeenv(VM.lua.GLOBALSINDEX, true);
 
-        if (Zune.STATE.BUNDLE == null or Zune.STATE.BUNDLE.?.mode.compiled == .debug) {
+        if (Zune.State.bundle == null or Zune.State.bundle.?.mode.compiled == .debug) {
             @branchHint(.likely);
             Engine.loadModule(ML, module_src, file_content, null) catch |err| switch (err) {
                 error.Syntax => {
@@ -358,15 +545,7 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
         }
     }
 
-    switch (ML.resumethread(L, 0).check() catch |err| {
-        Engine.logError(ML, err, false);
-        if (Zune.Runtime.Debugger.ACTIVE) {
-            @branchHint(.unpredictable);
-            switch (err) {
-                error.Runtime => Zune.Runtime.Debugger.luau_panic(ML, -2),
-                else => {},
-            }
-        }
+    switch (Scheduler.resumeStateFast(ML, L, 0) catch {
         L.pop(1); // drop: thread
         entry = REQUIRE_MAP.getEntry(script_path) orelse unreachable;
         entry.value_ptr.* = .@"error";
@@ -379,25 +558,24 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
                 entry.value_ptr.* = .@"error";
                 return L.Zerror("module must return one value");
             } else if (t == 0)
-                ML.pushnil();
+                return L.Zerror("module did not exactly return one value");
         },
         .Yield => {
             {
                 const ptr = try allocator.create(RequireContext);
 
                 ptr.* = .{
-                    .allocator = allocator,
                     .path = script_path,
                 };
 
-                scheduler.awaitResult(RequireContext, ptr, ML, require_finished, require_dtor, .Internal);
+                scheduler.awaitResult(RequireContext, ptr, ML, require_finished, .Internal);
             }
 
-            var list: std.ArrayListUnmanaged(QueueItem) = .empty;
+            var list: std.ArrayList(Scheduler.ThreadRef) = .empty;
             if (L.isyieldable())
-                try list.append(Zune.DEFAULT_ALLOCATOR, .{
-                    .state = Scheduler.ThreadRef.init(L),
-                });
+                try list.append(Zune.DEFAULT_ALLOCATOR, .init(L));
+
+            entry = REQUIRE_MAP.getEntry(script_path) orelse unreachable;
 
             entry = REQUIRE_MAP.getEntry(script_path) orelse unreachable;
             entry.value_ptr.* = .{ .yielded = list };
@@ -423,37 +601,31 @@ pub fn zune_require(L: *VM.lua.State) !i32 {
     return 1;
 }
 
-pub fn init(L: *VM.lua.State) !void {
-    const allocator = luau.getallocator(L);
-
+pub fn init(allocator: std.mem.Allocator) !void {
     REQUIRE_MAP = .empty;
-    Navigator.PATH_ALLOCATOR = .init(try allocator.alloc(u8, (std.fs.max_path_bytes * 4) + 32));
+    CONFIG_CACHE = .empty;
+    Navigator.PATH_ALLOCATOR = .init(try allocator.alloc(u8, (std.Io.Dir.max_path_bytes * 4) + 32));
 }
 
-pub fn deinit(L: *VM.lua.State) void {
-    const allocator = luau.getallocator(L);
-
+pub fn deinit(allocator: std.mem.Allocator) void {
     allocator.free(Navigator.PATH_ALLOCATOR.buffer);
 
-    var iter = REQUIRE_MAP.iterator();
-    while (iter.next()) |entry|
-        allocator.free(entry.key_ptr.*);
-    REQUIRE_MAP.deinit(Zune.DEFAULT_ALLOCATOR);
+    {
+        var iter = CONFIG_CACHE.iterator();
+        while (iter.next()) |entry| {
+            entry.value_ptr.*.deinit(allocator);
+            allocator.free(entry.key_ptr.*);
+        }
+        CONFIG_CACHE.deinit(Zune.DEFAULT_ALLOCATOR);
+    }
+    {
+        var iter = REQUIRE_MAP.iterator();
+        while (iter.next()) |entry|
+            allocator.free(entry.key_ptr.*);
+        REQUIRE_MAP.deinit(Zune.DEFAULT_ALLOCATOR);
+    }
 }
 
 pub fn load(L: *VM.lua.State) !void {
-    try L.Zsetglobalfn("require", zune_require);
-}
-
-test "require" {
-    const TestRunner = @import("../utils/testrunner.zig");
-
-    const testResult = try TestRunner.runTest(
-        TestRunner.newTestFile("engine/require.test.luau"),
-        &.{},
-        .{},
-    );
-
-    try std.testing.expect(testResult.failed == 0);
-    try std.testing.expect(testResult.total > 0);
+    try L.Zsetglobalfn("require", Scripting.toCFn(zune_require));
 }

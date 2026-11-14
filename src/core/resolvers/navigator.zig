@@ -88,6 +88,37 @@ pub fn getLuaurcPath(buf: []u8, path: []const u8) []const u8 {
     return out;
 }
 
+pub fn getConfigLuauPath(buf: []u8, path: []const u8) []const u8 {
+    std.debug.assert(buf.len >= path.len + 12);
+    var written: usize = 0;
+    if (path.len > 0) {
+        @memcpy(buf[0..path.len], path);
+        written += path.len;
+        switch (path[path.len - 1]) {
+            '/', '\\' => written -= 1,
+            else => {},
+        }
+    }
+    const END = fs.path.sep_str ++ ".config.luau";
+    @memcpy(buf[written .. written + END.len], END);
+    const out = buf[0 .. written + END.len];
+    if (comptime builtin.os.tag == .windows)
+        std.mem.replaceScalar(u8, out, '/', fs.path.sep);
+    return out;
+}
+
+pub const CONFIGS: []const [:0]const u8 = &.{
+    ".luaurc",
+    ".config.luau",
+};
+
+pub const MAX_CONFIG_EXT_LEN = blk: {
+    var max_len: comptime_int = 0;
+    for (CONFIGS) |ext|
+        max_len = @max(max_len, ext.len);
+    break :blk max_len;
+};
+
 fn joinPathScalar(out: []u8, scalar: u8, path: []const u8) []u8 {
     std.debug.assert(out.len >= path.len + 2);
     out[0] = scalar;
@@ -257,14 +288,18 @@ pub fn navigate(allocator: std.mem.Allocator, context: anytype, from: []const u8
             defer if (config) |*c| context.freeConfig(c);
             while (parent) |parent_path| : (parent = dirname(parent_path)) {
                 blk: {
-                    if (parent_path.len + 8 > buf.len)
+                    if (parent_path.len + MAX_CONFIG_EXT_LEN > buf.len)
                         return error.PathTooLong;
-                    const config_path = getLuaurcPath(buf, parent_path);
                     if (config) |*c|
                         context.freeConfig(c);
                     config = null;
-                    config = context.getConfig(config_path, out_err) catch |err| switch (@as(anyerror, @errorCast(err))) {
+                    config = context.getConfig(buf, parent_path, out_err) catch |err| switch (@as(anyerror, @errorCast(err))) {
                         error.NotPresent => break :blk,
+                        error.Ambiguous => {
+                            if (out_err) |ptr_out|
+                                ptr_out.* = try std.fmt.allocPrint(allocator, "could not resolve alias \"{s}\" (ambiguous configuration file)", .{alias_name});
+                            return err;
+                        },
                         else => return err,
                     };
 
@@ -309,7 +344,7 @@ pub fn navigate(allocator: std.mem.Allocator, context: anytype, from: []const u8
 
             const ext_path = try joinPath(path_allocator, alias_value, path[alias_name.len + 1 ..]);
             std.mem.replaceScalar(u8, ext_path, '\\', '/');
-            return try context.resolvePathAlloc(
+            return context.resolvePathAlloc(
                 allocator,
                 if (parent) |dir| dir else from,
                 ext_path,
@@ -320,15 +355,18 @@ pub fn navigate(allocator: std.mem.Allocator, context: anytype, from: []const u8
             const parent: ?[]const u8 = dirname(adjusted) orelse
                 if (isInitSuffix(from)) ".." else null;
 
-            const absolute = isAbsolute(from);
-            if (absolute and parent == null)
-                return error.PathNotFound;
-
             const section = buf[0..path.len];
             @memcpy(section, path);
             std.mem.replaceScalar(u8, section, '\\', '/');
 
-            return try context.resolvePathAlloc(
+            if (std.mem.endsWith(u8, section, "/.config"))
+                return error.NotAllowed;
+
+            const absolute = isAbsolute(from);
+            if (absolute and parent == null)
+                return error.PathNotFound;
+
+            return context.resolvePathAlloc(
                 allocator,
                 if (!absolute) joinPathScalar(path_buf, '.', parent orelse "") else parent.?,
                 section,
@@ -367,17 +405,19 @@ fn navigateTestError(allocator: std.mem.Allocator, context: anytype, from: []con
 
 test "empty context" {
     const allocator = std.testing.allocator;
-    const buf = try allocator.alloc(u8, (std.fs.max_path_bytes * 4) + 32);
+    const buf = try allocator.alloc(u8, (std.Io.Dir.max_path_bytes * 4) + 32);
     defer allocator.free(buf);
     PATH_ALLOCATOR = .init(buf);
     const EmptyContext = struct {
-        pub fn getConfig(_: []const u8, _: ?*?[]const u8) !Config {
+        pub fn getConfig(_: []u8, _: []const u8, _: ?*?[]const u8) !Config {
             unreachable;
         }
         pub fn freeConfig(_: *Config) void {
             unreachable;
         }
         pub fn resolvePathAlloc(a: std.mem.Allocator, from: []const u8, to: []const u8) ![]u8 {
+            if (std.mem.eql(u8, fs.path.basename(to), ".config"))
+                return error.NotAllowed;
             return fs.path.resolve(a, &.{ from, to });
         }
     };
@@ -394,6 +434,7 @@ test "empty context" {
     try std.testing.expectError(error.PathNotFound, navigateTestError(allocator, EmptyContext, "/init.luau", "./test", null));
     try std.testing.expectError(error.PathNotFound, navigateTestError(allocator, EmptyContext, "/", "./main", null));
     try std.testing.expectError(error.PathNotFound, navigateTestError(allocator, EmptyContext, "/", "@alias/", null));
+    try std.testing.expectError(error.NotAllowed, navigateTestError(allocator, EmptyContext, "/", "./.config", null));
 
     if (comptime builtin.os.tag == .windows) {
         try navigateTest(allocator, EmptyContext, "C:/test", "C:/script/init.luau", "./test");
@@ -407,14 +448,16 @@ test "empty context" {
 
 test "home context" {
     const allocator = std.testing.allocator;
-    const buf = try allocator.alloc(u8, (std.fs.max_path_bytes * 4) + 32);
+    const buf = try allocator.alloc(u8, (std.Io.Dir.max_path_bytes * 4) + 32);
     defer allocator.free(buf);
     PATH_ALLOCATOR = .init(buf);
     const HomeContext = struct {
         allocator: std.mem.Allocator,
-        pub fn getConfig(self: *@This(), path: []const u8, _: ?*?[]const u8) !Config {
-            if (!std.mem.eql(u8, path, comptime OSPath("./.luaurc")) and !std.mem.eql(u8, path, comptime OSPath("/.luaurc")))
-                std.testing.expectEqualStrings(comptime OSPath("/.luaurc"), path) catch @panic("Path mismatch");
+        pub fn getConfig(self: *@This(), b: []u8, path: []const u8, _: ?*?[]const u8) !Config {
+            const luaurc_path = getLuaurcPath(b, path);
+            if (!std.mem.eql(u8, luaurc_path, comptime OSPath("./.luaurc")) and
+                !std.mem.eql(u8, luaurc_path, comptime OSPath("/.luaurc")))
+                std.testing.expectEqualStrings(comptime OSPath("/.luaurc"), luaurc_path) catch @panic("Path mismatch");
 
             var config: Config = .{};
             errdefer config.deinit(self.allocator);
@@ -459,11 +502,11 @@ test "home context" {
 
 test "broken config" {
     const allocator = std.testing.allocator;
-    const buf = try allocator.alloc(u8, (std.fs.max_path_bytes * 4) + 32);
+    const buf = try allocator.alloc(u8, (std.Io.Dir.max_path_bytes * 4) + 32);
     defer allocator.free(buf);
     PATH_ALLOCATOR = .init(buf);
     const BrokenConfig = struct {
-        pub fn getConfig(_: []const u8, err: ?*?[]const u8) !Config {
+        pub fn getConfig(_: []u8, _: []const u8, err: ?*?[]const u8) !Config {
             std.testing.expectError(error.SyntaxError, Config.parse(std.testing.allocator, "{", err)) catch @panic("Expected syntax error");
             return error.SyntaxError;
         }
@@ -481,7 +524,7 @@ test "broken config" {
 
 test "config tree" {
     const allocator = std.testing.allocator;
-    const buf = try allocator.alloc(u8, (std.fs.max_path_bytes * 4) + 32);
+    const buf = try allocator.alloc(u8, (std.Io.Dir.max_path_bytes * 4) + 32);
     defer allocator.free(buf);
     PATH_ALLOCATOR = .init(buf);
     const ConfigTree = std.StaticStringMap([:0]const u8).initComptime(.{
@@ -512,8 +555,9 @@ test "config tree" {
     });
 
     const ConfigContext = struct {
-        pub fn getConfig(path: []const u8, err: ?*?[]const u8) !Config {
-            return Config.parse(std.testing.allocator, ConfigTree.get(path) orelse return error.NotPresent, err);
+        pub fn getConfig(b: []u8, path: []const u8, err: ?*?[]const u8) !Config {
+            const luaurc_path = getLuaurcPath(b, path);
+            return Config.parse(std.testing.allocator, ConfigTree.get(luaurc_path) orelse return error.NotPresent, err);
         }
         pub fn freeConfig(config: *Config) void {
             config.deinit(std.testing.allocator);

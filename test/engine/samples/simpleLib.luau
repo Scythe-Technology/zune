@@ -1,14 +1,14 @@
 local utilA = require("./Utils/utilA");
 local constant = require("./anyvalue");
 
-local testing = zune.testing;
+local testing = require("@zune/testing");
 
 local describe = testing.describe;
 local expect = testing.expect;
 local test = testing.test;
 
 describe("utilA", function()
-	test("Validating", function()
+	test("validating", function()
 		expect(utilA).toBe(expect.any("table"));
 		local i, v = next(utilA);
 		expect(i).toBeNil();
@@ -16,13 +16,13 @@ describe("utilA", function()
 	end)
 end)
 
-test("Constant", function()
+test("constant", function()
 	expect(constant).toBe(expect.type("string"));
 	expect(constant).toBe("Zune");
 end)
 
 describe("simpleLib", function()
-	test("Validating Context", function()
+	test("validating context", function()
 		expect(_FILE).never.toBeNil();
 		expect(debug.info(1, "s"):find("simpleLib%.luau")).never.toBeNil();
 	end)

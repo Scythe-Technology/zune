@@ -4,119 +4,133 @@ const lz4 = @import("lz4");
 
 const Zune = @import("zune");
 
+const Scheduler = Zune.Runtime.Scheduler;
+const Scripting = Zune.Runtime.Scripting;
+
+const Codec = @import("codec.zig");
+
 const VM = luau.VM;
 
-// Lune compatibility
-
-pub fn lua_frame_compress(L: *VM.lua.State) !i32 {
-    const allocator = luau.getallocator(L);
-
-    const is_buffer = L.typeOf(1) == .Buffer;
-
-    const string = if (is_buffer)
-        L.Lcheckbuffer(1)
-    else
-        L.Lcheckstring(1);
-
-    var level: u32 = 4;
-
-    if (!L.typeOf(2).isnoneornil()) {
-        try L.Zchecktype(2, .Table);
-        const levelType = L.rawgetfield(2, "level");
-        if (!levelType.isnoneornil()) {
-            if (levelType != .Number)
-                return L.Zerror("options 'level' field must be a number");
-            const num = L.tointeger(-1) orelse unreachable;
-            if (num < 0)
-                return L.Zerror("options 'level' must not be less than 0");
-            level = @intCast(num);
-        }
-        L.pop(1);
-    }
-
-    var encoder = try lz4.Encoder.init(allocator);
-    _ = encoder.setLevel(level)
-        .setContentChecksum(lz4.Frame.ContentChecksum.Enabled)
-        .setBlockMode(lz4.Frame.BlockMode.Independent);
-    defer encoder.deinit();
-
-    var allocating: std.Io.Writer.Allocating = .init(allocator);
-    defer allocating.deinit();
-
-    try encoder.compressStream(&allocating.writer, string);
-
-    const written = allocating.written();
-
-    const out = try allocator.alloc(u8, written.len + 4);
-    defer allocator.free(out);
-
-    const header: [4]u8 = @bitCast(@as(u32, @intCast(string.len)));
-    @memcpy(out[0..4], header[0..4]);
-    @memcpy(out[4..][0..written.len], written[0..]);
-
-    if (is_buffer)
-        try L.Zpushbuffer(out)
-    else
-        try L.pushlstring(out);
-
-    return 1;
+fn frameLevel(L: *VM.lua.State) !u32 {
+    if (L.typeOf(6).isnoneornil())
+        return 4;
+    const num = try L.Zcheckvalue(i32, 6, null);
+    if (num < 0)
+        return L.Zerror("options 'level' must not be less than 0");
+    return @intCast(num);
 }
 
-pub fn lua_frame_decompress(L: *VM.lua.State) !i32 {
-    const allocator = luau.getallocator(L);
+fn framePreferences(level: u32) lz4.Frame.Preferences {
+    return .{
+        .compressionLevel = @intCast(level),
+        .frameInfo = .{
+            .blockSizeID = @backingInt(lz4.Frame.BlockSize.Default),
+            .blockMode = @backingInt(lz4.Frame.BlockMode.Independent),
+            .contentChecksumFlag = @backingInt(lz4.Frame.ContentChecksum.Enabled),
+            .frameType = @backingInt(lz4.Frame.FrameType.Frame),
+            .dictID = 0,
+            .blockChecksumFlag = @backingInt(lz4.Frame.BlockChecksum.Disabled),
+        },
+    };
+}
 
-    const is_buffer = L.typeOf(1) == .Buffer;
+pub fn lua_calcSize(L: *VM.lua.State) !i32 {
+    const len = try L.Zcheckvalue(u32, 1, null);
+    if (len > lz4.MAX_INPUT_SIZE)
+        return L.Zerror("no space");
 
-    const string = if (is_buffer) L.Lcheckbuffer(1) else L.Lcheckstring(1);
+    const bound = lz4.Standard.compressBound(len);
 
-    if (string.len < 4)
-        return L.Zerror("invalid header");
-
-    var decoder = try lz4.Decoder.init(allocator);
-    defer decoder.deinit();
-
-    const sizeHint = std.mem.bytesAsSlice(u32, string[0..4])[0];
-
-    const decompressed = try decoder.decompress(string[4..], sizeHint);
-    defer allocator.free(decompressed);
-
-    if (decompressed.len > Zune.Utils.LuaHelper.MAX_LUAU_SIZE)
-        return L.Zerror("decompressed data exceeds maximum string/buffer size");
-
-    if (is_buffer) try L.Zpushbuffer(decompressed) else try L.pushlstring(decompressed);
+    try L.Zpushvalue(bound);
 
     return 1;
 }
 
 pub fn lua_compress(L: *VM.lua.State) !i32 {
-    const allocator = luau.getallocator(L);
+    const src = try Codec.sourceWindow(L);
+    const dest = try Codec.destTail(L);
+    if (src.len > lz4.MAX_INPUT_SIZE)
+        return L.Zerror("no space");
+    const n = lz4.Standard.compressDefault(src, dest) catch |err| switch (err) {
+        error.Failed => return L.Zerror("no space"),
+    };
 
-    const is_buffer = L.typeOf(1) == .Buffer;
-    const string = if (is_buffer) L.Lcheckbuffer(1) else L.Lcheckstring(1);
-
-    const compressed = try lz4.Standard.compress(allocator, string);
-    defer allocator.free(compressed);
-
-    if (is_buffer) try L.Zpushbuffer(compressed) else try L.pushlstring(compressed);
+    try L.Zpushvalue(n);
 
     return 1;
 }
 
 pub fn lua_decompress(L: *VM.lua.State) !i32 {
-    const allocator = luau.getallocator(L);
+    const src = try Codec.sourceWindow(L);
+    const dest = try Codec.destTail(L);
 
-    const is_buffer = L.typeOf(1) == .Buffer;
+    const n = try lz4.Standard.decompressSafe(src, dest);
 
-    const string = if (is_buffer) L.Lcheckbuffer(1) else L.Lcheckstring(1);
-    const sizeHint = try L.Zcheckvalue(i32, 2, null);
+    try L.Zpushvalue(n);
 
-    const decompressed = try lz4.Standard.decompress(allocator, string, @intCast(sizeHint));
-    defer allocator.free(decompressed);
+    return 1;
+}
 
-    if (decompressed.len > Zune.Utils.LuaHelper.MAX_LUAU_SIZE)
+pub fn lua_calcFrameSize(L: *VM.lua.State) !i32 {
+    const len = try L.Zcheckvalue(u32, 1, null);
+    const prefs = framePreferences(4);
+    const bound = lz4.Frame.compressBound(len, &prefs);
+    if (bound == 0)
+        return L.Zerror("no space");
+    try L.Zpushvalue(std.math.add(usize, bound, 4) catch return L.Zerror("no space"));
+    return 1;
+}
+
+pub fn lua_compressFrame(L: *VM.lua.State) !i32 {
+    const allocator = Scheduler.fromState(L).allocator();
+    const src = try Codec.sourceWindow(L);
+    const dest = try Codec.destTail(L);
+    const level = try frameLevel(L);
+    if (src.len > std.math.maxInt(u32) or dest.len < 4)
+        return L.Zerror("no space");
+
+    var encoder = try lz4.Encoder.init(allocator);
+    defer encoder.deinit();
+    _ = encoder.setLevel(level)
+        .setContentChecksum(lz4.Frame.ContentChecksum.Enabled)
+        .setBlockMode(lz4.Frame.BlockMode.Independent);
+
+    const header: [4]u8 = @bitCast(@as(u32, @intCast(src.len)));
+    @memcpy(dest[0..4], &header);
+
+    var writer: std.Io.Writer = .fixed(dest[4..]);
+    encoder.compressStream(&writer, src) catch |err| switch (err) {
+        error.WriteFailed => return L.Zerror("no space"),
+        else => return err,
+    };
+
+    try L.Zpushvalue(writer.end + 4);
+
+    return 1;
+}
+
+pub fn lua_decompressFrame(L: *VM.lua.State) !i32 {
+    const allocator = Scheduler.fromState(L).allocator();
+    const src = try Codec.sourceWindow(L);
+    const dest = try Codec.destTail(L);
+    if (src.len < 4)
+        return L.Zerror("invalid header");
+
+    var header: [4]u8 = undefined;
+    @memcpy(&header, src[0..4]);
+    const size: u32 = @bitCast(header);
+    if (size > Scripting.MAX_LUAU_SIZE)
         return L.Zerror("decompressed data exceeds maximum string/buffer size");
+    if (size > dest.len)
+        return L.Zerror("no space");
 
-    if (is_buffer) try L.Zpushbuffer(decompressed) else try L.pushlstring(decompressed);
+    var decoder = try lz4.Decoder.init(allocator);
+    defer decoder.deinit();
+    const plain = try decoder.decompress(src[4..], size);
+    defer allocator.free(plain);
+    @memcpy(dest[0..plain.len], plain);
+
+    try L.Zpushvalue(plain.len);
 
     return 1;
 }

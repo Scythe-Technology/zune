@@ -1,6 +1,10 @@
 const std = @import("std");
 const luau = @import("luau");
 
+const Zune = @import("zune");
+
+const Scheduler = Zune.Runtime.Scheduler;
+
 const Parser = @import("../../utils/parser.zig");
 
 const json = @import("json.zig");
@@ -73,7 +77,7 @@ const EncodeInfo = struct {
     isName: bool = false,
     keyName: []const u8,
     tracked: *std.AutoHashMapUnmanaged(*const anyopaque, void),
-    tagged: *std.StringArrayHashMap([]const u8),
+    tagged: *std.array_hash_map.String([]const u8),
 };
 
 fn createIndex(allocator: std.mem.Allocator, all: []const u8, key: []const u8) ![]const u8 {
@@ -325,7 +329,7 @@ fn encodeTable(L: *VM.lua.State, allocator: std.mem.Allocator, writer: *std.Io.W
                         });
                         if (allocating.written().len > 0) {
                             const nameCopy = try allocator.dupe(u8, name);
-                            try info.tagged.put(nameCopy, try allocating.toOwnedSlice());
+                            try info.tagged.put(allocator, nameCopy, try allocating.toOwnedSlice());
                         }
                     }
                 }
@@ -456,7 +460,7 @@ fn decodeString(L: *VM.lua.State, string: []const u8, comptime multi: bool, info
     const delim = string[0];
     const literal = delim == '\'';
 
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator();
 
     var buf: std.ArrayList(u8) = .empty;
     defer buf.deinit(allocator);
@@ -811,7 +815,7 @@ fn decode(L: *VM.lua.State, string: []const u8, info: *DecodeInfo) !void {
 
 pub fn lua_encode(L: *VM.lua.State) !i32 {
     try L.Zchecktype(1, .Table);
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator();
 
     if (L.gettop() != 1)
         L.settop(1);
@@ -819,8 +823,8 @@ pub fn lua_encode(L: *VM.lua.State) !i32 {
     var allocating: std.Io.Writer.Allocating = .init(allocator);
     defer allocating.deinit();
 
-    var tagged = std.StringArrayHashMap([]const u8).init(allocator);
-    defer tagged.deinit();
+    var tagged: std.array_hash_map.String([]const u8) = .empty;
+    defer tagged.deinit(allocator);
 
     var tracked: std.AutoHashMapUnmanaged(*const anyopaque, void) = .empty;
     defer tracked.deinit(allocator);

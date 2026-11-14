@@ -3,7 +3,11 @@ const luau = @import("luau");
 
 const Zune = @import("zune");
 
+const Scheduler = Zune.Runtime.Scheduler;
+
 const VM = luau.VM;
+
+pub const Indent = enum(u2) { TwoSpaces, FourSpaces, Tabs };
 
 fn tostring(allocator: std.mem.Allocator, L: *VM.lua.State, idx: i32) !?[]const u8 {
     switch (L.typeOf(idx)) {
@@ -57,10 +61,10 @@ pub fn printValue(
     idx: i32,
     depth: usize,
     asKey: bool,
-    map: ?*std.AutoArrayHashMap(usize, bool),
+    map: ?*std.array_hash_map.Auto(usize, bool),
     max_depth: usize,
 ) anyerror!void {
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator();
     if (depth > max_depth) {
         try writer.print("{s}", .{"{...}"});
         return;
@@ -72,8 +76,8 @@ pub fn printValue(
                 try Zune.debug.writerPrint(writer, "<bold><yellow>{s}<clear>", .{if (b) "true" else "false"});
             },
             .Number => {
-                const n = L.tonumber(idx) orelse unreachable;
-                try Zune.debug.writerPrint(writer, "<bcyan>{d}<clear>", .{n});
+                var buf: [VM.zapi.STR_BUF_SIZE]u8 = undefined;
+                try Zune.debug.writerPrint(writer, "<bcyan>{s}<clear>", .{VM.zapi.Ztolstringkc(L, idx, &buf)});
             },
             .String => {
                 const s = L.tostring(idx) orelse unreachable;
@@ -99,16 +103,16 @@ pub fn printValue(
                 const ptr = @intFromPtr(L.topointer(idx).?);
                 if (map) |tracked| {
                     if (tracked.get(ptr)) |_| {
-                        if (Zune.STATE.FORMAT.TABLE_ADDRESS)
+                        if (Zune.State.options.format.table_address)
                             try Zune.debug.writerPrint(writer, "<dim><<recursive, table: 0x{x}>><clear>", .{ptr})
                         else
                             try Zune.debug.writerPrint(writer, "<dim><<recursive, table>><clear>", .{});
                         return;
                     }
-                    try tracked.put(ptr, true);
+                    try tracked.put(allocator, ptr, true);
                 }
                 defer _ = if (map) |tracked| tracked.orderedRemove(ptr);
-                if (Zune.STATE.FORMAT.TABLE_ADDRESS) {
+                if (Zune.State.options.format.table_address) {
                     if (tostring(allocator, L, idx) catch try allocator.dupe(u8, "!ERR!")) |str| {
                         defer allocator.free(str);
                         try Zune.debug.writerPrint(writer, "<dim><<{s}>> {{<clear>\n", .{str});
@@ -119,7 +123,11 @@ pub fn printValue(
                 var i: i32 = L.rawiter(idx, 0);
                 while (i >= 0) : (i = L.rawiter(idx, i)) {
                     for (0..depth + 1) |_|
-                        try writer.print("    ", .{});
+                        switch (Zune.State.options.format.indent) {
+                            .TwoSpaces => try writer.print("  ", .{}),
+                            .FourSpaces => try writer.print("    ", .{}),
+                            .Tabs => try writer.print("\t", .{}),
+                        };
                     const n = L.gettop();
                     if (L.typeOf(@intCast(n - 1)) == .String) {
                         try printValue(L, writer, @intCast(n - 1), depth + 1, true, null, max_depth);
@@ -134,7 +142,11 @@ pub fn printValue(
                     L.pop(2);
                 }
                 for (0..depth) |_|
-                    try writer.print("    ", .{});
+                    switch (Zune.State.options.format.indent) {
+                        .TwoSpaces => try writer.print("  ", .{}),
+                        .FourSpaces => try writer.print("    ", .{}),
+                        .Tabs => try writer.print("\t", .{}),
+                    };
                 try Zune.debug.writerPrint(writer, "<dim>}}<clear>", .{});
             },
             .Buffer => {
@@ -143,10 +155,10 @@ pub fn printValue(
                     break :blk @intFromPtr(L.topointer(idx) orelse break :blk 0);
                 };
                 try Zune.debug.writerPrint(writer, "<bmagenta><<buffer ", .{});
-                if (Zune.STATE.FORMAT.BUFFER_MAX_DISPLAY > 0) {
-                    if (b.len > Zune.STATE.FORMAT.BUFFER_MAX_DISPLAY) {
-                        try writer.print("0x{x} {X}", .{ ptr, b[0..Zune.STATE.FORMAT.BUFFER_MAX_DISPLAY] });
-                        try writer.print(" ...{d} truncated", .{(b.len - Zune.STATE.FORMAT.BUFFER_MAX_DISPLAY)});
+                if (Zune.State.options.format.buffer_max_display > 0) {
+                    if (b.len > Zune.State.options.format.buffer_max_display) {
+                        try writer.print("0x{x} {X}", .{ ptr, b[0..Zune.State.options.format.buffer_max_display] });
+                        try writer.print(" ...{d} truncated", .{(b.len - Zune.State.options.format.buffer_max_display)});
                     } else {
                         try writer.print("0x{x} {X}", .{ ptr, b });
                     }
@@ -154,11 +166,8 @@ pub fn printValue(
                 try Zune.debug.writerPrint(writer, ">><clear>", .{});
             },
             .Vector => {
-                const v = L.tovector(idx) orelse unreachable;
-                if (comptime luau.VM.lua.config.VECTOR_SIZE == 3)
-                    try Zune.debug.writerPrint(writer, "<bmagenta><<vector ({d}, {d}, {d})>><clear>", .{ v[0], v[1], v[2] })
-                else
-                    try Zune.debug.writerPrint(writer, "<bmagenta><<vector ({d}, {d}, {d}, {d})>><clear>", .{ v[0], v[1], v[2], v[3] });
+                var buf: [VM.zapi.STR_BUF_SIZE]u8 = undefined;
+                try Zune.debug.writerPrint(writer, "<bmagenta><<vector ({s})>><clear>", .{VM.zapi.Ztolstringkc(L, idx, &buf)});
             },
             else => {
                 if (try writeMetamethod__tostring(L, writer, -1))
@@ -185,9 +194,9 @@ pub fn writeIdx(allocator: std.mem.Allocator, L: *VM.lua.State, writer: *std.Io.
             } else try Zune.debug.writerPrint(writer, "<bmagenta><<{s}>><clear>", .{VM.lapi.typename(t)});
         },
         else => {
-            if (!Zune.STATE.FORMAT.RECURSIVE_TABLE) {
-                var map = std.AutoArrayHashMap(usize, bool).init(allocator);
-                defer map.deinit();
+            if (!Zune.State.options.format.recursive_table) {
+                var map: std.array_hash_map.Auto(usize, bool) = .empty;
+                defer map.deinit(allocator);
                 try printValue(L, writer, idx, 0, false, &map, max_depth);
             } else try printValue(L, writer, idx, 0, false, null, max_depth);
         },
@@ -205,7 +214,7 @@ fn writeBuffer(L: *VM.lua.State, allocator: std.mem.Allocator, writer: *std.Io.W
 
 pub fn args(L: *VM.lua.State) !i32 {
     const top = L.gettop();
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator();
     if (top == 0) {
         try L.pushlstring("");
         return 1;
@@ -215,7 +224,7 @@ pub fn args(L: *VM.lua.State) !i32 {
 
     const writer = &allocating.writer;
 
-    try writeBuffer(L, allocator, writer, @intCast(top), Zune.STATE.FORMAT.MAX_DEPTH);
+    try writeBuffer(L, allocator, writer, @intCast(top), Zune.State.options.format.max_depth);
 
     try L.pushlstring(allocating.written());
 
@@ -224,7 +233,7 @@ pub fn args(L: *VM.lua.State) !i32 {
 
 pub fn print(L: *VM.lua.State) !i32 {
     const top = L.gettop();
-    const allocator = luau.getallocator(L);
+    const allocator = Scheduler.fromState(L).allocator();
     if (top == 0) {
         std.debug.print("\n", .{});
         return 0;
@@ -234,7 +243,7 @@ pub fn print(L: *VM.lua.State) !i32 {
 
     const writer = &allocating.writer;
 
-    try writeBuffer(L, allocator, writer, @intCast(top), Zune.STATE.FORMAT.MAX_DEPTH);
+    try writeBuffer(L, allocator, writer, @intCast(top), Zune.State.options.format.max_depth);
 
     std.debug.print("{s}\n", .{allocating.written()});
 
