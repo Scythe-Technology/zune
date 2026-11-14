@@ -1,5 +1,6 @@
 const std = @import("std");
 const luau = @import("luau");
+const builtin = @import("builtin");
 
 const Zune = @import("zune");
 
@@ -27,6 +28,9 @@ threadlocal var CONFIG_CACHE: std.hash_map.StringHashMapUnmanaged(Config) = .emp
 const RequireContext = struct {
     path: []const u8,
 };
+
+const MAX_RESUME_DEPTH: u16 = 200;
+
 fn require_finished(self: *RequireContext, ML: *VM.lua.State, scheduler: *Scheduler) void {
     var out_err: ?[]const u8 = null;
     const allocator = scheduler.allocator();
@@ -408,6 +412,11 @@ pub fn checkSearchResult(
 pub fn zune_require(L: *VM.lua.State) !i32 {
     const scheduler = Scheduler.fromState(L);
     const allocator = scheduler.allocator();
+
+    if (L.nCcalls >= MAX_RESUME_DEPTH) {
+        @branchHint(.cold);
+        return L.Zerror("C stack overflow");
+    }
 
     const moduleName = L.Lcheckstring(1);
 

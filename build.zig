@@ -108,6 +108,8 @@ pub fn build(b: *std.Build) !void {
     exe.link_data_sections = true;
     exe.link_gc_sections = true;
 
+    exe.stack_size = 16 * 1024 * 1024;
+
     if (no_bin) {
         b.getInstallStep().dependOn(&exe.step);
     } else {
