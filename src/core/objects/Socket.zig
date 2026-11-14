@@ -402,6 +402,8 @@ pub fn lua_sendToAddress(self: *Socket, L: *VM.lua.State) !i32 {
 }
 
 pub fn lua_sendToUnix(self: *Socket, L: *VM.lua.State) !i32 {
+    if (comptime !zio.os.net.has_unix_sockets)
+        return L.Zerror("unix sockets not supported");
     switch (self.state.top()) {
         .closed => return L.Zerror("socket closed"),
         .connected => return L.Zerror("socket has peer"),
@@ -628,6 +630,8 @@ pub fn lua_connectAddress(self: *Socket, L: *VM.lua.State) !i32 {
 }
 
 pub fn lua_connectUnix(self: *Socket, L: *VM.lua.State) !i32 {
+    if (comptime !zio.os.net.has_unix_sockets)
+        return L.Zerror("unix sockets not supported");
     switch (self.state.top()) {
         .closed => return L.Zerror("socket closed"),
         .connected => return L.Zerror("socket already connected"),
@@ -745,6 +749,9 @@ pub fn lua_bindAddress(self: *Socket, L: *VM.lua.State) !i32 {
 }
 
 pub fn lua_bindUnix(self: *Socket, L: *VM.lua.State) !i32 {
+    if (comptime !zio.os.net.has_unix_sockets)
+        return L.Zerror("unix sockets not supported");
+
     switch (self.state.top()) {
         .closed => return L.Zerror("socket closed"),
         .connected => return L.Zerror("socket already connected"),
