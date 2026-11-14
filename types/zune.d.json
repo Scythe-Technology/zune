@@ -4273,6 +4273,7 @@
     "documentation": "A library to do networking in luau. Provides functions to create sockets, start an HTTP server, make HTTP requests, and handle WebSockets.",
     "keys": {
       "IPPROTO": "@zune/globaltype/_zune_net.IPPROTO",
+      "HAS_UNIX_SOCKETS": "@zune/globaltype/_zune_net.HAS_UNIX_SOCKETS",
       "getAddressList": "@zune/globaltype/_zune_net.getAddressList",
       "ADDRF": "@zune/globaltype/_zune_net.ADDRF",
       "openSocket": "@zune/globaltype/_zune_net.openSocket",

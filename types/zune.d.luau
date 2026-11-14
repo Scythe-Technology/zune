@@ -1036,6 +1036,7 @@ export type _zune_net = {
     ADDRF: _zune_net_ADDRF,
     SOCK: _zune_net_SOCK,
     IPPROTO: _zune_net_IPPROTO,
+    HAS_UNIX_SOCKETS: boolean,
     openSocket: (domain: number | NetDomain, type: number | NetType, protocol: number | NetProtocol) -> Socket,
     getAddressList: (name: string, port: number) -> {NetworkAddress}, 
 }

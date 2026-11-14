@@ -59,8 +59,8 @@ pub const Types = struct {
     pub const double: CType.TypedData = .{ .type = .float64, .kind = .f64 };
     pub const pointer: CType.TypedData = .{ .type = .pointer, .kind = .{ .pointer = .{} } };
 
-    pub const vector2_32: CType.TypedData = .{ .type = .{ .size = 8, .alignment = .@"4", .class = .sse }, .kind = .vector2_32 };
-    pub const vector3_32: CType.TypedData = .{ .type = .{ .size = 12, .alignment = .@"4", .class = .sse }, .kind = .vector3_32 };
+    pub const vector2_32: CType.TypedData = .{ .type = .comptimeStruct(&.{ .float32, .float32 }, null), .kind = .vector2_32 };
+    pub const vector3_32: CType.TypedData = .{ .type = .comptimeStruct(&.{ .float32, .float32, .float32 }, null), .kind = .vector3_32 };
 };
 
 const FunctionSymbol = struct {

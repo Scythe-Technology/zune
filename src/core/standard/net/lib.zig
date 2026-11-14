@@ -158,3 +158,5 @@ pub fn lua_getAddressList(L: *VM.lua.State) !i32 {
 pub const lua_forced_ADDRF = std.posix.AF;
 pub const lua_forced_SOCK = std.posix.SOCK;
 pub const lua_forced_IPPROTO = std.posix.IPPROTO;
+
+pub const lua_HAS_UNIX_SOCKETS = zio.os.net.has_unix_sockets;

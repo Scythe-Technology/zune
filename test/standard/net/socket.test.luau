@@ -1,4 +1,6 @@
 --!strict
+local TEMP_DIR = zune.process.env.TEMP_PATH or error("TEMP_PATH environment variable is not set")
+
 local net = zune.net
 local task = zune.task
 
@@ -110,11 +112,14 @@ test("basic datagram", function()
 end)
 
 test("basic unix stream", function()
-    if fs.stat("/tmp/zune_test.sock").kind ~= "none" then
-        fs.deleteFile("/tmp/zune_test.sock")
+    if not net.HAS_UNIX_SOCKETS then
+        error("SkipTest", 0)
+    end
+    if fs.stat(fs.path.join(TEMP_DIR, "zune_test.sock")).kind ~= "none" then
+        fs.deleteFile(fs.path.join(TEMP_DIR, "zune_test.sock"))
     end
     local server_socket = net.openSocket("unix", "stream", "ip")
-    server_socket:bindUnix("/tmp/zune_test.sock")
+    server_socket:bindUnix(fs.path.join(TEMP_DIR, "zune_test.sock"))
     server_socket:listen(2)
     local server_address = server_socket:address()
     local client_socket = net.openSocket("unix", "stream", "ip")
@@ -156,19 +161,22 @@ test("basic unix stream", function()
 end)
 
 test("basic unix datagram", function()
-    if fs.stat("/tmp/zune_test_a.sock").kind ~= "none" then
-        fs.deleteFile("/tmp/zune_test_a.sock")
+    if not net.HAS_UNIX_SOCKETS then
+        error("SkipTest", 0)
     end
-    if fs.stat("/tmp/zune_test_b.sock").kind ~= "none" then
-        fs.deleteFile("/tmp/zune_test_b.sock")
+    if fs.stat(fs.path.join(TEMP_DIR, "zune_test_a.sock")).kind ~= "none" then
+        fs.deleteFile(fs.path.join(TEMP_DIR, "zune_test_a.sock"))
+    end
+    if fs.stat(fs.path.join(TEMP_DIR, "zune_test_b.sock")).kind ~= "none" then
+        fs.deleteFile(fs.path.join(TEMP_DIR, "zune_test_b.sock"))
     end
     local socket_a = net.openSocket("unix", "dgram", "ip")
     local socket_b = net.openSocket("unix", "dgram", "ip")
 
-    socket_a:bindUnix("/tmp/zune_test_a.sock")
+    socket_a:bindUnix(fs.path.join(TEMP_DIR, "zune_test_a.sock"))
     local address_a = socket_a:address()
 
-    socket_b:bindUnix("/tmp/zune_test_b.sock")
+    socket_b:bindUnix(fs.path.join(TEMP_DIR, "zune_test_b.sock"))
     local address_b = socket_b:address()
 
     socket_a:sendToUnix(address_b.address, "Hello from A")
@@ -183,8 +191,8 @@ test("basic unix datagram", function()
     assert(address_a_from)
     assert(address_b_from)
 
-    expect(address_a_from.address).toBe("/tmp/zune_test_b.sock")
-    expect(address_b_from.address).toBe("/tmp/zune_test_a.sock")
+    expect(address_a_from.address).toBe(fs.path.join(TEMP_DIR, "zune_test_b.sock"))
+    expect(address_b_from.address).toBe(fs.path.join(TEMP_DIR, "zune_test_a.sock"))
 
     assert(bytes_a == 12)
     assert(bytes_b == 12)
