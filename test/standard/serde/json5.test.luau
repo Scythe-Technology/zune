@@ -15,6 +15,8 @@ describe("json5", function()
             expect(serde.json5.encode(math.huge)).toBe("Infinity")
             expect(serde.json5.encode(-math.huge)).toBe("-Infinity")
             expect(serde.json5.encode(0 / 0)).toBe("NaN")
+            expect(serde.json5.encode({ a = 1, b = 2, c = 3 }, { sort = true })).toBe(`\{"a":1,"b":2,"c":3\}`)
+            expect(serde.json5.encode({ a = 1, b = 2, c = 3 }, { sort = false })).toBe(`\{"a":1,"c":3,"b":2\}`)
         end)
     end)
 

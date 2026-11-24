@@ -172,7 +172,7 @@ describe("thread", function()
     test("basic error", function()
         -- should not stop any of the code below
         local bytecode = luau.compile([[
-            error("Some error");
+            error("Some error")
         ]])
         local t = thread.fromBytecode(bytecode, {
             chunk_name = "test",
@@ -183,15 +183,15 @@ describe("thread", function()
 
     test("echo thread", function()
         local bytecode = luau.compile([[
-            local thread = zune.thread;
+            local thread = zune.thread
 
             while true do
-                local a, b = thread.receive();
-                if (a == nil) then
+                local a, b = thread.receive()
+                if a == nil then
                     break;
                 end
-                print("Received:", a, b);
-                thread.send(a, b);
+                print("Received:", a, b)
+                thread.send(a, b)
             end
         ]])
         local t = thread.fromBytecode(bytecode, {
@@ -212,14 +212,14 @@ describe("thread", function()
 
     test("echo thread values", function()
         local bytecode = luau.compile([[
-            local thread = zune.thread;
+            local thread = zune.thread
 
             while true do
-                local msgs = {thread.receive()};
-                if (#msgs == 0) then
-                    break;
+                local msgs = { thread.receive() }
+                if #msgs == 0 then
+                    break
                 end
-                thread.send(unpack(msgs));
+                thread.send(unpack(msgs))
             end
         ]])
         local t = thread.fromBytecode(bytecode, {
@@ -392,14 +392,14 @@ describe("thread", function()
             create,
             name
         ))
-        local holder = thread.fromBytecode(bytecode, { chunk_name = name .. "-holder" })
+        local holder = thread.fromBytecode(bytecode, { chunk_name = `{name}-holder` })
         local waiter: Thread? = nil
         local function cleanup()
             if holder:status() == "running" then
                 holder:send("release")
             end
             holder:join()
-            if waiter ~= nil then
+            if waiter then
                 waiter:join()
             end
         end
@@ -408,7 +408,7 @@ describe("thread", function()
             holder:send("hold")
             expect(holder:receive()).toBe("held")
 
-            waiter = thread.fromBytecode(bytecode, { chunk_name = name .. "-waiter" })
+            waiter = thread.fromBytecode(bytecode, { chunk_name = `{name}-waiter` })
             waiter:start()
             waiter:send("wait")
 
@@ -670,7 +670,7 @@ describe("thread", function()
             zune.thread.send("set")
             local msg = zune.thread.receive()
             value:update(function(current)
-                return current .. ":" .. msg
+                return `{current}:{msg}`
             end)
             zune.thread.send(value:get())
         ]])

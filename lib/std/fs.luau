@@ -7,7 +7,7 @@ local fs = setmetatable({}, { __index = zune.fs })
 
 function fs.readFile(path: string): string
     local file = io.cwd():openFile(path, { mode = "r" })
-    local reader = io.createReader(file, { positional = true })
+    local reader = io.createPosReader(file)
     local buf = reader:readRemainingAlloc()
     file:close()
     return buffer.tostring(buf)
@@ -15,7 +15,7 @@ end
 
 function fs.readFileBytes(path: string): buffer
     local file = io.cwd():openFile(path, { mode = "r" })
-    local reader = io.createReader(file, { positional = true })
+    local reader = io.createPosReader(file)
     local buf = reader:readRemainingAlloc()
     file:close()
     return buf
@@ -26,7 +26,7 @@ function fs.writeFile(path: string, content: string | buffer)
         truncate = true,
         nonblocking = true,
     })
-    local writer = io.createWriter(file, { positional = true })
+    local writer = io.createPosWriter(file)
     writer:writeAll(content)
     file:close()
 end
@@ -69,6 +69,10 @@ function fs.stat(path: string)
     return fs.statFile(io.cwd(), path)
 end
 
+function fs.exists(path: string): boolean
+    return fs.stat(path).kind ~= "none"
+end
+
 function fs.realPathFileAlloc(dir: Dir, path: string)
     local b = buffer.create(fs.path.max_path_bytes)
     local amt = dir:realPathFile(path, b)
@@ -86,30 +90,30 @@ function fs.realPath(path: string)
     return fs.realPathFileAlloc(io.cwd(), path)
 end
 
-type CreateFileOptions = {
+export type CreateOptions = {
     read: boolean?,
     exclusive: boolean?,
     truncate: boolean?,
     mode: number?,
 }
-function fs.createFile(path: string, opts: CreateFileOptions?)
-    local options = opts or {} :: CreateFileOptions
-    local create_opts: { [string]: any } = {
+function fs.createFile(path: string, opts: CreateOptions?)
+    local options = opts or {} :: CreateOptions
+    local create_opts: CreateFileOptions = {
         read = if options.read == nil then true else options.read,
         exclusive = options.exclusive == true,
         truncate = if options.truncate == nil then true else options.truncate,
     }
-    if options.mode ~= nil then
+    if options.mode then
         create_opts.permissions = options.mode
     end
     return io.cwd():createFile(path, create_opts)
 end
 
-type OpenFileOptions = {
+export type OpenOptions = {
     mode: string?,
 }
-function fs.openFile(path: string, opts: OpenFileOptions?)
-    local options = opts or {} :: OpenFileOptions
+function fs.openFile(path: string, opts: OpenOptions?)
+    local options = opts or {} :: OpenOptions
     return io.cwd():openFile(path, {
         mode = options.mode,
     })

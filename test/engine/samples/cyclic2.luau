@@ -1,3 +1,3 @@
-local b = require("./cyclic");
+local b = require("./cyclic")
 
-return {};
+return {}

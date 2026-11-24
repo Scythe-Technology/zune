@@ -2,28 +2,15 @@
 --!native
 --!optimize 2
 
-local io = zune.io
 local task = zune.task
+
+local io = require("./io")
+local spec = require("@zune/spec")
 
 local ansi = require("./ansi").auto()
 
 local tui = {}
 
-local function moveLeft(amount: number?)
-    return `\x1b[{amount or ""}D`
-end
-local function moveRight(amount: number?)
-    return `\x1b[{amount or ""}C`
-end
-local function moveUp(amount: number?)
-    return `\x1b[{amount or ""}A`
-end
-local function moveDown(amount: number?)
-    return `\x1b[{amount or ""}B`
-end
-local function moveToColumn(position: number)
-    return `\x1b[{position}G`
-end
 local CLEAR_FROM_CURSOR = "\x1b[0J"
 
 type PromptFn =
@@ -32,6 +19,70 @@ type PromptFn =
     & ((kind: "select", message: string, options: { string }) -> number)
     & ((kind: "multiselect", message: string, options: { string }) -> { number })
 
+function tui.ask(msg: string, options: { string }): string?
+    local default: string? = nil
+    local registered = {}
+    for i = 1, #options do
+        local opt = options[i]
+        if #opt ~= 1 then
+            error(`option "{opt}" must be a single character`, 2)
+        end
+        if registered[opt] then
+            error(`duplicate option "{opt}"`, 2)
+        end
+        if opt ~= string.lower(opt) then
+            if default then
+                error(`multiple default options are not allowed`, 2)
+            end
+            default = opt
+            registered[opt] = opt
+            registered[string.lower(opt)] = opt
+        else
+            registered[opt] = opt
+            registered[string.upper(opt)] = opt
+        end
+    end
+
+    local display: string? = table.concat(options, "/")
+
+    if not io.terminal.isTty() then
+        print(`{ansi.bold}{msg} [{display}]{ansi.reset}`)
+        return nil
+    end
+    local writer = io.createWriter(io.stdout)
+
+    writer:writeAll(`{ansi.bold}{msg} [{display}]{ansi.reset} `)
+
+    local was_raw = io.terminal.getCurrentMode() == "raw"
+    local enabled = false
+    if not was_raw then
+        enabled = io.terminal.enableRawMode()
+    end
+
+    local buf = buffer.create(8)
+    local n = io.stdin:read(buf, 0, 1)
+    if enabled then
+        io.terminal.restoreMode()
+    end
+
+    writer:write("\n")
+    if n == 0 then
+        return nil
+    end
+    local ch = buffer.readstring(buf, 0, 1)
+    if ch == "\n" or ch == "\r" then
+        if default then
+            return default
+        end
+    end
+
+    if registered[ch] then
+        return registered[ch]
+    end
+
+    return nil
+end
+
 local function prompt(
     kind: ("text" | "confirm" | "select" | "multiselect")?,
     message: string,
@@ -39,14 +90,13 @@ local function prompt(
 ): string | boolean | number | { number }
     kind = kind or "text"
     if not io.terminal.isTty() then
-        error("Not a terminal")
+        error("not a terminal")
     end
 
-    local is_raw = io.terminal.getCurrentMode() == "raw"
-    if not is_raw then
-        if not io.terminal.enableRawMode() then
-            error("Failed to enable raw mode")
-        end
+    local was_raw = io.terminal.getCurrentMode() == "raw"
+    local enabled = false
+    if not was_raw then
+        enabled = io.terminal.enableRawMode()
     end
 
     io.stderr:write(`{ansi.paint(ansi.yellow, "?")} {ansi.paint(ansi.bold, message)}`)
@@ -58,26 +108,25 @@ local function prompt(
         assert(options, "Options are required for select and multiselect")
         assert(#options > 0, "Options cannot be empty")
         for i = 1, #options do
-            assert(type(options[i]) == "string", "Option must be strings")
+            assert((spec.string(options[i])), "Option must be strings")
             selection[i] = false
         end
         for i = 1, #options do
-            local option = options[i]
             if kind == "select" then
                 io.stderr:write(
-                    `\n {if i == 1 then ansi.paint(ansi.green, ">") else " "} {ansi.paint(ansi.bold, option)}`
+                    `\n {if i == 1 then ansi.paint(ansi.green, ">") else " "} {ansi.paint(ansi.bold, options[i])}`
                 )
             elseif kind == "multiselect" then
                 io.stderr:write(
                     `\n {if i == 1 then ansi.paint(ansi.green, "[ ]") else ansi.paint(ansi.dim, "[ ]")} {ansi.paint(
                         ansi.bold,
-                        option
+                        options[i]
                     )}`
                 )
             end
         end
-        io.stderr:write(moveUp(#options - 1))
-        io.stderr:write(moveToColumn(0))
+        io.stderr:write(ansi.cursorMove("up", #options - 1))
+        io.stderr:write(ansi.cursorMove("gotocol", 0))
         order = 1
     elseif kind == "confirm" then
         io.stderr:write(` {ansi.paint(ansi.dim, "(y/n)")} › `)
@@ -87,12 +136,12 @@ local function prompt(
 
     local function renderSelection(id: number, hovered: boolean)
         if kind == "select" then
-            io.stderr:write(`{moveToColumn(0)}\x1b[2K`)
+            io.stderr:write(`${ansi.cursorMove("gotocol", 0)}\x1b[2K`)
             io.stderr:write(
                 ` {if hovered then ansi.paint(ansi.green, ">") else " "} {ansi.paint(ansi.bold, options[id])}`
             )
         else
-            io.stderr:write(`{moveToColumn(0)}\x1b[2K`)
+            io.stderr:write(`${ansi.cursorMove("gotocol", 0)}\x1b[2K`)
             local selected = selection[id]
             if hovered then
                 io.stderr:write(
@@ -137,15 +186,15 @@ local function prompt(
                         if last_order == order then
                             continue
                         end
-                        direction = moveDown(#options - 1)
+                        direction = ansi.cursorMove("down", #options - 1)
                     else
                         order -= 1
-                        direction = moveUp()
+                        direction = ansi.cursorMove("up", 1)
                     end
                     renderSelection(last_order, false)
                     io.stderr:write(direction)
                     renderSelection(order, true)
-                    io.stderr:write(moveToColumn(0))
+                    io.stderr:write(ansi.cursorMove("gotocol", 0))
                 end
             elseif bytes[3] == 66 then -- down
                 if kind == "select" or kind == "multiselect" then
@@ -156,15 +205,15 @@ local function prompt(
                         if last_order == order then
                             continue
                         end
-                        direction = moveUp(#options - 1)
+                        direction = ansi.cursorMove("up", #options - 1)
                     else
                         order += 1
-                        direction = moveDown()
+                        direction = ansi.cursorMove("down", 1)
                     end
                     renderSelection(last_order, false)
                     io.stderr:write(direction)
                     renderSelection(order, true)
-                    io.stderr:write(moveToColumn(0))
+                    io.stderr:write(ansi.cursorMove("gotocol", 0))
                 end
             elseif bytes[3] == 67 then -- right
                 if kind == "text" then
@@ -172,7 +221,7 @@ local function prompt(
                         continue
                     end
                     order += 1
-                    io.stderr:write(moveRight())
+                    io.stderr:write(ansi.cursorMove("right", 1))
                 end
             elseif bytes[3] == 68 then -- left
                 if kind == "text" then
@@ -180,7 +229,7 @@ local function prompt(
                         continue
                     end
                     order -= 1
-                    io.stderr:write(moveLeft())
+                    io.stderr:write(ansi.cursorMove("left", 1))
                 end
             else
                 continue
@@ -194,14 +243,14 @@ local function prompt(
                 if #input == 0 then
                     continue
                 end
-                io.stderr:write(moveLeft())
+                io.stderr:write(ansi.cursorMove("left", 1))
                 input = input:sub(1, order - 1) .. input:sub(order + 1)
                 order -= 1
                 io.stderr:write(CLEAR_FROM_CURSOR)
                 if order ~= #input then
                     local rest = input:sub(order + 1)
                     io.stderr:write(rest)
-                    io.stderr:write(moveLeft(#rest))
+                    io.stderr:write(ansi.cursorMove("left", #rest))
                 end
             end
         elseif bytes[1] == 0x09 then -- tab
@@ -209,11 +258,11 @@ local function prompt(
                 if selection[order] then
                     selection[order] = false
                     renderSelection(order, true)
-                    io.stderr:write(moveToColumn(0))
+                    io.stderr:write(ansi.cursorMove("gotocol", 0))
                 else
                     selection[order] = true
                     renderSelection(order, true)
-                    io.stderr:write(moveToColumn(0))
+                    io.stderr:write(ansi.cursorMove("gotocol", 0))
                 end
             end
         elseif bytes[1] >= 0x20 and bytes[1] <= 0x7E then -- printable
@@ -243,7 +292,7 @@ local function prompt(
                         end
                     end
                     for i = 1, order - 1 do
-                        io.stderr:write(moveUp())
+                        io.stderr:write(ansi.cursorMove("up", 1))
                     end
                     for i = 1, #selection do
                         if i ~= 1 then
@@ -252,15 +301,15 @@ local function prompt(
                         renderSelection(i, i == order)
                     end
                     for i = 1, #selection - order do
-                        io.stderr:write(moveUp())
+                        io.stderr:write(ansi.cursorMove("up", 1))
                     end
-                    io.stderr:write(moveToColumn(0))
+                    io.stderr:write(ansi.cursorMove("gotocol", 0))
                 end
             end
         end
     end
 
-    if not is_raw then
+    if not enabled then
         io.terminal.restoreMode()
     end
 
@@ -268,11 +317,11 @@ local function prompt(
         local len = #options
         local down = len - order
         if down > 0 then
-            io.stderr:write(moveDown(down))
+            io.stderr:write(ansi.cursorMove("down", down))
         end
         for _ = 1, len do
-            io.stderr:write(`{moveToColumn(0)}\x1b[2K`)
-            io.stderr:write(moveUp())
+            io.stderr:write(`${ansi.cursorMove("gotocol", 0)}\x1b[2K`)
+            io.stderr:write(ansi.cursorMove("up", 1))
         end
         if kind == "select" then
             io.stderr:write(
@@ -298,13 +347,12 @@ local function prompt(
                     if i ~= 1 then
                         io.stderr:write(", ")
                     end
-                    local obj = selected_items[i]
-                    io.stderr:write(`{ansi.paint(ansi.green, obj)}`)
+                    io.stderr:write(`{ansi.paint(ansi.green, selected_items[i])}`)
                 end
             end
         end
     else
-        io.stderr:write(`{moveToColumn(0)}\x1b[2K`)
+        io.stderr:write(`${ansi.cursorMove("gotocol", 0)}\x1b[2K`)
         io.stderr:write(
             `{ansi.paint(ansi.green, "✔")} {ansi.paint(ansi.bold, message)} · {ansi.paint(ansi.green, input)}`
         )

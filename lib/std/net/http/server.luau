@@ -6,6 +6,8 @@ local task = zune.task
 local crypto = zune.crypto
 local mem = zune.mem
 
+local spec = require("@zune/spec")
+
 local Encoding = require("./encoding")
 local Request = require("./request")
 local Response = require("./response")
@@ -83,7 +85,7 @@ local function pull(conn: session.Session, buf: buffer, timeout: number): (numbe
         if name == "timed out" then
             return 0, true
         end
-        if name ~= nil and name ~= "connection closed" and not session.isClosed(name) then
+        if name and name ~= "connection closed" and not session.isClosed(name) then
             print(`Error(Unhandled): {name}`)
         end
         return 0, false
@@ -100,7 +102,7 @@ end
 
 local function sendTimeout(conn: session.Session)
     local tls = conn.tls
-    if tls ~= nil and not tls.established then
+    if tls and not tls.established then
         return
     end
     send(
@@ -135,7 +137,7 @@ end
 
 local function listen(
     socket: Socket,
-    tls_auth: TlsCertKeyPair?,
+    tls: CryptoTls?,
     max_body_size: number,
     client_timeout: number,
     keep_alive_timeout: number,
@@ -143,13 +145,6 @@ local function listen(
     callback: (request: Request.Request) -> string | Response,
     handlers: websocket.ServerHandlers?
 )
-    local tls: CryptoTls? = nil
-    if tls_auth then
-        tls = crypto.tls.createServer(socket, {
-            auth = tls_auth,
-        })
-    end
-
     local function idleSeconds(requests: number): number
         if requests > 0 and keep_alive_timeout > 0 then
             return keep_alive_timeout
@@ -181,7 +176,7 @@ local function listen(
 
     while socket.open do
         local chunk: buffer
-        if pending ~= nil then
+        if pending then
             chunk = pending
             pending = nil
         else
@@ -220,11 +215,11 @@ local function listen(
 
         requests += 1
         local path_or_err: string
-        if string.find(path, "%", 1, true) == nil then
+        if mem.findScalar(path, 37) == nil then -- '%'
             path_or_err = path
         else
             local decoded_ok, decoded = pcall(Encoding.url.decode, path)
-            if not decoded_ok or type(decoded) ~= "string" then
+            if not decoded_ok then
                 reject(conn, 400, "Bad Request", "Bad Request")
                 break
             end
@@ -241,7 +236,7 @@ local function listen(
         local spill = parser.spill
         Request.resetParser(parser)
 
-        if handlers ~= nil and websocket.handles(method, incoming.headers) then
+        if handlers and websocket.handles(method, incoming.headers) then
             websocket.accept(conn, incoming, spill, handlers)
             return
         end
@@ -251,15 +246,16 @@ local function listen(
             reject(conn, 500, "Internal Server Error", "An error occurred on the server")
             break
         end
-        if type(response) == "string" then
+        if spec.string(response) then
+            local text = response :: string
             local wire = cached_wire
-            if wire == nil or cached_text ~= response then
-                wire = Response.from({ body = response })
-                cached_text = response
+            if not wire or cached_text ~= text then
+                wire = Response.from({ body = text })
+                cached_text = text
                 cached_wire = wire
             end
             send(conn, wire :: string)
-        elseif type(response) == "table" then
+        elseif spec.table(response) then
             send(conn, Response.from(response :: Response))
         else
             reject(conn, 500, "Internal Server Error", "An error occurred on the server")
@@ -356,7 +352,7 @@ local function startServer(
             end)
             if not accepted_ok then
                 local name: string = conn :: any
-                if not server.stopped and name ~= nil and not session.isClosed(name) and not session.isClosed(conn) then
+                if not server.stopped and name and not session.isClosed(name) and not session.isClosed(conn) then
                     print(`Error(Unhandled): {name}`)
                 end
                 server.stopped = true
@@ -373,9 +369,15 @@ local function startServer(
             server.clients[conn] = true
             task.spawn(function()
                 local call_ok, call_err = xpcall(function(): any
+                    local tls: CryptoTls? = nil
+                    if tls_auth then
+                        tls = crypto.tls.createServer({
+                            auth = tls_auth,
+                        })
+                    end
                     return listen(
                         conn,
-                        tls_auth,
+                        tls,
                         max_body_size,
                         client_timeout,
                         keep_alive_timeout,
@@ -407,7 +409,7 @@ end
 local server = {}
 
 function server.serve(opts: ServeOptions): Server
-    assert(type(opts) == "table", "expected opts to be a table")
+    assert((spec.table(opts)), "expected opts to be a table")
 
     local port = if opts.port == nil then 80 else opts.port
     local address = opts.address or "127.0.0.1"
@@ -420,26 +422,26 @@ function server.serve(opts: ServeOptions): Server
     local callback = opts.request
     local tls_auth = if opts.tls then opts.tls.auth else nil
 
-    assert(type(port) == "number", "expected port to be a number")
-    assert(type(address) == "string", "expected address to be a string")
-    assert(type(max_backlog) == "number", "expected max_backlog to be a number")
-    assert(type(max_body_size) == "number", "expected max_body_size to be a number")
-    assert(type(reuse_address) == "boolean", "expected reuse_address to be a boolean")
-    assert(type(client_timeout) == "number", "expected client_timeout to be a number")
-    assert(type(max_connections) == "number", "expected max_connections to be a number")
-    assert(type(keep_alive) == "table", "expected keep_alive to be a table")
-    assert(type(callback) == "function", "expected request to be a function")
-    if opts.tls ~= nil then
-        assert(type(opts.tls) == "table", "expected tls to be a table")
-        assert(tls_auth ~= nil, "expected tls.auth")
+    assert((spec.number(port)), "expected port to be a number")
+    assert((spec.string(address)), "expected address to be a string")
+    assert((spec.number(max_backlog)), "expected max_backlog to be a number")
+    assert((spec.number(max_body_size)), "expected max_body_size to be a number")
+    assert((spec.boolean(reuse_address)), "expected reuse_address to be a boolean")
+    assert((spec.number(client_timeout)), "expected client_timeout to be a number")
+    assert((spec.number(max_connections)), "expected max_connections to be a number")
+    assert((spec.table(keep_alive)), "expected keep_alive to be a table")
+    assert((spec.fn(callback)), "expected request to be a function")
+    if opts.tls then
+        assert((spec.table(opts.tls)), "expected tls to be a table")
+        assert(tls_auth, "expected tls.auth")
     end
 
     local handlers: websocket.ServerHandlers? = nil
-    if opts.websocket ~= nil then
-        assert(type(opts.websocket) == "table", "expected websocket to be a table")
+    if opts.websocket then
+        assert((spec.table(opts.websocket)), "expected websocket to be a table")
         local ws = opts.websocket
         local function check(value: any, name: string)
-            if value ~= nil and type(value) ~= "function" then
+            if value and not spec.fn(value) then
                 error(`expected websocket.{name} to be a function`, 0)
             end
         end
@@ -447,17 +449,17 @@ function server.serve(opts: ServeOptions): Server
         check(ws.open, "open")
         check(ws.message, "message")
         check(ws.close, "close")
-        if ws.upgrade ~= nil or ws.open ~= nil or ws.message ~= nil or ws.close ~= nil then
+        if ws.upgrade or ws.open or ws.message or ws.close then
             handlers = ws
         end
     end
 
     local keep_alive_timeout = keep_alive.timeout or 0
     local keep_alive_enabled = if keep_alive.enabled == nil then true else keep_alive.enabled
-    assert(type(keep_alive_timeout) == "number", "expected keep_alive.timeout to be a number")
-    assert(type(keep_alive_enabled) == "boolean", "expected keep_alive.enabled to be a boolean")
+    assert((spec.number(keep_alive_timeout)), "expected keep_alive.timeout to be a number")
+    assert((spec.boolean(keep_alive_enabled)), "expected keep_alive.enabled to be a boolean")
 
-    local domain: "ipv4" | "ipv6" = if string.find(address, ":", 1, true) then "ipv6" else "ipv4"
+    local domain: "ipv4" | "ipv6" = if mem.findScalar(address, 58) then "ipv6" else "ipv4" -- ':'
     local socket = net.openSocket(domain, "stream", "tcp")
     if reuse_address then
         socket:setReuseAddress(true)

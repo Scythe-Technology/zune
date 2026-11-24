@@ -1,7 +1,7 @@
-local task = zune.task;
+local task = zune.task
 
-task.wait(1);
+task.wait(1)
 
-error("This is an error in async require");
+error("This is an error in async require")
 
-return true;
+return true

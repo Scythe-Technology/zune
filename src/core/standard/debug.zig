@@ -39,3 +39,18 @@ pub fn lua_dumpStacktrace(L: *VM.lua.State) !i32 {
 
     return 1;
 }
+
+pub fn lua_source(L: *VM.lua.State) !i32 {
+    const level = try L.Zcheckvalue(?i32, 1, null) orelse 1;
+    if (level < 0)
+        return L.Zerror("invalid stack level");
+
+    var ar: VM.lua.Debug = .{ .ssbuf = undefined };
+    if (!L.getinfo(level, "s", &ar))
+        return 0;
+    const source = ar.source orelse return 0;
+    if (source.len < 2 or source[0] != '@')
+        return 0;
+    try L.pushlstring(source[1..]);
+    return 1;
+}

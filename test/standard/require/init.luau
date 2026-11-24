@@ -48,7 +48,9 @@ describe("require", function()
         expect(function()
             zune.require.navigate("@zune/fs", this_path, 0)
         end).toThrow("@zune is not a valid alias")
-        expect(zune.require.navigate("@self/module/foo", this_path, 0)).toBe(`test{_7}standard{_7}require{_7}module{_7}foo`)
+        expect(zune.require.navigate("@self/module/foo", this_path, 0)).toBe(
+            `test{_7}standard{_7}require{_7}module{_7}foo`
+        )
     end)
     test("forced config", function()
         local path = zune.require.navigate("@test/foo", this_path, RelativeAlias)

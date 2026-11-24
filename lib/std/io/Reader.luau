@@ -70,7 +70,7 @@ local function grow(current: number, minimum: number): number
 end
 
 function Reader.readRemainingAlloc(self: Reader, limit: number?): buffer
-    if limit ~= nil and (limit <= 0 or limit > mem.MAX_SIZE) then
+    if limit and (limit <= 0 or limit > mem.MAX_SIZE) then
         error("invalid limit", 2)
     end
     local lim = limit or mem.MAX_SIZE
@@ -156,7 +156,7 @@ function Reader.pipe(self: Reader, writer: Writer.Writer, limit: number?): (numb
     local moved = 0
     local cap = math.min(65536, limit or 65536)
     local buf = buffer.create(cap)
-    while limit == nil or moved < limit do
+    while not limit or moved < limit do
         local want = if limit then math.min(cap, limit - moved) else cap
         local bytes, err = self:read(buf, 0, want)
         if err then
@@ -165,7 +165,10 @@ function Reader.pipe(self: Reader, writer: Writer.Writer, limit: number?): (numb
         if bytes == 0 then
             break
         end
-        writer:writeAll(buf, 0, bytes)
+        local failed = writer:writeAll(buf, 0, bytes)
+        if failed then
+            return moved, failed
+        end
         moved += bytes
     end
     return moved, nil

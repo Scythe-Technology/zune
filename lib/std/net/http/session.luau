@@ -2,15 +2,16 @@
 --!optimize 2
 
 local net = zune.net
+local mem = zune.mem
 local task = zune.task
 local crypto = zune.crypto
-local mem = zune.mem
+
+local uri = require("@zune/net/uri")
+local spec = require("@zune/spec")
 
 local PLAIN_RECORD = 8192
--- `_RUNTIME.version.display` already appends the Luau version. The token
--- callers compare is the zune version alone.
-local version_token = string.match(_VERSION, "^zune%s+([^%+]+)") or "0.0.0"
-local USER_AGENT = `zune/{version_token}`
+
+local USER_AGENT = `zune/{_RUNTIME.version.display}`
 
 local CLOSED_ERRORS: { [string]: boolean } = {
     ["socket closed"] = true,
@@ -72,12 +73,8 @@ local session = {}
 
 session.user_agent = USER_AGENT
 
-local function isClosedError(err: any): boolean
-    return type(err) == "string" and CLOSED_ERRORS[err] == true
-end
-
 function session.isClosed(err: any): boolean
-    return isClosedError(err)
+    return spec.string(err) and CLOSED_ERRORS[err :: string] == true
 end
 
 local function remaining(gate: Gate): number?
@@ -85,7 +82,7 @@ local function remaining(gate: Gate): number?
         error("timed out", 0)
     end
     local deadline = gate.deadline
-    if deadline == nil then
+    if not deadline then
         return nil
     end
     local left = deadline - os.clock()
@@ -96,111 +93,33 @@ local function remaining(gate: Gate): number?
     return left
 end
 
-local function parseUrl(raw: string): ParsedUrl
-    if type(raw) ~= "string" or raw == "" then
+function session.parseUrl(raw: string): ParsedUrl
+    local parsed = uri.parse(raw)
+    local scheme = parsed.scheme
+    local tls = scheme == "https" or scheme == "wss"
+    if scheme ~= "http" and scheme ~= "https" and scheme ~= "ws" and scheme ~= "wss" then
         error("unsupported URI scheme", 0)
     end
-    local scheme, rest = string.match(raw, "^([%a][%w+.-]*)://(.*)$")
-    if scheme == nil or rest == nil then
-        error("unsupported URI scheme", 0)
-    end
-    scheme = string.lower(scheme)
-    local tls = false
-    local default_port = 80
-    if scheme == "https" or scheme == "wss" then
-        tls = true
-        default_port = 443
-    elseif scheme == "http" or scheme == "ws" then
-        default_port = 80
-    else
-        error("unsupported URI scheme", 0)
-    end
-
-    local hash = string.find(rest, "#", 1, true)
-    if hash then
-        rest = string.sub(rest, 1, hash - 1)
-    end
-
-    local authority: string
-    local target: string
-    local slash = string.find(rest, "/", 1, true)
-    if slash then
-        authority = string.sub(rest, 1, slash - 1)
-        target = string.sub(rest, slash)
-    else
-        local query = string.find(rest, "?", 1, true)
-        if query then
-            authority = string.sub(rest, 1, query - 1)
-            target = "/" .. string.sub(rest, query)
-        else
-            authority = rest
-            target = "/"
-        end
-    end
-    if authority == "" then
+    local host = parsed.host
+    if host == nil or host == "" then
         error("URI missing host", 0)
     end
-
-    local at = string.find(authority, "@", 1, true)
-    if at then
-        authority = string.sub(authority, at + 1)
-        if authority == "" then
-            error("URI missing host", 0)
-        end
+    local port = parsed.port or (if tls then 443 else 80)
+    local target = parsed.path
+    if target == "" then
+        target = "/"
     end
-
-    local host: string
-    local port: number? = nil
-    if mem.startsWith(authority, "[") then
-        local end_bracket = string.find(authority, "]", 1, true)
-        if end_bracket == nil then
-            error("URI missing host", 0)
-        end
-        host = string.sub(authority, 2, end_bracket - 1)
-        local tail = string.sub(authority, end_bracket + 1)
-        if tail ~= "" then
-            local digits = string.match(tail, "^:(%d+)$")
-            if digits == nil then
-                error("URI missing host", 0)
-            end
-            port = tonumber(digits)
-        end
-    else
-        local name, digits = string.match(authority, "^(.-):(%d+)$")
-        if name ~= nil and digits ~= nil and string.find(name, ":", 1, true) == nil then
-            host = name
-            port = tonumber(digits)
-        else
-            if string.find(authority, ":", 1, true) ~= nil then
-                error("URI missing host", 0)
-            end
-            host = authority
-        end
-    end
-    if host == "" then
-        error("URI missing host", 0)
-    end
-    if port == nil then
-        port = default_port
-    end
-    assert(port)
-    if port < 0 or port > 65535 then
-        error(`invalid port ({port})`, 0)
+    local query = parsed.query
+    if query ~= nil then
+        target = `{target}?{query}`
     end
     return {
         scheme = scheme,
         tls = tls,
         host = host,
-        port = port :: number,
+        port = port,
         target = target,
     }
-end
-
-local function byteCount(message: string | buffer): number
-    if type(message) == "buffer" then
-        return buffer.len(message)
-    end
-    return #message
 end
 
 local function socketRecv(self: Connection, dest: buffer, offset: number, count: number, timeout: number?): number
@@ -208,18 +127,18 @@ local function socketRecv(self: Connection, dest: buffer, offset: number, count:
         return 0
     end
     local limit = timeout
-    if limit == nil then
+    if not limit then
         limit = remaining(self.gate)
     end
     local amount, err = self.socket:recv(dest, offset, count, limit)
-    if err ~= nil then
+    if err then
         if self.gate.timed_out or err == "Timeout" then
-            if timeout == nil then
+            if not timeout then
                 self.gate.timed_out = true
             end
             error("timed out", 0)
         end
-        if isClosedError(err) then
+        if session.isClosed(err) then
             return 0
         end
         error(err, 0)
@@ -235,7 +154,7 @@ local function sendAll(self: Connection, src: string | buffer, count: number)
         end
         local timeout = remaining(self.gate)
         local amount, err = self.socket:send(src, written, count - written, timeout)
-        if err ~= nil then
+        if err then
             if self.gate.timed_out or err == "Timeout" then
                 self.gate.timed_out = true
                 error("timed out", 0)
@@ -257,7 +176,7 @@ end
 
 local function writePlain(self: Connection, message: string | buffer)
     local tls = self.tls
-    local total = byteCount(message)
+    local total = if spec.buffer(message) then buffer.len(message :: buffer) else #(message :: string)
     if not tls then
         sendAll(self, message, total)
         return
@@ -429,9 +348,7 @@ local function readChunk(self: Connection, dest: buffer, dest_offset: number, co
 end
 
 local function connectOne(gate: Gate, host: string, port: number): Socket
-    local ok, list: { NetworkAddress } = pcall(function()
-        return net.getAddressList(host, port)
-    end)
+    local ok, list: { NetworkAddress } = pcall(net.getAddressList, host, port)
     if not ok then
         error(list :: any, 0)
     end
@@ -443,7 +360,7 @@ local function connectOne(gate: Gate, host: string, port: number): Socket
         if gate.timed_out then
             error("timed out", 0)
         end
-        local domain: "ipv4" | "ipv6" = if string.find(addr.address, ":", 1, true) ~= nil then "ipv6" else "ipv4"
+        local domain: "ipv4" | "ipv6" = if mem.findScalar(addr.address, 58) then "ipv6" else "ipv4" -- ':'
         local sock = net.openSocket(domain, "stream", "tcp")
         gate.socket = sock
         local connected, err = pcall(function()
@@ -477,7 +394,7 @@ local function closeConn(self: Connection)
     end
     local sock = self.gate.socket
     self.gate.socket = nil
-    if sock ~= nil and sock.open then
+    if sock and sock.open then
         pcall(function()
             sock:close()
         end)
@@ -521,27 +438,32 @@ local function newConnection(sock: Socket, tls: CryptoTls?, gate: Gate): Connect
     return self
 end
 
-function session.parseUrl(raw: string): ParsedUrl
-    return parseUrl(raw)
-end
-
 function session.open(parsed: ParsedUrl, timeout_seconds: number?, tls_opts: TlsOptions?): Session
     local sni = parsed.host
     local ca: TlsCertBundle? = nil
-    if tls_opts ~= nil then
-        if tls_opts.host ~= nil then
+    if tls_opts then
+        if tls_opts.host then
             sni = tls_opts.host
         end
         ca = tls_opts.ca
     end
 
+    local tls: CryptoTls? = nil
+    if parsed.tls or tls_opts then
+        local bundle = ca or crypto.tls.bundleFromSystem()
+        tls = crypto.tls.createClient({
+            host = sni,
+            ca = bundle,
+        })
+    end
+
     local gate: Gate = {
         timed_out = false,
         socket = nil,
-        deadline = if timeout_seconds ~= nil then os.clock() + timeout_seconds else nil,
+        deadline = if timeout_seconds then os.clock() + timeout_seconds else nil,
     }
     local watchdog: thread? = nil
-    if timeout_seconds ~= nil then
+    if timeout_seconds then
         watchdog = task.delay(timeout_seconds, function()
             gate.timed_out = true
             local sock = gate.socket
@@ -555,14 +477,6 @@ function session.open(parsed: ParsedUrl, timeout_seconds: number?, tls_opts: Tls
 
     local ok, result = pcall(function(): Connection
         local sock = connectOne(gate, parsed.host, parsed.port)
-        local tls: CryptoTls? = nil
-        if parsed.tls or tls_opts ~= nil then
-            local bundle = ca or crypto.tls.bundleFromSystem()
-            tls = crypto.tls.createClient(sock, {
-                host = sni,
-                ca = bundle,
-            })
-        end
         local conn = newConnection(sock, tls, gate)
 
         handshake(conn, false)
@@ -577,7 +491,7 @@ function session.open(parsed: ParsedUrl, timeout_seconds: number?, tls_opts: Tls
         end
         local sock = gate.socket
         gate.socket = nil
-        if sock ~= nil and sock.open then
+        if sock and sock.open then
             pcall(function()
                 sock:close()
             end)

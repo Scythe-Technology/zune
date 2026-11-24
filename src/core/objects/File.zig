@@ -797,6 +797,10 @@ pub fn __dtor(L: *VM.lua.State, self: *File) void {
     }
 }
 
+pub fn to(L: *VM.lua.State, idx: i32) ?*File {
+    return L.touserdatatagged(File, idx, OBJECT_TAG);
+}
+
 pub fn create(L: *VM.lua.State, file: std.Io.File, kind: Kind, mode: OpenMode) !*File {
     const self = try L.newuserdatataggedwithmetatable(File, OBJECT_TAG);
     self.* = .{

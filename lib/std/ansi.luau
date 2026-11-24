@@ -1,25 +1,27 @@
 --!strict
 --!optimize 2
 
+local spec = require("@zune/spec")
+
+local byte = spec.union(spec.minInteger(0), spec.maxInteger(255))
+
+local codeByteSpec = spec.params(spec.label("Code", byte))
 local function color256Fn(set: number): (code: number) -> string
     return function(code: number): string
-        if code < 0 or code > 255 then
-            error("Code must be between 0 to 255", 2)
+        local pass, reason = codeByteSpec(code)
+        if not pass then
+            error(reason, 2)
         end
         return string.format(`\x1b[{set};5;%dm`, code)
     end
 end
 
+local rgbByteSpec = spec.params(spec.label("R", byte), spec.label("G", byte), spec.label("B", byte))
 local function trueColorFn(set: number): (r: number, g: number, b: number) -> string
     return function(r: number, g: number, b: number): string
-        if r < 0 or r > 255 then
-            error("R must be between 0 to 255", 2)
-        end
-        if g < 0 or g > 255 then
-            error("G must be between 0 to 255", 2)
-        end
-        if b < 0 or b > 255 then
-            error("B must be between 0 to 255", 2)
+        local pass, reason = rgbByteSpec(r, g, b)
+        if not pass then
+            error(reason, 2)
         end
         return string.format(`\x1b[{set};2;%d;%d;%dm`, r, g, b)
     end

@@ -9,6 +9,10 @@ pub const CType = @import("CType.zig");
 pub const DynamicLibrary = @import("DynamicLibrary.zig");
 
 pub const CryptoHasher = @import("CryptoHasher.zig");
+
+pub const DeflateStream = @import("DeflateStream.zig");
+pub const InflateStream = @import("InflateStream.zig");
+
 pub const CryptoTls = @import("CryptoTls.zig");
 pub const CryptoTlsCertBundle = @import("CryptoTlsCertBundle.zig");
 pub const CryptoTlsCertKeyPair = @import("CryptoTlsCertKeyPair.zig");

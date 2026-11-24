@@ -77,25 +77,34 @@ pub fn lua_createBufferArray(L: *VM.lua.State) !i32 {
 
     const Options = struct {
         limit: u53 = std.math.maxInt(u53),
+        with: ?[]const u8 = null,
         size: u64 = 0,
     };
 
-    const opts: Options = try L.Zcheckvalue(?Options, 1, null) orelse .{};
+    var opts: Options = try L.Zcheckvalue(?Options, 1, null) orelse .{};
 
     if (opts.size > opts.limit)
         return L.Zerror("size cannot be larger than limit");
 
+    if (opts.with) |buf| {
+        if (buf.len > opts.limit)
+            return L.Zerror("buffer length cannot be larger than limit");
+        if (opts.size != 0 and opts.size != buf.len)
+            return L.Zerror("size does not match length of 'with' buffer");
+        opts.size = buf.len;
+    }
+
     const self = try L.newuserdatataggedwithmetatable(BufferArray, BufferArray.OBJECT_TAG);
 
-    const ref_table: Scripting.ReferenceTable = try .init(L, true);
+    var array_list: std.ArrayList(u8) = if (opts.size > 0) try .initCapacity(allocator, opts.size) else .empty;
 
-    const array_list: std.ArrayList(u8) = if (opts.size > 0) try .initCapacity(allocator, opts.size) else .empty;
+    if (opts.with) |buf|
+        try array_list.appendSlice(allocator, buf);
 
     self.* = .{
         .alloc = allocator,
         .buf = array_list,
         .limit = opts.limit,
-        .ref_table = ref_table,
     };
 
     return 1;

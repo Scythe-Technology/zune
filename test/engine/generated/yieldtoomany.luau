@@ -1,5 +1,5 @@
-local task = zune.task;
+local task = zune.task
 
-task.wait(1);
+task.wait(1)
 
-return "Hello, World!", "String 2";
+return "Hello, World!", "String 2"

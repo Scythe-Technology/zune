@@ -10,7 +10,7 @@ const LuauCommandMap = std.hash_map.StringHashMapUnmanaged(LuauCommandEntry);
 const LuauCommandEntry = struct {
     content: []const u8,
 
-    pub const DESCRIPTION_TAG = "--- @description ";
+    pub const DESCRIPTION_TAG = "--- @description";
     pub const EXAMPLE_TAG = "--- @example ";
 
     pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
@@ -121,8 +121,11 @@ fn Execute(allocator: std.mem.Allocator, args: []const []const u8) !void {
                     if (std.mem.indexOf(u8, content[i..], LuauCommandEntry.DESCRIPTION_TAG)) |desc_start| {
                         const desc_src = content[i + desc_start + LuauCommandEntry.DESCRIPTION_TAG.len ..];
                         const next_line_start = std.mem.indexOfScalar(u8, desc_src, '\n') orelse desc_src.len;
-                        const desc_line = desc_src[0..next_line_start];
-                        Zune.debug.print("{s}\n", .{desc_line});
+                        var desc_line = desc_src[0..next_line_start];
+                        if (desc_line.len > 0) {
+                            if (desc_line[0] == ' ')
+                                Zune.debug.print("{s}\n", .{desc_line[1..]});
+                        } else Zune.debug.print("\n", .{});
                         i += desc_start + LuauCommandEntry.DESCRIPTION_TAG.len + next_line_start;
                     } else break;
                 }

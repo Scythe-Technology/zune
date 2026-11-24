@@ -205,7 +205,8 @@ pub const Features = packed struct(u32) {
     net: bool = true,
     time: bool = true,
     thread: bool = true,
-    _: u10 = 0,
+    hash: bool = true,
+    _: u9 = 0,
 
     pub fn write(writer: anytype, features: Features) !void {
         try writer.writeInt(u32, @bitCast(features), .big);
@@ -230,19 +231,20 @@ pub const PackedState = packed struct(u40) {
     mode: Mode,
     luau: Luau,
     format: Format,
-    _: u3 = 0, // reserved bits
+    _: u2 = 0, // reserved bits
 
     pub const Mode = packed struct(u2) {
         compiled: enum(u1) { debug, release },
         limbo: bool = false,
     };
 
-    const Format = packed struct(u29) {
+    const Format = packed struct(u30) {
         enabled: bool = true,
         indent: u2 = @backingInt(Zune.Resolvers.Fmt.Indent.FourSpaces),
         use_color: bool = true,
         table_address: bool = true,
         recursive_table: bool = false,
+        sorted: bool = false,
         max_depth: u8 = 4,
         buffer_max_display: u15 = 48,
     };
@@ -422,6 +424,7 @@ fn applyPacked(state: PackedState, features: Features) void {
     Zune.State.options.format.use_color = state.format.use_color;
     Zune.State.options.format.table_address = state.format.table_address;
     Zune.State.options.format.recursive_table = state.format.recursive_table;
+    Zune.State.options.format.sorted = state.format.sorted;
     Zune.State.options.format.max_depth = state.format.max_depth;
     Zune.State.options.format.buffer_max_display = state.format.buffer_max_display;
 

@@ -5,6 +5,11 @@ local process = zune.process
 
 local fs = require("@zune/fs")
 local io = require("@zune/io")
+local tui = require("@zune/tui")
+local pkg = require("@zune/package")
+local runtime = require("@zune/runtime")
+
+local ansi = require("@zune/ansi").auto()
 
 local CONFIG = [[
 # Zune Configuration
@@ -28,6 +33,7 @@ max_depth = 4
 use_color = true
 table_address = true
 recursive_table = false
+sorted = false
 buffer_max_display = 48
 
 # FFlag settings for Luau
@@ -61,6 +67,7 @@ buffer_max_display = 48
 #net = true
 #time = true
 #thread = true
+#hash = true
 ]]
 
 local MODULE = [[local io = zune.io
@@ -135,70 +142,81 @@ local function writeNew(cwd: Dir, path: string, contents: string): boolean
         error(tostring(file), 0)
     end
 
-    local writer = io.createWriter(file, { positional = true })
+    local writer = io.createPosWriter(file)
+
     writer:writeAll(contents)
 
     file:close()
 
+    print(`init created file: {path}`)
+
     return true
 end
 
-local cwd = io.cwd()
+local function main()
+    local cwd = io.cwd()
 
-if not writeNew(cwd, "zune.toml", CONFIG) then
-    print("zune configuration file, 'zune.toml' already exists.")
-    return
-end
+    local root = fs.realPathAlloc(cwd)
 
-local std_path: string? = nil
-local exe_dir = fs.path.dirname(process.getExePath())
-if exe_dir then
-    local ok, dir = pcall(function()
-        return cwd:openDir(exe_dir)
-    end)
-    if ok then
-        if fs.statFile(dir, fs.path.join("lib", "std")).kind == "directory" then
-            std_path = fs.path.join(exe_dir, "lib", "std")
-        end
-        dir:close()
+    local wrote_package = false
+    local loaded = nil
+
+    local std_path = runtime.getStd()
+
+    if not std_path then
+        local exe_dir = fs.path.dirname(process.getExePath())
+        print(`{ansi.yellow}Could not find the standard library. Some features may not work correctly.`)
+        print(`  Reinstall the standard library ({exe_dir}){ansi.reset}`)
+        print()
     end
-end
 
-if std_path then
-    local escaped = (string.gsub(std_path, "\\", "\\\\"))
-    escaped = (string.gsub(escaped, '"', '\\"'))
-    writeNew(
-        cwd,
-        ".config.luau",
-        table.concat({
-            "return {",
-            "    luau = {",
-            "        aliases = {",
-            `            zune = "{escaped}",`,
-            "        },",
-            "    },",
-            "}",
-            "",
-        }, "\n")
-    )
-end
-
-local kind = process.args[2]
-if kind == "bare" then
-    return
-end
-
-cwd:createDirPath("src")
-
-if kind == "module" then
-    cwd:createDirPath("tests")
-    writeNew(cwd, "src/init.luau", if std_path then MODULE_IO else MODULE)
     if std_path then
-        writeNew(cwd, "tests/init.luau", TEST)
-    else
-        writeNew(cwd, "tests/init.luau", "-- could not create demo test file, missing library.\n")
+        if fs.stat("package.luau").kind ~= "file" then
+            if fs.stat(".config.luau").kind == "file" then
+                local allow = tui.ask("aliases in .config.luau would be managed by the package", { "Y", "n" })
+                if allow == "Y" then
+                    print("loading .config.luau and writing bare package...")
+                    loaded = pkg.loadConfig(fs.path.join(root, ".config.luau"))
+                    wrote_package = pkg.writeBare(root, loaded)
+                    print("init created file: package.luau")
+                end
+            else
+                wrote_package = pkg.writeBare(root)
+                print("init created file: package.luau")
+            end
+        end
+
+        if wrote_package and fs.stat(".zune").kind == "none" then
+            pkg.seedConfig(root, loaded)
+        end
     end
-    return
+
+    if not writeNew(cwd, "zune.toml", CONFIG) then
+        print("zune configuration file, 'zune.toml' already exists.")
+        print("skipping template creation.")
+        return
+    end
+
+    local kind = process.args[2]
+    if kind == "bare" then
+        return
+    end
+
+    cwd:createDirPath("src")
+
+    if kind == "module" then
+        cwd:createDirPath("tests")
+        writeNew(cwd, "src/init.luau", if std_path then MODULE_IO else MODULE)
+        if std_path then
+            writeNew(cwd, "tests/init.luau", TEST)
+        else
+            writeNew(cwd, "tests/init.luau", "-- could not create demo test file, missing library.\n")
+        end
+        return
+    end
+
+    writeNew(cwd, "src/main.luau", if std_path then MAIN_IO else MAIN)
 end
 
-writeNew(cwd, "src/main.luau", if std_path then MAIN_IO else MAIN)
+main()
+print("init complete!")

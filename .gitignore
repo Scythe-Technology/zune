@@ -6,8 +6,6 @@ zig-pkg/
 # macOs Directory
 **/.DS_Store
 
-**/**.luac
-**/**.luauc
 **/**.gz
 
 test/engine/generated/.*

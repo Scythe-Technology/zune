@@ -1,3 +1,3 @@
 return function()
-    return require("./v1");
+    return require("./v1")
 end

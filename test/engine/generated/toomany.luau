@@ -1,1 +1,1 @@
-return "Hello, World!", "String 2";
+return "Hello, World!", "String 2"

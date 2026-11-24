@@ -5,6 +5,7 @@ const Zune = @import("zune");
 
 const Scripting = Zune.Runtime.Scripting;
 
+pub const lua_luau = @import("luau.zig");
 pub const lua_toml = @import("toml.zig");
 pub const lua_yaml = @import("yaml.zig");
 pub const lua_base64 = @import("base64.zig");
@@ -36,6 +37,7 @@ pub const lua_json5 = struct {
 
 test {
     _ = json;
+    _ = lua_luau;
     _ = lua_toml;
     _ = lua_yaml;
     _ = lua_base64;

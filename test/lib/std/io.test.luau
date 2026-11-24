@@ -34,7 +34,7 @@ describe("writer", function()
 
     test("positional writer does not move the cursor", function()
         local array = zune.io.createBufferArray({ limit = 32 })
-        local writer = io.createWriter(array, { positional = true })
+        local writer = io.createPosWriter(array)
 
         expect(writer:writeAll("hello")).toBeNil()
         expect(writer:writeAll("!")).toBeNil()
@@ -83,7 +83,7 @@ describe("reader", function()
         local array = zune.io.createBufferArray({ limit = 32 })
         expect(array:write("hello")).toBe(5)
 
-        local reader = io.createReader(array, { positional = true })
+        local reader = io.createPosReader(array)
         local dest = buffer.create(5)
         local n, err = reader:read(dest)
 
@@ -97,7 +97,7 @@ describe("reader", function()
         local array = zune.io.createBufferArray({ limit = 32 })
         expect(array:append("hi")).toBe(2)
 
-        local reader = io.createReader(array, { positional = true })
+        local reader = io.createPosReader(array)
         local dest = buffer.create(4)
 
         expect(function()
@@ -109,7 +109,7 @@ describe("reader", function()
         local array = zune.io.createBufferArray({ limit = 8 })
         expect(array:append("ab")).toBe(2)
 
-        local reader = io.createReader(array, { positional = true })
+        local reader = io.createPosReader(array)
         reader.offset = 3
 
         expect(function()
@@ -121,6 +121,28 @@ describe("reader", function()
         expect(function()
             io.createReader({})
         end).toThrow("must have a read method")
+    end)
+
+    test("pipe copies up to a limit", function()
+        local src = zune.io.createBufferArray({ limit = 32 })
+        expect(src:append("hello")).toBe(5)
+        local dest = zune.io.createBufferArray({ limit = 32 })
+        local moved, err = io.createPosReader(src):pipe(io.createPosWriter(dest), 3)
+
+        expect(err).toBeNil()
+        expect(moved).toBe(3)
+        expect(contents(dest)).toBe("hel")
+    end)
+
+    test("pipe returns a write error", function()
+        local src = zune.io.createBufferArray({ limit = 32 })
+        expect(src:append("hello")).toBe(5)
+        local dest = zune.io.createBufferArray({ limit = 3 })
+        local moved, err = io.createPosReader(src):pipe(io.createPosWriter(dest), 5)
+
+        expect(err).toBe("limit exceeded")
+        expect(moved).toBe(0)
+        expect(dest.len).toBe(0)
     end)
 end)
 
@@ -135,11 +157,11 @@ describe("file", function()
             truncate = true,
             nonblocking = true,
         })
-        local writer = io.createWriter(file, { positional = true })
+        local writer = io.createPosWriter(file)
 
         expect(writer:writeAll("hello")).toBeNil()
 
-        local reader = io.createReader(file, { positional = true })
+        local reader = io.createPosReader(file)
         local dest = buffer.create(8)
         local n, err = reader:read(dest, 0, 5)
 

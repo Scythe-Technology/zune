@@ -17,6 +17,9 @@ expect(serde.json5).toBe(expect.similar({
     null = expect.type("table"),
 }))
 expect(serde.json5.null).toBe(serde.json.null)
+expect(serde.luau).toBe(expect.similar({
+    encode = expect.type("function"),
+}))
 expect(serde.toml).toBe(expect.similar({
     encode = expect.type("function"),
     decode = expect.type("function"),
@@ -34,16 +37,22 @@ expect(serde.gzip).toBe(expect.similar({
     calcSize = expect.type("function"),
     compress = expect.type("function"),
     decompress = expect.type("function"),
+    createCompressor = expect.type("function"),
+    createDecompressor = expect.type("function"),
 }))
 expect(serde.zlib).toBe(expect.similar({
     calcSize = expect.type("function"),
     compress = expect.type("function"),
     decompress = expect.type("function"),
+    createCompressor = expect.type("function"),
+    createDecompressor = expect.type("function"),
 }))
 expect(serde.flate).toBe(expect.similar({
     calcSize = expect.type("function"),
     compress = expect.type("function"),
     decompress = expect.type("function"),
+    createCompressor = expect.type("function"),
+    createDecompressor = expect.type("function"),
 }))
 expect(serde.lz4).toBe(expect.similar({
     calcSize = expect.type("function"),
@@ -61,6 +70,7 @@ expect(serde.zstd).toBe(expect.similar({
 
 require("@self/json.test")
 require("@self/json5.test")
+require("@self/luau.test")
 require("@self/toml.test")
 require("@self/yaml.test")
 require("@self/base64.test")

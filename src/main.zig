@@ -137,6 +137,7 @@ pub const ZuneState = struct {
                 net: bool = true,
                 time: bool = true,
                 thread: bool = true,
+                hash: bool = true,
             };
 
             pub const Luau = struct {
@@ -169,6 +170,7 @@ pub const ZuneState = struct {
             use_color: bool = true,
             table_address: bool = true,
             recursive_table: bool = false,
+            sorted: bool = false,
             buffer_max_display: u15 = 48,
         };
     };
@@ -354,7 +356,7 @@ pub fn openZune(L: *VM.lua.State, flags: Flags) !void {
     try L.Zsetglobal("_RUNTIME", .{
         .name = "zune",
         .version = .{
-            .display = std.fmt.comptimePrint("{s}", .{VERSION_FULL_STR}),
+            .display = VERSION_STR,
             .semantic = .{
                 .major = info.version.major,
                 .minor = info.version.minor,

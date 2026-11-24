@@ -66,15 +66,14 @@ local function loadHistory(path: string)
         error(tostring(file), 0)
     end
 
-    local reader = io.createReader(file, { positional = true })
+    local reader = io.createPosReader(file)
     local text = buffer.tostring(reader:readRemainingAlloc())
     file:close()
 
-    local start = 1
-    while start <= #text do
-        local new_line = string.find(text, "\n", start, true)
-        local stop = if new_line then new_line - 1 else #text
-        local entry = text:sub(start, stop)
+    local start = 0
+    while start < #text do
+        local new_line = mem.findScalarPos(text, start, 10) -- '\n'
+        local entry = text:sub(start + 1, if new_line then new_line else #text)
         if not string.match(entry, "^[ \r]*$") then
             table.insert(history, entry)
         end
@@ -102,8 +101,7 @@ local function saveHistory()
         truncate = false,
         nonblocking = true,
     })
-    local writer = io.createWriter(file, { positional = true })
-    writer.offset = file:size()
+    local writer = io.createPosWriter(file)
     if #history > 0 then
         writer:writeAll(table.concat(history, "\n"))
         writer:writeAll("\n")
@@ -117,16 +115,7 @@ local function finish()
     end
     finished = true
     pcall(saveHistory)
-    pcall(function()
-        io.terminal.restoreMode()
-    end)
-end
-
-local function show(kind: string, message: string)
-    out:writeAll(`{ansi.paint(ansi.red, kind)} {message}`)
-    if string.sub(message, -1) ~= "\n" then
-        out:writeAll("\n")
-    end
+    pcall(io.terminal.restoreMode)
 end
 
 local function resumeRaw()
@@ -165,28 +154,28 @@ end
 
 local function run(source: string)
     io.terminal.restoreMode()
-    local compiled, bytecode = pcall(function()
-        return zune.luau.compile(source)
-    end)
+    local compiled, bytecode = pcall(zune.luau.compile, source, nil)
     if not compiled then
-        show("syntax", tostring(bytecode))
+        out:writeAll(`{ansi.paint(ansi.red, "syntax")} {tostring(bytecode)}\n`)
         resumeRaw()
         return
     end
-    local loaded, fn = pcall(function()
-        return zune.luau.load(bytecode, {
+    local loaded, fn = pcall(
+        zune.luau.load,
+        bytecode,
+        {
             chunk_name = "REPL",
             env = env,
-        })
-    end)
-    if not loaded or type(fn) ~= "function" then
-        show("syntax", tostring(fn))
+        } :: any
+    )
+    if not loaded then
+        out:writeAll(`{ansi.paint(ansi.red, "syntax")} {tostring(fn)}\n`)
         resumeRaw()
         return
     end
     local packed = table.pack(pcall(call, fn))
     if not packed[1] then
-        show("error", tostring(packed[2]))
+        out:writeAll(`{ansi.paint(ansi.red, "error")} {tostring(packed[2])}\n`)
     elseif packed.n > 1 then
         local values = {}
         for index = 2, packed.n do
@@ -259,7 +248,7 @@ process.onSignal("INT", interrupt)
 local function loop()
     while true do
         local byte = readByte()
-        if byte == nil then
+        if not byte then
             out:writeAll("\n")
             return
         end

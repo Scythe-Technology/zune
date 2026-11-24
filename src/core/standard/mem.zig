@@ -54,6 +54,28 @@ pub fn lua_slice(L: *VM.lua.State) !i32 {
     if (isOutOfBounds(offset, a.len, count orelse 0))
         return L.Zerror("access out of bounds");
 
+    const target = if (count) |n| a[offset .. n + offset] else a[offset..];
+
+    if (offset == 0) {
+        if (target.len == a.len and L.typeOf(1) == .Buffer) {
+            L.pushvalue(1);
+            return 1;
+        }
+    }
+
+    try L.Zpushbuffer(target);
+
+    return 1;
+}
+
+pub fn lua_sliceCopy(L: *VM.lua.State) !i32 {
+    const a = try Scripting.getReadable(L, 1);
+    const offset = try L.Zcheckvalue(u32, 2, null);
+    const count = try L.Zcheckvalue(?u32, 3, null);
+
+    if (isOutOfBounds(offset, a.len, count orelse 0))
+        return L.Zerror("access out of bounds");
+
     try L.Zpushbuffer(if (count) |n| a[offset .. n + offset] else a[offset..]);
 
     return 1;
@@ -66,8 +88,14 @@ pub fn lua_eqlSlice(L: *VM.lua.State) !i32 {
     const b_offset = try L.Zcheckvalue(u32, 4, null);
     const count = try L.Zcheckvalue(?u32, 5, null);
 
-    if (isOutOfBounds(a_offset, a.len, count orelse 0) or isOutOfBounds(b_offset, b.len, count orelse 0))
-        return L.Zerror("access out of bounds");
+    const a_out_of_bounds = isOutOfBounds(a_offset, a.len, count orelse 0);
+    const b_out_of_bounds = isOutOfBounds(b_offset, b.len, count orelse 0);
+    if (a_out_of_bounds or b_out_of_bounds) {
+        if (a_out_of_bounds and b_out_of_bounds)
+            return L.Zerror("access out of bounds");
+        L.pushboolean(false);
+        return 1;
+    }
 
     L.pushboolean(std.mem.eql(
         u8,

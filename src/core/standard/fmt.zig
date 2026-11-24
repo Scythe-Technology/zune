@@ -51,6 +51,11 @@ pub fn lua_setRecursiveTable(L: *VM.lua.State) i32 {
     return 0;
 }
 
+pub fn lua_setSorted(L: *VM.lua.State) i32 {
+    Zune.State.options.format.sorted = L.toboolean(1);
+    return 0;
+}
+
 pub fn lua_setBufferMaxDisplay(L: *VM.lua.State) !i32 {
     Zune.State.options.format.buffer_max_display = try L.Zcheckvalue(u15, 1, null);
     return 0;

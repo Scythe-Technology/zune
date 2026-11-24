@@ -1,12 +1,29 @@
 -- This file was auto-generated with "zune-docs"
 
 --[[ serde ]]
-export type SerdeJsonEncodeConfig = {
-    pretty_indent: number?, 
+export type SerdeEncodeConfig = {
+    pretty_indent: number?,
+    base_indent: number?,
+    sort: boolean?, 
 }
 export type SerdeJsonDecodeConfig = {
     preserve_null: boolean?, 
 }
+export type SerdeYamlEncodeConfig = {
+    base_indent: number?, 
+}
+declare extern type DeflateStream with
+    array: BufferArray
+    write: (self: DeflateStream, src: string | buffer, srcOffset: number?, count: number?) -> (number, string?)
+    finish: (self: DeflateStream) -> ()
+    reset: (self: DeflateStream) -> ()
+    swapArray: (self: DeflateStream, output: BufferArray) -> () 
+end
+declare extern type InflateStream with
+    array: BufferArray
+    read: (self: InflateStream, dest: buffer, destOffset: number?, count: number?) -> (number, string?)
+    finish: (self: InflateStream) -> () 
+end
 type YamlInput = string | number | boolean | {
     [string]: YamlInput
 }
@@ -14,7 +31,7 @@ type YamlOutput = string | {
     [string]: YamlOutput
 }
 export type _zune_serde_json = {
-    encode: (value: any, config: SerdeJsonEncodeConfig?) -> string,
+    encode: (value: any, config: SerdeEncodeConfig?) -> string,
     decode: (json: string, config: SerdeJsonDecodeConfig?) -> any,
     indents: {
         none: number,
@@ -22,12 +39,10 @@ export type _zune_serde_json = {
         four_spaces: number,
         tabs: number, 
     },
-    values: {
-        null: any, 
-    }
+    null: any, 
 }
 export type _zune_serde_json5 = {
-    encode: (value: any, config: SerdeJsonEncodeConfig?) -> string,
+    encode: (value: any, config: SerdeEncodeConfig?) -> string,
     decode: (json: string, config: SerdeJsonDecodeConfig?) -> any,
     indents: {
         none: number,
@@ -35,17 +50,18 @@ export type _zune_serde_json5 = {
         four_spaces: number,
         tabs: number, 
     },
-    values: {
-        null: any, 
-    }
+    null: any, 
 }
 export type _zune_serde_toml = {
     encode: (object: {[string]: any}) -> string,
     decode: (toml: string | buffer) -> {[string]: any}, 
 }
 export type _zune_serde_yaml = {
-    encode: (object: YamlInput) -> string,
+    encode: (object: YamlInput, config: SerdeYamlEncodeConfig?) -> string,
     decode: (yaml: string | buffer) -> YamlOutput, 
+}
+export type _zune_serde_luau = {
+    encode: (value: any, config: SerdeEncodeConfig?) -> string, 
 }
 export type _zune_serde_base64 = {
     calcSize: (len: number) -> number,
@@ -55,22 +71,30 @@ export type _zune_serde_base64 = {
 export type _zune_serde_gzip = {
     calcSize: (len: number) -> number,
     compress: (dest: buffer, destOffset: number, src: string | buffer, srcOffset: number, count: number?, level: number?) -> number,
-    decompress: (dest: buffer, destOffset: number, src: string | buffer, srcOffset: number, count: number?) -> number, 
+    decompress: (dest: buffer, destOffset: number, src: string | buffer, srcOffset: number, count: number?) -> number,
+    createCompressor: (output: BufferArray, level: number?) -> DeflateStream,
+    createDecompressor: (input: BufferArray) -> InflateStream, 
 }
 export type _zune_serde_flate = {
     calcSize: (len: number) -> number,
     compress: (dest: buffer, destOffset: number, src: string | buffer, srcOffset: number, count: number?, level: number?) -> number,
-    decompress: (dest: buffer, destOffset: number, src: string | buffer, srcOffset: number, count: number?) -> number, 
+    decompress: (dest: buffer, destOffset: number, src: string | buffer, srcOffset: number, count: number?) -> number,
+    createCompressor: (output: BufferArray, level: number?) -> DeflateStream,
+    createDecompressor: (input: BufferArray) -> InflateStream, 
 }
 export type _zune_serde_zlib = {
     calcSize: (len: number) -> number,
     compress: (dest: buffer, destOffset: number, src: string | buffer, srcOffset: number, count: number?, level: number?) -> number,
-    decompress: (dest: buffer, destOffset: number, src: string | buffer, srcOffset: number, count: number?) -> number, 
+    decompress: (dest: buffer, destOffset: number, src: string | buffer, srcOffset: number, count: number?) -> number,
+    createCompressor: (output: BufferArray, level: number?) -> DeflateStream,
+    createDecompressor: (input: BufferArray) -> InflateStream, 
 }
 export type _zune_serde_zstd = {
     calcSize: (len: number) -> number,
     compress: (dest: buffer, destOffset: number, src: string | buffer, srcOffset: number, count: number?, level: number?) -> number,
-    decompress: (dest: buffer, destOffset: number, src: string | buffer, srcOffset: number, count: number?) -> number, 
+    decompress: (dest: buffer, destOffset: number, src: string | buffer, srcOffset: number, count: number?) -> number,
+    createCompressor: (output: BufferArray, level: number?) -> DeflateStream,
+    createDecompressor: (input: BufferArray) -> InflateStream, 
 }
 export type _zune_serde_lz4 = {
     calcSize: (len: number) -> number,
@@ -85,6 +109,7 @@ export type _zune_serde = {
     json5: _zune_serde_json5,
     toml: _zune_serde_toml,
     yaml: _zune_serde_yaml,
+    luau: _zune_serde_luau,
     base64: _zune_serde_base64,
     gzip: _zune_serde_gzip,
     flate: _zune_serde_flate,
@@ -317,7 +342,8 @@ export type _zune_fs_path = {
     stem: (path: string) -> string,
     extension: (path: string) -> string,
     isAbsolute: (path: string) -> boolean,
-    globMatch: (path: string, pattern: string) -> boolean, 
+    globMatch: (path: string, pattern: string) -> boolean,
+    parse: (path: string) -> {disk: string?, [number]: string}
 }
 declare extern type FileWatcher with
     add: (self: FileWatcher, path: string, recursive: boolean?) -> ()
@@ -379,17 +405,13 @@ export type CryptoHashAlgorithms =
     | "blake2s160"
     | "blake2s224"
     | "blake2s256"
-type BcryptPasswordOptions = {
-    algorithm: "bcrypt"?,
-    cost: number?, 
-}
-type Argon2PasswordOptions = {
-    algorithm: ("argon2d" | "argon2i" | "argon2id")?,
+export type CryptoPasswordOptions = {
+    algorithm: ("bcrypt" | "argon2d" | "argon2i" | "argon2id")?,
+    cost: number?,
     time_cost: number?,
     memory_cost: number?,
     threads: number?, 
 }
-export type CryptoPasswordOptions = BcryptPasswordOptions | Argon2PasswordOptions
 type EncryptedData = {
     cipher: buffer,
     tag: buffer, 
@@ -531,8 +553,8 @@ export type _zune_crypto_tls = {
     bundleFromSystem: () -> TlsCertBundle,
     bundleFromFile: (file: string) -> TlsCertBundle,
     keyPairFromFile: (certFile: string, keyFile: string) -> TlsCertKeyPair,
-    createClient: (socket: Socket, opts: CreateTlsClientOptions) -> CryptoTls,
-    createServer: (socket: Socket, opts: CreateTlsServerOptions) -> CryptoTls, 
+    createClient: (opts: CreateTlsClientOptions) -> CryptoTls,
+    createServer: (opts: CreateTlsServerOptions) -> CryptoTls, 
 }
 export type CreateTlsServerOptions = {
     auth: TlsCertKeyPair, 
@@ -670,7 +692,18 @@ export type _zune_ascii = {
     findIgnoreCase: (slice: MemReadableSlice, needle: MemReadableSlice) -> number?,
     findIgnoreCasePos: (slice: MemReadableSlice, offset: number, needle: MemReadableSlice, count: number?) -> number?,
     lessThanIgnoreCase: (a: MemReadableSlice, b: MemReadableSlice) -> boolean,
-    lessThanIgnoreCaseSlice: (a: MemReadableSlice, aOffset: number, b: MemReadableSlice, bOffset: number, count: number?) -> boolean, 
+    lessThanIgnoreCaseSlice: (a: MemReadableSlice, aOffset: number, b: MemReadableSlice, bOffset: number, count: number?) -> boolean,
+    isAlphanumeric: (c: number) -> boolean,
+    isAlphabetic: (c: number) -> boolean,
+    isControl: (c: number) -> boolean,
+    isDigit: (c: number) -> boolean,
+    isWhitespace: (c: number) -> boolean,
+    isLower: (c: number) -> boolean,
+    isUpper: (c: number) -> boolean,
+    isHex: (c: number) -> boolean,
+    isAscii: (c: number) -> boolean,
+    toUpper: (c: number) -> number,
+    toLower: (c: number) -> number, 
 }
 --[[ regex ]]
 export type RegexMatch = {
@@ -834,6 +867,8 @@ export type PlatformOS =
     | "windows"
     | "macos"
     | "freebsd"
+    | "netbsd"
+    | "openbsd"
 export type _zune_platform_cpu = {
     arch: PlatformCPUArchitecture,
     endian: "big" | "little", 
@@ -882,7 +917,8 @@ export type _zune_platform = {
 }
 --[[ debug ]]
 export type _zune_debug = {
-    dumpStacktrace: (level: number, limit: number?) -> string, 
+    dumpStacktrace: (level: number, limit: number?) -> string,
+    source: (level: number?) -> string?, 
 }
 --[[ net ]]
 export type NetworkVec = {string | buffer | number}
@@ -908,7 +944,7 @@ declare extern type Socket with
     setReceiveBufferSize: (self: Socket, size: number) -> ()
     getSendBufferSize: (self: Socket) -> number
     getReceiveBufferSize: (self: Socket) -> number
-    shutdown: (self: Socket) -> ()
+    shutdown: (self: Socket, how: "send" | "receive" | "both") -> ()
     close: (self: Socket) -> ()
     address: (self: Socket) -> NetworkAddress 
 end
@@ -1040,6 +1076,16 @@ export type _zune_net = {
     openSocket: (domain: number | NetDomain, type: number | NetType, protocol: number | NetProtocol) -> Socket,
     getAddressList: (name: string, port: number) -> {NetworkAddress}, 
 }
+--[[ hash ]]
+export type _zune_hash = {
+    crc32: (data: string | buffer, crc: number?) -> number,
+    crc32c: (data: string | buffer, crc: number?) -> number,
+    adler32: (data: string | buffer, sum: number?) -> number,
+    fnv1a32: (data: string | buffer, sum: number?) -> number,
+    xxhash32: (data: string | buffer, seed: number?) -> number,
+    murmur32: (data: string | buffer, seed: number?) -> number,
+    cityhash32: (data: string | buffer) -> number, 
+}
 --[[ io ]]
 declare extern type BufferArray with
     len: number
@@ -1051,6 +1097,7 @@ declare extern type BufferArray with
     readPositional: (self: BufferArray, offset: number, dest: buffer, destOffset: number?, count: number?) -> (number, string?)
     write: (self: BufferArray, src: buffer | string, srcOffset: number?, count: number?) -> (number, string?)
     writePositional: (self: BufferArray, offset: number, src: buffer | string, srcOffset: number?, count: number?) -> (number, string?)
+    dropFront: (self: BufferArray, n: number) -> ()
     clear: (self: BufferArray) -> () 
 end
 export type _zune_io_terminal = {
@@ -1062,7 +1109,8 @@ export type _zune_io_terminal = {
 }
 export type BufferArrayOptions = {
     limit: number?,
-    size: number?, 
+    size: number?,
+    with: buffer?, 
 }
 export type _zune_io = {
     cwd: () -> Dir,
@@ -1144,10 +1192,12 @@ export type ZuneConfiguration = {
     },
     format: {
         enabled: boolean,
+        indent: number,
         max_depth: number,
         use_color: boolean,
         table_address: boolean,
         recursive_table: boolean,
+        sorted: boolean,
         buffer_max_display: number, 
     },
     workspace: {
@@ -1174,11 +1224,12 @@ export type _zune_fmt = {
     setUseColor: (enabled: boolean) -> (),
     setTableAddress: (enabled: boolean) -> (),
     setRecursiveTable: (enabled: boolean) -> (),
+    setSorted: (enabled: boolean) -> (),
     setBufferMaxDisplay: (max: number) -> (), 
 }
 --[[ require ]]
 export type _zune_require = {
-    navigate: (path: string | buffer, from: (string | buffer)?, config: string | buffer?) -> string,
+    navigate: (path: string | buffer, from: (string | buffer)?, config: number | any) -> string,
     getCached: (resolvedPath: string) -> any?, 
 }
 --[[ mem ]]
@@ -1189,6 +1240,7 @@ export type _zune_mem = {
     len: (src: MemReadableSlice) -> number?,
     copy: (dest: MemWritableSlice, destOffset: number, src: MemReadableSlice, srcOffset: number, count: number?) -> (),
     slice: (src: MemReadableSlice, offset: number, count: number?) -> buffer,
+    sliceCopy: (src: MemReadableSlice, offset: number, count: number?) -> buffer,
     eqlSlice: (a: MemReadableSlice, aOffset: number, b: MemReadableSlice, bOffset: number, count: number?) -> boolean,
     eql: (a: MemReadableSlice, b: MemReadableSlice) -> boolean,
     startsWith: (slice: MemReadableSlice, needle: MemReadableSlice) -> boolean,
@@ -1271,7 +1323,8 @@ declare zune: {
     debug: _zune_debug,
     fmt: _zune_fmt,
     gpio: _zune_gpio,
-    ascii: _zune_ascii, 
+    ascii: _zune_ascii,
+    hash: _zune_hash, 
 }
 declare _RUNTIME: {
     name: "zune",

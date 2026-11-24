@@ -8,8 +8,8 @@ local expect = testing.expect
 local test = testing.test
 
 local function testPassword(password: string, options: any?)
-    local hash
-    local hash2
+    local hash: buffer | string
+    local hash2: buffer | string
     test("hash", function()
         -- Hashes should be different
         hash = crypto.password.hash(password, options)
@@ -43,24 +43,24 @@ describe("password", function()
     test("fail", function()
         expect(function()
             crypto.password.hash("blank", {
-                algorithm = 123,
+                algorithm = 123 :: any,
             })
         end).toThrow("invalid field 'algorithm' (string expected, got number)")
         expect(function()
             crypto.password.hash("blank", {
-                algorithm = "argon2b",
+                algorithm = "argon2b" :: any,
             })
         end).toThrow("invalid algorithm kind")
         expect(function()
             crypto.password.hash("blank", {
                 algorithm = "argon2d",
-                time_cost = "abc",
+                time_cost = "abc" :: any,
             })
         end).toThrow("invalid field 'time_cost' (number expected, got string)")
         expect(function()
             crypto.password.hash("blank", {
                 algorithm = "bcrypt",
-                cost = "abc",
+                cost = "abc" :: any,
             })
         end).toThrow("invalid field 'cost' (number expected, got string)")
     end)

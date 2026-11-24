@@ -1,6 +1,7 @@
 --!strict
 --- @description Evaluate lua/luau code snippet.
 
+local mem = zune.mem
 local process = zune.process
 
 local ansi = require("@zune/ansi").auto()
@@ -16,35 +17,35 @@ if not source then
     return
 end
 
-if string.sub(source, 1, 2) == "#!" then
-    local newline = string.find(source, "\n", 1, true)
-    source = if newline then string.sub(source, newline) else ""
+if mem.startsWith(source, "#!") then
+    local newline = mem.findScalar(source, 10) -- '\n'
+    source = if newline then string.sub(source, newline + 1) else ""
 end
 
 _G._FILE = { main = true }
 
 local function syntax(message: unknown): never
     local text = tostring(message)
-    if string.sub(text, 1, 1) == ":" then
+    if mem.startsWith(text, ":") then
         text = `///EVAL{text}`
     end
     return fail("syntax error", text)
 end
 
-local compiled, bytecode = pcall(function()
-    return zune.luau.compile(source)
-end)
+local compiled, bytecode = pcall(zune.luau.compile, source, nil)
 if not compiled then
     syntax(bytecode)
     return
 end
 
-local loaded, chunk = pcall(function()
-    return zune.luau.load(bytecode :: buffer, {
+local loaded, chunk = pcall(
+    zune.luau.load,
+    bytecode :: buffer,
+    {
         chunk_name = "=///EVAL",
-    })
-end)
-if not loaded or type(chunk) ~= "function" then
+    } :: any
+)
+if not loaded then
     syntax(chunk)
 end
 
