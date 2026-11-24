@@ -1,5 +1,5 @@
 --!strict
--- Shared by the HTTP suites. Not a `*.test.luau`, so the lib runner does not execute it.
+-- HTTP utilities for test suite.
 
 local net = zune.net
 local task = zune.task
@@ -23,9 +23,9 @@ export type Seen = {
     path: string,
     host: string?,
     connection: string?,
-    contentType: string?,
-    contentLength: string?,
-    userAgent: string?,
+    content_type: string?,
+    content_length: string?,
+    user_agent: string?,
     body: string?,
 }
 
@@ -34,14 +34,6 @@ export type ServeExtra = {
     max_connections: number?,
     client_timeout: number?,
 }
-
-type RecvWithDeadline = (
-    self: Socket,
-    dest: buffer,
-    destOffset: number?,
-    count: number?,
-    timeout: number?
-) -> (number, string?)
 
 local support = {}
 
@@ -53,7 +45,7 @@ function support.agent(): string
 end
 
 function support.text(body: buffer?): string
-    if body == nil then
+    if not body then
         return ""
     end
     return buffer.tostring(body)
@@ -85,25 +77,26 @@ function support.record(incoming: Incoming): Seen
         path = incoming.path,
         host = headers.host,
         connection = headers.connection,
-        contentType = headers["content-type"],
-        contentLength = headers["content-length"],
-        userAgent = headers["user-agent"],
+        content_type = headers["content-type"],
+        content_length = headers["content-length"],
+        user_agent = headers["user-agent"],
         body = if incoming.body then buffer.tostring(incoming.body) else nil,
     }
 end
 
+--- Creates a socket, closes it, and returns the `port` number that was bound.
 function support.closedPort(): number
     local socket = net.openSocket("ipv4", "stream", "tcp")
     socket:bindAddress("127.0.0.1", 0)
     local port = socket:address().port
     socket:close()
-    if port == nil then
+    if not port then
         error("missing port", 0)
     end
     return port
 end
 
--- Writes `data`, then reads until the peer closes. A transfer error is raised.
+--- Writes `data`, then reads until the peer closes. A transfer error is raised.
 function support.exchange(port: number, data: string, timeout: number?): string
     local socket = net.openSocket("ipv4", "stream", "tcp")
     socket:connectAddress("127.0.0.1", port)
@@ -111,17 +104,16 @@ function support.exchange(port: number, data: string, timeout: number?): string
     local sent = 0
     while sent < buffer.len(payload) do
         local wrote, err = socket:send(payload, sent)
-        if err ~= nil then
+        if err then
             error(err, 0)
         end
         sent += wrote
     end
     local incoming = buffer.create(8192)
-    local recv: RecvWithDeadline = socket.recv :: any
     local got = 0
     while got < buffer.len(incoming) do
-        local n, err = recv(socket, incoming, got, nil, timeout or 2)
-        if err ~= nil then
+        local n, err = socket:recv(incoming, got, nil, timeout or 2)
+        if err then
             error(err, 0)
         end
         if n == 0 then
@@ -133,7 +125,7 @@ function support.exchange(port: number, data: string, timeout: number?): string
     return buffer.readstring(incoming, 0, got)
 end
 
--- Accepts one request and writes `response` unchanged. The caller closes `listener`.
+--- Accepts one request and writes `response` unchanged. The caller closes `listener`.
 function support.rawServe(response: string): Socket
     local listener = net.openSocket("ipv4", "stream", "tcp")
     listener:bindAddress("127.0.0.1", 0)
@@ -147,11 +139,10 @@ function support.rawServe(response: string): Socket
         end
         local peer = conn :: Socket
         local buf = buffer.create(4096)
-        local recv: RecvWithDeadline = peer.recv :: any
         local got = 0
         while got < buffer.len(buf) do
-            local n, err = recv(peer, buf, got, nil, 2)
-            if err ~= nil then
+            local n, err = peer:recv(buf, got, nil, 2)
+            if err then
                 error(err, 0)
             end
             if n == 0 then
@@ -166,7 +157,7 @@ function support.rawServe(response: string): Socket
         local sent = 0
         while sent < buffer.len(payload) do
             local wrote, err = peer:send(payload, sent)
-            if err ~= nil then
+            if err then
                 error(err, 0)
             end
             sent += wrote

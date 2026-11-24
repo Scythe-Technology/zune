@@ -21,10 +21,6 @@ buf: std.ArrayList(u8),
 limit: usize,
 offset: usize = 0,
 
-ref: Scripting.CountedReference = .empty,
-ref_table: Scripting.ReferenceTable,
-stream_writer: Scripting.TableReference = .empty,
-
 pub fn lua_direct_len(self: *BufferArray, res: *VM.lobject.TValue) void {
     res.setnvalue(@floatFromInt(self.buf.items.len));
 }
@@ -110,7 +106,7 @@ pub fn lua_readPositional(self: *BufferArray, L: *VM.lua.State) !i32 {
     return 1;
 }
 
-fn writeAt(self: *BufferArray, offset: usize, bytes: []const u8) !void {
+pub fn writeAt(self: *BufferArray, offset: usize, bytes: []const u8) !void {
     if (bytes.len == 0)
         return;
     const end = std.math.add(usize, offset, bytes.len) catch return error.LimitExceeded;
@@ -126,6 +122,12 @@ fn writeAt(self: *BufferArray, offset: usize, bytes: []const u8) !void {
     std.mem.copyForwards(u8, self.buf.items[offset..end], bytes);
 }
 
+pub fn write(self: *BufferArray, bytes: []const u8) !usize {
+    try self.writeAt(self.offset, bytes);
+    self.offset += bytes.len;
+    return bytes.len;
+}
+
 pub fn lua_write(self: *BufferArray, L: *VM.lua.State) !i32 {
     const buf = Scripting.getControlledBuffer(L, []const u8, 2) catch |err| switch (err) {
         error.NoSpace => {
@@ -134,7 +136,7 @@ pub fn lua_write(self: *BufferArray, L: *VM.lua.State) !i32 {
         },
         else => return err,
     };
-    self.writeAt(self.offset, buf) catch |err| switch (err) {
+    const n = self.write(buf) catch |err| switch (err) {
         error.LimitExceeded => {
             L.pushnumber(@floatFromInt(0));
             try L.pushlstring("limit exceeded");
@@ -146,8 +148,7 @@ pub fn lua_write(self: *BufferArray, L: *VM.lua.State) !i32 {
             return 2;
         },
     };
-    self.offset += buf.len;
-    L.pushnumber(@floatFromInt(buf.len));
+    L.pushnumber(@floatFromInt(n));
     return 1;
 }
 
@@ -182,6 +183,23 @@ pub fn lua_writePositional(self: *BufferArray, L: *VM.lua.State) !i32 {
     return 1;
 }
 
+pub fn dropFront(self: *BufferArray, n: usize) void {
+    const len = self.buf.items.len;
+    const drop = @min(n, len);
+    if (drop == 0)
+        return;
+    if (drop < len)
+        std.mem.copyForwards(u8, self.buf.items[0 .. len - drop], self.buf.items[drop..len]);
+    self.buf.shrinkRetainingCapacity(len - drop);
+    self.offset = @min(self.offset, self.buf.items.len);
+}
+
+pub fn lua_dropFront(self: *BufferArray, L: *VM.lua.State) !i32 {
+    const n = try L.Zcheckvalue(u53, 2, null);
+    self.dropFront(@min(n, self.buf.items.len));
+    return 0;
+}
+
 pub fn lua_clear(self: *BufferArray, L: *VM.lua.State) !i32 {
     _ = L;
     self.offset = 0;
@@ -189,7 +207,27 @@ pub fn lua_clear(self: *BufferArray, L: *VM.lua.State) !i32 {
     return 0;
 }
 
+pub fn lua_dupe(self: *BufferArray, L: *VM.lua.State) !i32 {
+    const allocator = Scheduler.fromState(L).allocator();
+
+    const copy = try L.newuserdatataggedwithmetatable(BufferArray, BufferArray.OBJECT_TAG);
+
+    const array_list: std.ArrayList(u8) = try self.buf.clone(allocator);
+
+    copy.* = .{
+        .alloc = allocator,
+        .buf = array_list,
+        .limit = self.limit,
+    };
+
+    return 1;
+}
+
 pub fn __dtor(L: *VM.lua.State, self: *BufferArray) void {
+    _ = L;
     self.buf.deinit(self.alloc);
-    self.ref_table.deinit(L);
+}
+
+pub fn to(L: *VM.lua.State, idx: i32) ?*BufferArray {
+    return L.touserdatatagged(BufferArray, idx, OBJECT_TAG);
 }

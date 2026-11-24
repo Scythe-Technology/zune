@@ -49,7 +49,7 @@ local function stripSourceFromError(src: string?, line: number?, err: string): s
 end
 
 local function findTargetTrace()
-    local level, count = nil, 0
+    local level, count = nil, 1
     local src: string? = nil
     local line: number? = nil
     for i = 1, 30 do
@@ -76,7 +76,7 @@ local function findTargetTrace()
     if not level then
         level = 1
     end
-    return level :: number, src, line, math.max(count, 1)
+    return level :: number, src, line, count
 end
 
 local function runTest(fn: () -> (), info: TestInfo)
@@ -96,8 +96,7 @@ local function runTest(fn: () -> (), info: TestInfo)
 
     local function cleanupAsync()
         for i = #DEFER_QUEUE, 1, -1 do
-            local v = DEFER_QUEUE[i]
-            xpcall(v, function(e)
+            xpcall(DEFER_QUEUE[i], function(e)
                 local level, src, line, count = findTargetTrace()
                 print(
                     `{ansi.yellow}{ansi.bold}DEFER ERROR{ansi.reset} {scope} {ansi.dim}[{secondsToMs(
@@ -487,7 +486,7 @@ local conditionals = {
             flipTag(self.flipped)
         )
         local ok, err = pcall(self.received)
-        if expected ~= nil then
+        if expected then
             assertExpect(false, type(err) == "string", "expected error to be a string (got %s)", readable(err))
             assertExpect(
                 false,

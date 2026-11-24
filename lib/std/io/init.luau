@@ -16,31 +16,59 @@ local function streaming<T>(fn: (self: any, src: T, src_offset: number?, count: 
     end
 end
 
-export type WriterOptions = {
-    positional: boolean?,
-}
-function io.createWriter(target: any, opts: WriterOptions?): Writer
-    local options: WriterOptions = opts or { positional = false }
-    local fn = if options.positional then target.writePositional else target.write
-    assert(type(fn) == "function", "must have a write method")
+--- Creates a streaming writer.
+--- @param target The target object with a `write` method.
+--- @param track Whether to track the write offset.
+function io.createWriter(target: any, track: boolean?): Writer
+    local fn = target.write
+    if type(fn) ~= "function" then
+        error("must have a write method", 2)
+    end
     return setmetatable({
         ud = target,
-        offset = if options.positional then 0 else nil,
-        write_impl = if options.positional then fn else streaming<<buffer | string>>(fn),
+        offset = if track then 0 else nil,
+        write_impl = streaming<<buffer | string>>(fn),
     }, Writer)
 end
 
-export type ReaderOptions = {
-    positional: boolean?,
-}
-function io.createReader(target: any, opts: ReaderOptions?): Reader
-    local options: ReaderOptions = opts or { positional = false }
-    local fn = if options.positional then target.readPositional else target.read
+--- Creates a positional writer.
+--- @param target The target object with a `writePositional` method.
+--- @param offset The starting offset for the writer.
+function io.createPosWriter(target: any, offset: number?): Writer
+    local fn = target.writePositional
+    if type(fn) ~= "function" then
+        error("must have a write method", 2)
+    end
+    return setmetatable({
+        ud = target,
+        offset = offset or 0,
+        write_impl = fn,
+    }, Writer)
+end
+
+--- Creates a streaming reader.
+--- @param target The target object with a `read` method.
+--- @param track Whether to track the read offset.
+function io.createReader(target: any, track: boolean?): Reader
+    local fn = target.read
     assert(type(fn) == "function", "must have a read method")
     return setmetatable({
         ud = target,
-        offset = if options.positional then 0 else nil,
-        read_impl = if options.positional then fn else streaming<<buffer>>(fn),
+        offset = if track then 0 else nil,
+        read_impl = streaming<<buffer>>(fn),
+    }, Reader)
+end
+
+--- Creates a positional reader.
+--- @param target The target object with a `readPositional` method.
+--- @param offset The starting offset for the reader.
+function io.createPosReader(target: any, offset: number?): Reader
+    local fn = target.readPositional
+    assert(type(fn) == "function", "must have a read method")
+    return setmetatable({
+        ud = target,
+        offset = offset or 0,
+        read_impl = fn,
     }, Reader)
 end
 

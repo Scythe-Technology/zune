@@ -14,7 +14,10 @@ fn ZigErrorHandler(L: *VM.lua.State, err: anyerror) noreturn {
     switch (err) {
         error.RaiseLuauError => L.raiseerror(),
         error.OutOfMemory => VM.ldo.throw(L, .ErrMem),
-        else => L.LerrorL("{s}", .{@errorName(err)}) catch VM.ldo.throw(L, .ErrMem),
+        else => {
+            L.pushstring(@errorName(err)) catch VM.ldo.throw(L, .ErrMem);
+            L.raiseerror();
+        },
     }
 }
 
@@ -294,6 +297,15 @@ pub const Reference = struct {
         };
     }
 
+    pub fn swap(self: *Reference, L: *VM.lua.State, idx: i32) !void {
+        if (self.valid()) {
+            const obj = L.Atoobject(idx) orelse @panic("null swap");
+            const t = VM.lapi.index2addr(L, VM.lua.REGISTRYINDEX);
+            (try VM.ltable.Hsetnum(L, t.hvalue(), self.id)).setobj(L, obj);
+            VM.lgc.Cbarriert(L, t.hvalue(), obj);
+        }
+    }
+
     pub fn valid(self: Reference) bool {
         return self.id > 0;
     }
@@ -350,6 +362,11 @@ pub fn ValueReference(comptime T: type) type {
 
         pub fn valid(self: Self) bool {
             return self.ref.valid();
+        }
+
+        pub fn swap(self: *Self, L: *VM.lua.State, idx: i32, value: T) !void {
+            try self.ref.swap(L, idx);
+            self.value = value;
         }
 
         pub fn deref(self: *Self, L: *VM.lua.State) void {

@@ -108,3 +108,69 @@ pub fn lua_lessThanIgnoreCase(L: *VM.lua.State) !i32 {
 
     return 1;
 }
+
+pub fn lua_isAlphanumeric(L: *VM.lua.State) !i32 {
+    const byte = try L.Zcheckvalue(u8, 1, null);
+    L.pushboolean(std.ascii.isAlphanumeric(byte));
+    return 1;
+}
+
+pub fn lua_isAlphabetic(L: *VM.lua.State) !i32 {
+    const byte = try L.Zcheckvalue(u8, 1, null);
+    L.pushboolean(std.ascii.isAlphabetic(byte));
+    return 1;
+}
+
+pub fn lua_isControl(L: *VM.lua.State) !i32 {
+    const byte = try L.Zcheckvalue(u8, 1, null);
+    L.pushboolean(std.ascii.isControl(byte));
+    return 1;
+}
+
+pub fn lua_isDigit(L: *VM.lua.State) !i32 {
+    const byte = try L.Zcheckvalue(u8, 1, null);
+    L.pushboolean(std.ascii.isDigit(byte));
+    return 1;
+}
+
+pub fn lua_isWhitespace(L: *VM.lua.State) !i32 {
+    const byte = try L.Zcheckvalue(u8, 1, null);
+    L.pushboolean(std.ascii.isWhitespace(byte));
+    return 1;
+}
+
+pub fn lua_isLower(L: *VM.lua.State) !i32 {
+    const byte = try L.Zcheckvalue(u8, 1, null);
+    L.pushboolean(std.ascii.isLower(byte));
+    return 1;
+}
+
+pub fn lua_isUpper(L: *VM.lua.State) !i32 {
+    const byte = try L.Zcheckvalue(u8, 1, null);
+    L.pushboolean(std.ascii.isUpper(byte));
+    return 1;
+}
+
+pub fn lua_isHex(L: *VM.lua.State) !i32 {
+    const byte = try L.Zcheckvalue(u8, 1, null);
+    L.pushboolean(std.ascii.isHex(byte));
+    return 1;
+}
+
+pub fn lua_isAscii(L: *VM.lua.State) !i32 {
+    const byte = try L.Zcheckvalue(u8, 1, null);
+    L.pushboolean(std.ascii.isAscii(byte));
+    return 1;
+}
+
+pub fn lua_toLower(L: *VM.lua.State) !i32 {
+    const byte = try L.Zcheckvalue(u8, 1, null);
+    L.pushinteger(std.ascii.toLower(byte));
+    return 1;
+}
+
+pub fn lua_toUpper(L: *VM.lua.State) !i32 {
+    const byte = try L.Zcheckvalue(u8, 1, null);
+    L.pushinteger(std.ascii.toUpper(byte));
+    return 1;
+}

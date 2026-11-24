@@ -15,3 +15,11 @@ pub fn lua_compress(L: *VM.lua.State) !i32 {
 pub fn lua_decompress(L: *VM.lua.State) !i32 {
     return Codec.decompress(L, .gzip);
 }
+
+pub fn lua_createDecompressor(L: *VM.lua.State) !i32 {
+    return Codec.createDecompressor(L, .gzip);
+}
+
+pub fn lua_createCompressor(L: *VM.lua.State) !i32 {
+    return Codec.createCompressor(L, .gzip);
+}

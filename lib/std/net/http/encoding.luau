@@ -1,13 +1,15 @@
 --!strict
 --!optimize 2
 
+local mem = zune.mem
+
 local encoding = {}
 
 encoding.url = {}
 
 function encoding.url.decode(data: string): string
     -- gsub builds a new string even when the path has no escapes.
-    if string.find(data, "%", 1, true) == nil then
+    if mem.findScalar(data, 37) == nil then -- '%'
         return data
     end
     return (

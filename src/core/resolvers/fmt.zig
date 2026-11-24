@@ -44,15 +44,183 @@ fn writeMetamethod__tostring(L: *VM.lua.State, writer: *std.Io.Writer, idx: i32)
     return false;
 }
 
-fn isPlainText(slice: []const u8) bool {
-    for (0..slice.len) |i| {
-        switch (slice[i]) {
-            'A'...'Z', 'a'...'z', '_' => {},
-            '0'...'9' => if (i == 0) return false,
+pub fn isPlainText(slice: []const u8) bool {
+    if (slice.len == 0)
+        return false;
+    switch (slice[0]) {
+        'A'...'Z', 'a'...'z', '_' => {},
+        else => return false,
+    }
+    for (slice[1..]) |byte| {
+        switch (byte) {
+            'A'...'Z', 'a'...'z', '0'...'9', '_' => {},
             else => return false,
         }
     }
     return true;
+}
+
+const hex = "0123456789abcdef";
+pub fn escapeString(writer: *std.Io.Writer, text: []const u8) !void {
+    try writer.writeByte('"');
+    for (text) |byte| {
+        switch (byte) {
+            '"' => try writer.writeAll("\\\""),
+            '\\' => try writer.writeAll("\\\\"),
+            '\n' => try writer.writeAll("\\n"),
+            '\r' => try writer.writeAll("\\r"),
+            '\t' => try writer.writeAll("\\t"),
+            8 => try writer.writeAll("\\b"),
+            11 => try writer.writeAll("\\v"),
+            12 => try writer.writeAll("\\f"),
+            0...7, 14...31, 127 => {
+                try writer.writeAll("\\x");
+                try writer.writeByte(hex[byte >> 4]);
+                try writer.writeByte(hex[byte & 15]);
+            },
+            else => try writer.writeByte(byte),
+        }
+    }
+    try writer.writeByte('"');
+}
+
+fn writeIndent(writer: *std.Io.Writer, levels: usize) !void {
+    for (0..levels) |_|
+        switch (Zune.State.options.format.indent) {
+            .TwoSpaces => try writer.print("  ", .{}),
+            .FourSpaces => try writer.print("    ", .{}),
+            .Tabs => try writer.print("\t", .{}),
+        };
+}
+
+fn writeField(
+    L: *VM.lua.State,
+    writer: *std.Io.Writer,
+    depth: usize,
+    map: ?*std.array_hash_map.Auto(usize, bool),
+    max_depth: usize,
+) anyerror!void {
+    try writeIndent(writer, depth + 1);
+    const n = L.gettop();
+    if (L.typeOf(@intCast(n - 1)) == .String) {
+        try printValue(L, writer, @intCast(n - 1), depth + 1, true, null, max_depth);
+        try Zune.debug.writerPrint(writer, "<dim> = <clear>", .{});
+    } else {
+        try Zune.debug.writerPrint(writer, "<dim>[<clear>", .{});
+        try printValue(L, writer, @intCast(n - 1), depth + 1, true, null, max_depth);
+        try Zune.debug.writerPrint(writer, "<dim>] = <clear>", .{});
+    }
+    try printValue(L, writer, @intCast(n), depth + 1, false, map, max_depth);
+    try Zune.debug.writerPrint(writer, "<dim>,<clear> \n", .{});
+    L.pop(2);
+}
+
+fn writeSortedFields(
+    L: *VM.lua.State,
+    allocator: std.mem.Allocator,
+    writer: *std.Io.Writer,
+    idx: i32,
+    depth: usize,
+    map: ?*std.array_hash_map.Auto(usize, bool),
+    max_depth: usize,
+) anyerror!void {
+    const KeyOrder = struct {
+        L: *VM.lua.State,
+        keys_index: i32,
+
+        fn less(ctx: @This(), left_index: i32, right_index: i32) bool {
+            const keys = ctx.L.Atoobject(ctx.keys_index).?.hvalue();
+            const left = VM.ltable.Hgetnum(keys, left_index);
+            const right = VM.ltable.Hgetnum(keys, right_index);
+            const left_type = left.typeOf();
+            const right_type = right.typeOf();
+            const left_rank: i16 = switch (left_type) {
+                .String => 0,
+                .Number => 1,
+                else => 100 + @as(i16, @backingInt(left_type)),
+            };
+            const right_rank: i16 = switch (right_type) {
+                .String => 0,
+                .Number => 1,
+                else => 100 + @as(i16, @backingInt(right_type)),
+            };
+            if (left_rank != right_rank)
+                return left_rank < right_rank;
+            const order: std.math.Order = switch (left_type) {
+                .String => std.mem.order(u8, left.tsvalue().toSlice(), right.tsvalue().toSlice()),
+                .Number => blk: {
+                    const left_number = left.nvalue();
+                    const right_number = right.nvalue();
+                    if (std.math.isNan(left_number) or std.math.isNan(right_number)) {
+                        if (std.math.isNan(left_number) == std.math.isNan(right_number))
+                            break :blk .eq;
+                        break :blk if (std.math.isNan(left_number)) .gt else .lt;
+                    }
+                    if (left_number < right_number)
+                        break :blk .lt;
+                    if (right_number < left_number)
+                        break :blk .gt;
+                    break :blk .eq;
+                },
+                else => .eq,
+            };
+            if (order == .eq)
+                return left_index < right_index;
+            return order == .lt;
+        }
+    };
+
+    const table_index = L.absindex(idx);
+    if (!try L.checkstack(2))
+        return error.StackOverflow;
+
+    var count: i32 = 0;
+    var iter = L.rawiter(table_index, 0);
+    while (iter >= 0) : (iter = L.rawiter(table_index, iter)) {
+        L.pop(2);
+        if (count == std.math.maxInt(i32))
+            return L.Zerror("table is too large");
+        count += 1;
+    }
+    if (count == 0)
+        return;
+
+    const saved: i32 = @intCast(L.gettop());
+    errdefer L.settop(saved);
+    if (!try L.checkstack(5))
+        return error.StackOverflow;
+
+    try L.createtable(@intCast(count), 0);
+    const keys = L.absindex(-1);
+    try L.createtable(@intCast(count), 0);
+    const values = L.absindex(-1);
+
+    var slot_index: i32 = 0;
+    iter = L.rawiter(table_index, 0);
+    while (iter >= 0) : (iter = L.rawiter(table_index, iter)) {
+        slot_index += 1;
+        L.pushvalue(-2);
+        try L.rawseti(keys, slot_index);
+        L.pushvalue(-1);
+        try L.rawseti(values, slot_index);
+        L.pop(2);
+    }
+
+    const slots = try allocator.alloc(i32, @intCast(count));
+    defer allocator.free(slots);
+    for (slots, 1..) |*slot, index|
+        slot.* = @intCast(index);
+
+    std.mem.sort(i32, slots, KeyOrder{ .L = L, .keys_index = keys }, KeyOrder.less);
+
+    for (slots) |slot| {
+        if (!try L.checkstack(2))
+            return error.StackOverflow;
+        _ = L.rawgeti(keys, slot);
+        _ = L.rawgeti(values, slot);
+        try writeField(L, writer, depth, map, max_depth);
+    }
+    L.settop(saved);
 }
 
 pub fn printValue(
@@ -81,13 +249,16 @@ pub fn printValue(
             },
             .String => {
                 const s = L.tostring(idx) orelse unreachable;
-                if (asKey) {
-                    if (isPlainText(s)) try writer.print("{s}", .{s}) else {
-                        try Zune.debug.writerPrint(writer, "<dim>[<clear><green>\"{s}\"<clear><dim>]<clear>", .{s});
-                        return;
-                    }
+                if (asKey and isPlainText(s)) {
+                    try writer.print("{s}", .{s});
+                } else if (asKey) {
+                    try Zune.debug.writerPrint(writer, "<dim>[<clear><green>", .{});
+                    try escapeString(writer, s);
+                    try Zune.debug.writerPrint(writer, "<clear><dim>]<clear>", .{});
                 } else {
-                    try Zune.debug.writerPrint(writer, "<green>\"{s}\"<clear>", .{s});
+                    try Zune.debug.writerPrint(writer, "<green>", .{});
+                    try escapeString(writer, s);
+                    try Zune.debug.writerPrint(writer, "<clear>", .{});
                 }
             },
             .Table => {
@@ -118,35 +289,16 @@ pub fn printValue(
                         try Zune.debug.writerPrint(writer, "<dim><<{s}>> {{<clear>\n", .{str});
                     } else try Zune.debug.writerPrint(writer, "<dim><<table>> {{<clear>\n", .{});
                 } else try Zune.debug.writerPrint(writer, "<dim>{{<clear>\n", .{});
-                if (!try L.checkstack(3))
-                    return error.StackOverflow;
-                var i: i32 = L.rawiter(idx, 0);
-                while (i >= 0) : (i = L.rawiter(idx, i)) {
-                    for (0..depth + 1) |_|
-                        switch (Zune.State.options.format.indent) {
-                            .TwoSpaces => try writer.print("  ", .{}),
-                            .FourSpaces => try writer.print("    ", .{}),
-                            .Tabs => try writer.print("\t", .{}),
-                        };
-                    const n = L.gettop();
-                    if (L.typeOf(@intCast(n - 1)) == .String) {
-                        try printValue(L, writer, @intCast(n - 1), depth + 1, true, null, max_depth);
-                        try Zune.debug.writerPrint(writer, "<dim> = <clear>", .{});
-                    } else {
-                        try Zune.debug.writerPrint(writer, "<dim>[<clear>", .{});
-                        try printValue(L, writer, @intCast(n - 1), depth + 1, true, null, max_depth);
-                        try Zune.debug.writerPrint(writer, "<dim>] = <clear>", .{});
-                    }
-                    try printValue(L, writer, @intCast(n), depth + 1, false, map, max_depth);
-                    try Zune.debug.writerPrint(writer, "<dim>,<clear> \n", .{});
-                    L.pop(2);
+                if (Zune.State.options.format.sorted)
+                    try writeSortedFields(L, allocator, writer, idx, depth, map, max_depth)
+                else {
+                    if (!try L.checkstack(3))
+                        return error.StackOverflow;
+                    var i: i32 = L.rawiter(idx, 0);
+                    while (i >= 0) : (i = L.rawiter(idx, i))
+                        try writeField(L, writer, depth, map, max_depth);
                 }
-                for (0..depth) |_|
-                    switch (Zune.State.options.format.indent) {
-                        .TwoSpaces => try writer.print("  ", .{}),
-                        .FourSpaces => try writer.print("    ", .{}),
-                        .Tabs => try writer.print("\t", .{}),
-                    };
+                try writeIndent(writer, depth);
                 try Zune.debug.writerPrint(writer, "<dim>}}<clear>", .{});
             },
             .Buffer => {

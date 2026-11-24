@@ -62,10 +62,10 @@ threadlocal var rng: std.Random.IoSource = .{ .io = undefined };
 pub fn lua_createClient(L: *VM.lua.State) !i32 {
     const options = try L.Zcheckvalue(struct {
         host: [:0]const u8,
-    }, 2, null);
+    }, 1, null);
 
-    if (L.rawgetfield(2, "ca") != .Userdata or L.userdatatag(-1) != CryptoTlsCertBundle.OBJECT_TAG)
-        return L.Zerror("argument #2 field 'ca' must be a CertBundle");
+    if (L.rawgetfield(1, "ca") != .Userdata or L.userdatatag(-1) != CryptoTlsCertBundle.OBJECT_TAG)
+        return L.Zerror("argument #1 field 'ca' must be a CertBundle");
 
     const ca_bundle = L.touserdatatagged(CryptoTlsCertBundle, -1, CryptoTlsCertBundle.OBJECT_TAG).?;
 
@@ -92,10 +92,10 @@ pub fn lua_createClient(L: *VM.lua.State) !i32 {
 }
 
 pub fn lua_createServer(L: *VM.lua.State) !i32 {
-    try L.Zchecktype(2, .Table);
+    try L.Zchecktype(1, .Table);
 
-    if (L.rawgetfield(2, "auth") != .Userdata or L.userdatatag(-1) != CryptoTlsCertKeyPair.OBJECT_TAG)
-        return L.Zerror("argument #2 field 'auth' must be a CertKeyPair");
+    if (L.rawgetfield(1, "auth") != .Userdata or L.userdatatag(-1) != CryptoTlsCertKeyPair.OBJECT_TAG)
+        return L.Zerror("argument #1 field 'auth' must be a CertKeyPair");
 
     const ca_keypair = L.touserdatatagged(CryptoTlsCertKeyPair, -1, CryptoTlsCertKeyPair.OBJECT_TAG).?;
 

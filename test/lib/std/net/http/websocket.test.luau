@@ -38,10 +38,13 @@ local function acceptOf(key: string): string
 end
 
 local function switching(key: string): string
-    return "HTTP/1.1 101 Switching Protocols\r\n"
-        .. "Upgrade: websocket\r\n"
-        .. "Connection: Upgrade\r\n"
-        .. `Sec-WebSocket-Accept: {acceptOf(key)}\r\n\r\n`
+    return table.concat({
+        "HTTP/1.1 101 Switching Protocols",
+        "Upgrade: websocket",
+        "Connection: Upgrade",
+        `Sec-WebSocket-Accept: {acceptOf(key)}`,
+        "\r\n",
+    }, "\r\n")
 end
 
 local function unmasked(opcode: number, payload: string, fin: boolean?): buffer
@@ -77,7 +80,7 @@ local function listen(handler: (Socket) -> ())
     listener:bindAddress("127.0.0.1", 0)
     listener:listen(16)
     local port = listener:address().port
-    if port == nil then
+    if not port then
         error("missing port", 0)
     end
     testing.defer(function()
@@ -89,7 +92,7 @@ local function listen(handler: (Socket) -> ())
         local ok, conn = pcall(function()
             return listener:accept()
         end)
-        if not ok or conn == nil then
+        if not ok or not conn then
             return
         end
         local peer = conn :: Socket
@@ -107,7 +110,7 @@ local function headerText(peer: Socket): (string, string)
     local store = ""
     while string.find(store, "\r\n\r\n", 1, true) == nil do
         local amt, err = recv(peer, buf, 0, 1024, 2)
-        if err ~= nil then
+        if err then
             error(err, 0)
         end
         if amt == 0 then
@@ -135,7 +138,7 @@ local function reader(peer: Socket, pending: string): Reader
             while buffer.len(inbox) < n do
                 local chunk = buffer.create(4096)
                 local amt, err = recv(peer, chunk, 0, 4096, 2)
-                if err ~= nil then
+                if err then
                     error(err, 0)
                 end
                 if amt == 0 then
@@ -186,7 +189,7 @@ end
 
 local function keyFrom(head: string): string
     local key = string.match(head, "Sec%-WebSocket%-Key: ([%w+/=]+)")
-    if key == nil then
+    if not key then
         error("missing key", 0)
     end
     return key
@@ -195,7 +198,7 @@ end
 test("rejects bad requests", function()
     expect(function()
         websocket.connect("not a url")
-    end).toThrow("unsupported URI scheme")
+    end).toThrow("bad URI")
     expect(function()
         websocket.connect("http://127.0.0.1/")
     end).toThrow("unsupported URI scheme")

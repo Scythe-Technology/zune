@@ -101,6 +101,12 @@ fn encodeValue(L: *VM.lua.State, allocator: std.mem.Allocator, tracked: *std.Aut
 pub fn lua_encode(L: *VM.lua.State) !i32 {
     const allocator = Scheduler.fromState(L).allocator();
 
+    var base: usize = 0;
+    if (!L.typeOf(2).isnoneornil()) {
+        try L.Zchecktype(2, .Table);
+        base = @intCast(try json.baseIndent(L));
+    }
+
     if (L.gettop() != 1)
         L.settop(1);
 
@@ -117,7 +123,7 @@ pub fn lua_encode(L: *VM.lua.State) !i32 {
 
     const writer = &allocating.writer;
 
-    try value.stringify(writer, .{});
+    try value.stringify(writer, .{ .indentation = base });
 
     try L.pushlstring(allocating.written());
 

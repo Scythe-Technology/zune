@@ -6,6 +6,7 @@ local process = zune.process
 
 local io = require("@zune/io")
 local fs = require("@zune/fs")
+local text = require("@zune/text")
 local ansi = require("@zune/ansi").auto()
 
 local cwd = io.cwd()
@@ -57,7 +58,7 @@ if not opened then
     return
 end
 
-local reader = io.createReader(file, { positional = true })
+local reader = io.createPosReader(file)
 
 local function giveUp(msg: string): never
     file:close()
@@ -101,7 +102,7 @@ local function locate(): BundleImage
         local from = 0
         while from < n do
             local at = mem.findPos(buf, from, IMAGE_MAGIC)
-            if at == nil then
+            if not at then
                 break
             end
             from = at + 1
@@ -203,6 +204,7 @@ local feature_names = {
     "net",
     "time",
     "thread",
+    "hash",
 }
 local disabled: { string } = {}
 for index, name in feature_names do
@@ -307,13 +309,6 @@ end
 
 local compression_names = { "none", "zlib", "lz4", "zstd", "gzip", "flate" }
 
-local function pad(text: string, width: number): string
-    if #text >= width then
-        return text
-    end
-    return text .. string.rep(" ", width - #text)
-end
-
 print(`path: {path}`)
 print(`size: {file_bytes}`)
 print(`exe: {image.payload_at}`)
@@ -336,15 +331,15 @@ end
 print(`home: {home}`)
 print()
 print(`sections: {image.sections} ({script_count} <scripts> + {file_count} <files>)`)
-print(`> {pad("kind", 6)}  {pad("compression", 11)}  {pad("bytes", 12)}  name`)
+print(`> {text.pad("kind", 6)}  {text.pad("compression", 11)}  {text.pad("bytes", 12)}  name`)
 for _, section in sections do
     local bytes = tostring(section.size)
     local plain = section.uncompressed
-    if plain ~= nil then
+    if plain then
         bytes = `{bytes} ({plain} uncompressed)`
     end
     print(
-        `  {pad(kindName(section.kind), 6)}  {pad(compression_names[section.compression + 1] or "unknown", 11)}  {pad(
+        `  {text.pad(kindName(section.kind), 6)}  {text.pad(compression_names[section.compression + 1] or "unknown", 11)}  {text.pad(
             bytes,
             12
         )}  {section.name}`

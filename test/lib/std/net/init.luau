@@ -3,6 +3,10 @@ local testing = require("@zune/testing")
 
 local describe = testing.describe
 
+describe("uri", function()
+    require("@self/uri.test")
+end)
+
 describe("http", function()
     describe("server", function()
         require("@self/http/server.test")

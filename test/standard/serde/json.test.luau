@@ -65,6 +65,33 @@ describe("json", function()
             expect(serde.json.encode({ a = 1, b = 2, c = 3 }, {
                 pretty_indent = 3,
             })).toBe(`\{\n\t"a": 1,\n\t"c": 3,\n\t"b": 2\n\}`)
+
+            expect(serde.json.encode({ 1, 2, 3 }, {
+                pretty_indent = 0,
+                base_indent = 4,
+            })).toBe(`[1,2,3]`)
+            expect(serde.json.encode({ a = 1 }, {
+                pretty_indent = 1,
+                base_indent = 1,
+            })).toBe(`\{\n    "a": 1\n  \}`)
+        end)
+        test("sort", function()
+            local value = { a = 1, b = 2, c = 3 }
+            expect(serde.json.encode(value, { sort = false })).toBe(serde.json.encode(value))
+            expect(serde.json.encode(value, { sort = true })).toBe(`\{"a":1,"b":2,"c":3\}`)
+            expect(serde.json.encode(value, {
+                sort = true,
+                pretty_indent = 1,
+            })).toBe(`\{\n  "a": 1,\n  "b": 2,\n  "c": 3\n\}`)
+            expect(serde.json.encode({ z = { b = 1, a = 2 }, a = 1 }, { sort = true })).toBe(
+                `\{"a":1,"z":\{"a":2,"b":1\}\}`
+            )
+            expect(serde.json.encode({ { b = 1, a = 2 } }, { sort = true })).toBe(`[\{"a":2,"b":1\}]`)
+            expect(serde.json.encode({ 3, 1, 2 }, { sort = true })).toBe(`[3,1,2]`)
+            expect(serde.json.encode({}, { sort = true })).toBe(`[]`)
+            expect(function()
+                serde.json.encode({}, { sort = 1 :: any })
+            end).toThrow("invalid value (boolean expected, got number)")
         end)
         test("fail", function()
             expect(function()
@@ -84,6 +111,9 @@ describe("json", function()
             expect(function()
                 serde.json.encode({}, { pretty_indent = 4 })
             end).toThrow(`unsupported indent kind 4`)
+            expect(function()
+                serde.json.encode({}, { base_indent = -1 })
+            end).toThrow("unsupported base indent -1")
         end)
     end)
 

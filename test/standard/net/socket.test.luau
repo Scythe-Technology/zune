@@ -249,7 +249,7 @@ test("misuse", function()
     wide:close()
 
     expect(function()
-        listener:shutdown("nope")
+        listener:shutdown("nope" :: any)
     end).toThrow("invalid shutdown how option")
 
     listener:listen(1)
@@ -280,6 +280,18 @@ test("basic stream tls", function()
         print("tls test certs not found, skipping test")
         error("SkipTest", 0)
     end
+
+    local server_tls = zune.crypto.tls.createServer({
+        auth = zune.crypto.tls.keyPairFromFile("/tmp/certs/test.crt", "/tmp/certs/test.key"),
+    })
+    expect(server_tls.established).toBe(false)
+
+    local client_tls = zune.crypto.tls.createClient({
+        host = "example.test",
+        ca = zune.crypto.tls.bundleFromFile("/tmp/certs/test.crt"),
+    })
+    expect(client_tls.established).toBe(false)
+
     local server_socket = net.openSocket("ipv4", "stream", "tcp")
 
     server_socket:setReuseAddress(true)
@@ -293,10 +305,6 @@ test("basic stream tls", function()
 
     local disconnected: thread? = coroutine.running()
     task.spawn(function()
-        local server_tls = zune.crypto.tls.createServer(server_socket, {
-            auth = zune.crypto.tls.keyPairFromFile("/tmp/certs/test.crt", "/tmp/certs/test.key"),
-        })
-        expect(server_tls.established).toBe(false)
         local connection_socket = server_socket:accept()
 
         local ciphertext = buffer.create(zune.crypto.tls.MAX_RECORD_SIZE)
@@ -357,13 +365,8 @@ test("basic stream tls", function()
         disconnected = nil
     end)
 
-    local client_tls = zune.crypto.tls.createClient(client_socket, {
-        host = "example.test",
-        ca = zune.crypto.tls.bundleFromFile("/tmp/certs/test.crt"),
-    })
     assert(server_address.port)
     client_socket:connectAddress("127.0.0.1", server_address.port)
-    expect(client_tls.established).toBe(false)
     local ciphertext = buffer.create(zune.crypto.tls.MAX_RECORD_SIZE)
     local cleartext = buffer.create(zune.crypto.tls.MAX_RECORD_SIZE)
     do

@@ -64,6 +64,14 @@ pub fn compress(L: *VM.lua.State, container: std.compress.flate.Container) !i32 
     return 1;
 }
 
+pub fn createDecompressor(L: *VM.lua.State, container: std.compress.flate.Container) !i32 {
+    return Zune.objects.InflateStream.create(L, container);
+}
+
+pub fn createCompressor(L: *VM.lua.State, container: std.compress.flate.Container) !i32 {
+    return Zune.objects.DeflateStream.create(L, container);
+}
+
 pub fn decompress(L: *VM.lua.State, container: std.compress.flate.Container) !i32 {
     const src = try sourceWindow(L);
     const dest = try destTail(L);

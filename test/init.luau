@@ -9,7 +9,6 @@ assert(not success, "zune should be readonly")
 assert((err :: string):find("readonly"), "zune should be readonly")
 
 local task = zune.task
-local luau = zune.luau
 local process = zune.process
 
 local io = require("./lib/std/io")
@@ -207,6 +206,7 @@ runTest("./test/standard/ascii.test.luau")
 runTest("./test/standard/debug.test.luau")
 runTest("./test/standard/fs.test.luau")
 runTest("./test/standard/fmt.test.luau")
+runTest("./test/standard/hash.test.luau")
 runTest("./test/standard/gpio.test.luau")
 runTest("./test/standard/io.test.luau")
 runTest("./test/standard/mem.test.luau")
@@ -286,7 +286,7 @@ if PARALLEL then
     for _, worker in parallel_tests do
         assert(worker.output, "unreachable")
         if worker.failed then
-            local reader = io.createReader(worker.output, { positional = true })
+            local reader = io.createPosReader(worker.output)
             reader:pipe(stderr_writer)
         end
     end

@@ -1,15 +1,14 @@
-
 return {
-  luau = {
-    aliases = {
-        module = "./module",
-        dev = "./dev",
-        sub = "./sublibrary",
-        subd = "./sublibrary/subdir",
-        alias_path = "@test",
-        unknown_path = "test",
-        home = "~",
-        home_sub = "~/sub_path"
-    }
-  }
+    luau = {
+        aliases = {
+            module = "./module",
+            dev = "./dev",
+            sub = "./sublibrary",
+            subd = "./sublibrary/subdir",
+            alias_path = "@test",
+            unknown_path = "test",
+            home = "~",
+            home_sub = "~/sub_path",
+        },
+    },
 }

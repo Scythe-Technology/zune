@@ -1,3 +1,3 @@
 return {
-	t = "child",
+    t = "child",
 }

@@ -9,6 +9,8 @@ const Scripting = Zune.Runtime.Scripting;
 
 const VM = luau.VM;
 
+pub const JsonIndent = json.JsonIndent;
+
 var NULL_PTR: ?*const anyopaque = null;
 
 const charset = "0123456789abcdef";
@@ -54,7 +56,51 @@ pub fn escapeString(writer: *std.Io.Writer, str: []const u8) !void {
     try writer.writeByte('"');
 }
 
-fn writeIndent(writer: *std.Io.Writer, kind: json.JsonIndent, depth: u32) !void {
+pub fn prettyIndent(L: *VM.lua.State, default: JsonIndent) !JsonIndent {
+    const field_type = L.rawgetfield(2, "pretty_indent");
+    if (field_type.isnoneornil()) {
+        L.pop(1);
+        return default;
+    }
+    try L.Zchecktype(-1, .Number);
+    const n = L.tointeger(-1).?;
+    L.pop(1);
+    return switch (n) {
+        0 => .NO_LINE,
+        1 => .SPACES_2,
+        2 => .SPACES_4,
+        3 => .TABS,
+        else => L.Zerrorf("unsupported indent kind {d}", .{n}),
+    };
+}
+
+pub fn baseIndent(L: *VM.lua.State) !u32 {
+    const field_type = L.rawgetfield(2, "base_indent");
+    if (field_type.isnoneornil()) {
+        L.pop(1);
+        return 0;
+    }
+    try L.Zchecktype(-1, .Number);
+    const number = L.tointeger(-1).?;
+    L.pop(1);
+    if (number < 0 or number > 255)
+        return L.Zerrorf("unsupported base indent {d}", .{number});
+    return @intCast(number);
+}
+
+pub fn sortEntries(L: *VM.lua.State, default: bool) !bool {
+    const field_type = L.rawgetfield(2, "sort");
+    if (field_type.isnoneornil()) {
+        L.pop(1);
+        return default;
+    }
+    try L.Zchecktype(-1, .Boolean);
+    const enabled = L.toboolean(-1);
+    L.pop(1);
+    return enabled;
+}
+
+pub fn writeIndent(writer: *std.Io.Writer, kind: json.JsonIndent, depth: u32) !void {
     const indent = switch (kind) {
         .NO_LINE => return,
         .SPACES_2 => "  ",
@@ -71,6 +117,92 @@ const JsonKind = enum {
     JSON5,
 };
 
+fn encodeSortedObject(
+    L: *VM.lua.State,
+    allocator: std.mem.Allocator,
+    writer: *std.Io.Writer,
+    tracked: *std.AutoHashMapUnmanaged(*const anyopaque, void),
+    kind: json.JsonIndent,
+    depth: u32,
+    sort: bool,
+    comptime json_kind: JsonKind,
+) !void {
+    const Entry = struct {
+        key: []u8,
+        slot: i32,
+
+        fn before(_: void, left: @This(), right: @This()) bool {
+            return std.mem.order(u8, left.key, right.key) == .lt;
+        }
+    };
+
+    const table_index = L.absindex(-1);
+    const saved: i32 = @intCast(L.gettop());
+
+    try L.rawcheckstack(4);
+    try L.createtable(0, 0);
+    const values_index = L.absindex(-1);
+
+    var entries: std.ArrayList(Entry) = .empty;
+    defer {
+        for (entries.items) |entry|
+            allocator.free(entry.key);
+        entries.deinit(allocator);
+    }
+
+    var order: i32 = 0;
+    var iter = L.rawiter(table_index, 0);
+    while (iter >= 0) : (iter = L.rawiter(table_index, iter)) {
+        if (order == std.math.maxInt(i32)) {
+            L.settop(saved);
+            return L.Zerror("table is too large");
+        }
+        order += 1;
+        switch (L.typeOf(-2)) {
+            .String => {},
+            else => |tag| {
+                const name = VM.lapi.typename(tag);
+                L.settop(saved);
+                return L.Zerrorf("invalid key type (expected string, got {s})", .{name});
+            },
+        }
+        L.pushvalue(-1);
+        try L.rawseti(values_index, order);
+        const copy = try allocator.dupe(u8, L.tolstring(-2).?);
+        entries.append(allocator, .{ .key = copy, .slot = order }) catch |err| {
+            allocator.free(copy);
+            return err;
+        };
+        L.pop(2);
+    }
+
+    std.mem.sort(Entry, entries.items, {}, Entry.before);
+    const nested = std.math.add(u32, depth, 1) catch return L.Zerror("table is too deep");
+    try writer.writeAll("{");
+    for (entries.items, 0..) |entry, index| {
+        if (index != 0)
+            try writer.writeByte(',');
+        if (kind != .NO_LINE)
+            try writer.writeByte('\n');
+        try writeIndent(writer, kind, nested);
+
+        try L.pushlstring(entry.key);
+        try encode(L, allocator, writer, tracked, kind, nested, sort, json_kind);
+        L.pop(1);
+        try writer.writeByte(':');
+        if (kind != .NO_LINE)
+            try writer.writeByte(' ');
+        _ = L.rawgeti(values_index, entry.slot);
+        try encode(L, allocator, writer, tracked, kind, nested, sort, json_kind);
+        L.pop(1);
+    }
+    if (kind != .NO_LINE)
+        try writer.writeByte('\n');
+    try writeIndent(writer, kind, depth);
+    try writer.writeByte('}');
+    L.settop(saved);
+}
+
 fn encode(
     L: *VM.lua.State,
     allocator: std.mem.Allocator,
@@ -78,8 +210,9 @@ fn encode(
     tracked: *std.AutoHashMapUnmanaged(*const anyopaque, void),
     kind: json.JsonIndent,
     depth: u32,
+    sort: bool,
     comptime json_kind: JsonKind,
-) !void {
+) anyerror!void {
     switch (L.typeOf(-1)) {
         .Nil => try writer.writeAll("null"),
         .Table => {
@@ -97,6 +230,8 @@ fn encode(
 
             try L.rawcheckstack(2);
 
+            const nested = std.math.add(u32, depth, 1) catch return L.Zerror("table is too deep");
+
             const tableSize = L.objlen(-1);
             var i: i32 = L.rawiter(-1, 0);
             if (tableSize > 0 or i < 0) {
@@ -112,14 +247,14 @@ fn encode(
 
                         if (kind != .NO_LINE)
                             try writer.writeByte('\n');
-                        try writeIndent(writer, kind, depth + 1);
+                        try writeIndent(writer, kind, nested);
 
                         switch (L.typeOf(-2)) {
                             .Number => {},
                             else => |t| return L.Zerrorf("invalid key type (expected number, got {s})", .{(VM.lapi.typename(t))}),
                         }
 
-                        try encode(L, allocator, writer, tracked, kind, depth + 1, json_kind);
+                        try encode(L, allocator, writer, tracked, kind, nested, sort, json_kind);
                         L.pop(2); // drop: value, key
                         n += 1;
                     }
@@ -133,36 +268,41 @@ fn encode(
 
                 try writer.writeByte(']');
             } else {
-                try writer.writeAll("{");
-                var appended = false;
-                while (i >= 0) : (i = L.rawiter(-1, i)) {
-                    defer appended = true;
-                    if (appended)
-                        try writer.writeByte(',');
-                    switch (L.typeOf(-2)) {
-                        .String => {},
-                        else => |t| return L.Zerrorf("invalid key type (expected string, got {s})", .{(VM.lapi.typename(t))}),
+                if (sort) {
+                    L.pop(2);
+                    try encodeSortedObject(L, allocator, writer, tracked, kind, depth, sort, json_kind);
+                } else {
+                    try writer.writeAll("{");
+                    var appended = false;
+                    while (i >= 0) : (i = L.rawiter(-1, i)) {
+                        defer appended = true;
+                        if (appended)
+                            try writer.writeByte(',');
+                        switch (L.typeOf(-2)) {
+                            .String => {},
+                            else => |t| return L.Zerrorf("invalid key type (expected string, got {s})", .{(VM.lapi.typename(t))}),
+                        }
+
+                        if (kind != .NO_LINE)
+                            try writer.writeByte('\n');
+                        try writeIndent(writer, kind, nested);
+
+                        L.pushvalue(-2); // push key [copy]
+                        try encode(L, allocator, writer, tracked, kind, nested, sort, json_kind);
+                        try writer.writeByte(':');
+                        if (kind != .NO_LINE)
+                            try writer.writeByte(' ');
+                        L.pop(1); // drop: key [copy]
+                        try encode(L, allocator, writer, tracked, kind, nested, sort, json_kind);
+                        L.pop(2); // drop: value, key
                     }
 
                     if (kind != .NO_LINE)
                         try writer.writeByte('\n');
-                    try writeIndent(writer, kind, depth + 1);
+                    try writeIndent(writer, kind, depth);
 
-                    L.pushvalue(-2); // push key [copy]
-                    try encode(L, allocator, writer, tracked, kind, depth + 1, json_kind);
-                    try writer.writeByte(':');
-                    if (kind != .NO_LINE)
-                        try writer.writeByte(' ');
-                    L.pop(1); // drop: key [copy]
-                    try encode(L, allocator, writer, tracked, kind, depth + 1, json_kind);
-                    L.pop(2); // drop: value, key
+                    try writer.writeByte('}');
                 }
-
-                if (kind != .NO_LINE)
-                    try writer.writeByte('\n');
-                try writeIndent(writer, kind, depth);
-
-                try writer.writeByte('}');
             }
         },
         .Number => {
@@ -203,22 +343,15 @@ pub fn LuaEncoder(comptime json_kind: JsonKind) fn (L: *VM.lua.State) anyerror!i
             const allocator = Scheduler.fromState(L).allocator();
 
             var kind = json.JsonIndent.NO_LINE;
+            var base: u32 = 0;
+            var sort = false;
 
             const config_type = L.typeOf(2);
             if (!config_type.isnoneornil()) {
                 try L.Zchecktype(2, .Table);
-                const indent_type = L.rawgetfield(2, "pretty_indent");
-                if (!indent_type.isnoneornil()) {
-                    try L.Zchecktype(-1, .Number);
-                    kind = switch (L.tointeger(-1) orelse unreachable) {
-                        0 => json.JsonIndent.NO_LINE,
-                        1 => json.JsonIndent.SPACES_2,
-                        2 => json.JsonIndent.SPACES_4,
-                        3 => json.JsonIndent.TABS,
-                        else => |n| return L.Zerrorf("unsupported indent kind {d}", .{n}),
-                    };
-                }
-                L.pop(1);
+                kind = try prettyIndent(L, .NO_LINE);
+                base = try baseIndent(L);
+                sort = try sortEntries(L, false);
             }
 
             var allocating: std.Io.Writer.Allocating = .init(allocator);
@@ -230,7 +363,7 @@ pub fn LuaEncoder(comptime json_kind: JsonKind) fn (L: *VM.lua.State) anyerror!i
             defer tracked.deinit(allocator);
 
             L.pushvalue(1);
-            try encode(L, allocator, writer, &tracked, kind, 0, json_kind);
+            try encode(L, allocator, writer, &tracked, kind, base, sort, json_kind);
             try L.pushlstring(allocating.written());
 
             return 1;

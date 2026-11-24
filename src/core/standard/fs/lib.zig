@@ -259,6 +259,31 @@ pub const lua_path = struct {
 
         return 1;
     }
+
+    pub fn lua_parse(L: *VM.lua.State) !i32 {
+        const path = try L.Zcheckvalue([:0]const u8, 1, null);
+        try L.newtable();
+        var index: i32 = 1;
+
+        var it = fs.path.ComponentIterator(.windows, u8).init(path);
+        while (it.next()) |component| {
+            try L.pushlstring(component.name);
+            try L.rawseti(-2, index);
+            index += 1;
+        }
+
+        const parsed = fs.path.parsePathWindows(u8, path);
+        switch (parsed.kind) {
+            .drive_absolute, .drive_relative => {
+                const len = std.unicode.utf8ByteSequenceLength(parsed.root[0]) catch 1;
+                try L.pushlstring(parsed.root[0..@min(len, parsed.root.len)]);
+                try L.rawsetfield(-2, "disk");
+            },
+            else => {},
+        }
+
+        return 1;
+    }
 };
 
 test {

@@ -18,6 +18,9 @@ const TagNames: []const []const u8 = &.{
     "DATETIME",
     // PROCESS
     "PROCESS_CHILD",
+    // SERDE
+    "SERDE_DEFLATE",
+    "SERDE_INFLATE",
     // CRYPTO
     "CRYPTO_HASHER",
     "CRYPTO_TLS",

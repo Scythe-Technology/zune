@@ -1,1 +1,1 @@
-return buffer.create(32);
+return buffer.create(32)

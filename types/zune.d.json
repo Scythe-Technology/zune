@@ -18,6 +18,7 @@
       "platform": "@zune/globaltype/_zune_platform",
       "debug": "@zune/globaltype/_zune_debug",
       "net": "@zune/globaltype/_zune_net",
+      "hash": "@zune/globaltype/_zune_hash",
       "gpio": "@zune/globaltype/_zune_gpio",
       "io": "@zune/globaltype/_zune_io",
       "compiled": "@zune/global/zune.compiled",
@@ -169,6 +170,15 @@
     ],
     "params": []
   },
+  "@zune/globaltype/GPIOChip": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "lines": "@zune/globaltype/GPIOChip.lines",
+      "name": "@zune/globaltype/GPIOChip.name",
+      "label": "@zune/globaltype/GPIOChip.label"
+    }
+  },
   "@zune/globaltype/DynamicLibrary": {
     "code_sample": "",
     "documentation": "",
@@ -193,98 +203,6 @@
       }
     ]
   },
-  "@zune/globaltype/CreateTempDirOptions": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "iterate": "@zune/globaltype/CreateTempDirOptions.iterate",
-      "cleanup": "@zune/globaltype/CreateTempDirOptions.cleanup"
-    }
-  },
-  "@zune/globaltype/_zune_serde_zlib": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "decompress": "@zune/globaltype/_zune_serde_zlib.decompress",
-      "calcSize": "@zune/globaltype/_zune_serde_zlib.calcSize",
-      "compress": "@zune/globaltype/_zune_serde_zlib.compress"
-    }
-  },
-  "@zune/globaltype/_zune_serde_zlib.calcSize": {
-    "code_sample": "",
-    "documentation": "",
-    "returns": [
-      "@zune/globaltype/_zune_serde_zlib.calcSize/return/0"
-    ],
-    "params": [
-      {
-        "name": "len",
-        "documentation": "@zune/globaltype/_zune_serde_zlib.calcSize/param/0"
-      }
-    ]
-  },
-  "@zune/globaltype/_zune_serde_zlib.compress": {
-    "code_sample": "",
-    "documentation": "",
-    "returns": [
-      "@zune/globaltype/_zune_serde_zlib.compress/return/0"
-    ],
-    "params": [
-      {
-        "name": "dest",
-        "documentation": "@zune/globaltype/_zune_serde_zlib.compress/param/0"
-      },
-      {
-        "name": "destOffset",
-        "documentation": "@zune/globaltype/_zune_serde_zlib.compress/param/1"
-      },
-      {
-        "name": "src",
-        "documentation": "@zune/globaltype/_zune_serde_zlib.compress/param/2"
-      },
-      {
-        "name": "srcOffset",
-        "documentation": "@zune/globaltype/_zune_serde_zlib.compress/param/3"
-      },
-      {
-        "name": "count",
-        "documentation": "@zune/globaltype/_zune_serde_zlib.compress/param/4"
-      },
-      {
-        "name": "level",
-        "documentation": "@zune/globaltype/_zune_serde_zlib.compress/param/5"
-      }
-    ]
-  },
-  "@zune/globaltype/_zune_serde_zlib.decompress": {
-    "code_sample": "",
-    "documentation": "",
-    "returns": [
-      "@zune/globaltype/_zune_serde_zlib.decompress/return/0"
-    ],
-    "params": [
-      {
-        "name": "dest",
-        "documentation": "@zune/globaltype/_zune_serde_zlib.decompress/param/0"
-      },
-      {
-        "name": "destOffset",
-        "documentation": "@zune/globaltype/_zune_serde_zlib.decompress/param/1"
-      },
-      {
-        "name": "src",
-        "documentation": "@zune/globaltype/_zune_serde_zlib.decompress/param/2"
-      },
-      {
-        "name": "srcOffset",
-        "documentation": "@zune/globaltype/_zune_serde_zlib.decompress/param/3"
-      },
-      {
-        "name": "count",
-        "documentation": "@zune/globaltype/_zune_serde_zlib.decompress/param/4"
-      }
-    ]
-  },
   "@zune/globaltype/_zune_mem": {
     "code_sample": "",
     "documentation": "A library to manipulate/interact with bytes and buffers.",
@@ -294,7 +212,7 @@
       "findScalar": "@zune/globaltype/_zune_mem.findScalar",
       "cut": "@zune/globaltype/_zune_mem.cut",
       "findAnyLast": "@zune/globaltype/_zune_mem.findAnyLast",
-      "slice": "@zune/globaltype/_zune_mem.slice",
+      "copy": "@zune/globaltype/_zune_mem.copy",
       "cutLast": "@zune/globaltype/_zune_mem.cutLast",
       "findNoneLast": "@zune/globaltype/_zune_mem.findNoneLast",
       "endsWith": "@zune/globaltype/_zune_mem.endsWith",
@@ -302,39 +220,40 @@
       "findPos": "@zune/globaltype/_zune_mem.findPos",
       "trimStart": "@zune/globaltype/_zune_mem.trimStart",
       "findAnyPos": "@zune/globaltype/_zune_mem.findAnyPos",
-      "trim": "@zune/globaltype/_zune_mem.trim",
-      "findNonePos": "@zune/globaltype/_zune_mem.findNonePos",
+      "find": "@zune/globaltype/_zune_mem.find",
+      "sliceCopy": "@zune/globaltype/_zune_mem.sliceCopy",
       "eql": "@zune/globaltype/_zune_mem.eql",
       "rotate": "@zune/globaltype/_zune_mem.rotate",
       "readi64": "@zune/globaltype/_zune_mem.readi64",
       "writeu64": "@zune/globaltype/_zune_mem.writeu64",
       "readu64": "@zune/globaltype/_zune_mem.readu64",
+      "writevectorf32x3": "@zune/globaltype/_zune_mem.writevectorf32x3",
       "findDiffPos": "@zune/globaltype/_zune_mem.findDiffPos",
       "readvectorf32x3": "@zune/globaltype/_zune_mem.readvectorf32x3",
-      "writevectorf32x3": "@zune/globaltype/_zune_mem.writevectorf32x3",
-      "eqlSlice": "@zune/globaltype/_zune_mem.eqlSlice",
       "writevectorf32x2": "@zune/globaltype/_zune_mem.writevectorf32x2",
-      "findLast": "@zune/globaltype/_zune_mem.findLast",
+      "eqlSlice": "@zune/globaltype/_zune_mem.eqlSlice",
+      "cutScalar": "@zune/globaltype/_zune_mem.cutScalar",
       "set": "@zune/globaltype/_zune_mem.set",
       "reverse": "@zune/globaltype/_zune_mem.reverse",
       "min": "@zune/globaltype/_zune_mem.min",
+      "max": "@zune/globaltype/_zune_mem.max",
       "findNone": "@zune/globaltype/_zune_mem.findNone",
       "findScalarLast": "@zune/globaltype/_zune_mem.findScalarLast",
-      "max": "@zune/globaltype/_zune_mem.max",
       "replaceScalar": "@zune/globaltype/_zune_mem.replaceScalar",
+      "findLast": "@zune/globaltype/_zune_mem.findLast",
       "readvectorf32x2": "@zune/globaltype/_zune_mem.readvectorf32x2",
-      "cutScalar": "@zune/globaltype/_zune_mem.cutScalar",
-      "MAX_SIZE": "@zune/globaltype/_zune_mem.MAX_SIZE",
-      "cutPrefix": "@zune/globaltype/_zune_mem.cutPrefix",
-      "findMax": "@zune/globaltype/_zune_mem.findMax",
       "findScalarPos": "@zune/globaltype/_zune_mem.findScalarPos",
-      "copy": "@zune/globaltype/_zune_mem.copy",
+      "MAX_SIZE": "@zune/globaltype/_zune_mem.MAX_SIZE",
+      "trim": "@zune/globaltype/_zune_mem.trim",
+      "findMax": "@zune/globaltype/_zune_mem.findMax",
+      "cutPrefix": "@zune/globaltype/_zune_mem.cutPrefix",
+      "slice": "@zune/globaltype/_zune_mem.slice",
       "findDiff": "@zune/globaltype/_zune_mem.findDiff",
       "cutScalarLast": "@zune/globaltype/_zune_mem.cutScalarLast",
       "startsWith": "@zune/globaltype/_zune_mem.startsWith",
-      "trimEnd": "@zune/globaltype/_zune_mem.trimEnd",
+      "findNonePos": "@zune/globaltype/_zune_mem.findNonePos",
       "len": "@zune/globaltype/_zune_mem.len",
-      "find": "@zune/globaltype/_zune_mem.find",
+      "trimEnd": "@zune/globaltype/_zune_mem.trimEnd",
       "cutSuffix": "@zune/globaltype/_zune_mem.cutSuffix",
       "findMinMax": "@zune/globaltype/_zune_mem.findMinMax"
     },
@@ -410,7 +329,7 @@
   },
   "@zune/globaltype/_zune_mem.slice": {
     "code_sample": "",
-    "documentation": "Slices a portion of a source and returns it as a new buffer.\n\nThis does allocate memory for the new buffer.\n\n**Parameters**\n- `src`: The source to slice from.\n- `offset`: The offset to start the slice from.\n- `count`: The number of bytes to include in the slice. If not provided,\n\n\n**Throws**\n- Memory Error\n",
+    "documentation": "Returns the same slice when possible, as buffer, otherwise a new buffer is created.\n\nThis does allocate memory for the new buffer.\n\n**Parameters**\n- `src`: The source to slice from.\n- `offset`: The offset to start the slice from.\n- `count`: The number of bytes to include in the slice. If not provided, will include until the end of the source.\n\n\n**Throws**\n- Memory Error\n",
     "returns": [
       "@zune/globaltype/_zune_mem.slice/return/0"
     ],
@@ -439,7 +358,40 @@
   },
   "@zune/globaltype/_zune_mem.slice/param/2": {
     "code_sample": "",
-    "documentation": "The number of bytes to include in the slice. If not provided,"
+    "documentation": "The number of bytes to include in the slice. If not provided, will include until the end of the source."
+  },
+  "@zune/globaltype/_zune_mem.sliceCopy": {
+    "code_sample": "",
+    "documentation": "Slices a portion of a source and returns it as a new buffer.\n\nThis does allocate memory for the new buffer.\n\n**Parameters**\n- `src`: The source to slice from.\n- `offset`: The offset to start the slice from.\n- `count`: The number of bytes to include in the slice. If not provided, will include until the end of the source.\n\n\n**Throws**\n- Memory Error\n",
+    "returns": [
+      "@zune/globaltype/_zune_mem.sliceCopy/return/0"
+    ],
+    "params": [
+      {
+        "name": "src",
+        "documentation": "@zune/globaltype/_zune_mem.sliceCopy/param/0"
+      },
+      {
+        "name": "offset",
+        "documentation": "@zune/globaltype/_zune_mem.sliceCopy/param/1"
+      },
+      {
+        "name": "count",
+        "documentation": "@zune/globaltype/_zune_mem.sliceCopy/param/2"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_mem.sliceCopy/param/0": {
+    "code_sample": "",
+    "documentation": "The source to slice from."
+  },
+  "@zune/globaltype/_zune_mem.sliceCopy/param/1": {
+    "code_sample": "",
+    "documentation": "The offset to start the slice from."
+  },
+  "@zune/globaltype/_zune_mem.sliceCopy/param/2": {
+    "code_sample": "",
+    "documentation": "The number of bytes to include in the slice. If not provided, will include until the end of the source."
   },
   "@zune/globaltype/_zune_mem.eqlSlice": {
     "code_sample": "",
@@ -1706,16 +1658,129 @@
       }
     ]
   },
-  "@zune/globaltype/GPIORequestOptions": {
+  "@zune/globaltype/CreateTempDirOptions": {
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "offset": "@zune/globaltype/GPIORequestOptions.offset",
-      "direction": "@zune/globaltype/GPIORequestOptions.direction",
-      "chip": "@zune/globaltype/GPIORequestOptions.chip",
-      "consumer": "@zune/globaltype/GPIORequestOptions.consumer",
-      "initial": "@zune/globaltype/GPIORequestOptions.initial"
+      "iterate": "@zune/globaltype/CreateTempDirOptions.iterate",
+      "cleanup": "@zune/globaltype/CreateTempDirOptions.cleanup"
     }
+  },
+  "@zune/globaltype/_zune_serde_zlib": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "compress": "@zune/globaltype/_zune_serde_zlib.compress",
+      "createDecompressor": "@zune/globaltype/_zune_serde_zlib.createDecompressor",
+      "createCompressor": "@zune/globaltype/_zune_serde_zlib.createCompressor",
+      "calcSize": "@zune/globaltype/_zune_serde_zlib.calcSize",
+      "decompress": "@zune/globaltype/_zune_serde_zlib.decompress"
+    }
+  },
+  "@zune/globaltype/_zune_serde_zlib.calcSize": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_serde_zlib.calcSize/return/0"
+    ],
+    "params": [
+      {
+        "name": "len",
+        "documentation": "@zune/globaltype/_zune_serde_zlib.calcSize/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_serde_zlib.compress": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_serde_zlib.compress/return/0"
+    ],
+    "params": [
+      {
+        "name": "dest",
+        "documentation": "@zune/globaltype/_zune_serde_zlib.compress/param/0"
+      },
+      {
+        "name": "destOffset",
+        "documentation": "@zune/globaltype/_zune_serde_zlib.compress/param/1"
+      },
+      {
+        "name": "src",
+        "documentation": "@zune/globaltype/_zune_serde_zlib.compress/param/2"
+      },
+      {
+        "name": "srcOffset",
+        "documentation": "@zune/globaltype/_zune_serde_zlib.compress/param/3"
+      },
+      {
+        "name": "count",
+        "documentation": "@zune/globaltype/_zune_serde_zlib.compress/param/4"
+      },
+      {
+        "name": "level",
+        "documentation": "@zune/globaltype/_zune_serde_zlib.compress/param/5"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_serde_zlib.decompress": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_serde_zlib.decompress/return/0"
+    ],
+    "params": [
+      {
+        "name": "dest",
+        "documentation": "@zune/globaltype/_zune_serde_zlib.decompress/param/0"
+      },
+      {
+        "name": "destOffset",
+        "documentation": "@zune/globaltype/_zune_serde_zlib.decompress/param/1"
+      },
+      {
+        "name": "src",
+        "documentation": "@zune/globaltype/_zune_serde_zlib.decompress/param/2"
+      },
+      {
+        "name": "srcOffset",
+        "documentation": "@zune/globaltype/_zune_serde_zlib.decompress/param/3"
+      },
+      {
+        "name": "count",
+        "documentation": "@zune/globaltype/_zune_serde_zlib.decompress/param/4"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_serde_zlib.createCompressor": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_serde_zlib.createCompressor/return/0"
+    ],
+    "params": [
+      {
+        "name": "output",
+        "documentation": "@zune/globaltype/_zune_serde_zlib.createCompressor/param/0"
+      },
+      {
+        "name": "level",
+        "documentation": "@zune/globaltype/_zune_serde_zlib.createCompressor/param/1"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_serde_zlib.createDecompressor": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_serde_zlib.createDecompressor/return/0"
+    ],
+    "params": [
+      {
+        "name": "input",
+        "documentation": "@zune/globaltype/_zune_serde_zlib.createDecompressor/param/0"
+      }
+    ]
   },
   "@zune/globaltype/_zune_require": {
     "code_sample": "",
@@ -1772,94 +1837,92 @@
       }
     ]
   },
-  "@zune/globaltype/_zune_serde_zstd": {
+  "@zune/globaltype/GPIORequestOptions": {
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "decompress": "@zune/globaltype/_zune_serde_zstd.decompress",
-      "calcSize": "@zune/globaltype/_zune_serde_zstd.calcSize",
-      "compress": "@zune/globaltype/_zune_serde_zstd.compress"
+      "offset": "@zune/globaltype/GPIORequestOptions.offset",
+      "direction": "@zune/globaltype/GPIORequestOptions.direction",
+      "chip": "@zune/globaltype/GPIORequestOptions.chip",
+      "consumer": "@zune/globaltype/GPIORequestOptions.consumer",
+      "initial": "@zune/globaltype/GPIORequestOptions.initial"
     }
   },
-  "@zune/globaltype/_zune_serde_zstd.calcSize": {
+  "@zune/globaltype/_zune_serde_json": {
     "code_sample": "",
     "documentation": "",
+    "keys": {
+      "encode": "@zune/globaltype/_zune_serde_json.encode",
+      "null": "@zune/globaltype/_zune_serde_json.null",
+      "decode": "@zune/globaltype/_zune_serde_json.decode",
+      "indents": "@zune/globaltype/_zune_serde_json.indents"
+    }
+  },
+  "@zune/globaltype/_zune_serde_json.encode": {
+    "code_sample": "",
+    "documentation": "Encodes a value to JSON.\n\n**Parameters**\n- `value`: The value to encode.\n- `config`: The configuration for the encoding.\n\n\n**Throws**\n- Memory Error\n",
     "returns": [
-      "@zune/globaltype/_zune_serde_zstd.calcSize/return/0"
+      "@zune/globaltype/_zune_serde_json.encode/return/0"
     ],
     "params": [
       {
-        "name": "len",
-        "documentation": "@zune/globaltype/_zune_serde_zstd.calcSize/param/0"
+        "name": "value",
+        "documentation": "@zune/globaltype/_zune_serde_json.encode/param/0"
+      },
+      {
+        "name": "config",
+        "documentation": "@zune/globaltype/_zune_serde_json.encode/param/1"
       }
     ]
   },
-  "@zune/globaltype/_zune_serde_zstd.compress": {
+  "@zune/globaltype/_zune_serde_json.encode/param/0": {
     "code_sample": "",
-    "documentation": "",
+    "documentation": "The value to encode."
+  },
+  "@zune/globaltype/_zune_serde_json.encode/param/1": {
+    "code_sample": "",
+    "documentation": "The configuration for the encoding."
+  },
+  "@zune/globaltype/_zune_serde_json.decode": {
+    "code_sample": "",
+    "documentation": "Decodes JSON.\n\n**Parameters**\n- `json`: The JSON string to decode.\n- `config`: The configuration for the decoding.\n\n\n**Throws**\n- Memory Error\n",
     "returns": [
-      "@zune/globaltype/_zune_serde_zstd.compress/return/0"
+      "@zune/globaltype/_zune_serde_json.decode/return/0"
     ],
     "params": [
       {
-        "name": "dest",
-        "documentation": "@zune/globaltype/_zune_serde_zstd.compress/param/0"
+        "name": "json",
+        "documentation": "@zune/globaltype/_zune_serde_json.decode/param/0"
       },
       {
-        "name": "destOffset",
-        "documentation": "@zune/globaltype/_zune_serde_zstd.compress/param/1"
-      },
-      {
-        "name": "src",
-        "documentation": "@zune/globaltype/_zune_serde_zstd.compress/param/2"
-      },
-      {
-        "name": "srcOffset",
-        "documentation": "@zune/globaltype/_zune_serde_zstd.compress/param/3"
-      },
-      {
-        "name": "count",
-        "documentation": "@zune/globaltype/_zune_serde_zstd.compress/param/4"
-      },
-      {
-        "name": "level",
-        "documentation": "@zune/globaltype/_zune_serde_zstd.compress/param/5"
+        "name": "config",
+        "documentation": "@zune/globaltype/_zune_serde_json.decode/param/1"
       }
     ]
   },
-  "@zune/globaltype/_zune_serde_zstd.decompress": {
+  "@zune/globaltype/_zune_serde_json.decode/param/0": {
     "code_sample": "",
-    "documentation": "",
-    "returns": [
-      "@zune/globaltype/_zune_serde_zstd.decompress/return/0"
-    ],
-    "params": [
-      {
-        "name": "dest",
-        "documentation": "@zune/globaltype/_zune_serde_zstd.decompress/param/0"
-      },
-      {
-        "name": "destOffset",
-        "documentation": "@zune/globaltype/_zune_serde_zstd.decompress/param/1"
-      },
-      {
-        "name": "src",
-        "documentation": "@zune/globaltype/_zune_serde_zstd.decompress/param/2"
-      },
-      {
-        "name": "srcOffset",
-        "documentation": "@zune/globaltype/_zune_serde_zstd.decompress/param/3"
-      },
-      {
-        "name": "count",
-        "documentation": "@zune/globaltype/_zune_serde_zstd.decompress/param/4"
-      }
-    ]
+    "documentation": "The JSON string to decode."
+  },
+  "@zune/globaltype/_zune_serde_json.decode/param/1": {
+    "code_sample": "",
+    "documentation": "The configuration for the decoding."
+  },
+  "@zune/globaltype/_zune_serde_json.indents": {
+    "code_sample": "",
+    "documentation": "Indentation levels for JSON.",
+    "keys": {
+      "tabs": "@zune/globaltype/_zune_serde_json.indents.tabs",
+      "four_spaces": "@zune/globaltype/_zune_serde_json.indents.four_spaces",
+      "two_spaces": "@zune/globaltype/_zune_serde_json.indents.two_spaces",
+      "none": "@zune/globaltype/_zune_serde_json.indents.none"
+    }
   },
   "@zune/globaltype/_zune_fmt": {
     "code_sample": "",
     "documentation": "A helper library to simplify string formatting, dedicated to formatting in the way zune does.",
     "keys": {
+      "setSorted": "@zune/globaltype/_zune_fmt.setSorted",
       "setRecursiveTable": "@zune/globaltype/_zune_fmt.setRecursiveTable",
       "setUseColor": "@zune/globaltype/_zune_fmt.setUseColor",
       "useColors": "@zune/globaltype/_zune_fmt.useColors",
@@ -1963,6 +2026,17 @@
       }
     ]
   },
+  "@zune/globaltype/_zune_fmt.setSorted": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [],
+    "params": [
+      {
+        "name": "enabled",
+        "documentation": "@zune/globaltype/_zune_fmt.setSorted/param/0"
+      }
+    ]
+  },
   "@zune/globaltype/_zune_fmt.setBufferMaxDisplay": {
     "code_sample": "",
     "documentation": "",
@@ -1971,6 +2045,122 @@
       {
         "name": "max",
         "documentation": "@zune/globaltype/_zune_fmt.setBufferMaxDisplay/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_serde_zstd": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "compress": "@zune/globaltype/_zune_serde_zstd.compress",
+      "createDecompressor": "@zune/globaltype/_zune_serde_zstd.createDecompressor",
+      "createCompressor": "@zune/globaltype/_zune_serde_zstd.createCompressor",
+      "calcSize": "@zune/globaltype/_zune_serde_zstd.calcSize",
+      "decompress": "@zune/globaltype/_zune_serde_zstd.decompress"
+    }
+  },
+  "@zune/globaltype/_zune_serde_zstd.calcSize": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_serde_zstd.calcSize/return/0"
+    ],
+    "params": [
+      {
+        "name": "len",
+        "documentation": "@zune/globaltype/_zune_serde_zstd.calcSize/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_serde_zstd.compress": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_serde_zstd.compress/return/0"
+    ],
+    "params": [
+      {
+        "name": "dest",
+        "documentation": "@zune/globaltype/_zune_serde_zstd.compress/param/0"
+      },
+      {
+        "name": "destOffset",
+        "documentation": "@zune/globaltype/_zune_serde_zstd.compress/param/1"
+      },
+      {
+        "name": "src",
+        "documentation": "@zune/globaltype/_zune_serde_zstd.compress/param/2"
+      },
+      {
+        "name": "srcOffset",
+        "documentation": "@zune/globaltype/_zune_serde_zstd.compress/param/3"
+      },
+      {
+        "name": "count",
+        "documentation": "@zune/globaltype/_zune_serde_zstd.compress/param/4"
+      },
+      {
+        "name": "level",
+        "documentation": "@zune/globaltype/_zune_serde_zstd.compress/param/5"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_serde_zstd.decompress": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_serde_zstd.decompress/return/0"
+    ],
+    "params": [
+      {
+        "name": "dest",
+        "documentation": "@zune/globaltype/_zune_serde_zstd.decompress/param/0"
+      },
+      {
+        "name": "destOffset",
+        "documentation": "@zune/globaltype/_zune_serde_zstd.decompress/param/1"
+      },
+      {
+        "name": "src",
+        "documentation": "@zune/globaltype/_zune_serde_zstd.decompress/param/2"
+      },
+      {
+        "name": "srcOffset",
+        "documentation": "@zune/globaltype/_zune_serde_zstd.decompress/param/3"
+      },
+      {
+        "name": "count",
+        "documentation": "@zune/globaltype/_zune_serde_zstd.decompress/param/4"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_serde_zstd.createCompressor": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_serde_zstd.createCompressor/return/0"
+    ],
+    "params": [
+      {
+        "name": "output",
+        "documentation": "@zune/globaltype/_zune_serde_zstd.createCompressor/param/0"
+      },
+      {
+        "name": "level",
+        "documentation": "@zune/globaltype/_zune_serde_zstd.createCompressor/param/1"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_serde_zstd.createDecompressor": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_serde_zstd.createDecompressor/return/0"
+    ],
+    "params": [
+      {
+        "name": "input",
+        "documentation": "@zune/globaltype/_zune_serde_zstd.createDecompressor/param/0"
       }
     ]
   },
@@ -3534,6 +3724,14 @@
       }
     ]
   },
+  "@zune/globaltype/DirectoryEntry": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "name": "@zune/globaltype/DirectoryEntry.name",
+      "kind": "@zune/globaltype/DirectoryEntry.kind"
+    }
+  },
   "@zune/globaltype/_zune_c_types": {
     "code_sample": "",
     "documentation": "",
@@ -3554,29 +3752,80 @@
       "uint16": "@zune/globaltype/_zune_c_types.uint16"
     }
   },
-  "@zune/globaltype/RegexMatch": {
+  "@zune/globaltype/_zune_serde_toml": {
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "index": "@zune/globaltype/RegexMatch.index",
-      "string": "@zune/globaltype/RegexMatch.string"
+      "encode": "@zune/globaltype/_zune_serde_toml.encode",
+      "decode": "@zune/globaltype/_zune_serde_toml.decode"
     }
   },
-  "@zune/globaltype/CreateTlsClientOptions": {
+  "@zune/globaltype/_zune_serde_toml.encode": {
+    "code_sample": "",
+    "documentation": "Encodes a table to TOML.\n\n**Parameters**\n- `object`: The table to encode.\n\n\n**Throws**\n- Memory Error\n",
+    "returns": [
+      "@zune/globaltype/_zune_serde_toml.encode/return/0"
+    ],
+    "params": [
+      {
+        "name": "object",
+        "documentation": "@zune/globaltype/_zune_serde_toml.encode/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_serde_toml.encode/param/0": {
+    "code_sample": "",
+    "documentation": "The table to encode.",
+    "keys": []
+  },
+  "@zune/globaltype/_zune_serde_toml.decode": {
+    "code_sample": "",
+    "documentation": "Decodes TOML.\n\n**Parameters**\n- `toml`: The TOML string to decode.\n\n\n**Throws**\n- Memory Error\n",
+    "returns": [
+      "@zune/globaltype/_zune_serde_toml.decode/return/0"
+    ],
+    "params": [
+      {
+        "name": "toml",
+        "documentation": "@zune/globaltype/_zune_serde_toml.decode/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_serde_toml.decode/param/0": {
+    "code_sample": "",
+    "documentation": "The TOML string to decode."
+  },
+  "@zune/globaltype/_zune_serde_toml.decode/return/0": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": []
+  },
+  "@zune/globaltype/_zune_random_Xoshiro256": {
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "host": "@zune/globaltype/CreateTlsClientOptions.host",
-      "ca": "@zune/globaltype/CreateTlsClientOptions.ca"
+      "new": "@zune/globaltype/_zune_random_Xoshiro256.new"
     }
   },
-  "@zune/globaltype/CreateTlsClientOptions.host": {
+  "@zune/globaltype/_zune_random_Xoshiro256.new": {
     "code_sample": "",
-    "documentation": "The host."
+    "documentation": "\n\n**Throws**\n- Memory Error\n",
+    "returns": [
+      "@zune/globaltype/_zune_random_Xoshiro256.new/return/0"
+    ],
+    "params": [
+      {
+        "name": "seed",
+        "documentation": "@zune/globaltype/_zune_random_Xoshiro256.new/param/0"
+      }
+    ]
   },
-  "@zune/globaltype/CreateTlsClientOptions.ca": {
+  "@zune/globaltype/SerdeYamlEncodeConfig": {
     "code_sample": "",
-    "documentation": "The CA bundle to use for verification."
+    "documentation": "",
+    "keys": {
+      "base_indent": "@zune/globaltype/SerdeYamlEncodeConfig.base_indent"
+    }
   },
   "@zune/globaltype/_zune_c": {
     "code_sample": "",
@@ -3880,6 +4129,135 @@
     "code_sample": "",
     "documentation": "The path to the library."
   },
+  "@zune/globaltype/_zune_hash": {
+    "code_sample": "",
+    "documentation": "A library to perform non-cryptographic hash functions in luau.",
+    "keys": {
+      "fnv1a32": "@zune/globaltype/_zune_hash.fnv1a32",
+      "adler32": "@zune/globaltype/_zune_hash.adler32",
+      "crc32c": "@zune/globaltype/_zune_hash.crc32c",
+      "cityhash32": "@zune/globaltype/_zune_hash.cityhash32",
+      "crc32": "@zune/globaltype/_zune_hash.crc32",
+      "xxhash32": "@zune/globaltype/_zune_hash.xxhash32",
+      "murmur32": "@zune/globaltype/_zune_hash.murmur32"
+    },
+    "learn_more_link": "https://zune.sh/docs/v0.6.x/api/hash"
+  },
+  "@zune/globaltype/_zune_hash.crc32": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_hash.crc32/return/0"
+    ],
+    "params": [
+      {
+        "name": "data",
+        "documentation": "@zune/globaltype/_zune_hash.crc32/param/0"
+      },
+      {
+        "name": "crc",
+        "documentation": "@zune/globaltype/_zune_hash.crc32/param/1"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_hash.crc32c": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_hash.crc32c/return/0"
+    ],
+    "params": [
+      {
+        "name": "data",
+        "documentation": "@zune/globaltype/_zune_hash.crc32c/param/0"
+      },
+      {
+        "name": "crc",
+        "documentation": "@zune/globaltype/_zune_hash.crc32c/param/1"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_hash.adler32": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_hash.adler32/return/0"
+    ],
+    "params": [
+      {
+        "name": "data",
+        "documentation": "@zune/globaltype/_zune_hash.adler32/param/0"
+      },
+      {
+        "name": "sum",
+        "documentation": "@zune/globaltype/_zune_hash.adler32/param/1"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_hash.fnv1a32": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_hash.fnv1a32/return/0"
+    ],
+    "params": [
+      {
+        "name": "data",
+        "documentation": "@zune/globaltype/_zune_hash.fnv1a32/param/0"
+      },
+      {
+        "name": "sum",
+        "documentation": "@zune/globaltype/_zune_hash.fnv1a32/param/1"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_hash.xxhash32": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_hash.xxhash32/return/0"
+    ],
+    "params": [
+      {
+        "name": "data",
+        "documentation": "@zune/globaltype/_zune_hash.xxhash32/param/0"
+      },
+      {
+        "name": "seed",
+        "documentation": "@zune/globaltype/_zune_hash.xxhash32/param/1"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_hash.murmur32": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_hash.murmur32/return/0"
+    ],
+    "params": [
+      {
+        "name": "data",
+        "documentation": "@zune/globaltype/_zune_hash.murmur32/param/0"
+      },
+      {
+        "name": "seed",
+        "documentation": "@zune/globaltype/_zune_hash.murmur32/param/1"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_hash.cityhash32": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_hash.cityhash32/return/0"
+    ],
+    "params": [
+      {
+        "name": "data",
+        "documentation": "@zune/globaltype/_zune_hash.cityhash32/param/0"
+      }
+    ]
+  },
   "@zune/globaltype/ProcessOptions": {
     "code_sample": "",
     "documentation": "",
@@ -3916,34 +4294,6 @@
     "code_sample": "",
     "documentation": "The stderr configuration for the process."
   },
-  "@zune/globaltype/_zune_random_Xoroshiro128": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "new": "@zune/globaltype/_zune_random_Xoroshiro128.new"
-    }
-  },
-  "@zune/globaltype/_zune_random_Xoroshiro128.new": {
-    "code_sample": "",
-    "documentation": "\n\n**Throws**\n- Memory Error\n",
-    "returns": [
-      "@zune/globaltype/_zune_random_Xoroshiro128.new/return/0"
-    ],
-    "params": [
-      {
-        "name": "seed",
-        "documentation": "@zune/globaltype/_zune_random_Xoroshiro128.new/param/0"
-      }
-    ]
-  },
-  "@zune/globaltype/ThreadLoadOptions": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "native_code_gen": "@zune/globaltype/ThreadLoadOptions.native_code_gen",
-      "chunk_name": "@zune/globaltype/ThreadLoadOptions.chunk_name"
-    }
-  },
   "@zune/globaltype/_zune_net_SOCK": {
     "code_sample": "",
     "documentation": "Table of socket flags.",
@@ -3959,33 +4309,12 @@
       "NONBLOCK": "@zune/globaltype/_zune_net_SOCK.NONBLOCK"
     }
   },
-  "@zune/globaltype/ParseResult": {
+  "@zune/globaltype/ProcessResult": {
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "line_offsets": "@zune/globaltype/ParseResult.line_offsets",
-      "lines": "@zune/globaltype/ParseResult.lines",
-      "errors": "@zune/globaltype/ParseResult.errors",
-      "root": "@zune/globaltype/ParseResult.root",
-      "hotcomments": "@zune/globaltype/ParseResult.hotcomments",
-      "eof": "@zune/globaltype/ParseResult.eof"
-    }
-  },
-  "@zune/globaltype/ParseResult.eof": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "text": "@zune/globaltype/ParseResult.eof.text",
-      "tag": "@zune/globaltype/ParseResult.eof.tag",
-      "position": "@zune/globaltype/ParseResult.eof.position"
-    }
-  },
-  "@zune/globaltype/ParseResult.eof.position": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "column": "@zune/globaltype/ParseResult.eof.position.column",
-      "line": "@zune/globaltype/ParseResult.eof.position.line"
+      "ok": "@zune/globaltype/ProcessResult.ok",
+      "code": "@zune/globaltype/ProcessResult.code"
     }
   },
   "@zune/globaltype/_zune_testing": {
@@ -4091,98 +4420,20 @@
       "follow_symlinks": "@zune/globaltype/FileResolveOptions.follow_symlinks"
     }
   },
-  "@zune/globaltype/_zune_net_IPPROTO": {
+  "@zune/globaltype/ThreadLoadOptions": {
     "code_sample": "",
-    "documentation": "Table of IP protocols.",
+    "documentation": "",
     "keys": {
-      "COMP": "@zune/globaltype/_zune_net_IPPROTO.COMP",
-      "ICMP": "@zune/globaltype/_zune_net_IPPROTO.ICMP",
-      "ESP": "@zune/globaltype/_zune_net_IPPROTO.ESP",
-      "MPLS": "@zune/globaltype/_zune_net_IPPROTO.MPLS",
-      "TCP": "@zune/globaltype/_zune_net_IPPROTO.TCP",
-      "ICMPV6": "@zune/globaltype/_zune_net_IPPROTO.ICMPV6",
-      "MTP": "@zune/globaltype/_zune_net_IPPROTO.MTP",
-      "GRE": "@zune/globaltype/_zune_net_IPPROTO.GRE",
-      "SCTP": "@zune/globaltype/_zune_net_IPPROTO.SCTP",
-      "MAX": "@zune/globaltype/_zune_net_IPPROTO.MAX",
-      "NONE": "@zune/globaltype/_zune_net_IPPROTO.NONE",
-      "RSVP": "@zune/globaltype/_zune_net_IPPROTO.RSVP",
-      "IDP": "@zune/globaltype/_zune_net_IPPROTO.IDP",
-      "UDPLITE": "@zune/globaltype/_zune_net_IPPROTO.UDPLITE",
-      "HOPOPTS": "@zune/globaltype/_zune_net_IPPROTO.HOPOPTS",
-      "MH": "@zune/globaltype/_zune_net_IPPROTO.MH",
-      "BEETPH": "@zune/globaltype/_zune_net_IPPROTO.BEETPH",
-      "AH": "@zune/globaltype/_zune_net_IPPROTO.AH",
-      "IPIP": "@zune/globaltype/_zune_net_IPPROTO.IPIP",
-      "IPV6": "@zune/globaltype/_zune_net_IPPROTO.IPV6",
-      "PIM": "@zune/globaltype/_zune_net_IPPROTO.PIM",
-      "DSTOPTS": "@zune/globaltype/_zune_net_IPPROTO.DSTOPTS",
-      "UDP": "@zune/globaltype/_zune_net_IPPROTO.UDP",
-      "DCCP": "@zune/globaltype/_zune_net_IPPROTO.DCCP",
-      "RAW": "@zune/globaltype/_zune_net_IPPROTO.RAW",
-      "PUP": "@zune/globaltype/_zune_net_IPPROTO.PUP",
-      "IGMP": "@zune/globaltype/_zune_net_IPPROTO.IGMP",
-      "ENCAP": "@zune/globaltype/_zune_net_IPPROTO.ENCAP",
-      "FRAGMENT": "@zune/globaltype/_zune_net_IPPROTO.FRAGMENT",
-      "ROUTING": "@zune/globaltype/_zune_net_IPPROTO.ROUTING",
-      "EGP": "@zune/globaltype/_zune_net_IPPROTO.EGP",
-      "TP": "@zune/globaltype/_zune_net_IPPROTO.TP",
-      "IP": "@zune/globaltype/_zune_net_IPPROTO.IP"
+      "native_code_gen": "@zune/globaltype/ThreadLoadOptions.native_code_gen",
+      "chunk_name": "@zune/globaltype/ThreadLoadOptions.chunk_name"
     }
   },
-  "@zune/globaltype/_zune_net_ADDRF": {
+  "@zune/globaltype/RegexMatch": {
     "code_sample": "",
-    "documentation": "The table of address families.",
+    "documentation": "",
     "keys": {
-      "RDS": "@zune/globaltype/_zune_net_ADDRF.RDS",
-      "ROSE": "@zune/globaltype/_zune_net_ADDRF.ROSE",
-      "BRIDGE": "@zune/globaltype/_zune_net_ADDRF.BRIDGE",
-      "PHONET": "@zune/globaltype/_zune_net_ADDRF.PHONET",
-      "SNA": "@zune/globaltype/_zune_net_ADDRF.SNA",
-      "FILE": "@zune/globaltype/_zune_net_ADDRF.FILE",
-      "MPLS": "@zune/globaltype/_zune_net_ADDRF.MPLS",
-      "IUCV": "@zune/globaltype/_zune_net_ADDRF.IUCV",
-      "WANPIPE": "@zune/globaltype/_zune_net_ADDRF.WANPIPE",
-      "UNSPEC": "@zune/globaltype/_zune_net_ADDRF.UNSPEC",
-      "CAIF": "@zune/globaltype/_zune_net_ADDRF.CAIF",
-      "NETROM": "@zune/globaltype/_zune_net_ADDRF.NETROM",
-      "UNIX": "@zune/globaltype/_zune_net_ADDRF.UNIX",
-      "INET": "@zune/globaltype/_zune_net_ADDRF.INET",
-      "ATMSVC": "@zune/globaltype/_zune_net_ADDRF.ATMSVC",
-      "MAX": "@zune/globaltype/_zune_net_ADDRF.MAX",
-      "NETLINK": "@zune/globaltype/_zune_net_ADDRF.NETLINK",
-      "X25": "@zune/globaltype/_zune_net_ADDRF.X25",
-      "SECURITY": "@zune/globaltype/_zune_net_ADDRF.SECURITY",
-      "INET6": "@zune/globaltype/_zune_net_ADDRF.INET6",
-      "TIPC": "@zune/globaltype/_zune_net_ADDRF.TIPC",
-      "KEY": "@zune/globaltype/_zune_net_ADDRF.KEY",
-      "IRDA": "@zune/globaltype/_zune_net_ADDRF.IRDA",
-      "ECONET": "@zune/globaltype/_zune_net_ADDRF.ECONET",
-      "IPX": "@zune/globaltype/_zune_net_ADDRF.IPX",
-      "ASH": "@zune/globaltype/_zune_net_ADDRF.ASH",
-      "IB": "@zune/globaltype/_zune_net_ADDRF.IB",
-      "PACKET": "@zune/globaltype/_zune_net_ADDRF.PACKET",
-      "KCM": "@zune/globaltype/_zune_net_ADDRF.KCM",
-      "DECnet": "@zune/globaltype/_zune_net_ADDRF.DECnet",
-      "RXRPC": "@zune/globaltype/_zune_net_ADDRF.RXRPC",
-      "NETBEUI": "@zune/globaltype/_zune_net_ADDRF.NETBEUI",
-      "ALG": "@zune/globaltype/_zune_net_ADDRF.ALG",
-      "IEEE802154": "@zune/globaltype/_zune_net_ADDRF.IEEE802154",
-      "ISDN": "@zune/globaltype/_zune_net_ADDRF.ISDN",
-      "APPLETALK": "@zune/globaltype/_zune_net_ADDRF.APPLETALK",
-      "XDP": "@zune/globaltype/_zune_net_ADDRF.XDP",
-      "LOCAL": "@zune/globaltype/_zune_net_ADDRF.LOCAL",
-      "LLC": "@zune/globaltype/_zune_net_ADDRF.LLC",
-      "CAN": "@zune/globaltype/_zune_net_ADDRF.CAN",
-      "BLUETOOTH": "@zune/globaltype/_zune_net_ADDRF.BLUETOOTH",
-      "QIPCRTR": "@zune/globaltype/_zune_net_ADDRF.QIPCRTR",
-      "PPPOX": "@zune/globaltype/_zune_net_ADDRF.PPPOX",
-      "ATMPVC": "@zune/globaltype/_zune_net_ADDRF.ATMPVC",
-      "AX25": "@zune/globaltype/_zune_net_ADDRF.AX25",
-      "NFC": "@zune/globaltype/_zune_net_ADDRF.NFC",
-      "SMC": "@zune/globaltype/_zune_net_ADDRF.SMC",
-      "ROUTE": "@zune/globaltype/_zune_net_ADDRF.ROUTE",
-      "VSOCK": "@zune/globaltype/_zune_net_ADDRF.VSOCK"
+      "index": "@zune/globaltype/RegexMatch.index",
+      "string": "@zune/globaltype/RegexMatch.string"
     }
   },
   "@zune/globaltype/CreateSymLinkOptions": {
@@ -4268,195 +4519,11 @@
       }
     ]
   },
-  "@zune/globaltype/_zune_net": {
-    "code_sample": "",
-    "documentation": "A library to do networking in luau. Provides functions to create sockets, start an HTTP server, make HTTP requests, and handle WebSockets.",
-    "keys": {
-      "IPPROTO": "@zune/globaltype/_zune_net.IPPROTO",
-      "HAS_UNIX_SOCKETS": "@zune/globaltype/_zune_net.HAS_UNIX_SOCKETS",
-      "getAddressList": "@zune/globaltype/_zune_net.getAddressList",
-      "ADDRF": "@zune/globaltype/_zune_net.ADDRF",
-      "openSocket": "@zune/globaltype/_zune_net.openSocket",
-      "SOCK": "@zune/globaltype/_zune_net.SOCK"
-    },
-    "learn_more_link": "https://zune.sh/docs/v0.6.x/api/net"
-  },
-  "@zune/globaltype/_zune_net.ADDRF": {
-    "code_sample": "",
-    "documentation": "The table of address families.",
-    "keys": {
-      "RDS": "@zune/globaltype/_zune_net.ADDRF.RDS",
-      "ROSE": "@zune/globaltype/_zune_net.ADDRF.ROSE",
-      "BRIDGE": "@zune/globaltype/_zune_net.ADDRF.BRIDGE",
-      "PHONET": "@zune/globaltype/_zune_net.ADDRF.PHONET",
-      "SNA": "@zune/globaltype/_zune_net.ADDRF.SNA",
-      "FILE": "@zune/globaltype/_zune_net.ADDRF.FILE",
-      "MPLS": "@zune/globaltype/_zune_net.ADDRF.MPLS",
-      "IUCV": "@zune/globaltype/_zune_net.ADDRF.IUCV",
-      "WANPIPE": "@zune/globaltype/_zune_net.ADDRF.WANPIPE",
-      "UNSPEC": "@zune/globaltype/_zune_net.ADDRF.UNSPEC",
-      "CAIF": "@zune/globaltype/_zune_net.ADDRF.CAIF",
-      "NETROM": "@zune/globaltype/_zune_net.ADDRF.NETROM",
-      "UNIX": "@zune/globaltype/_zune_net.ADDRF.UNIX",
-      "INET": "@zune/globaltype/_zune_net.ADDRF.INET",
-      "ATMSVC": "@zune/globaltype/_zune_net.ADDRF.ATMSVC",
-      "MAX": "@zune/globaltype/_zune_net.ADDRF.MAX",
-      "NETLINK": "@zune/globaltype/_zune_net.ADDRF.NETLINK",
-      "X25": "@zune/globaltype/_zune_net.ADDRF.X25",
-      "SECURITY": "@zune/globaltype/_zune_net.ADDRF.SECURITY",
-      "INET6": "@zune/globaltype/_zune_net.ADDRF.INET6",
-      "TIPC": "@zune/globaltype/_zune_net.ADDRF.TIPC",
-      "KEY": "@zune/globaltype/_zune_net.ADDRF.KEY",
-      "IRDA": "@zune/globaltype/_zune_net.ADDRF.IRDA",
-      "ECONET": "@zune/globaltype/_zune_net.ADDRF.ECONET",
-      "IPX": "@zune/globaltype/_zune_net.ADDRF.IPX",
-      "ASH": "@zune/globaltype/_zune_net.ADDRF.ASH",
-      "IB": "@zune/globaltype/_zune_net.ADDRF.IB",
-      "PACKET": "@zune/globaltype/_zune_net.ADDRF.PACKET",
-      "KCM": "@zune/globaltype/_zune_net.ADDRF.KCM",
-      "DECnet": "@zune/globaltype/_zune_net.ADDRF.DECnet",
-      "RXRPC": "@zune/globaltype/_zune_net.ADDRF.RXRPC",
-      "NETBEUI": "@zune/globaltype/_zune_net.ADDRF.NETBEUI",
-      "ALG": "@zune/globaltype/_zune_net.ADDRF.ALG",
-      "IEEE802154": "@zune/globaltype/_zune_net.ADDRF.IEEE802154",
-      "ISDN": "@zune/globaltype/_zune_net.ADDRF.ISDN",
-      "APPLETALK": "@zune/globaltype/_zune_net.ADDRF.APPLETALK",
-      "XDP": "@zune/globaltype/_zune_net.ADDRF.XDP",
-      "LOCAL": "@zune/globaltype/_zune_net.ADDRF.LOCAL",
-      "LLC": "@zune/globaltype/_zune_net.ADDRF.LLC",
-      "CAN": "@zune/globaltype/_zune_net.ADDRF.CAN",
-      "BLUETOOTH": "@zune/globaltype/_zune_net.ADDRF.BLUETOOTH",
-      "QIPCRTR": "@zune/globaltype/_zune_net.ADDRF.QIPCRTR",
-      "PPPOX": "@zune/globaltype/_zune_net.ADDRF.PPPOX",
-      "ATMPVC": "@zune/globaltype/_zune_net.ADDRF.ATMPVC",
-      "AX25": "@zune/globaltype/_zune_net.ADDRF.AX25",
-      "NFC": "@zune/globaltype/_zune_net.ADDRF.NFC",
-      "SMC": "@zune/globaltype/_zune_net.ADDRF.SMC",
-      "ROUTE": "@zune/globaltype/_zune_net.ADDRF.ROUTE",
-      "VSOCK": "@zune/globaltype/_zune_net.ADDRF.VSOCK"
-    }
-  },
-  "@zune/globaltype/_zune_net.SOCK": {
-    "code_sample": "",
-    "documentation": "Table of socket flags.",
-    "keys": {
-      "DCCP": "@zune/globaltype/_zune_net.SOCK.DCCP",
-      "RAW": "@zune/globaltype/_zune_net.SOCK.RAW",
-      "RDM": "@zune/globaltype/_zune_net.SOCK.RDM",
-      "DGRAM": "@zune/globaltype/_zune_net.SOCK.DGRAM",
-      "PACKET": "@zune/globaltype/_zune_net.SOCK.PACKET",
-      "STREAM": "@zune/globaltype/_zune_net.SOCK.STREAM",
-      "SEQPACKET": "@zune/globaltype/_zune_net.SOCK.SEQPACKET",
-      "CLOEXEC": "@zune/globaltype/_zune_net.SOCK.CLOEXEC",
-      "NONBLOCK": "@zune/globaltype/_zune_net.SOCK.NONBLOCK"
-    }
-  },
-  "@zune/globaltype/_zune_net.IPPROTO": {
-    "code_sample": "",
-    "documentation": "Table of IP protocols.",
-    "keys": {
-      "COMP": "@zune/globaltype/_zune_net.IPPROTO.COMP",
-      "ICMP": "@zune/globaltype/_zune_net.IPPROTO.ICMP",
-      "ESP": "@zune/globaltype/_zune_net.IPPROTO.ESP",
-      "MPLS": "@zune/globaltype/_zune_net.IPPROTO.MPLS",
-      "TCP": "@zune/globaltype/_zune_net.IPPROTO.TCP",
-      "ICMPV6": "@zune/globaltype/_zune_net.IPPROTO.ICMPV6",
-      "MTP": "@zune/globaltype/_zune_net.IPPROTO.MTP",
-      "GRE": "@zune/globaltype/_zune_net.IPPROTO.GRE",
-      "SCTP": "@zune/globaltype/_zune_net.IPPROTO.SCTP",
-      "MAX": "@zune/globaltype/_zune_net.IPPROTO.MAX",
-      "NONE": "@zune/globaltype/_zune_net.IPPROTO.NONE",
-      "RSVP": "@zune/globaltype/_zune_net.IPPROTO.RSVP",
-      "IDP": "@zune/globaltype/_zune_net.IPPROTO.IDP",
-      "UDPLITE": "@zune/globaltype/_zune_net.IPPROTO.UDPLITE",
-      "HOPOPTS": "@zune/globaltype/_zune_net.IPPROTO.HOPOPTS",
-      "MH": "@zune/globaltype/_zune_net.IPPROTO.MH",
-      "BEETPH": "@zune/globaltype/_zune_net.IPPROTO.BEETPH",
-      "AH": "@zune/globaltype/_zune_net.IPPROTO.AH",
-      "IPIP": "@zune/globaltype/_zune_net.IPPROTO.IPIP",
-      "IPV6": "@zune/globaltype/_zune_net.IPPROTO.IPV6",
-      "PIM": "@zune/globaltype/_zune_net.IPPROTO.PIM",
-      "DSTOPTS": "@zune/globaltype/_zune_net.IPPROTO.DSTOPTS",
-      "UDP": "@zune/globaltype/_zune_net.IPPROTO.UDP",
-      "DCCP": "@zune/globaltype/_zune_net.IPPROTO.DCCP",
-      "RAW": "@zune/globaltype/_zune_net.IPPROTO.RAW",
-      "PUP": "@zune/globaltype/_zune_net.IPPROTO.PUP",
-      "IGMP": "@zune/globaltype/_zune_net.IPPROTO.IGMP",
-      "ENCAP": "@zune/globaltype/_zune_net.IPPROTO.ENCAP",
-      "FRAGMENT": "@zune/globaltype/_zune_net.IPPROTO.FRAGMENT",
-      "ROUTING": "@zune/globaltype/_zune_net.IPPROTO.ROUTING",
-      "EGP": "@zune/globaltype/_zune_net.IPPROTO.EGP",
-      "TP": "@zune/globaltype/_zune_net.IPPROTO.TP",
-      "IP": "@zune/globaltype/_zune_net.IPPROTO.IP"
-    }
-  },
-  "@zune/globaltype/_zune_net.openSocket": {
-    "code_sample": "",
-    "documentation": "Creates a new socket from OS.\n\n**Parameters**\n- `protocol`: The protocol to use.\n\n\n**Throws**\n- IO Error\n- Network Error\n",
-    "returns": [
-      "@zune/globaltype/_zune_net.openSocket/return/0"
-    ],
-    "params": [
-      {
-        "name": "domain",
-        "documentation": "@zune/globaltype/_zune_net.openSocket/param/0"
-      },
-      {
-        "name": "type",
-        "documentation": "@zune/globaltype/_zune_net.openSocket/param/1"
-      },
-      {
-        "name": "protocol",
-        "documentation": "@zune/globaltype/_zune_net.openSocket/param/2"
-      }
-    ]
-  },
-  "@zune/globaltype/_zune_net.openSocket/param/2": {
-    "code_sample": "",
-    "documentation": "The protocol to use."
-  },
-  "@zune/globaltype/_zune_net.getAddressList": {
-    "code_sample": "",
-    "documentation": "Gets a list of addresses for the provided name and port.\n\n**Parameters**\n- `name`: The name to resolve.\n- `port`: The port to resolve.\n\n\n**Throws**\n- IO Error\n",
-    "returns": [
-      "@zune/globaltype/_zune_net.getAddressList/return/0"
-    ],
-    "params": [
-      {
-        "name": "name",
-        "documentation": "@zune/globaltype/_zune_net.getAddressList/param/0"
-      },
-      {
-        "name": "port",
-        "documentation": "@zune/globaltype/_zune_net.getAddressList/param/1"
-      }
-    ]
-  },
-  "@zune/globaltype/_zune_net.getAddressList/param/0": {
-    "code_sample": "",
-    "documentation": "The name to resolve."
-  },
-  "@zune/globaltype/_zune_net.getAddressList/param/1": {
-    "code_sample": "",
-    "documentation": "The port to resolve."
-  },
-  "@zune/globaltype/DescriptorStat": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "accessed_at": "@zune/globaltype/DescriptorStat.accessed_at",
-      "changed_at": "@zune/globaltype/DescriptorStat.changed_at",
-      "kind": "@zune/globaltype/DescriptorStat.kind",
-      "modified_at": "@zune/globaltype/DescriptorStat.modified_at",
-      "mode": "@zune/globaltype/DescriptorStat.mode",
-      "block_size": "@zune/globaltype/DescriptorStat.block_size",
-      "size": "@zune/globaltype/DescriptorStat.size"
-    }
-  },
   "@zune/globaltype/_zune_debug": {
     "code_sample": "",
     "documentation": "A library to use zune's verbose debugging features.",
     "keys": {
+      "source": "@zune/globaltype/_zune_debug.source",
       "dumpStacktrace": "@zune/globaltype/_zune_debug.dumpStacktrace"
     },
     "learn_more_link": "https://zune.sh/docs/v0.6.x/api/debug"
@@ -4478,103 +4545,170 @@
       }
     ]
   },
-  "@zune/globaltype/ZuneConfiguration": {
+  "@zune/globaltype/_zune_debug.source": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_debug.source/return/0"
+    ],
+    "params": [
+      {
+        "name": "level",
+        "documentation": "@zune/globaltype/_zune_debug.source/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/DescriptorStat": {
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "runtime": "@zune/globaltype/ZuneConfiguration.runtime",
-      "format": "@zune/globaltype/ZuneConfiguration.format",
-      "workspace": "@zune/globaltype/ZuneConfiguration.workspace"
+      "accessed_at": "@zune/globaltype/DescriptorStat.accessed_at",
+      "changed_at": "@zune/globaltype/DescriptorStat.changed_at",
+      "kind": "@zune/globaltype/DescriptorStat.kind",
+      "modified_at": "@zune/globaltype/DescriptorStat.modified_at",
+      "mode": "@zune/globaltype/DescriptorStat.mode",
+      "block_size": "@zune/globaltype/DescriptorStat.block_size",
+      "size": "@zune/globaltype/DescriptorStat.size"
     }
   },
-  "@zune/globaltype/ZuneConfiguration.runtime": {
+  "@zune/globaltype/_zune_net_IPPROTO": {
+    "code_sample": "",
+    "documentation": "Table of IP protocols.",
+    "keys": {
+      "COMP": "@zune/globaltype/_zune_net_IPPROTO.COMP",
+      "ICMP": "@zune/globaltype/_zune_net_IPPROTO.ICMP",
+      "ESP": "@zune/globaltype/_zune_net_IPPROTO.ESP",
+      "MPLS": "@zune/globaltype/_zune_net_IPPROTO.MPLS",
+      "TCP": "@zune/globaltype/_zune_net_IPPROTO.TCP",
+      "ICMPV6": "@zune/globaltype/_zune_net_IPPROTO.ICMPV6",
+      "MTP": "@zune/globaltype/_zune_net_IPPROTO.MTP",
+      "GRE": "@zune/globaltype/_zune_net_IPPROTO.GRE",
+      "SCTP": "@zune/globaltype/_zune_net_IPPROTO.SCTP",
+      "MAX": "@zune/globaltype/_zune_net_IPPROTO.MAX",
+      "NONE": "@zune/globaltype/_zune_net_IPPROTO.NONE",
+      "RSVP": "@zune/globaltype/_zune_net_IPPROTO.RSVP",
+      "IDP": "@zune/globaltype/_zune_net_IPPROTO.IDP",
+      "UDPLITE": "@zune/globaltype/_zune_net_IPPROTO.UDPLITE",
+      "HOPOPTS": "@zune/globaltype/_zune_net_IPPROTO.HOPOPTS",
+      "MH": "@zune/globaltype/_zune_net_IPPROTO.MH",
+      "BEETPH": "@zune/globaltype/_zune_net_IPPROTO.BEETPH",
+      "AH": "@zune/globaltype/_zune_net_IPPROTO.AH",
+      "IPIP": "@zune/globaltype/_zune_net_IPPROTO.IPIP",
+      "IPV6": "@zune/globaltype/_zune_net_IPPROTO.IPV6",
+      "PIM": "@zune/globaltype/_zune_net_IPPROTO.PIM",
+      "DSTOPTS": "@zune/globaltype/_zune_net_IPPROTO.DSTOPTS",
+      "UDP": "@zune/globaltype/_zune_net_IPPROTO.UDP",
+      "DCCP": "@zune/globaltype/_zune_net_IPPROTO.DCCP",
+      "RAW": "@zune/globaltype/_zune_net_IPPROTO.RAW",
+      "PUP": "@zune/globaltype/_zune_net_IPPROTO.PUP",
+      "IGMP": "@zune/globaltype/_zune_net_IPPROTO.IGMP",
+      "ENCAP": "@zune/globaltype/_zune_net_IPPROTO.ENCAP",
+      "FRAGMENT": "@zune/globaltype/_zune_net_IPPROTO.FRAGMENT",
+      "ROUTING": "@zune/globaltype/_zune_net_IPPROTO.ROUTING",
+      "EGP": "@zune/globaltype/_zune_net_IPPROTO.EGP",
+      "TP": "@zune/globaltype/_zune_net_IPPROTO.TP",
+      "IP": "@zune/globaltype/_zune_net_IPPROTO.IP"
+    }
+  },
+  "@zune/globaltype/_zune_luau_fflag": {
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "luau": "@zune/globaltype/ZuneConfiguration.runtime.luau",
-      "use_detailed_error": "@zune/globaltype/ZuneConfiguration.runtime.use_detailed_error",
-      "features": "@zune/globaltype/ZuneConfiguration.runtime.features"
+      "list": "@zune/globaltype/_zune_luau_fflag.list",
+      "set": "@zune/globaltype/_zune_luau_fflag.set",
+      "get": "@zune/globaltype/_zune_luau_fflag.get"
     }
   },
-  "@zune/globaltype/ZuneConfiguration.runtime.luau": {
+  "@zune/globaltype/_zune_luau_fflag.get": {
     "code_sample": "",
     "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_luau_fflag.get/return/0"
+    ],
+    "params": [
+      {
+        "name": "name",
+        "documentation": "@zune/globaltype/_zune_luau_fflag.get/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_luau_fflag.set": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [],
+    "params": [
+      {
+        "name": "name",
+        "documentation": "@zune/globaltype/_zune_luau_fflag.set/param/0"
+      },
+      {
+        "name": "value",
+        "documentation": "@zune/globaltype/_zune_luau_fflag.set/param/1"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_luau_fflag.list": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_luau_fflag.list/return/0"
+    ],
+    "params": []
+  },
+  "@zune/globaltype/_zune_net_ADDRF": {
+    "code_sample": "",
+    "documentation": "The table of address families.",
     "keys": {
-      "default_ncg": "@zune/globaltype/ZuneConfiguration.runtime.luau.default_ncg",
-      "jit_enabled": "@zune/globaltype/ZuneConfiguration.runtime.luau.jit_enabled",
-      "optimization_level": "@zune/globaltype/ZuneConfiguration.runtime.luau.optimization_level",
-      "debug_level": "@zune/globaltype/ZuneConfiguration.runtime.luau.debug_level",
-      "coverage_level": "@zune/globaltype/ZuneConfiguration.runtime.luau.coverage_level"
+      "RDS": "@zune/globaltype/_zune_net_ADDRF.RDS",
+      "ROSE": "@zune/globaltype/_zune_net_ADDRF.ROSE",
+      "BRIDGE": "@zune/globaltype/_zune_net_ADDRF.BRIDGE",
+      "PHONET": "@zune/globaltype/_zune_net_ADDRF.PHONET",
+      "SNA": "@zune/globaltype/_zune_net_ADDRF.SNA",
+      "FILE": "@zune/globaltype/_zune_net_ADDRF.FILE",
+      "MPLS": "@zune/globaltype/_zune_net_ADDRF.MPLS",
+      "IUCV": "@zune/globaltype/_zune_net_ADDRF.IUCV",
+      "WANPIPE": "@zune/globaltype/_zune_net_ADDRF.WANPIPE",
+      "UNSPEC": "@zune/globaltype/_zune_net_ADDRF.UNSPEC",
+      "CAIF": "@zune/globaltype/_zune_net_ADDRF.CAIF",
+      "NETROM": "@zune/globaltype/_zune_net_ADDRF.NETROM",
+      "UNIX": "@zune/globaltype/_zune_net_ADDRF.UNIX",
+      "INET": "@zune/globaltype/_zune_net_ADDRF.INET",
+      "ATMSVC": "@zune/globaltype/_zune_net_ADDRF.ATMSVC",
+      "MAX": "@zune/globaltype/_zune_net_ADDRF.MAX",
+      "NETLINK": "@zune/globaltype/_zune_net_ADDRF.NETLINK",
+      "X25": "@zune/globaltype/_zune_net_ADDRF.X25",
+      "SECURITY": "@zune/globaltype/_zune_net_ADDRF.SECURITY",
+      "INET6": "@zune/globaltype/_zune_net_ADDRF.INET6",
+      "TIPC": "@zune/globaltype/_zune_net_ADDRF.TIPC",
+      "KEY": "@zune/globaltype/_zune_net_ADDRF.KEY",
+      "IRDA": "@zune/globaltype/_zune_net_ADDRF.IRDA",
+      "ECONET": "@zune/globaltype/_zune_net_ADDRF.ECONET",
+      "IPX": "@zune/globaltype/_zune_net_ADDRF.IPX",
+      "ASH": "@zune/globaltype/_zune_net_ADDRF.ASH",
+      "IB": "@zune/globaltype/_zune_net_ADDRF.IB",
+      "PACKET": "@zune/globaltype/_zune_net_ADDRF.PACKET",
+      "KCM": "@zune/globaltype/_zune_net_ADDRF.KCM",
+      "DECnet": "@zune/globaltype/_zune_net_ADDRF.DECnet",
+      "RXRPC": "@zune/globaltype/_zune_net_ADDRF.RXRPC",
+      "NETBEUI": "@zune/globaltype/_zune_net_ADDRF.NETBEUI",
+      "ALG": "@zune/globaltype/_zune_net_ADDRF.ALG",
+      "IEEE802154": "@zune/globaltype/_zune_net_ADDRF.IEEE802154",
+      "ISDN": "@zune/globaltype/_zune_net_ADDRF.ISDN",
+      "APPLETALK": "@zune/globaltype/_zune_net_ADDRF.APPLETALK",
+      "XDP": "@zune/globaltype/_zune_net_ADDRF.XDP",
+      "LOCAL": "@zune/globaltype/_zune_net_ADDRF.LOCAL",
+      "LLC": "@zune/globaltype/_zune_net_ADDRF.LLC",
+      "CAN": "@zune/globaltype/_zune_net_ADDRF.CAN",
+      "BLUETOOTH": "@zune/globaltype/_zune_net_ADDRF.BLUETOOTH",
+      "QIPCRTR": "@zune/globaltype/_zune_net_ADDRF.QIPCRTR",
+      "PPPOX": "@zune/globaltype/_zune_net_ADDRF.PPPOX",
+      "ATMPVC": "@zune/globaltype/_zune_net_ADDRF.ATMPVC",
+      "AX25": "@zune/globaltype/_zune_net_ADDRF.AX25",
+      "NFC": "@zune/globaltype/_zune_net_ADDRF.NFC",
+      "SMC": "@zune/globaltype/_zune_net_ADDRF.SMC",
+      "ROUTE": "@zune/globaltype/_zune_net_ADDRF.ROUTE",
+      "VSOCK": "@zune/globaltype/_zune_net_ADDRF.VSOCK"
     }
-  },
-  "@zune/globaltype/ZuneConfiguration.runtime.features": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "serde": "@zune/globaltype/ZuneConfiguration.runtime.features.serde",
-      "c": "@zune/globaltype/ZuneConfiguration.runtime.features.c",
-      "fs": "@zune/globaltype/ZuneConfiguration.runtime.features.fs",
-      "crypto": "@zune/globaltype/ZuneConfiguration.runtime.features.crypto",
-      "thread": "@zune/globaltype/ZuneConfiguration.runtime.features.thread",
-      "time": "@zune/globaltype/ZuneConfiguration.runtime.features.time",
-      "process": "@zune/globaltype/ZuneConfiguration.runtime.features.process",
-      "ascii": "@zune/globaltype/ZuneConfiguration.runtime.features.ascii",
-      "regex": "@zune/globaltype/ZuneConfiguration.runtime.features.regex",
-      "task": "@zune/globaltype/ZuneConfiguration.runtime.features.task",
-      "testing": "@zune/globaltype/ZuneConfiguration.runtime.features.testing",
-      "luau": "@zune/globaltype/ZuneConfiguration.runtime.features.luau",
-      "platform": "@zune/globaltype/ZuneConfiguration.runtime.features.platform",
-      "debug": "@zune/globaltype/ZuneConfiguration.runtime.features.debug",
-      "net": "@zune/globaltype/ZuneConfiguration.runtime.features.net",
-      "config": "@zune/globaltype/ZuneConfiguration.runtime.features.config",
-      "gpio": "@zune/globaltype/ZuneConfiguration.runtime.features.gpio",
-      "mem": "@zune/globaltype/ZuneConfiguration.runtime.features.mem",
-      "fmt": "@zune/globaltype/ZuneConfiguration.runtime.features.fmt",
-      "require": "@zune/globaltype/ZuneConfiguration.runtime.features.require",
-      "random": "@zune/globaltype/ZuneConfiguration.runtime.features.random",
-      "io": "@zune/globaltype/ZuneConfiguration.runtime.features.io"
-    }
-  },
-  "@zune/globaltype/ZuneConfiguration.format": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "table_address": "@zune/globaltype/ZuneConfiguration.format.table_address",
-      "max_depth": "@zune/globaltype/ZuneConfiguration.format.max_depth",
-      "enabled": "@zune/globaltype/ZuneConfiguration.format.enabled",
-      "use_color": "@zune/globaltype/ZuneConfiguration.format.use_color",
-      "recursive_table": "@zune/globaltype/ZuneConfiguration.format.recursive_table",
-      "buffer_max_display": "@zune/globaltype/ZuneConfiguration.format.buffer_max_display"
-    }
-  },
-  "@zune/globaltype/ZuneConfiguration.workspace": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "scripts": "@zune/globaltype/ZuneConfiguration.workspace.scripts",
-      "run_path": "@zune/globaltype/ZuneConfiguration.workspace.run_path"
-    }
-  },
-  "@zune/globaltype/ZuneConfiguration.workspace.scripts": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": []
-  },
-  "@zune/globaltype/BufferArrayOptions": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "limit": "@zune/globaltype/BufferArrayOptions.limit",
-      "size": "@zune/globaltype/BufferArrayOptions.size"
-    }
-  },
-  "@zune/globaltype/BufferArrayOptions.limit": {
-    "code_sample": "",
-    "documentation": "The maximum amount of bytes allowed to be written to the buffer."
-  },
-  "@zune/globaltype/BufferArrayOptions.size": {
-    "code_sample": "",
-    "documentation": "The initial size of the buffer."
   },
   "@zune/globaltype/_zune_fs_path": {
     "code_sample": "",
@@ -4585,6 +4719,7 @@
       "extension": "@zune/globaltype/_zune_fs_path.extension",
       "isAbsolute": "@zune/globaltype/_zune_fs_path.isAbsolute",
       "relative": "@zune/globaltype/_zune_fs_path.relative",
+      "parse": "@zune/globaltype/_zune_fs_path.parse",
       "join": "@zune/globaltype/_zune_fs_path.join",
       "stem": "@zune/globaltype/_zune_fs_path.stem",
       "basename": "@zune/globaltype/_zune_fs_path.basename",
@@ -4761,6 +4896,26 @@
     "code_sample": "",
     "documentation": "The glob pattern to match against."
   },
+  "@zune/globaltype/_zune_fs_path.parse": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_fs_path.parse/return/0"
+    ],
+    "params": [
+      {
+        "name": "path",
+        "documentation": "@zune/globaltype/_zune_fs_path.parse/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_fs_path.parse/return/0": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "disk": "@zune/globaltype/_zune_fs_path.parse/return/0.disk"
+    }
+  },
   "@zune/globaltype/_zune_io_terminal": {
     "code_sample": "",
     "documentation": "",
@@ -4826,61 +4981,278 @@
       "mode": "@zune/globaltype/OpenFileOptions.mode"
     }
   },
-  "@zune/globaltype/_zune_luau_fflag": {
+  "@zune/globaltype/_zune_net": {
     "code_sample": "",
-    "documentation": "",
+    "documentation": "A library to do networking in luau. Provides functions to create sockets, start an HTTP server, make HTTP requests, and handle WebSockets.",
     "keys": {
-      "list": "@zune/globaltype/_zune_luau_fflag.list",
-      "set": "@zune/globaltype/_zune_luau_fflag.set",
-      "get": "@zune/globaltype/_zune_luau_fflag.get"
+      "IPPROTO": "@zune/globaltype/_zune_net.IPPROTO",
+      "HAS_UNIX_SOCKETS": "@zune/globaltype/_zune_net.HAS_UNIX_SOCKETS",
+      "getAddressList": "@zune/globaltype/_zune_net.getAddressList",
+      "ADDRF": "@zune/globaltype/_zune_net.ADDRF",
+      "openSocket": "@zune/globaltype/_zune_net.openSocket",
+      "SOCK": "@zune/globaltype/_zune_net.SOCK"
+    },
+    "learn_more_link": "https://zune.sh/docs/v0.6.x/api/net"
+  },
+  "@zune/globaltype/_zune_net.ADDRF": {
+    "code_sample": "",
+    "documentation": "The table of address families.",
+    "keys": {
+      "RDS": "@zune/globaltype/_zune_net.ADDRF.RDS",
+      "ROSE": "@zune/globaltype/_zune_net.ADDRF.ROSE",
+      "BRIDGE": "@zune/globaltype/_zune_net.ADDRF.BRIDGE",
+      "PHONET": "@zune/globaltype/_zune_net.ADDRF.PHONET",
+      "SNA": "@zune/globaltype/_zune_net.ADDRF.SNA",
+      "FILE": "@zune/globaltype/_zune_net.ADDRF.FILE",
+      "MPLS": "@zune/globaltype/_zune_net.ADDRF.MPLS",
+      "IUCV": "@zune/globaltype/_zune_net.ADDRF.IUCV",
+      "WANPIPE": "@zune/globaltype/_zune_net.ADDRF.WANPIPE",
+      "UNSPEC": "@zune/globaltype/_zune_net.ADDRF.UNSPEC",
+      "CAIF": "@zune/globaltype/_zune_net.ADDRF.CAIF",
+      "NETROM": "@zune/globaltype/_zune_net.ADDRF.NETROM",
+      "UNIX": "@zune/globaltype/_zune_net.ADDRF.UNIX",
+      "INET": "@zune/globaltype/_zune_net.ADDRF.INET",
+      "ATMSVC": "@zune/globaltype/_zune_net.ADDRF.ATMSVC",
+      "MAX": "@zune/globaltype/_zune_net.ADDRF.MAX",
+      "NETLINK": "@zune/globaltype/_zune_net.ADDRF.NETLINK",
+      "X25": "@zune/globaltype/_zune_net.ADDRF.X25",
+      "SECURITY": "@zune/globaltype/_zune_net.ADDRF.SECURITY",
+      "INET6": "@zune/globaltype/_zune_net.ADDRF.INET6",
+      "TIPC": "@zune/globaltype/_zune_net.ADDRF.TIPC",
+      "KEY": "@zune/globaltype/_zune_net.ADDRF.KEY",
+      "IRDA": "@zune/globaltype/_zune_net.ADDRF.IRDA",
+      "ECONET": "@zune/globaltype/_zune_net.ADDRF.ECONET",
+      "IPX": "@zune/globaltype/_zune_net.ADDRF.IPX",
+      "ASH": "@zune/globaltype/_zune_net.ADDRF.ASH",
+      "IB": "@zune/globaltype/_zune_net.ADDRF.IB",
+      "PACKET": "@zune/globaltype/_zune_net.ADDRF.PACKET",
+      "KCM": "@zune/globaltype/_zune_net.ADDRF.KCM",
+      "DECnet": "@zune/globaltype/_zune_net.ADDRF.DECnet",
+      "RXRPC": "@zune/globaltype/_zune_net.ADDRF.RXRPC",
+      "NETBEUI": "@zune/globaltype/_zune_net.ADDRF.NETBEUI",
+      "ALG": "@zune/globaltype/_zune_net.ADDRF.ALG",
+      "IEEE802154": "@zune/globaltype/_zune_net.ADDRF.IEEE802154",
+      "ISDN": "@zune/globaltype/_zune_net.ADDRF.ISDN",
+      "APPLETALK": "@zune/globaltype/_zune_net.ADDRF.APPLETALK",
+      "XDP": "@zune/globaltype/_zune_net.ADDRF.XDP",
+      "LOCAL": "@zune/globaltype/_zune_net.ADDRF.LOCAL",
+      "LLC": "@zune/globaltype/_zune_net.ADDRF.LLC",
+      "CAN": "@zune/globaltype/_zune_net.ADDRF.CAN",
+      "BLUETOOTH": "@zune/globaltype/_zune_net.ADDRF.BLUETOOTH",
+      "QIPCRTR": "@zune/globaltype/_zune_net.ADDRF.QIPCRTR",
+      "PPPOX": "@zune/globaltype/_zune_net.ADDRF.PPPOX",
+      "ATMPVC": "@zune/globaltype/_zune_net.ADDRF.ATMPVC",
+      "AX25": "@zune/globaltype/_zune_net.ADDRF.AX25",
+      "NFC": "@zune/globaltype/_zune_net.ADDRF.NFC",
+      "SMC": "@zune/globaltype/_zune_net.ADDRF.SMC",
+      "ROUTE": "@zune/globaltype/_zune_net.ADDRF.ROUTE",
+      "VSOCK": "@zune/globaltype/_zune_net.ADDRF.VSOCK"
     }
   },
-  "@zune/globaltype/_zune_luau_fflag.get": {
+  "@zune/globaltype/_zune_net.SOCK": {
     "code_sample": "",
-    "documentation": "",
+    "documentation": "Table of socket flags.",
+    "keys": {
+      "DCCP": "@zune/globaltype/_zune_net.SOCK.DCCP",
+      "RAW": "@zune/globaltype/_zune_net.SOCK.RAW",
+      "RDM": "@zune/globaltype/_zune_net.SOCK.RDM",
+      "DGRAM": "@zune/globaltype/_zune_net.SOCK.DGRAM",
+      "PACKET": "@zune/globaltype/_zune_net.SOCK.PACKET",
+      "STREAM": "@zune/globaltype/_zune_net.SOCK.STREAM",
+      "SEQPACKET": "@zune/globaltype/_zune_net.SOCK.SEQPACKET",
+      "CLOEXEC": "@zune/globaltype/_zune_net.SOCK.CLOEXEC",
+      "NONBLOCK": "@zune/globaltype/_zune_net.SOCK.NONBLOCK"
+    }
+  },
+  "@zune/globaltype/_zune_net.IPPROTO": {
+    "code_sample": "",
+    "documentation": "Table of IP protocols.",
+    "keys": {
+      "COMP": "@zune/globaltype/_zune_net.IPPROTO.COMP",
+      "ICMP": "@zune/globaltype/_zune_net.IPPROTO.ICMP",
+      "ESP": "@zune/globaltype/_zune_net.IPPROTO.ESP",
+      "MPLS": "@zune/globaltype/_zune_net.IPPROTO.MPLS",
+      "TCP": "@zune/globaltype/_zune_net.IPPROTO.TCP",
+      "ICMPV6": "@zune/globaltype/_zune_net.IPPROTO.ICMPV6",
+      "MTP": "@zune/globaltype/_zune_net.IPPROTO.MTP",
+      "GRE": "@zune/globaltype/_zune_net.IPPROTO.GRE",
+      "SCTP": "@zune/globaltype/_zune_net.IPPROTO.SCTP",
+      "MAX": "@zune/globaltype/_zune_net.IPPROTO.MAX",
+      "NONE": "@zune/globaltype/_zune_net.IPPROTO.NONE",
+      "RSVP": "@zune/globaltype/_zune_net.IPPROTO.RSVP",
+      "IDP": "@zune/globaltype/_zune_net.IPPROTO.IDP",
+      "UDPLITE": "@zune/globaltype/_zune_net.IPPROTO.UDPLITE",
+      "HOPOPTS": "@zune/globaltype/_zune_net.IPPROTO.HOPOPTS",
+      "MH": "@zune/globaltype/_zune_net.IPPROTO.MH",
+      "BEETPH": "@zune/globaltype/_zune_net.IPPROTO.BEETPH",
+      "AH": "@zune/globaltype/_zune_net.IPPROTO.AH",
+      "IPIP": "@zune/globaltype/_zune_net.IPPROTO.IPIP",
+      "IPV6": "@zune/globaltype/_zune_net.IPPROTO.IPV6",
+      "PIM": "@zune/globaltype/_zune_net.IPPROTO.PIM",
+      "DSTOPTS": "@zune/globaltype/_zune_net.IPPROTO.DSTOPTS",
+      "UDP": "@zune/globaltype/_zune_net.IPPROTO.UDP",
+      "DCCP": "@zune/globaltype/_zune_net.IPPROTO.DCCP",
+      "RAW": "@zune/globaltype/_zune_net.IPPROTO.RAW",
+      "PUP": "@zune/globaltype/_zune_net.IPPROTO.PUP",
+      "IGMP": "@zune/globaltype/_zune_net.IPPROTO.IGMP",
+      "ENCAP": "@zune/globaltype/_zune_net.IPPROTO.ENCAP",
+      "FRAGMENT": "@zune/globaltype/_zune_net.IPPROTO.FRAGMENT",
+      "ROUTING": "@zune/globaltype/_zune_net.IPPROTO.ROUTING",
+      "EGP": "@zune/globaltype/_zune_net.IPPROTO.EGP",
+      "TP": "@zune/globaltype/_zune_net.IPPROTO.TP",
+      "IP": "@zune/globaltype/_zune_net.IPPROTO.IP"
+    }
+  },
+  "@zune/globaltype/_zune_net.openSocket": {
+    "code_sample": "",
+    "documentation": "Creates a new socket from OS.\n\n**Parameters**\n- `protocol`: The protocol to use.\n\n\n**Throws**\n- IO Error\n- Network Error\n",
     "returns": [
-      "@zune/globaltype/_zune_luau_fflag.get/return/0"
+      "@zune/globaltype/_zune_net.openSocket/return/0"
     ],
     "params": [
       {
-        "name": "name",
-        "documentation": "@zune/globaltype/_zune_luau_fflag.get/param/0"
-      }
-    ]
-  },
-  "@zune/globaltype/_zune_luau_fflag.set": {
-    "code_sample": "",
-    "documentation": "",
-    "returns": [],
-    "params": [
-      {
-        "name": "name",
-        "documentation": "@zune/globaltype/_zune_luau_fflag.set/param/0"
+        "name": "domain",
+        "documentation": "@zune/globaltype/_zune_net.openSocket/param/0"
       },
       {
-        "name": "value",
-        "documentation": "@zune/globaltype/_zune_luau_fflag.set/param/1"
+        "name": "type",
+        "documentation": "@zune/globaltype/_zune_net.openSocket/param/1"
+      },
+      {
+        "name": "protocol",
+        "documentation": "@zune/globaltype/_zune_net.openSocket/param/2"
       }
     ]
   },
-  "@zune/globaltype/_zune_luau_fflag.list": {
+  "@zune/globaltype/_zune_net.openSocket/param/2": {
     "code_sample": "",
-    "documentation": "",
-    "returns": [
-      "@zune/globaltype/_zune_luau_fflag.list/return/0"
-    ],
-    "params": []
+    "documentation": "The protocol to use."
   },
-  "@zune/globaltype/SerdeJsonEncodeConfig": {
+  "@zune/globaltype/_zune_net.getAddressList": {
+    "code_sample": "",
+    "documentation": "Gets a list of addresses for the provided name and port.\n\n**Parameters**\n- `name`: The name to resolve.\n- `port`: The port to resolve.\n\n\n**Throws**\n- IO Error\n",
+    "returns": [
+      "@zune/globaltype/_zune_net.getAddressList/return/0"
+    ],
+    "params": [
+      {
+        "name": "name",
+        "documentation": "@zune/globaltype/_zune_net.getAddressList/param/0"
+      },
+      {
+        "name": "port",
+        "documentation": "@zune/globaltype/_zune_net.getAddressList/param/1"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_net.getAddressList/param/0": {
+    "code_sample": "",
+    "documentation": "The name to resolve."
+  },
+  "@zune/globaltype/_zune_net.getAddressList/param/1": {
+    "code_sample": "",
+    "documentation": "The port to resolve."
+  },
+  "@zune/globaltype/ZuneConfiguration": {
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "pretty_indent": "@zune/globaltype/SerdeJsonEncodeConfig.pretty_indent"
+      "runtime": "@zune/globaltype/ZuneConfiguration.runtime",
+      "format": "@zune/globaltype/ZuneConfiguration.format",
+      "workspace": "@zune/globaltype/ZuneConfiguration.workspace"
     }
   },
-  "@zune/globaltype/SerdeJsonEncodeConfig.pretty_indent": {
+  "@zune/globaltype/ZuneConfiguration.runtime": {
     "code_sample": "",
-    "documentation": "The indentation level for pretty printing"
+    "documentation": "",
+    "keys": {
+      "luau": "@zune/globaltype/ZuneConfiguration.runtime.luau",
+      "use_detailed_error": "@zune/globaltype/ZuneConfiguration.runtime.use_detailed_error",
+      "features": "@zune/globaltype/ZuneConfiguration.runtime.features"
+    }
+  },
+  "@zune/globaltype/ZuneConfiguration.runtime.luau": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "default_ncg": "@zune/globaltype/ZuneConfiguration.runtime.luau.default_ncg",
+      "jit_enabled": "@zune/globaltype/ZuneConfiguration.runtime.luau.jit_enabled",
+      "optimization_level": "@zune/globaltype/ZuneConfiguration.runtime.luau.optimization_level",
+      "debug_level": "@zune/globaltype/ZuneConfiguration.runtime.luau.debug_level",
+      "coverage_level": "@zune/globaltype/ZuneConfiguration.runtime.luau.coverage_level"
+    }
+  },
+  "@zune/globaltype/ZuneConfiguration.runtime.features": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "serde": "@zune/globaltype/ZuneConfiguration.runtime.features.serde",
+      "c": "@zune/globaltype/ZuneConfiguration.runtime.features.c",
+      "fs": "@zune/globaltype/ZuneConfiguration.runtime.features.fs",
+      "crypto": "@zune/globaltype/ZuneConfiguration.runtime.features.crypto",
+      "thread": "@zune/globaltype/ZuneConfiguration.runtime.features.thread",
+      "time": "@zune/globaltype/ZuneConfiguration.runtime.features.time",
+      "process": "@zune/globaltype/ZuneConfiguration.runtime.features.process",
+      "ascii": "@zune/globaltype/ZuneConfiguration.runtime.features.ascii",
+      "regex": "@zune/globaltype/ZuneConfiguration.runtime.features.regex",
+      "task": "@zune/globaltype/ZuneConfiguration.runtime.features.task",
+      "testing": "@zune/globaltype/ZuneConfiguration.runtime.features.testing",
+      "luau": "@zune/globaltype/ZuneConfiguration.runtime.features.luau",
+      "platform": "@zune/globaltype/ZuneConfiguration.runtime.features.platform",
+      "debug": "@zune/globaltype/ZuneConfiguration.runtime.features.debug",
+      "net": "@zune/globaltype/ZuneConfiguration.runtime.features.net",
+      "config": "@zune/globaltype/ZuneConfiguration.runtime.features.config",
+      "gpio": "@zune/globaltype/ZuneConfiguration.runtime.features.gpio",
+      "mem": "@zune/globaltype/ZuneConfiguration.runtime.features.mem",
+      "fmt": "@zune/globaltype/ZuneConfiguration.runtime.features.fmt",
+      "require": "@zune/globaltype/ZuneConfiguration.runtime.features.require",
+      "random": "@zune/globaltype/ZuneConfiguration.runtime.features.random",
+      "io": "@zune/globaltype/ZuneConfiguration.runtime.features.io"
+    }
+  },
+  "@zune/globaltype/ZuneConfiguration.format": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "enabled": "@zune/globaltype/ZuneConfiguration.format.enabled",
+      "indent": "@zune/globaltype/ZuneConfiguration.format.indent",
+      "sorted": "@zune/globaltype/ZuneConfiguration.format.sorted",
+      "max_depth": "@zune/globaltype/ZuneConfiguration.format.max_depth",
+      "recursive_table": "@zune/globaltype/ZuneConfiguration.format.recursive_table",
+      "use_color": "@zune/globaltype/ZuneConfiguration.format.use_color",
+      "table_address": "@zune/globaltype/ZuneConfiguration.format.table_address",
+      "buffer_max_display": "@zune/globaltype/ZuneConfiguration.format.buffer_max_display"
+    }
+  },
+  "@zune/globaltype/ZuneConfiguration.workspace": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "scripts": "@zune/globaltype/ZuneConfiguration.workspace.scripts",
+      "run_path": "@zune/globaltype/ZuneConfiguration.workspace.run_path"
+    }
+  },
+  "@zune/globaltype/ZuneConfiguration.workspace.scripts": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": []
+  },
+  "@zune/globaltype/BufferArrayOptions": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "with": "@zune/globaltype/BufferArrayOptions.with",
+      "limit": "@zune/globaltype/BufferArrayOptions.limit",
+      "size": "@zune/globaltype/BufferArrayOptions.size"
+    }
+  },
+  "@zune/globaltype/BufferArrayOptions.limit": {
+    "code_sample": "",
+    "documentation": "The maximum amount of bytes allowed to be written to the buffer."
+  },
+  "@zune/globaltype/BufferArrayOptions.size": {
+    "code_sample": "",
+    "documentation": "The initial size of the buffer."
   },
   "@zune/globaltype/Location": {
     "code_sample": "",
@@ -4895,218 +5267,6 @@
     "keys": {
       "column": "@zune/globaltype/Location.begin.column",
       "line": "@zune/globaltype/Location.begin.line"
-    }
-  },
-  "@zune/globaltype/_zune_luau": {
-    "code_sample": "",
-    "documentation": "A library to parse, compile and run luau code.",
-    "keys": {
-      "coverage": "@zune/globaltype/_zune_luau.coverage",
-      "fflag": "@zune/globaltype/_zune_luau.fflag",
-      "sync": "@zune/globaltype/_zune_luau.sync",
-      "parse": "@zune/globaltype/_zune_luau.parse",
-      "parseExpr": "@zune/globaltype/_zune_luau.parseExpr",
-      "compile": "@zune/globaltype/_zune_luau.compile",
-      "load": "@zune/globaltype/_zune_luau.load",
-      "garbagecollect": "@zune/globaltype/_zune_luau.garbagecollect"
-    },
-    "learn_more_link": "https://zune.sh/docs/v0.6.x/api/luau"
-  },
-  "@zune/globaltype/_zune_luau.compile": {
-    "code_sample": "",
-    "documentation": "Compiles `Luau` source code.\n\n**Parameters**\n- `source`: The source code to compile.\n- `opts`: The options for the compiler.\n\n\n**Throws**\n- Luau Error\n- Memory Error\n",
-    "returns": [
-      "@zune/globaltype/_zune_luau.compile/return/0"
-    ],
-    "params": [
-      {
-        "name": "source",
-        "documentation": "@zune/globaltype/_zune_luau.compile/param/0"
-      },
-      {
-        "name": "opts",
-        "documentation": "@zune/globaltype/_zune_luau.compile/param/1"
-      }
-    ]
-  },
-  "@zune/globaltype/_zune_luau.compile/param/0": {
-    "code_sample": "",
-    "documentation": "The source code to compile."
-  },
-  "@zune/globaltype/_zune_luau.compile/param/1": {
-    "code_sample": "",
-    "documentation": "The options for the compiler."
-  },
-  "@zune/globaltype/_zune_luau.load": {
-    "code_sample": "",
-    "documentation": "Loads `Luau` bytecode into a function.\n\n**Parameters**\n- `bytecode`: The bytecode to load.\n- `opts`: The options for loading the bytecode.\n\n\n**Throws**\n- Luau Error\n",
-    "returns": [
-      "@zune/globaltype/_zune_luau.load/return/0"
-    ],
-    "params": [
-      {
-        "name": "bytecode",
-        "documentation": "@zune/globaltype/_zune_luau.load/param/0"
-      },
-      {
-        "name": "opts",
-        "documentation": "@zune/globaltype/_zune_luau.load/param/1"
-      }
-    ]
-  },
-  "@zune/globaltype/_zune_luau.load/param/0": {
-    "code_sample": "",
-    "documentation": "The bytecode to load."
-  },
-  "@zune/globaltype/_zune_luau.load/param/1": {
-    "code_sample": "",
-    "documentation": "The options for loading the bytecode."
-  },
-  "@zune/globaltype/_zune_luau.coverage": {
-    "code_sample": "",
-    "documentation": "Get coverage data from a function.\n\n**Parameters**\n- `fn`: The function to get the coverage data from.\n",
-    "returns": [
-      "@zune/globaltype/_zune_luau.coverage/return/0"
-    ],
-    "params": [
-      {
-        "name": "fn",
-        "documentation": "@zune/globaltype/_zune_luau.coverage/param/0"
-      }
-    ]
-  },
-  "@zune/globaltype/_zune_luau.coverage/param/0": {
-    "code_sample": "",
-    "documentation": "The function to get the coverage data from.",
-    "returns": [],
-    "params": [
-      {
-        "name": "...",
-        "documentation": "@zune/globaltype/_zune_luau.coverage/param/0/param/0"
-      }
-    ]
-  },
-  "@zune/globaltype/_zune_luau.sync": {
-    "code_sample": "",
-    "documentation": "",
-    "returns": [],
-    "params": [
-      {
-        "documentation": "@zune/globaltype/_zune_luau.sync/param/0"
-      },
-      {
-        "name": "...",
-        "documentation": "@zune/globaltype/_zune_luau.sync/param/1"
-      }
-    ]
-  },
-  "@zune/globaltype/_zune_luau.sync/param/0": {
-    "code_sample": "",
-    "documentation": "",
-    "returns": [],
-    "params": [
-      {
-        "name": "...",
-        "documentation": "@zune/globaltype/_zune_luau.sync/param/0/param/0"
-      }
-    ]
-  },
-  "@zune/globaltype/_zune_luau.garbagecollect": {
-    "code_sample": "",
-    "documentation": "Runs a full garbage collection cycle.",
-    "returns": [],
-    "params": [
-      {
-        "name": "step",
-        "documentation": "@zune/globaltype/_zune_luau.garbagecollect/param/0"
-      }
-    ]
-  },
-  "@zune/globaltype/_zune_luau.fflag": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "list": "@zune/globaltype/_zune_luau.fflag.list",
-      "set": "@zune/globaltype/_zune_luau.fflag.set",
-      "get": "@zune/globaltype/_zune_luau.fflag.get"
-    }
-  },
-  "@zune/globaltype/_zune_luau.fflag.get": {
-    "code_sample": "",
-    "documentation": "",
-    "returns": [
-      "@zune/globaltype/_zune_luau.fflag.get/return/0"
-    ],
-    "params": [
-      {
-        "name": "name",
-        "documentation": "@zune/globaltype/_zune_luau.fflag.get/param/0"
-      }
-    ]
-  },
-  "@zune/globaltype/_zune_luau.fflag.set": {
-    "code_sample": "",
-    "documentation": "",
-    "returns": [],
-    "params": [
-      {
-        "name": "name",
-        "documentation": "@zune/globaltype/_zune_luau.fflag.set/param/0"
-      },
-      {
-        "name": "value",
-        "documentation": "@zune/globaltype/_zune_luau.fflag.set/param/1"
-      }
-    ]
-  },
-  "@zune/globaltype/_zune_luau.fflag.list": {
-    "code_sample": "",
-    "documentation": "",
-    "returns": [
-      "@zune/globaltype/_zune_luau.fflag.list/return/0"
-    ],
-    "params": []
-  },
-  "@zune/globaltype/_zune_luau.parse": {
-    "code_sample": "",
-    "documentation": "Parses `Luau` source code.\n\n**Parameters**\n- `src`: The source code to parse.\n\n\n**Throws**\n- Memory Error\n",
-    "returns": [
-      "@zune/globaltype/_zune_luau.parse/return/0"
-    ],
-    "params": [
-      {
-        "name": "src",
-        "documentation": "@zune/globaltype/_zune_luau.parse/param/0"
-      }
-    ]
-  },
-  "@zune/globaltype/_zune_luau.parse/param/0": {
-    "code_sample": "",
-    "documentation": "The source code to parse."
-  },
-  "@zune/globaltype/_zune_luau.parseExpr": {
-    "code_sample": "",
-    "documentation": "Parses a `Luau` expression.\n\n**Parameters**\n- `src`: The expression to parse.\n\n\n**Throws**\n- Memory Error\n",
-    "returns": [
-      "@zune/globaltype/_zune_luau.parseExpr/return/0"
-    ],
-    "params": [
-      {
-        "name": "src",
-        "documentation": "@zune/globaltype/_zune_luau.parseExpr/param/0"
-      }
-    ]
-  },
-  "@zune/globaltype/_zune_luau.parseExpr/param/0": {
-    "code_sample": "",
-    "documentation": "The expression to parse."
-  },
-  "@zune/globaltype/DirectoryEntry": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "name": "@zune/globaltype/DirectoryEntry.name",
-      "kind": "@zune/globaltype/DirectoryEntry.kind"
     }
   },
   "@zune/globaltype/_zune_regex": {
@@ -5148,16 +5308,6 @@
     "keys": {
       "port": "@zune/globaltype/NetworkAddress.port",
       "address": "@zune/globaltype/NetworkAddress.address"
-    }
-  },
-  "@zune/globaltype/DirAccessOptions": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "execute": "@zune/globaltype/DirAccessOptions.execute",
-      "follow_symlinks": "@zune/globaltype/DirAccessOptions.follow_symlinks",
-      "write": "@zune/globaltype/DirAccessOptions.write",
-      "read": "@zune/globaltype/DirAccessOptions.read"
     }
   },
   "@zune/globaltype/_zune_random_Isaac64": {
@@ -5385,10 +5535,215 @@
     ],
     "params": []
   },
+  "@zune/globaltype/_zune_luau": {
+    "code_sample": "",
+    "documentation": "A library to parse, compile and run luau code.",
+    "keys": {
+      "coverage": "@zune/globaltype/_zune_luau.coverage",
+      "fflag": "@zune/globaltype/_zune_luau.fflag",
+      "sync": "@zune/globaltype/_zune_luau.sync",
+      "parse": "@zune/globaltype/_zune_luau.parse",
+      "parseExpr": "@zune/globaltype/_zune_luau.parseExpr",
+      "compile": "@zune/globaltype/_zune_luau.compile",
+      "load": "@zune/globaltype/_zune_luau.load",
+      "garbagecollect": "@zune/globaltype/_zune_luau.garbagecollect"
+    },
+    "learn_more_link": "https://zune.sh/docs/v0.6.x/api/luau"
+  },
+  "@zune/globaltype/_zune_luau.compile": {
+    "code_sample": "",
+    "documentation": "Compiles `Luau` source code.\n\n**Parameters**\n- `source`: The source code to compile.\n- `opts`: The options for the compiler.\n\n\n**Throws**\n- Luau Error\n- Memory Error\n",
+    "returns": [
+      "@zune/globaltype/_zune_luau.compile/return/0"
+    ],
+    "params": [
+      {
+        "name": "source",
+        "documentation": "@zune/globaltype/_zune_luau.compile/param/0"
+      },
+      {
+        "name": "opts",
+        "documentation": "@zune/globaltype/_zune_luau.compile/param/1"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_luau.compile/param/0": {
+    "code_sample": "",
+    "documentation": "The source code to compile."
+  },
+  "@zune/globaltype/_zune_luau.compile/param/1": {
+    "code_sample": "",
+    "documentation": "The options for the compiler."
+  },
+  "@zune/globaltype/_zune_luau.load": {
+    "code_sample": "",
+    "documentation": "Loads `Luau` bytecode into a function.\n\n**Parameters**\n- `bytecode`: The bytecode to load.\n- `opts`: The options for loading the bytecode.\n\n\n**Throws**\n- Luau Error\n",
+    "returns": [
+      "@zune/globaltype/_zune_luau.load/return/0"
+    ],
+    "params": [
+      {
+        "name": "bytecode",
+        "documentation": "@zune/globaltype/_zune_luau.load/param/0"
+      },
+      {
+        "name": "opts",
+        "documentation": "@zune/globaltype/_zune_luau.load/param/1"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_luau.load/param/0": {
+    "code_sample": "",
+    "documentation": "The bytecode to load."
+  },
+  "@zune/globaltype/_zune_luau.load/param/1": {
+    "code_sample": "",
+    "documentation": "The options for loading the bytecode."
+  },
+  "@zune/globaltype/_zune_luau.coverage": {
+    "code_sample": "",
+    "documentation": "Get coverage data from a function.\n\n**Parameters**\n- `fn`: The function to get the coverage data from.\n",
+    "returns": [
+      "@zune/globaltype/_zune_luau.coverage/return/0"
+    ],
+    "params": [
+      {
+        "name": "fn",
+        "documentation": "@zune/globaltype/_zune_luau.coverage/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_luau.coverage/param/0": {
+    "code_sample": "",
+    "documentation": "The function to get the coverage data from.",
+    "returns": [],
+    "params": [
+      {
+        "name": "...",
+        "documentation": "@zune/globaltype/_zune_luau.coverage/param/0/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_luau.sync": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [],
+    "params": [
+      {
+        "documentation": "@zune/globaltype/_zune_luau.sync/param/0"
+      },
+      {
+        "name": "...",
+        "documentation": "@zune/globaltype/_zune_luau.sync/param/1"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_luau.sync/param/0": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [],
+    "params": [
+      {
+        "name": "...",
+        "documentation": "@zune/globaltype/_zune_luau.sync/param/0/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_luau.garbagecollect": {
+    "code_sample": "",
+    "documentation": "Runs a full garbage collection cycle.",
+    "returns": [],
+    "params": [
+      {
+        "name": "step",
+        "documentation": "@zune/globaltype/_zune_luau.garbagecollect/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_luau.fflag": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "list": "@zune/globaltype/_zune_luau.fflag.list",
+      "set": "@zune/globaltype/_zune_luau.fflag.set",
+      "get": "@zune/globaltype/_zune_luau.fflag.get"
+    }
+  },
+  "@zune/globaltype/_zune_luau.fflag.get": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_luau.fflag.get/return/0"
+    ],
+    "params": [
+      {
+        "name": "name",
+        "documentation": "@zune/globaltype/_zune_luau.fflag.get/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_luau.fflag.set": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [],
+    "params": [
+      {
+        "name": "name",
+        "documentation": "@zune/globaltype/_zune_luau.fflag.set/param/0"
+      },
+      {
+        "name": "value",
+        "documentation": "@zune/globaltype/_zune_luau.fflag.set/param/1"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_luau.fflag.list": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_luau.fflag.list/return/0"
+    ],
+    "params": []
+  },
+  "@zune/globaltype/_zune_luau.parse": {
+    "code_sample": "",
+    "documentation": "Parses `Luau` source code.\n\n**Parameters**\n- `src`: The source code to parse.\n\n\n**Throws**\n- Memory Error\n",
+    "returns": [
+      "@zune/globaltype/_zune_luau.parse/return/0"
+    ],
+    "params": [
+      {
+        "name": "src",
+        "documentation": "@zune/globaltype/_zune_luau.parse/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_luau.parse/param/0": {
+    "code_sample": "",
+    "documentation": "The source code to parse."
+  },
+  "@zune/globaltype/_zune_luau.parseExpr": {
+    "code_sample": "",
+    "documentation": "Parses a `Luau` expression.\n\n**Parameters**\n- `src`: The expression to parse.\n\n\n**Throws**\n- Memory Error\n",
+    "returns": [
+      "@zune/globaltype/_zune_luau.parseExpr/return/0"
+    ],
+    "params": [
+      {
+        "name": "src",
+        "documentation": "@zune/globaltype/_zune_luau.parseExpr/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_luau.parseExpr/param/0": {
+    "code_sample": "",
+    "documentation": "The expression to parse."
+  },
   "@zune/globaltype/_zune_serde": {
     "code_sample": "",
     "documentation": "A library to serialize and deserialize data in luau.",
     "keys": {
+      "luau": "@zune/globaltype/_zune_serde.luau",
       "gzip": "@zune/globaltype/_zune_serde.gzip",
       "flate": "@zune/globaltype/_zune_serde.flate",
       "json": "@zune/globaltype/_zune_serde.json",
@@ -5407,7 +5762,7 @@
     "documentation": "",
     "keys": {
       "encode": "@zune/globaltype/_zune_serde.json.encode",
-      "values": "@zune/globaltype/_zune_serde.json.values",
+      "null": "@zune/globaltype/_zune_serde.json.null",
       "decode": "@zune/globaltype/_zune_serde.json.decode",
       "indents": "@zune/globaltype/_zune_serde.json.indents"
     }
@@ -5472,19 +5827,12 @@
       "none": "@zune/globaltype/_zune_serde.json.indents.none"
     }
   },
-  "@zune/globaltype/_zune_serde.json.values": {
-    "code_sample": "",
-    "documentation": "Special values for JSON.",
-    "keys": {
-      "null": "@zune/globaltype/_zune_serde.json.values.null"
-    }
-  },
   "@zune/globaltype/_zune_serde.json5": {
     "code_sample": "",
     "documentation": "",
     "keys": {
       "encode": "@zune/globaltype/_zune_serde.json5.encode",
-      "values": "@zune/globaltype/_zune_serde.json5.values",
+      "null": "@zune/globaltype/_zune_serde.json5.null",
       "decode": "@zune/globaltype/_zune_serde.json5.decode",
       "indents": "@zune/globaltype/_zune_serde.json5.indents"
     }
@@ -5547,13 +5895,6 @@
       "four_spaces": "@zune/globaltype/_zune_serde.json5.indents.four_spaces",
       "two_spaces": "@zune/globaltype/_zune_serde.json5.indents.two_spaces",
       "none": "@zune/globaltype/_zune_serde.json5.indents.none"
-    }
-  },
-  "@zune/globaltype/_zune_serde.json5.values": {
-    "code_sample": "",
-    "documentation": "Special values for JSON.",
-    "keys": {
-      "null": "@zune/globaltype/_zune_serde.json5.values.null"
     }
   },
   "@zune/globaltype/_zune_serde.toml": {
@@ -5622,6 +5963,10 @@
       {
         "name": "object",
         "documentation": "@zune/globaltype/_zune_serde.yaml.encode/param/0"
+      },
+      {
+        "name": "config",
+        "documentation": "@zune/globaltype/_zune_serde.yaml.encode/param/1"
       }
     ]
   },
@@ -5645,6 +5990,30 @@
   "@zune/globaltype/_zune_serde.yaml.decode/param/0": {
     "code_sample": "",
     "documentation": "The YAML string to decode."
+  },
+  "@zune/globaltype/_zune_serde.luau": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "encode": "@zune/globaltype/_zune_serde.luau.encode"
+    }
+  },
+  "@zune/globaltype/_zune_serde.luau.encode": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_serde.luau.encode/return/0"
+    ],
+    "params": [
+      {
+        "name": "value",
+        "documentation": "@zune/globaltype/_zune_serde.luau.encode/param/0"
+      },
+      {
+        "name": "config",
+        "documentation": "@zune/globaltype/_zune_serde.luau.encode/param/1"
+      }
+    ]
   },
   "@zune/globaltype/_zune_serde.base64": {
     "code_sample": "",
@@ -5730,9 +6099,11 @@
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "decompress": "@zune/globaltype/_zune_serde.gzip.decompress",
+      "compress": "@zune/globaltype/_zune_serde.gzip.compress",
+      "createDecompressor": "@zune/globaltype/_zune_serde.gzip.createDecompressor",
+      "createCompressor": "@zune/globaltype/_zune_serde.gzip.createCompressor",
       "calcSize": "@zune/globaltype/_zune_serde.gzip.calcSize",
-      "compress": "@zune/globaltype/_zune_serde.gzip.compress"
+      "decompress": "@zune/globaltype/_zune_serde.gzip.decompress"
     }
   },
   "@zune/globaltype/_zune_serde.gzip.calcSize": {
@@ -5810,13 +6181,45 @@
       }
     ]
   },
+  "@zune/globaltype/_zune_serde.gzip.createCompressor": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_serde.gzip.createCompressor/return/0"
+    ],
+    "params": [
+      {
+        "name": "output",
+        "documentation": "@zune/globaltype/_zune_serde.gzip.createCompressor/param/0"
+      },
+      {
+        "name": "level",
+        "documentation": "@zune/globaltype/_zune_serde.gzip.createCompressor/param/1"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_serde.gzip.createDecompressor": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_serde.gzip.createDecompressor/return/0"
+    ],
+    "params": [
+      {
+        "name": "input",
+        "documentation": "@zune/globaltype/_zune_serde.gzip.createDecompressor/param/0"
+      }
+    ]
+  },
   "@zune/globaltype/_zune_serde.flate": {
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "decompress": "@zune/globaltype/_zune_serde.flate.decompress",
+      "compress": "@zune/globaltype/_zune_serde.flate.compress",
+      "createDecompressor": "@zune/globaltype/_zune_serde.flate.createDecompressor",
+      "createCompressor": "@zune/globaltype/_zune_serde.flate.createCompressor",
       "calcSize": "@zune/globaltype/_zune_serde.flate.calcSize",
-      "compress": "@zune/globaltype/_zune_serde.flate.compress"
+      "decompress": "@zune/globaltype/_zune_serde.flate.decompress"
     }
   },
   "@zune/globaltype/_zune_serde.flate.calcSize": {
@@ -5894,13 +6297,45 @@
       }
     ]
   },
+  "@zune/globaltype/_zune_serde.flate.createCompressor": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_serde.flate.createCompressor/return/0"
+    ],
+    "params": [
+      {
+        "name": "output",
+        "documentation": "@zune/globaltype/_zune_serde.flate.createCompressor/param/0"
+      },
+      {
+        "name": "level",
+        "documentation": "@zune/globaltype/_zune_serde.flate.createCompressor/param/1"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_serde.flate.createDecompressor": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_serde.flate.createDecompressor/return/0"
+    ],
+    "params": [
+      {
+        "name": "input",
+        "documentation": "@zune/globaltype/_zune_serde.flate.createDecompressor/param/0"
+      }
+    ]
+  },
   "@zune/globaltype/_zune_serde.zlib": {
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "decompress": "@zune/globaltype/_zune_serde.zlib.decompress",
+      "compress": "@zune/globaltype/_zune_serde.zlib.compress",
+      "createDecompressor": "@zune/globaltype/_zune_serde.zlib.createDecompressor",
+      "createCompressor": "@zune/globaltype/_zune_serde.zlib.createCompressor",
       "calcSize": "@zune/globaltype/_zune_serde.zlib.calcSize",
-      "compress": "@zune/globaltype/_zune_serde.zlib.compress"
+      "decompress": "@zune/globaltype/_zune_serde.zlib.decompress"
     }
   },
   "@zune/globaltype/_zune_serde.zlib.calcSize": {
@@ -5978,13 +6413,45 @@
       }
     ]
   },
+  "@zune/globaltype/_zune_serde.zlib.createCompressor": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_serde.zlib.createCompressor/return/0"
+    ],
+    "params": [
+      {
+        "name": "output",
+        "documentation": "@zune/globaltype/_zune_serde.zlib.createCompressor/param/0"
+      },
+      {
+        "name": "level",
+        "documentation": "@zune/globaltype/_zune_serde.zlib.createCompressor/param/1"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_serde.zlib.createDecompressor": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_serde.zlib.createDecompressor/return/0"
+    ],
+    "params": [
+      {
+        "name": "input",
+        "documentation": "@zune/globaltype/_zune_serde.zlib.createDecompressor/param/0"
+      }
+    ]
+  },
   "@zune/globaltype/_zune_serde.zstd": {
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "decompress": "@zune/globaltype/_zune_serde.zstd.decompress",
+      "compress": "@zune/globaltype/_zune_serde.zstd.compress",
+      "createDecompressor": "@zune/globaltype/_zune_serde.zstd.createDecompressor",
+      "createCompressor": "@zune/globaltype/_zune_serde.zstd.createCompressor",
       "calcSize": "@zune/globaltype/_zune_serde.zstd.calcSize",
-      "compress": "@zune/globaltype/_zune_serde.zstd.compress"
+      "decompress": "@zune/globaltype/_zune_serde.zstd.decompress"
     }
   },
   "@zune/globaltype/_zune_serde.zstd.calcSize": {
@@ -6059,6 +6526,36 @@
       {
         "name": "count",
         "documentation": "@zune/globaltype/_zune_serde.zstd.decompress/param/4"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_serde.zstd.createCompressor": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_serde.zstd.createCompressor/return/0"
+    ],
+    "params": [
+      {
+        "name": "output",
+        "documentation": "@zune/globaltype/_zune_serde.zstd.createCompressor/param/0"
+      },
+      {
+        "name": "level",
+        "documentation": "@zune/globaltype/_zune_serde.zstd.createCompressor/param/1"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_serde.zstd.createDecompressor": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_serde.zstd.createDecompressor/return/0"
+    ],
+    "params": [
+      {
+        "name": "input",
+        "documentation": "@zune/globaltype/_zune_serde.zstd.createDecompressor/param/0"
       }
     ]
   },
@@ -8029,53 +8526,46 @@
   },
   "@zune/globaltype/_zune_crypto.tls.createClient": {
     "code_sample": "",
-    "documentation": "\n\n**Parameters**\n- `socket`: The socket to setup the client on.\n- `opts`: The options for the client.\n\n\n**Throws**\n- Memory Error\n",
+    "documentation": "\n\n**Parameters**\n- `opts`: The options for the client.\n\n\n**Throws**\n- Memory Error\n",
     "returns": [
       "@zune/globaltype/_zune_crypto.tls.createClient/return/0"
     ],
     "params": [
       {
-        "name": "socket",
-        "documentation": "@zune/globaltype/_zune_crypto.tls.createClient/param/0"
-      },
-      {
         "name": "opts",
-        "documentation": "@zune/globaltype/_zune_crypto.tls.createClient/param/1"
+        "documentation": "@zune/globaltype/_zune_crypto.tls.createClient/param/0"
       }
     ]
   },
   "@zune/globaltype/_zune_crypto.tls.createClient/param/0": {
     "code_sample": "",
-    "documentation": "The socket to setup the client on."
-  },
-  "@zune/globaltype/_zune_crypto.tls.createClient/param/1": {
-    "code_sample": "",
     "documentation": "The options for the client."
   },
   "@zune/globaltype/_zune_crypto.tls.createServer": {
     "code_sample": "",
-    "documentation": "\n\n**Parameters**\n- `socket`: The socket to setup the server on.\n- `opts`: The options for the server.\n\n\n**Throws**\n- Memory Error\n",
+    "documentation": "\n\n**Parameters**\n- `opts`: The options for the server.\n\n\n**Throws**\n- Memory Error\n",
     "returns": [
       "@zune/globaltype/_zune_crypto.tls.createServer/return/0"
     ],
     "params": [
       {
-        "name": "socket",
-        "documentation": "@zune/globaltype/_zune_crypto.tls.createServer/param/0"
-      },
-      {
         "name": "opts",
-        "documentation": "@zune/globaltype/_zune_crypto.tls.createServer/param/1"
+        "documentation": "@zune/globaltype/_zune_crypto.tls.createServer/param/0"
       }
     ]
   },
   "@zune/globaltype/_zune_crypto.tls.createServer/param/0": {
     "code_sample": "",
-    "documentation": "The socket to setup the server on."
-  },
-  "@zune/globaltype/_zune_crypto.tls.createServer/param/1": {
-    "code_sample": "",
     "documentation": "The options for the server."
+  },
+  "@zune/globaltype/LuauCoverageData": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "line": "@zune/globaltype/LuauCoverageData.line",
+      "name": "@zune/globaltype/LuauCoverageData.name",
+      "depth": "@zune/globaltype/LuauCoverageData.depth"
+    }
   },
   "@zune/globaltype/_zune_crypto_random": {
     "code_sample": "",
@@ -8134,6 +8624,216 @@
     "code_sample": "",
     "documentation": "The number of bytes to write."
   },
+  "@zune/globaltype/_zune_process": {
+    "code_sample": "",
+    "documentation": "A library that interacts with the system process.",
+    "keys": {
+      "exit": "@zune/globaltype/_zune_process.exit",
+      "getExePath": "@zune/globaltype/_zune_process.getExePath",
+      "create": "@zune/globaltype/_zune_process.create",
+      "run": "@zune/globaltype/_zune_process.run",
+      "onSignal": "@zune/globaltype/_zune_process.onSignal",
+      "args": "@zune/globaltype/_zune_process.args",
+      "openExeFile": "@zune/globaltype/_zune_process.openExeFile",
+      "loadEnv": "@zune/globaltype/_zune_process.loadEnv",
+      "pid": "@zune/globaltype/_zune_process.pid",
+      "env": "@zune/globaltype/_zune_process.env"
+    },
+    "learn_more_link": "https://zune.sh/docs/v0.6.x/api/process"
+  },
+  "@zune/globaltype/_zune_process.getExePath": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_process.getExePath/return/0"
+    ],
+    "params": []
+  },
+  "@zune/globaltype/_zune_process.openExeFile": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_process.openExeFile/return/0"
+    ],
+    "params": [
+      {
+        "name": "opts",
+        "documentation": "@zune/globaltype/_zune_process.openExeFile/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_process.args": {
+    "code_sample": "",
+    "documentation": "The arguments passed to the process."
+  },
+  "@zune/globaltype/_zune_process.env": {
+    "code_sample": "",
+    "documentation": "The process enviroment table.\n\n(Loaded from top to bottom)\n- Includes `.env` file in the current working directory.\n- Includes `.env.production` file in the current working directory. When `LUAU_ENV` is set to `PRODUCTION`.\n- Includes `.env.development` file in the current working directory. When `LUAU_ENV` is set to `DEVELOPMENT`.\n- Includes `.env.test` file in the current working directory. When `LUAU_ENV` is set to `TEST`.\n- Includes `.env.local` file in the current working directory.",
+    "keys": []
+  },
+  "@zune/globaltype/_zune_process.loadEnv": {
+    "code_sample": "",
+    "documentation": "Same behavior as `process.env`, does not update `process.env`.\n\n**Throws**\n- IO Error\n- Memory Error\n",
+    "returns": [
+      "@zune/globaltype/_zune_process.loadEnv/return/0"
+    ],
+    "params": []
+  },
+  "@zune/globaltype/_zune_process.loadEnv/return/0": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": []
+  },
+  "@zune/globaltype/_zune_process.pid": {
+    "code_sample": "",
+    "documentation": "Get the current process ID.",
+    "returns": [
+      "@zune/globaltype/_zune_process.pid/return/0"
+    ],
+    "params": []
+  },
+  "@zune/globaltype/_zune_process.create": {
+    "code_sample": "",
+    "documentation": "Creates a new process.\n\n**Parameters**\n- `exec`: The executable to run.\n- `args`: The arguments to pass to the executable.\n- `opts`: The options for the process.\n\n\n**Throws**\n- Process Error\n",
+    "returns": [
+      "@zune/globaltype/_zune_process.create/return/0"
+    ],
+    "params": [
+      {
+        "name": "exec",
+        "documentation": "@zune/globaltype/_zune_process.create/param/0"
+      },
+      {
+        "name": "args",
+        "documentation": "@zune/globaltype/_zune_process.create/param/1"
+      },
+      {
+        "name": "opts",
+        "documentation": "@zune/globaltype/_zune_process.create/param/2"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_process.create/param/0": {
+    "code_sample": "",
+    "documentation": "The executable to run."
+  },
+  "@zune/globaltype/_zune_process.create/param/1": {
+    "code_sample": "",
+    "documentation": "The arguments to pass to the executable."
+  },
+  "@zune/globaltype/_zune_process.create/param/2": {
+    "code_sample": "",
+    "documentation": "The options for the process."
+  },
+  "@zune/globaltype/_zune_process.run": {
+    "code_sample": "",
+    "documentation": "Runs a new process, and yields for the result.\n\n**Parameters**\n- `exec`: The executable to run.\n- `args`: The arguments to pass to the executable.\n- `opts`: The options for the process.\n\n\n**Throws**\n- Process Error\n",
+    "returns": [
+      "@zune/globaltype/_zune_process.run/return/0"
+    ],
+    "params": [
+      {
+        "name": "exec",
+        "documentation": "@zune/globaltype/_zune_process.run/param/0"
+      },
+      {
+        "name": "args",
+        "documentation": "@zune/globaltype/_zune_process.run/param/1"
+      },
+      {
+        "name": "opts",
+        "documentation": "@zune/globaltype/_zune_process.run/param/2"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_process.run/param/0": {
+    "code_sample": "",
+    "documentation": "The executable to run."
+  },
+  "@zune/globaltype/_zune_process.run/param/1": {
+    "code_sample": "",
+    "documentation": "The arguments to pass to the executable."
+  },
+  "@zune/globaltype/_zune_process.run/param/2": {
+    "code_sample": "",
+    "documentation": "The options for the process."
+  },
+  "@zune/globaltype/_zune_process.exit": {
+    "code_sample": "",
+    "documentation": "Exits the process with the given code.\n\n**Parameters**\n- `code`: The exit code.\n",
+    "returns": [
+      "@zune/globaltype/_zune_process.exit/return/0"
+    ],
+    "params": [
+      {
+        "name": "code",
+        "documentation": "@zune/globaltype/_zune_process.exit/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_process.exit/param/0": {
+    "code_sample": "",
+    "documentation": "The exit code."
+  },
+  "@zune/globaltype/_zune_process.onSignal": {
+    "code_sample": "",
+    "documentation": "Registers a signal handler.\n\nSupported signals:\n- `INT` - Interrupt signal (SIGINT).\n\n**Parameters**\n- `signal`: The signal to handle.\n- `callback`: The callback to call when the signal is received.\n\n\n**Throws**\n- Process Error\n- Thread Error\n",
+    "returns": [],
+    "params": [
+      {
+        "name": "signal",
+        "documentation": "@zune/globaltype/_zune_process.onSignal/param/0"
+      },
+      {
+        "name": "callback",
+        "documentation": "@zune/globaltype/_zune_process.onSignal/param/1"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_process.onSignal/param/0": {
+    "code_sample": "",
+    "documentation": "The signal to handle."
+  },
+  "@zune/globaltype/_zune_process.onSignal/param/1": {
+    "code_sample": "",
+    "documentation": "The callback to call when the signal is received.",
+    "returns": [],
+    "params": []
+  },
+  "@zune/globaltype/_zune_process_env": {
+    "code_sample": "",
+    "documentation": "The process enviroment table.\n\n(Loaded from top to bottom)\n- Includes `.env` file in the current working directory.\n- Includes `.env.production` file in the current working directory. When `LUAU_ENV` is set to `PRODUCTION`.\n- Includes `.env.development` file in the current working directory. When `LUAU_ENV` is set to `DEVELOPMENT`.\n- Includes `.env.test` file in the current working directory. When `LUAU_ENV` is set to `TEST`.\n- Includes `.env.local` file in the current working directory.",
+    "keys": []
+  },
+  "@zune/globaltype/ParseResult": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "line_offsets": "@zune/globaltype/ParseResult.line_offsets",
+      "lines": "@zune/globaltype/ParseResult.lines",
+      "errors": "@zune/globaltype/ParseResult.errors",
+      "root": "@zune/globaltype/ParseResult.root",
+      "hotcomments": "@zune/globaltype/ParseResult.hotcomments",
+      "eof": "@zune/globaltype/ParseResult.eof"
+    }
+  },
+  "@zune/globaltype/ParseResult.eof": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "text": "@zune/globaltype/ParseResult.eof.text",
+      "tag": "@zune/globaltype/ParseResult.eof.tag",
+      "position": "@zune/globaltype/ParseResult.eof.position"
+    }
+  },
+  "@zune/globaltype/ParseResult.eof.position": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "column": "@zune/globaltype/ParseResult.eof.position.column",
+      "line": "@zune/globaltype/ParseResult.eof.position.line"
+    }
+  },
   "@zune/globaltype/_zune_random_RomuTrio": {
     "code_sample": "",
     "documentation": "",
@@ -8153,11 +8853,6 @@
         "documentation": "@zune/globaltype/_zune_random_RomuTrio.new/param/0"
       }
     ]
-  },
-  "@zune/globaltype/_zune_process_env": {
-    "code_sample": "",
-    "documentation": "The process enviroment table.\n\n(Loaded from top to bottom)\n- Includes `.env` file in the current working directory.\n- Includes `.env.production` file in the current working directory. When `LUAU_ENV` is set to `PRODUCTION`.\n- Includes `.env.development` file in the current working directory. When `LUAU_ENV` is set to `DEVELOPMENT`.\n- Includes `.env.test` file in the current working directory. When `LUAU_ENV` is set to `TEST`.\n- Includes `.env.local` file in the current working directory.",
-    "keys": []
   },
   "@zune/globaltype/_zune_random_Sfc64": {
     "code_sample": "",
@@ -8179,66 +8874,56 @@
       }
     ]
   },
-  "@zune/globaltype/LuauLoadOptions": {
+  "@zune/globaltype/_zune_random_Xoroshiro128": {
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "env": "@zune/globaltype/LuauLoadOptions.env",
-      "native_code_gen": "@zune/globaltype/LuauLoadOptions.native_code_gen",
-      "chunk_name": "@zune/globaltype/LuauLoadOptions.chunk_name"
+      "new": "@zune/globaltype/_zune_random_Xoroshiro128.new"
     }
   },
-  "@zune/globaltype/LuauLoadOptions.env": {
-    "code_sample": "",
-    "documentation": "The environment to use for the loaded function."
-  },
-  "@zune/globaltype/LuauLoadOptions.chunk_name": {
-    "code_sample": "",
-    "documentation": "The name of the chunk, used for debugging."
-  },
-  "@zune/globaltype/LuauLoadOptions.native_code_gen": {
-    "code_sample": "",
-    "documentation": "Whether to enable native code generation."
-  },
-  "@zune/globaltype/_zune_random_Xoshiro256": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "new": "@zune/globaltype/_zune_random_Xoshiro256.new"
-    }
-  },
-  "@zune/globaltype/_zune_random_Xoshiro256.new": {
+  "@zune/globaltype/_zune_random_Xoroshiro128.new": {
     "code_sample": "",
     "documentation": "\n\n**Throws**\n- Memory Error\n",
     "returns": [
-      "@zune/globaltype/_zune_random_Xoshiro256.new/return/0"
+      "@zune/globaltype/_zune_random_Xoroshiro128.new/return/0"
     ],
     "params": [
       {
         "name": "seed",
-        "documentation": "@zune/globaltype/_zune_random_Xoshiro256.new/param/0"
+        "documentation": "@zune/globaltype/_zune_random_Xoroshiro128.new/param/0"
       }
     ]
   },
-  "@zune/globaltype/_zune_random_Pcg32": {
+  "@zune/globaltype/CryptoPasswordOptions": {
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "new": "@zune/globaltype/_zune_random_Pcg32.new"
+      "time_cost": "@zune/globaltype/CryptoPasswordOptions.time_cost",
+      "cost": "@zune/globaltype/CryptoPasswordOptions.cost",
+      "memory_cost": "@zune/globaltype/CryptoPasswordOptions.memory_cost",
+      "algorithm": "@zune/globaltype/CryptoPasswordOptions.algorithm",
+      "threads": "@zune/globaltype/CryptoPasswordOptions.threads"
     }
   },
-  "@zune/globaltype/_zune_random_Pcg32.new": {
+  "@zune/globaltype/CryptoPasswordOptions.algorithm": {
     "code_sample": "",
-    "documentation": "\n\n**Throws**\n- Memory Error\n",
-    "returns": [
-      "@zune/globaltype/_zune_random_Pcg32.new/return/0"
-    ],
-    "params": [
-      {
-        "name": "seed",
-        "documentation": "@zune/globaltype/_zune_random_Pcg32.new/param/0"
-      }
-    ]
+    "documentation": "The algorithm to use."
+  },
+  "@zune/globaltype/CryptoPasswordOptions.cost": {
+    "code_sample": "",
+    "documentation": "`bcrypt` - The cost to use."
+  },
+  "@zune/globaltype/CryptoPasswordOptions.time_cost": {
+    "code_sample": "",
+    "documentation": "`argon2` - The time cost to use."
+  },
+  "@zune/globaltype/CryptoPasswordOptions.memory_cost": {
+    "code_sample": "",
+    "documentation": "`argon2` - The memory cost to use."
+  },
+  "@zune/globaltype/CryptoPasswordOptions.threads": {
+    "code_sample": "",
+    "documentation": "`argon2` - The number of threads to use."
   },
   "@zune/globaltype/_zune_time_date": {
     "code_sample": "",
@@ -8467,51 +9152,35 @@
   },
   "@zune/globaltype/_zune_crypto_tls.createClient": {
     "code_sample": "",
-    "documentation": "\n\n**Parameters**\n- `socket`: The socket to setup the client on.\n- `opts`: The options for the client.\n\n\n**Throws**\n- Memory Error\n",
+    "documentation": "\n\n**Parameters**\n- `opts`: The options for the client.\n\n\n**Throws**\n- Memory Error\n",
     "returns": [
       "@zune/globaltype/_zune_crypto_tls.createClient/return/0"
     ],
     "params": [
       {
-        "name": "socket",
-        "documentation": "@zune/globaltype/_zune_crypto_tls.createClient/param/0"
-      },
-      {
         "name": "opts",
-        "documentation": "@zune/globaltype/_zune_crypto_tls.createClient/param/1"
+        "documentation": "@zune/globaltype/_zune_crypto_tls.createClient/param/0"
       }
     ]
   },
   "@zune/globaltype/_zune_crypto_tls.createClient/param/0": {
     "code_sample": "",
-    "documentation": "The socket to setup the client on."
-  },
-  "@zune/globaltype/_zune_crypto_tls.createClient/param/1": {
-    "code_sample": "",
     "documentation": "The options for the client."
   },
   "@zune/globaltype/_zune_crypto_tls.createServer": {
     "code_sample": "",
-    "documentation": "\n\n**Parameters**\n- `socket`: The socket to setup the server on.\n- `opts`: The options for the server.\n\n\n**Throws**\n- Memory Error\n",
+    "documentation": "\n\n**Parameters**\n- `opts`: The options for the server.\n\n\n**Throws**\n- Memory Error\n",
     "returns": [
       "@zune/globaltype/_zune_crypto_tls.createServer/return/0"
     ],
     "params": [
       {
-        "name": "socket",
-        "documentation": "@zune/globaltype/_zune_crypto_tls.createServer/param/0"
-      },
-      {
         "name": "opts",
-        "documentation": "@zune/globaltype/_zune_crypto_tls.createServer/param/1"
+        "documentation": "@zune/globaltype/_zune_crypto_tls.createServer/param/0"
       }
     ]
   },
   "@zune/globaltype/_zune_crypto_tls.createServer/param/0": {
-    "code_sample": "",
-    "documentation": "The socket to setup the server on."
-  },
-  "@zune/globaltype/_zune_crypto_tls.createServer/param/1": {
     "code_sample": "",
     "documentation": "The options for the server."
   },
@@ -8669,23 +9338,23 @@
       "dynamic": "@zune/globaltype/LuauFFlagBoolean.dynamic"
     }
   },
-  "@zune/globaltype/_zune_random_LuauPcg32": {
+  "@zune/globaltype/_zune_random_Pcg32": {
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "new": "@zune/globaltype/_zune_random_LuauPcg32.new"
+      "new": "@zune/globaltype/_zune_random_Pcg32.new"
     }
   },
-  "@zune/globaltype/_zune_random_LuauPcg32.new": {
+  "@zune/globaltype/_zune_random_Pcg32.new": {
     "code_sample": "",
     "documentation": "\n\n**Throws**\n- Memory Error\n",
     "returns": [
-      "@zune/globaltype/_zune_random_LuauPcg32.new/return/0"
+      "@zune/globaltype/_zune_random_Pcg32.new/return/0"
     ],
     "params": [
       {
         "name": "seed",
-        "documentation": "@zune/globaltype/_zune_random_LuauPcg32.new/param/0"
+        "documentation": "@zune/globaltype/_zune_random_Pcg32.new/param/0"
       }
     ]
   },
@@ -8780,6 +9449,7 @@
       "extension": "@zune/globaltype/_zune_fs.path.extension",
       "isAbsolute": "@zune/globaltype/_zune_fs.path.isAbsolute",
       "relative": "@zune/globaltype/_zune_fs.path.relative",
+      "parse": "@zune/globaltype/_zune_fs.path.parse",
       "join": "@zune/globaltype/_zune_fs.path.join",
       "stem": "@zune/globaltype/_zune_fs.path.stem",
       "basename": "@zune/globaltype/_zune_fs.path.basename",
@@ -8956,12 +9626,32 @@
     "code_sample": "",
     "documentation": "The glob pattern to match against."
   },
+  "@zune/globaltype/_zune_fs.path.parse": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_fs.path.parse/return/0"
+    ],
+    "params": [
+      {
+        "name": "path",
+        "documentation": "@zune/globaltype/_zune_fs.path.parse/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_fs.path.parse/return/0": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "disk": "@zune/globaltype/_zune_fs.path.parse/return/0.disk"
+    }
+  },
   "@zune/globaltype/_zune_serde_json5": {
     "code_sample": "",
     "documentation": "",
     "keys": {
       "encode": "@zune/globaltype/_zune_serde_json5.encode",
-      "values": "@zune/globaltype/_zune_serde_json5.values",
+      "null": "@zune/globaltype/_zune_serde_json5.null",
       "decode": "@zune/globaltype/_zune_serde_json5.decode",
       "indents": "@zune/globaltype/_zune_serde_json5.indents"
     }
@@ -9026,13 +9716,6 @@
       "none": "@zune/globaltype/_zune_serde_json5.indents.none"
     }
   },
-  "@zune/globaltype/_zune_serde_json5.values": {
-    "code_sample": "",
-    "documentation": "Special values for JSON.",
-    "keys": {
-      "null": "@zune/globaltype/_zune_serde_json5.values.null"
-    }
-  },
   "@zune/globaltype/_zune_crypto_password": {
     "code_sample": "",
     "documentation": "",
@@ -9091,61 +9774,35 @@
     "code_sample": "",
     "documentation": "The hash to verify against."
   },
-  "@zune/globaltype/_zune_serde_toml": {
+  "@zune/globaltype/_zune_random_LuauPcg32": {
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "encode": "@zune/globaltype/_zune_serde_toml.encode",
-      "decode": "@zune/globaltype/_zune_serde_toml.decode"
+      "new": "@zune/globaltype/_zune_random_LuauPcg32.new"
     }
   },
-  "@zune/globaltype/_zune_serde_toml.encode": {
+  "@zune/globaltype/_zune_random_LuauPcg32.new": {
     "code_sample": "",
-    "documentation": "Encodes a table to TOML.\n\n**Parameters**\n- `object`: The table to encode.\n\n\n**Throws**\n- Memory Error\n",
+    "documentation": "\n\n**Throws**\n- Memory Error\n",
     "returns": [
-      "@zune/globaltype/_zune_serde_toml.encode/return/0"
+      "@zune/globaltype/_zune_random_LuauPcg32.new/return/0"
     ],
     "params": [
       {
-        "name": "object",
-        "documentation": "@zune/globaltype/_zune_serde_toml.encode/param/0"
+        "name": "seed",
+        "documentation": "@zune/globaltype/_zune_random_LuauPcg32.new/param/0"
       }
     ]
-  },
-  "@zune/globaltype/_zune_serde_toml.encode/param/0": {
-    "code_sample": "",
-    "documentation": "The table to encode.",
-    "keys": []
-  },
-  "@zune/globaltype/_zune_serde_toml.decode": {
-    "code_sample": "",
-    "documentation": "Decodes TOML.\n\n**Parameters**\n- `toml`: The TOML string to decode.\n\n\n**Throws**\n- Memory Error\n",
-    "returns": [
-      "@zune/globaltype/_zune_serde_toml.decode/return/0"
-    ],
-    "params": [
-      {
-        "name": "toml",
-        "documentation": "@zune/globaltype/_zune_serde_toml.decode/param/0"
-      }
-    ]
-  },
-  "@zune/globaltype/_zune_serde_toml.decode/param/0": {
-    "code_sample": "",
-    "documentation": "The TOML string to decode."
-  },
-  "@zune/globaltype/_zune_serde_toml.decode/return/0": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": []
   },
   "@zune/globaltype/_zune_serde_gzip": {
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "decompress": "@zune/globaltype/_zune_serde_gzip.decompress",
+      "compress": "@zune/globaltype/_zune_serde_gzip.compress",
+      "createDecompressor": "@zune/globaltype/_zune_serde_gzip.createDecompressor",
+      "createCompressor": "@zune/globaltype/_zune_serde_gzip.createCompressor",
       "calcSize": "@zune/globaltype/_zune_serde_gzip.calcSize",
-      "compress": "@zune/globaltype/_zune_serde_gzip.compress"
+      "decompress": "@zune/globaltype/_zune_serde_gzip.decompress"
     }
   },
   "@zune/globaltype/_zune_serde_gzip.calcSize": {
@@ -9222,6 +9879,49 @@
         "documentation": "@zune/globaltype/_zune_serde_gzip.decompress/param/4"
       }
     ]
+  },
+  "@zune/globaltype/_zune_serde_gzip.createCompressor": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_serde_gzip.createCompressor/return/0"
+    ],
+    "params": [
+      {
+        "name": "output",
+        "documentation": "@zune/globaltype/_zune_serde_gzip.createCompressor/param/0"
+      },
+      {
+        "name": "level",
+        "documentation": "@zune/globaltype/_zune_serde_gzip.createCompressor/param/1"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_serde_gzip.createDecompressor": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_serde_gzip.createDecompressor/return/0"
+    ],
+    "params": [
+      {
+        "name": "input",
+        "documentation": "@zune/globaltype/_zune_serde_gzip.createDecompressor/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/SerdeEncodeConfig": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "base_indent": "@zune/globaltype/SerdeEncodeConfig.base_indent",
+      "sort": "@zune/globaltype/SerdeEncodeConfig.sort",
+      "pretty_indent": "@zune/globaltype/SerdeEncodeConfig.pretty_indent"
+    }
+  },
+  "@zune/globaltype/SerdeEncodeConfig.pretty_indent": {
+    "code_sample": "",
+    "documentation": "The indentation level for pretty printing"
   },
   "@zune/globaltype/_zune_random": {
     "code_sample": "",
@@ -9391,13 +10091,14 @@
       }
     ]
   },
-  "@zune/globaltype/LuauCoverageData": {
+  "@zune/globaltype/DirAccessOptions": {
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "line": "@zune/globaltype/LuauCoverageData.line",
-      "name": "@zune/globaltype/LuauCoverageData.name",
-      "depth": "@zune/globaltype/LuauCoverageData.depth"
+      "execute": "@zune/globaltype/DirAccessOptions.execute",
+      "follow_symlinks": "@zune/globaltype/DirAccessOptions.follow_symlinks",
+      "write": "@zune/globaltype/DirAccessOptions.write",
+      "read": "@zune/globaltype/DirAccessOptions.read"
     }
   },
   "@zune/globaltype/CopyFileOptions": {
@@ -9407,18 +10108,6 @@
       "permissions": "@zune/globaltype/CopyFileOptions.permissions",
       "make_path": "@zune/globaltype/CopyFileOptions.make_path",
       "replace": "@zune/globaltype/CopyFileOptions.replace"
-    }
-  },
-  "@zune/globaltype/GPIOLineInfo": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "offset": "@zune/globaltype/GPIOLineInfo.offset",
-      "direction": "@zune/globaltype/GPIOLineInfo.direction",
-      "name": "@zune/globaltype/GPIOLineInfo.name",
-      "used": "@zune/globaltype/GPIOLineInfo.used",
-      "consumer": "@zune/globaltype/GPIOLineInfo.consumer",
-      "active_low": "@zune/globaltype/GPIOLineInfo.active_low"
     }
   },
   "@zune/globaltype/_zune_serde_base64": {
@@ -9501,26 +10190,45 @@
       }
     ]
   },
-  "@zune/globaltype/ProcessResult": {
+  "@zune/globaltype/CreateTlsClientOptions": {
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "ok": "@zune/globaltype/ProcessResult.ok",
-      "code": "@zune/globaltype/ProcessResult.code"
+      "host": "@zune/globaltype/CreateTlsClientOptions.host",
+      "ca": "@zune/globaltype/CreateTlsClientOptions.ca"
     }
+  },
+  "@zune/globaltype/CreateTlsClientOptions.host": {
+    "code_sample": "",
+    "documentation": "The host."
+  },
+  "@zune/globaltype/CreateTlsClientOptions.ca": {
+    "code_sample": "",
+    "documentation": "The CA bundle to use for verification."
   },
   "@zune/globaltype/_zune_ascii": {
     "code_sample": "",
     "documentation": "A library to manipulate/interact with ASCII strings.",
     "keys": {
-      "endsWithIgnoreCase": "@zune/globaltype/_zune_ascii.endsWithIgnoreCase",
-      "startsWithIgnoreCase": "@zune/globaltype/_zune_ascii.startsWithIgnoreCase",
-      "lessThanIgnoreCaseSlice": "@zune/globaltype/_zune_ascii.lessThanIgnoreCaseSlice",
-      "lessThanIgnoreCase": "@zune/globaltype/_zune_ascii.lessThanIgnoreCase",
-      "eqlIgnoreCase": "@zune/globaltype/_zune_ascii.eqlIgnoreCase",
       "findIgnoreCasePos": "@zune/globaltype/_zune_ascii.findIgnoreCasePos",
+      "startsWithIgnoreCase": "@zune/globaltype/_zune_ascii.startsWithIgnoreCase",
+      "isWhitespace": "@zune/globaltype/_zune_ascii.isWhitespace",
+      "toUpper": "@zune/globaltype/_zune_ascii.toUpper",
+      "isAlphanumeric": "@zune/globaltype/_zune_ascii.isAlphanumeric",
+      "findIgnoreCase": "@zune/globaltype/_zune_ascii.findIgnoreCase",
       "eqlIgnoreCaseSlice": "@zune/globaltype/_zune_ascii.eqlIgnoreCaseSlice",
-      "findIgnoreCase": "@zune/globaltype/_zune_ascii.findIgnoreCase"
+      "isHex": "@zune/globaltype/_zune_ascii.isHex",
+      "endsWithIgnoreCase": "@zune/globaltype/_zune_ascii.endsWithIgnoreCase",
+      "isAlphabetic": "@zune/globaltype/_zune_ascii.isAlphabetic",
+      "toLower": "@zune/globaltype/_zune_ascii.toLower",
+      "lessThanIgnoreCase": "@zune/globaltype/_zune_ascii.lessThanIgnoreCase",
+      "isAscii": "@zune/globaltype/_zune_ascii.isAscii",
+      "isLower": "@zune/globaltype/_zune_ascii.isLower",
+      "isUpper": "@zune/globaltype/_zune_ascii.isUpper",
+      "eqlIgnoreCase": "@zune/globaltype/_zune_ascii.eqlIgnoreCase",
+      "isDigit": "@zune/globaltype/_zune_ascii.isDigit",
+      "isControl": "@zune/globaltype/_zune_ascii.isControl",
+      "lessThanIgnoreCaseSlice": "@zune/globaltype/_zune_ascii.lessThanIgnoreCaseSlice"
     },
     "learn_more_link": "https://zune.sh/docs/v0.6.x/api/ascii"
   },
@@ -9692,6 +10400,149 @@
       }
     ]
   },
+  "@zune/globaltype/_zune_ascii.isAlphanumeric": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_ascii.isAlphanumeric/return/0"
+    ],
+    "params": [
+      {
+        "name": "c",
+        "documentation": "@zune/globaltype/_zune_ascii.isAlphanumeric/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_ascii.isAlphabetic": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_ascii.isAlphabetic/return/0"
+    ],
+    "params": [
+      {
+        "name": "c",
+        "documentation": "@zune/globaltype/_zune_ascii.isAlphabetic/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_ascii.isControl": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_ascii.isControl/return/0"
+    ],
+    "params": [
+      {
+        "name": "c",
+        "documentation": "@zune/globaltype/_zune_ascii.isControl/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_ascii.isDigit": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_ascii.isDigit/return/0"
+    ],
+    "params": [
+      {
+        "name": "c",
+        "documentation": "@zune/globaltype/_zune_ascii.isDigit/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_ascii.isWhitespace": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_ascii.isWhitespace/return/0"
+    ],
+    "params": [
+      {
+        "name": "c",
+        "documentation": "@zune/globaltype/_zune_ascii.isWhitespace/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_ascii.isLower": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_ascii.isLower/return/0"
+    ],
+    "params": [
+      {
+        "name": "c",
+        "documentation": "@zune/globaltype/_zune_ascii.isLower/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_ascii.isUpper": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_ascii.isUpper/return/0"
+    ],
+    "params": [
+      {
+        "name": "c",
+        "documentation": "@zune/globaltype/_zune_ascii.isUpper/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_ascii.isHex": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_ascii.isHex/return/0"
+    ],
+    "params": [
+      {
+        "name": "c",
+        "documentation": "@zune/globaltype/_zune_ascii.isHex/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_ascii.isAscii": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_ascii.isAscii/return/0"
+    ],
+    "params": [
+      {
+        "name": "c",
+        "documentation": "@zune/globaltype/_zune_ascii.isAscii/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_ascii.toUpper": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_ascii.toUpper/return/0"
+    ],
+    "params": [
+      {
+        "name": "c",
+        "documentation": "@zune/globaltype/_zune_ascii.toUpper/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_ascii.toLower": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_ascii.toLower/return/0"
+    ],
+    "params": [
+      {
+        "name": "c",
+        "documentation": "@zune/globaltype/_zune_ascii.toLower/param/0"
+      }
+    ]
+  },
   "@zune/globaltype/CreateFileOptions": {
     "code_sample": "",
     "documentation": "",
@@ -9704,257 +10555,16 @@
       "exclusive": "@zune/globaltype/CreateFileOptions.exclusive"
     }
   },
-  "@zune/globaltype/_zune_process": {
-    "code_sample": "",
-    "documentation": "A library that interacts with the system process.",
-    "keys": {
-      "exit": "@zune/globaltype/_zune_process.exit",
-      "getExePath": "@zune/globaltype/_zune_process.getExePath",
-      "create": "@zune/globaltype/_zune_process.create",
-      "run": "@zune/globaltype/_zune_process.run",
-      "onSignal": "@zune/globaltype/_zune_process.onSignal",
-      "args": "@zune/globaltype/_zune_process.args",
-      "openExeFile": "@zune/globaltype/_zune_process.openExeFile",
-      "loadEnv": "@zune/globaltype/_zune_process.loadEnv",
-      "pid": "@zune/globaltype/_zune_process.pid",
-      "env": "@zune/globaltype/_zune_process.env"
-    },
-    "learn_more_link": "https://zune.sh/docs/v0.6.x/api/process"
-  },
-  "@zune/globaltype/_zune_process.getExePath": {
-    "code_sample": "",
-    "documentation": "",
-    "returns": [
-      "@zune/globaltype/_zune_process.getExePath/return/0"
-    ],
-    "params": []
-  },
-  "@zune/globaltype/_zune_process.openExeFile": {
-    "code_sample": "",
-    "documentation": "",
-    "returns": [
-      "@zune/globaltype/_zune_process.openExeFile/return/0"
-    ],
-    "params": [
-      {
-        "name": "opts",
-        "documentation": "@zune/globaltype/_zune_process.openExeFile/param/0"
-      }
-    ]
-  },
-  "@zune/globaltype/_zune_process.args": {
-    "code_sample": "",
-    "documentation": "The arguments passed to the process."
-  },
-  "@zune/globaltype/_zune_process.env": {
-    "code_sample": "",
-    "documentation": "The process enviroment table.\n\n(Loaded from top to bottom)\n- Includes `.env` file in the current working directory.\n- Includes `.env.production` file in the current working directory. When `LUAU_ENV` is set to `PRODUCTION`.\n- Includes `.env.development` file in the current working directory. When `LUAU_ENV` is set to `DEVELOPMENT`.\n- Includes `.env.test` file in the current working directory. When `LUAU_ENV` is set to `TEST`.\n- Includes `.env.local` file in the current working directory.",
-    "keys": []
-  },
-  "@zune/globaltype/_zune_process.loadEnv": {
-    "code_sample": "",
-    "documentation": "Same behavior as `process.env`, does not update `process.env`.\n\n**Throws**\n- IO Error\n- Memory Error\n",
-    "returns": [
-      "@zune/globaltype/_zune_process.loadEnv/return/0"
-    ],
-    "params": []
-  },
-  "@zune/globaltype/_zune_process.loadEnv/return/0": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": []
-  },
-  "@zune/globaltype/_zune_process.pid": {
-    "code_sample": "",
-    "documentation": "Get the current process ID.",
-    "returns": [
-      "@zune/globaltype/_zune_process.pid/return/0"
-    ],
-    "params": []
-  },
-  "@zune/globaltype/_zune_process.create": {
-    "code_sample": "",
-    "documentation": "Creates a new process.\n\n**Parameters**\n- `exec`: The executable to run.\n- `args`: The arguments to pass to the executable.\n- `opts`: The options for the process.\n\n\n**Throws**\n- Process Error\n",
-    "returns": [
-      "@zune/globaltype/_zune_process.create/return/0"
-    ],
-    "params": [
-      {
-        "name": "exec",
-        "documentation": "@zune/globaltype/_zune_process.create/param/0"
-      },
-      {
-        "name": "args",
-        "documentation": "@zune/globaltype/_zune_process.create/param/1"
-      },
-      {
-        "name": "opts",
-        "documentation": "@zune/globaltype/_zune_process.create/param/2"
-      }
-    ]
-  },
-  "@zune/globaltype/_zune_process.create/param/0": {
-    "code_sample": "",
-    "documentation": "The executable to run."
-  },
-  "@zune/globaltype/_zune_process.create/param/1": {
-    "code_sample": "",
-    "documentation": "The arguments to pass to the executable."
-  },
-  "@zune/globaltype/_zune_process.create/param/2": {
-    "code_sample": "",
-    "documentation": "The options for the process."
-  },
-  "@zune/globaltype/_zune_process.run": {
-    "code_sample": "",
-    "documentation": "Runs a new process, and yields for the result.\n\n**Parameters**\n- `exec`: The executable to run.\n- `args`: The arguments to pass to the executable.\n- `opts`: The options for the process.\n\n\n**Throws**\n- Process Error\n",
-    "returns": [
-      "@zune/globaltype/_zune_process.run/return/0"
-    ],
-    "params": [
-      {
-        "name": "exec",
-        "documentation": "@zune/globaltype/_zune_process.run/param/0"
-      },
-      {
-        "name": "args",
-        "documentation": "@zune/globaltype/_zune_process.run/param/1"
-      },
-      {
-        "name": "opts",
-        "documentation": "@zune/globaltype/_zune_process.run/param/2"
-      }
-    ]
-  },
-  "@zune/globaltype/_zune_process.run/param/0": {
-    "code_sample": "",
-    "documentation": "The executable to run."
-  },
-  "@zune/globaltype/_zune_process.run/param/1": {
-    "code_sample": "",
-    "documentation": "The arguments to pass to the executable."
-  },
-  "@zune/globaltype/_zune_process.run/param/2": {
-    "code_sample": "",
-    "documentation": "The options for the process."
-  },
-  "@zune/globaltype/_zune_process.exit": {
-    "code_sample": "",
-    "documentation": "Exits the process with the given code.\n\n**Parameters**\n- `code`: The exit code.\n",
-    "returns": [
-      "@zune/globaltype/_zune_process.exit/return/0"
-    ],
-    "params": [
-      {
-        "name": "code",
-        "documentation": "@zune/globaltype/_zune_process.exit/param/0"
-      }
-    ]
-  },
-  "@zune/globaltype/_zune_process.exit/param/0": {
-    "code_sample": "",
-    "documentation": "The exit code."
-  },
-  "@zune/globaltype/_zune_process.onSignal": {
-    "code_sample": "",
-    "documentation": "Registers a signal handler.\n\nSupported signals:\n- `INT` - Interrupt signal (SIGINT).\n\n**Parameters**\n- `signal`: The signal to handle.\n- `callback`: The callback to call when the signal is received.\n\n\n**Throws**\n- Process Error\n- Thread Error\n",
-    "returns": [],
-    "params": [
-      {
-        "name": "signal",
-        "documentation": "@zune/globaltype/_zune_process.onSignal/param/0"
-      },
-      {
-        "name": "callback",
-        "documentation": "@zune/globaltype/_zune_process.onSignal/param/1"
-      }
-    ]
-  },
-  "@zune/globaltype/_zune_process.onSignal/param/0": {
-    "code_sample": "",
-    "documentation": "The signal to handle."
-  },
-  "@zune/globaltype/_zune_process.onSignal/param/1": {
-    "code_sample": "",
-    "documentation": "The callback to call when the signal is received.",
-    "returns": [],
-    "params": []
-  },
-  "@zune/globaltype/_zune_serde_json": {
+  "@zune/globaltype/GPIOLineInfo": {
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "encode": "@zune/globaltype/_zune_serde_json.encode",
-      "values": "@zune/globaltype/_zune_serde_json.values",
-      "decode": "@zune/globaltype/_zune_serde_json.decode",
-      "indents": "@zune/globaltype/_zune_serde_json.indents"
-    }
-  },
-  "@zune/globaltype/_zune_serde_json.encode": {
-    "code_sample": "",
-    "documentation": "Encodes a value to JSON.\n\n**Parameters**\n- `value`: The value to encode.\n- `config`: The configuration for the encoding.\n\n\n**Throws**\n- Memory Error\n",
-    "returns": [
-      "@zune/globaltype/_zune_serde_json.encode/return/0"
-    ],
-    "params": [
-      {
-        "name": "value",
-        "documentation": "@zune/globaltype/_zune_serde_json.encode/param/0"
-      },
-      {
-        "name": "config",
-        "documentation": "@zune/globaltype/_zune_serde_json.encode/param/1"
-      }
-    ]
-  },
-  "@zune/globaltype/_zune_serde_json.encode/param/0": {
-    "code_sample": "",
-    "documentation": "The value to encode."
-  },
-  "@zune/globaltype/_zune_serde_json.encode/param/1": {
-    "code_sample": "",
-    "documentation": "The configuration for the encoding."
-  },
-  "@zune/globaltype/_zune_serde_json.decode": {
-    "code_sample": "",
-    "documentation": "Decodes JSON.\n\n**Parameters**\n- `json`: The JSON string to decode.\n- `config`: The configuration for the decoding.\n\n\n**Throws**\n- Memory Error\n",
-    "returns": [
-      "@zune/globaltype/_zune_serde_json.decode/return/0"
-    ],
-    "params": [
-      {
-        "name": "json",
-        "documentation": "@zune/globaltype/_zune_serde_json.decode/param/0"
-      },
-      {
-        "name": "config",
-        "documentation": "@zune/globaltype/_zune_serde_json.decode/param/1"
-      }
-    ]
-  },
-  "@zune/globaltype/_zune_serde_json.decode/param/0": {
-    "code_sample": "",
-    "documentation": "The JSON string to decode."
-  },
-  "@zune/globaltype/_zune_serde_json.decode/param/1": {
-    "code_sample": "",
-    "documentation": "The configuration for the decoding."
-  },
-  "@zune/globaltype/_zune_serde_json.indents": {
-    "code_sample": "",
-    "documentation": "Indentation levels for JSON.",
-    "keys": {
-      "tabs": "@zune/globaltype/_zune_serde_json.indents.tabs",
-      "four_spaces": "@zune/globaltype/_zune_serde_json.indents.four_spaces",
-      "two_spaces": "@zune/globaltype/_zune_serde_json.indents.two_spaces",
-      "none": "@zune/globaltype/_zune_serde_json.indents.none"
-    }
-  },
-  "@zune/globaltype/_zune_serde_json.values": {
-    "code_sample": "",
-    "documentation": "Special values for JSON.",
-    "keys": {
-      "null": "@zune/globaltype/_zune_serde_json.values.null"
+      "offset": "@zune/globaltype/GPIOLineInfo.offset",
+      "direction": "@zune/globaltype/GPIOLineInfo.direction",
+      "name": "@zune/globaltype/GPIOLineInfo.name",
+      "used": "@zune/globaltype/GPIOLineInfo.used",
+      "consumer": "@zune/globaltype/GPIOLineInfo.consumer",
+      "active_low": "@zune/globaltype/GPIOLineInfo.active_low"
     }
   },
   "@zune/globaltype/TestingResults": {
@@ -9982,9 +10592,11 @@
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "decompress": "@zune/globaltype/_zune_serde_flate.decompress",
+      "compress": "@zune/globaltype/_zune_serde_flate.compress",
+      "createDecompressor": "@zune/globaltype/_zune_serde_flate.createDecompressor",
+      "createCompressor": "@zune/globaltype/_zune_serde_flate.createCompressor",
       "calcSize": "@zune/globaltype/_zune_serde_flate.calcSize",
-      "compress": "@zune/globaltype/_zune_serde_flate.compress"
+      "decompress": "@zune/globaltype/_zune_serde_flate.decompress"
     }
   },
   "@zune/globaltype/_zune_serde_flate.calcSize": {
@@ -10059,6 +10671,36 @@
       {
         "name": "count",
         "documentation": "@zune/globaltype/_zune_serde_flate.decompress/param/4"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_serde_flate.createCompressor": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_serde_flate.createCompressor/return/0"
+    ],
+    "params": [
+      {
+        "name": "output",
+        "documentation": "@zune/globaltype/_zune_serde_flate.createCompressor/param/0"
+      },
+      {
+        "name": "level",
+        "documentation": "@zune/globaltype/_zune_serde_flate.createCompressor/param/1"
+      }
+    ]
+  },
+  "@zune/globaltype/_zune_serde_flate.createDecompressor": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_serde_flate.createDecompressor/return/0"
+    ],
+    "params": [
+      {
+        "name": "input",
+        "documentation": "@zune/globaltype/_zune_serde_flate.createDecompressor/param/0"
       }
     ]
   },
@@ -10319,6 +10961,27 @@
     ],
     "params": []
   },
+  "@zune/globaltype/LuauLoadOptions": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "env": "@zune/globaltype/LuauLoadOptions.env",
+      "native_code_gen": "@zune/globaltype/LuauLoadOptions.native_code_gen",
+      "chunk_name": "@zune/globaltype/LuauLoadOptions.chunk_name"
+    }
+  },
+  "@zune/globaltype/LuauLoadOptions.env": {
+    "code_sample": "",
+    "documentation": "The environment to use for the loaded function."
+  },
+  "@zune/globaltype/LuauLoadOptions.chunk_name": {
+    "code_sample": "",
+    "documentation": "The name of the chunk, used for debugging."
+  },
+  "@zune/globaltype/LuauLoadOptions.native_code_gen": {
+    "code_sample": "",
+    "documentation": "Whether to enable native code generation."
+  },
   "@zune/globaltype/SerdeJsonDecodeConfig": {
     "code_sample": "",
     "documentation": "",
@@ -10330,38 +10993,29 @@
     "code_sample": "",
     "documentation": "Whether to preserve null values"
   },
-  "@zune/globaltype/GPIOChip": {
+  "@zune/globaltype/_zune_serde_luau": {
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "lines": "@zune/globaltype/GPIOChip.lines",
-      "name": "@zune/globaltype/GPIOChip.name",
-      "label": "@zune/globaltype/GPIOChip.label"
+      "encode": "@zune/globaltype/_zune_serde_luau.encode"
     }
   },
-  "@zune/globaltype/_zune_crypto_uuid": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "v7": "@zune/globaltype/_zune_crypto_uuid.v7",
-      "v4": "@zune/globaltype/_zune_crypto_uuid.v4"
-    }
-  },
-  "@zune/globaltype/_zune_crypto_uuid.v4": {
+  "@zune/globaltype/_zune_serde_luau.encode": {
     "code_sample": "",
     "documentation": "",
     "returns": [
-      "@zune/globaltype/_zune_crypto_uuid.v4/return/0"
+      "@zune/globaltype/_zune_serde_luau.encode/return/0"
     ],
-    "params": []
-  },
-  "@zune/globaltype/_zune_crypto_uuid.v7": {
-    "code_sample": "",
-    "documentation": "",
-    "returns": [
-      "@zune/globaltype/_zune_crypto_uuid.v7/return/0"
-    ],
-    "params": []
+    "params": [
+      {
+        "name": "value",
+        "documentation": "@zune/globaltype/_zune_serde_luau.encode/param/0"
+      },
+      {
+        "name": "config",
+        "documentation": "@zune/globaltype/_zune_serde_luau.encode/param/1"
+      }
+    ]
   },
   "@zune/globaltype/_zune_task": {
     "code_sample": "",
@@ -10588,6 +11242,41 @@
       }
     ]
   },
+  "@zune/globaltype/_zune_crypto_uuid": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "v7": "@zune/globaltype/_zune_crypto_uuid.v7",
+      "v4": "@zune/globaltype/_zune_crypto_uuid.v4"
+    }
+  },
+  "@zune/globaltype/_zune_crypto_uuid.v4": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_crypto_uuid.v4/return/0"
+    ],
+    "params": []
+  },
+  "@zune/globaltype/_zune_crypto_uuid.v7": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/_zune_crypto_uuid.v7/return/0"
+    ],
+    "params": []
+  },
+  "@zune/globaltype/CreateTlsServerOptions": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "auth": "@zune/globaltype/CreateTlsServerOptions.auth"
+    }
+  },
+  "@zune/globaltype/CreateTlsServerOptions.auth": {
+    "code_sample": "",
+    "documentation": "The certificate and key pair to use for the server."
+  },
   "@zune/globaltype/_zune_serde_yaml": {
     "code_sample": "",
     "documentation": "",
@@ -10606,6 +11295,10 @@
       {
         "name": "object",
         "documentation": "@zune/globaltype/_zune_serde_yaml.encode/param/0"
+      },
+      {
+        "name": "config",
+        "documentation": "@zune/globaltype/_zune_serde_yaml.encode/param/1"
       }
     ]
   },
@@ -10630,16 +11323,18 @@
     "code_sample": "",
     "documentation": "The YAML string to decode."
   },
-  "@zune/globaltype/CreateTlsServerOptions": {
+  "@zune/globaltype/TimeDictionary": {
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "auth": "@zune/globaltype/CreateTlsServerOptions.auth"
+      "minute": "@zune/globaltype/TimeDictionary.minute",
+      "year": "@zune/globaltype/TimeDictionary.year",
+      "month": "@zune/globaltype/TimeDictionary.month",
+      "day": "@zune/globaltype/TimeDictionary.day",
+      "millisecond": "@zune/globaltype/TimeDictionary.millisecond",
+      "hour": "@zune/globaltype/TimeDictionary.hour",
+      "second": "@zune/globaltype/TimeDictionary.second"
     }
-  },
-  "@zune/globaltype/CreateTlsServerOptions.auth": {
-    "code_sample": "",
-    "documentation": "The certificate and key pair to use for the server."
   },
   "@zune/globaltype/LuauCompileOptions": {
     "code_sample": "",
@@ -10666,19 +11361,6 @@
   "@zune/globaltype/LuauCompileOptions.type_info_level": {
     "code_sample": "",
     "documentation": "The type info level for the compilation."
-  },
-  "@zune/globaltype/TimeDictionary": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "minute": "@zune/globaltype/TimeDictionary.minute",
-      "year": "@zune/globaltype/TimeDictionary.year",
-      "month": "@zune/globaltype/TimeDictionary.month",
-      "day": "@zune/globaltype/TimeDictionary.day",
-      "millisecond": "@zune/globaltype/TimeDictionary.millisecond",
-      "hour": "@zune/globaltype/TimeDictionary.hour",
-      "second": "@zune/globaltype/TimeDictionary.second"
-    }
   },
   "@zune/globaltype/Socket": {
     "code_sample": "",
@@ -11217,12 +11899,16 @@
   },
   "@zune/globaltype/Socket.shutdown": {
     "code_sample": "",
-    "documentation": "Shuts down the socket for reading and writing.\n\n**Throws**\n- Network Error\n",
+    "documentation": "Shuts down the socket for the specified direction.\n\n**Throws**\n- Network Error\n",
     "returns": [],
     "params": [
       {
         "name": "self",
         "documentation": "@zune/globaltype/Socket.shutdown/param/0"
+      },
+      {
+        "name": "how",
+        "documentation": "@zune/globaltype/Socket.shutdown/param/1"
       }
     ]
   },
@@ -11247,6 +11933,52 @@
       {
         "name": "self",
         "documentation": "@zune/globaltype/Socket.address/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/InflateStream": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "array": "@zune/globaltype/InflateStream.array",
+      "read": "@zune/globaltype/InflateStream.read",
+      "finish": "@zune/globaltype/InflateStream.finish"
+    }
+  },
+  "@zune/globaltype/InflateStream.read": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/InflateStream.read/return/0",
+      "@zune/globaltype/InflateStream.read/return/1"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@zune/globaltype/InflateStream.read/param/0"
+      },
+      {
+        "name": "dest",
+        "documentation": "@zune/globaltype/InflateStream.read/param/1"
+      },
+      {
+        "name": "destOffset",
+        "documentation": "@zune/globaltype/InflateStream.read/param/2"
+      },
+      {
+        "name": "count",
+        "documentation": "@zune/globaltype/InflateStream.read/param/3"
+      }
+    ]
+  },
+  "@zune/globaltype/InflateStream.finish": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@zune/globaltype/InflateStream.finish/param/0"
       }
     ]
   },
@@ -11382,43 +12114,81 @@
     "documentation": "The fields to set in the structure.",
     "keys": []
   },
-  "@zune/globaltype/ProcessChild": {
+  "@zune/globaltype/Thread": {
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "pid": "@zune/globaltype/ProcessChild.pid",
-      "kill": "@zune/globaltype/ProcessChild.kill",
-      "stderr": "@zune/globaltype/ProcessChild.stderr",
-      "stdout": "@zune/globaltype/ProcessChild.stdout",
-      "stdin": "@zune/globaltype/ProcessChild.stdin",
-      "wait": "@zune/globaltype/ProcessChild.wait"
+      "receive": "@zune/globaltype/Thread.receive",
+      "join": "@zune/globaltype/Thread.join",
+      "status": "@zune/globaltype/Thread.status",
+      "send": "@zune/globaltype/Thread.send",
+      "start": "@zune/globaltype/Thread.start"
     }
   },
-  "@zune/globaltype/ProcessChild.wait": {
+  "@zune/globaltype/Thread.start": {
     "code_sample": "",
-    "documentation": "Yields until the process exits.\n\n**Throws**\n- Process Error\n",
-    "returns": [
-      "@zune/globaltype/ProcessChild.wait/return/0"
-    ],
+    "documentation": "Starts the thread.\n\n**Throws**\n- Thread Error\n",
+    "returns": [],
     "params": [
       {
         "name": "self",
-        "documentation": "@zune/globaltype/ProcessChild.wait/param/0"
+        "documentation": "@zune/globaltype/Thread.start/param/0"
       }
     ]
   },
-  "@zune/globaltype/ProcessChild.kill": {
+  "@zune/globaltype/Thread.join": {
     "code_sample": "",
-    "documentation": "Kills the process and yields until the process exits.\n\n**Throws**\n- Process Error\n",
+    "documentation": "Waits for the thread to finish.\n\n**Throws**\n- Thread Error\n",
+    "returns": [],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@zune/globaltype/Thread.join/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/Thread.status": {
+    "code_sample": "",
+    "documentation": "Returns the status of the thread.\n\n**Throws**\n- Memory Error\n",
     "returns": [
-      "@zune/globaltype/ProcessChild.kill/return/0"
+      "@zune/globaltype/Thread.status/return/0"
     ],
     "params": [
       {
         "name": "self",
-        "documentation": "@zune/globaltype/ProcessChild.kill/param/0"
+        "documentation": "@zune/globaltype/Thread.status/param/0"
       }
     ]
+  },
+  "@zune/globaltype/Thread.receive": {
+    "code_sample": "",
+    "documentation": "Immediately receive or yields until a value is sent from the thread.\n\n**Throws**\n- Thread Error\n- Memory Error\n",
+    "returns": [],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@zune/globaltype/Thread.receive/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/Thread.send": {
+    "code_sample": "",
+    "documentation": "Sends a value to the thread.\n\n**Throws**\n- Thread Error\n- Memory Error\n",
+    "returns": [],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@zune/globaltype/Thread.send/param/0"
+      },
+      {
+        "name": "...",
+        "documentation": "@zune/globaltype/Thread.send/param/1"
+      }
+    ]
+  },
+  "@zune/globaltype/Thread.send/param/1": {
+    "code_sample": "",
+    "documentation": "The values to send to the thread."
   },
   "@zune/globaltype/CVectorType": {
     "code_sample": "",
@@ -11448,89 +12218,51 @@
     "code_sample": "",
     "documentation": "The index to get the offset of."
   },
-  "@zune/globaltype/DateTime": {
+  "@zune/globaltype/GPIOLine": {
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "timestamp_millis": "@zune/globaltype/DateTime.timestamp_millis",
-      "toIsoDate": "@zune/globaltype/DateTime.toIsoDate",
-      "formatUniversalTime": "@zune/globaltype/DateTime.formatUniversalTime",
-      "toLocalTime": "@zune/globaltype/DateTime.toLocalTime",
-      "toUniversalTime": "@zune/globaltype/DateTime.toUniversalTime",
-      "formatLocalTime": "@zune/globaltype/DateTime.formatLocalTime",
-      "timestamp": "@zune/globaltype/DateTime.timestamp"
+      "read": "@zune/globaltype/GPIOLine.read",
+      "write": "@zune/globaltype/GPIOLine.write",
+      "close": "@zune/globaltype/GPIOLine.close"
     }
   },
-  "@zune/globaltype/DateTime.toLocalTime": {
+  "@zune/globaltype/GPIOLine.read": {
     "code_sample": "",
-    "documentation": "\n\n**Throws**\n- DateTime Error\n",
+    "documentation": "",
     "returns": [
-      "@zune/globaltype/DateTime.toLocalTime/return/0"
+      "@zune/globaltype/GPIOLine.read/return/0"
     ],
     "params": [
       {
         "name": "self",
-        "documentation": "@zune/globaltype/DateTime.toLocalTime/param/0"
+        "documentation": "@zune/globaltype/GPIOLine.read/param/0"
       }
     ]
   },
-  "@zune/globaltype/DateTime.toUniversalTime": {
+  "@zune/globaltype/GPIOLine.write": {
     "code_sample": "",
-    "documentation": "\n\n**Throws**\n- DateTime Error\n",
-    "returns": [
-      "@zune/globaltype/DateTime.toUniversalTime/return/0"
-    ],
+    "documentation": "",
+    "returns": [],
     "params": [
       {
         "name": "self",
-        "documentation": "@zune/globaltype/DateTime.toUniversalTime/param/0"
-      }
-    ]
-  },
-  "@zune/globaltype/DateTime.toIsoDate": {
-    "code_sample": "",
-    "documentation": "Return the date in ISO8601 format, `YYYY-MM-DDTHH:MM:SSZ`\n\n**Throws**\n- DateTime Error\n",
-    "returns": [
-      "@zune/globaltype/DateTime.toIsoDate/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@zune/globaltype/DateTime.toIsoDate/param/0"
-      }
-    ]
-  },
-  "@zune/globaltype/DateTime.formatLocalTime": {
-    "code_sample": "",
-    "documentation": "\n\n**Throws**\n- DateTime Error\n- Memory Error\n",
-    "returns": [
-      "@zune/globaltype/DateTime.formatLocalTime/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@zune/globaltype/DateTime.formatLocalTime/param/0"
+        "documentation": "@zune/globaltype/GPIOLine.write/param/0"
       },
       {
-        "name": "format",
-        "documentation": "@zune/globaltype/DateTime.formatLocalTime/param/1"
+        "name": "value",
+        "documentation": "@zune/globaltype/GPIOLine.write/param/1"
       }
     ]
   },
-  "@zune/globaltype/DateTime.formatUniversalTime": {
+  "@zune/globaltype/GPIOLine.close": {
     "code_sample": "",
-    "documentation": "\n\n**Throws**\n- DateTime Error\n- Memory Error\n",
-    "returns": [
-      "@zune/globaltype/DateTime.formatUniversalTime/return/0"
-    ],
+    "documentation": "",
+    "returns": [],
     "params": [
       {
         "name": "self",
-        "documentation": "@zune/globaltype/DateTime.formatUniversalTime/param/0"
-      },
-      {
-        "name": "format",
-        "documentation": "@zune/globaltype/DateTime.formatUniversalTime/param/1"
+        "documentation": "@zune/globaltype/GPIOLine.close/param/0"
       }
     ]
   },
@@ -11779,50 +12511,48 @@
     "documentation": "The values to set in the array.",
     "keys": []
   },
-  "@zune/globaltype/CryptoHash": {
+  "@zune/globaltype/ProcessChild": {
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "copy": "@zune/globaltype/CryptoHash.copy",
-      "update": "@zune/globaltype/CryptoHash.update",
-      "digest": "@zune/globaltype/CryptoHash.digest"
+      "pid": "@zune/globaltype/ProcessChild.pid",
+      "kill": "@zune/globaltype/ProcessChild.kill",
+      "stderr": "@zune/globaltype/ProcessChild.stderr",
+      "stdout": "@zune/globaltype/ProcessChild.stdout",
+      "stdin": "@zune/globaltype/ProcessChild.stdin",
+      "wait": "@zune/globaltype/ProcessChild.wait"
     }
   },
-  "@zune/globaltype/CryptoHash.digest": {
+  "@zune/globaltype/ProcessChild.wait": {
     "code_sample": "",
-    "documentation": "Returns the finalized hash value.\n\nIf the hash object was created with a key, this would close the object."
-  },
-  "@zune/globaltype/CryptoHash.update": {
-    "code_sample": "",
-    "documentation": "\n\n**Parameters**\n- `value`: The value to update the hash with.\n\n\n**Throws**\n- Crypto Error\n",
-    "returns": [],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@zune/globaltype/CryptoHash.update/param/0"
-      },
-      {
-        "name": "value",
-        "documentation": "@zune/globaltype/CryptoHash.update/param/1"
-      }
-    ]
-  },
-  "@zune/globaltype/CryptoHash.update/param/1": {
-    "code_sample": "",
-    "documentation": "The value to update the hash with."
-  },
-  "@zune/globaltype/CryptoHash.copy": {
-    "code_sample": "",
-    "documentation": "Copies the current hash state.\n\nIf the hash object was created with a key, the object must still be opened.\n\n**Throws**\n- Crypto Error\n- Memory Error\n",
+    "documentation": "Yields until the process exits.\n\n**Throws**\n- Process Error\n",
     "returns": [
-      "@zune/globaltype/CryptoHash.copy/return/0"
+      "@zune/globaltype/ProcessChild.wait/return/0"
     ],
     "params": [
       {
         "name": "self",
-        "documentation": "@zune/globaltype/CryptoHash.copy/param/0"
+        "documentation": "@zune/globaltype/ProcessChild.wait/param/0"
       }
     ]
+  },
+  "@zune/globaltype/ProcessChild.kill": {
+    "code_sample": "",
+    "documentation": "Kills the process and yields until the process exits.\n\n**Throws**\n- Process Error\n",
+    "returns": [
+      "@zune/globaltype/ProcessChild.kill/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@zune/globaltype/ProcessChild.kill/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/TlsCertKeyPair": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": []
   },
   "@zune/globaltype/Dir": {
     "code_sample": "",
@@ -12278,58 +13008,50 @@
       }
     ]
   },
-  "@zune/globaltype/GPIOLine": {
+  "@zune/globaltype/CryptoHash": {
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "read": "@zune/globaltype/GPIOLine.read",
-      "write": "@zune/globaltype/GPIOLine.write",
-      "close": "@zune/globaltype/GPIOLine.close"
+      "copy": "@zune/globaltype/CryptoHash.copy",
+      "update": "@zune/globaltype/CryptoHash.update",
+      "digest": "@zune/globaltype/CryptoHash.digest"
     }
   },
-  "@zune/globaltype/GPIOLine.read": {
+  "@zune/globaltype/CryptoHash.digest": {
     "code_sample": "",
-    "documentation": "",
+    "documentation": "Returns the finalized hash value.\n\nIf the hash object was created with a key, this would close the object."
+  },
+  "@zune/globaltype/CryptoHash.update": {
+    "code_sample": "",
+    "documentation": "\n\n**Parameters**\n- `value`: The value to update the hash with.\n\n\n**Throws**\n- Crypto Error\n",
+    "returns": [],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@zune/globaltype/CryptoHash.update/param/0"
+      },
+      {
+        "name": "value",
+        "documentation": "@zune/globaltype/CryptoHash.update/param/1"
+      }
+    ]
+  },
+  "@zune/globaltype/CryptoHash.update/param/1": {
+    "code_sample": "",
+    "documentation": "The value to update the hash with."
+  },
+  "@zune/globaltype/CryptoHash.copy": {
+    "code_sample": "",
+    "documentation": "Copies the current hash state.\n\nIf the hash object was created with a key, the object must still be opened.\n\n**Throws**\n- Crypto Error\n- Memory Error\n",
     "returns": [
-      "@zune/globaltype/GPIOLine.read/return/0"
+      "@zune/globaltype/CryptoHash.copy/return/0"
     ],
     "params": [
       {
         "name": "self",
-        "documentation": "@zune/globaltype/GPIOLine.read/param/0"
+        "documentation": "@zune/globaltype/CryptoHash.copy/param/0"
       }
     ]
-  },
-  "@zune/globaltype/GPIOLine.write": {
-    "code_sample": "",
-    "documentation": "",
-    "returns": [],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@zune/globaltype/GPIOLine.write/param/0"
-      },
-      {
-        "name": "value",
-        "documentation": "@zune/globaltype/GPIOLine.write/param/1"
-      }
-    ]
-  },
-  "@zune/globaltype/GPIOLine.close": {
-    "code_sample": "",
-    "documentation": "",
-    "returns": [],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@zune/globaltype/GPIOLine.close/param/0"
-      }
-    ]
-  },
-  "@zune/globaltype/TlsCertKeyPair": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": []
   },
   "@zune/globaltype/Descriptor": {
     "code_sample": "",
@@ -12988,48 +13710,6 @@
       }
     ]
   },
-  "@zune/globaltype/CPointerType": {
-    "code_sample": "",
-    "documentation": "",
-    "keys": {
-      "newTag": "@zune/globaltype/CPointerType.newTag",
-      "tag": "@zune/globaltype/CPointerType.tag"
-    }
-  },
-  "@zune/globaltype/CPointerType.tag": {
-    "code_sample": "",
-    "documentation": "Get the tag id of the pointer type.",
-    "returns": [
-      "@zune/globaltype/CPointerType.tag/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@zune/globaltype/CPointerType.tag/param/0"
-      }
-    ]
-  },
-  "@zune/globaltype/CPointerType.newTag": {
-    "code_sample": "",
-    "documentation": "Creates a new pointer type with the given tag.\n\n**Parameters**\n- `tag`: The tag to set.\n\n\n**Throws**\n- Memory Error\n",
-    "returns": [
-      "@zune/globaltype/CPointerType.newTag/return/0"
-    ],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@zune/globaltype/CPointerType.newTag/param/0"
-      },
-      {
-        "name": "tag",
-        "documentation": "@zune/globaltype/CPointerType.newTag/param/1"
-      }
-    ]
-  },
-  "@zune/globaltype/CPointerType.newTag/param/1": {
-    "code_sample": "",
-    "documentation": "The tag to set."
-  },
   "@zune/globaltype/Regex": {
     "code_sample": "",
     "documentation": "",
@@ -13235,6 +13915,122 @@
   "@zune/globaltype/Regex.replaceAll/param/2": {
     "code_sample": "",
     "documentation": "The replacement string."
+  },
+  "@zune/globaltype/CPointerType": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "newTag": "@zune/globaltype/CPointerType.newTag",
+      "tag": "@zune/globaltype/CPointerType.tag"
+    }
+  },
+  "@zune/globaltype/CPointerType.tag": {
+    "code_sample": "",
+    "documentation": "Get the tag id of the pointer type.",
+    "returns": [
+      "@zune/globaltype/CPointerType.tag/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@zune/globaltype/CPointerType.tag/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/CPointerType.newTag": {
+    "code_sample": "",
+    "documentation": "Creates a new pointer type with the given tag.\n\n**Parameters**\n- `tag`: The tag to set.\n\n\n**Throws**\n- Memory Error\n",
+    "returns": [
+      "@zune/globaltype/CPointerType.newTag/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@zune/globaltype/CPointerType.newTag/param/0"
+      },
+      {
+        "name": "tag",
+        "documentation": "@zune/globaltype/CPointerType.newTag/param/1"
+      }
+    ]
+  },
+  "@zune/globaltype/CPointerType.newTag/param/1": {
+    "code_sample": "",
+    "documentation": "The tag to set."
+  },
+  "@zune/globaltype/DeflateStream": {
+    "code_sample": "",
+    "documentation": "",
+    "keys": {
+      "write": "@zune/globaltype/DeflateStream.write",
+      "swapArray": "@zune/globaltype/DeflateStream.swapArray",
+      "array": "@zune/globaltype/DeflateStream.array",
+      "reset": "@zune/globaltype/DeflateStream.reset",
+      "finish": "@zune/globaltype/DeflateStream.finish"
+    }
+  },
+  "@zune/globaltype/DeflateStream.write": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [
+      "@zune/globaltype/DeflateStream.write/return/0",
+      "@zune/globaltype/DeflateStream.write/return/1"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@zune/globaltype/DeflateStream.write/param/0"
+      },
+      {
+        "name": "src",
+        "documentation": "@zune/globaltype/DeflateStream.write/param/1"
+      },
+      {
+        "name": "srcOffset",
+        "documentation": "@zune/globaltype/DeflateStream.write/param/2"
+      },
+      {
+        "name": "count",
+        "documentation": "@zune/globaltype/DeflateStream.write/param/3"
+      }
+    ]
+  },
+  "@zune/globaltype/DeflateStream.finish": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@zune/globaltype/DeflateStream.finish/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/DeflateStream.reset": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@zune/globaltype/DeflateStream.reset/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/DeflateStream.swapArray": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@zune/globaltype/DeflateStream.swapArray/param/0"
+      },
+      {
+        "name": "output",
+        "documentation": "@zune/globaltype/DeflateStream.swapArray/param/1"
+      }
+    ]
   },
   "@zune/globaltype/CryptoTls": {
     "code_sample": "",
@@ -13723,6 +14519,7 @@
       "readPositional": "@zune/globaltype/BufferArray.readPositional",
       "read": "@zune/globaltype/BufferArray.read",
       "clear": "@zune/globaltype/BufferArray.clear",
+      "dropFront": "@zune/globaltype/BufferArray.dropFront",
       "len": "@zune/globaltype/BufferArray.len",
       "writePositional": "@zune/globaltype/BufferArray.writePositional",
       "grow": "@zune/globaltype/BufferArray.grow",
@@ -13897,6 +14694,21 @@
       }
     ]
   },
+  "@zune/globaltype/BufferArray.dropFront": {
+    "code_sample": "",
+    "documentation": "",
+    "returns": [],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@zune/globaltype/BufferArray.dropFront/param/0"
+      },
+      {
+        "name": "n",
+        "documentation": "@zune/globaltype/BufferArray.dropFront/param/1"
+      }
+    ]
+  },
   "@zune/globaltype/BufferArray.clear": {
     "code_sample": "",
     "documentation": "",
@@ -13908,80 +14720,90 @@
       }
     ]
   },
-  "@zune/globaltype/Thread": {
+  "@zune/globaltype/DateTime": {
     "code_sample": "",
     "documentation": "",
     "keys": {
-      "receive": "@zune/globaltype/Thread.receive",
-      "join": "@zune/globaltype/Thread.join",
-      "status": "@zune/globaltype/Thread.status",
-      "send": "@zune/globaltype/Thread.send",
-      "start": "@zune/globaltype/Thread.start"
+      "timestamp_millis": "@zune/globaltype/DateTime.timestamp_millis",
+      "toIsoDate": "@zune/globaltype/DateTime.toIsoDate",
+      "formatUniversalTime": "@zune/globaltype/DateTime.formatUniversalTime",
+      "toLocalTime": "@zune/globaltype/DateTime.toLocalTime",
+      "toUniversalTime": "@zune/globaltype/DateTime.toUniversalTime",
+      "formatLocalTime": "@zune/globaltype/DateTime.formatLocalTime",
+      "timestamp": "@zune/globaltype/DateTime.timestamp"
     }
   },
-  "@zune/globaltype/Thread.start": {
+  "@zune/globaltype/DateTime.toLocalTime": {
     "code_sample": "",
-    "documentation": "Starts the thread.\n\n**Throws**\n- Thread Error\n",
-    "returns": [],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@zune/globaltype/Thread.start/param/0"
-      }
-    ]
-  },
-  "@zune/globaltype/Thread.join": {
-    "code_sample": "",
-    "documentation": "Waits for the thread to finish.\n\n**Throws**\n- Thread Error\n",
-    "returns": [],
-    "params": [
-      {
-        "name": "self",
-        "documentation": "@zune/globaltype/Thread.join/param/0"
-      }
-    ]
-  },
-  "@zune/globaltype/Thread.status": {
-    "code_sample": "",
-    "documentation": "Returns the status of the thread.\n\n**Throws**\n- Memory Error\n",
+    "documentation": "\n\n**Throws**\n- DateTime Error\n",
     "returns": [
-      "@zune/globaltype/Thread.status/return/0"
+      "@zune/globaltype/DateTime.toLocalTime/return/0"
     ],
     "params": [
       {
         "name": "self",
-        "documentation": "@zune/globaltype/Thread.status/param/0"
+        "documentation": "@zune/globaltype/DateTime.toLocalTime/param/0"
       }
     ]
   },
-  "@zune/globaltype/Thread.receive": {
+  "@zune/globaltype/DateTime.toUniversalTime": {
     "code_sample": "",
-    "documentation": "Immediately receive or yields until a value is sent from the thread.\n\n**Throws**\n- Thread Error\n- Memory Error\n",
-    "returns": [],
+    "documentation": "\n\n**Throws**\n- DateTime Error\n",
+    "returns": [
+      "@zune/globaltype/DateTime.toUniversalTime/return/0"
+    ],
     "params": [
       {
         "name": "self",
-        "documentation": "@zune/globaltype/Thread.receive/param/0"
+        "documentation": "@zune/globaltype/DateTime.toUniversalTime/param/0"
       }
     ]
   },
-  "@zune/globaltype/Thread.send": {
+  "@zune/globaltype/DateTime.toIsoDate": {
     "code_sample": "",
-    "documentation": "Sends a value to the thread.\n\n**Throws**\n- Thread Error\n- Memory Error\n",
-    "returns": [],
+    "documentation": "Return the date in ISO8601 format, `YYYY-MM-DDTHH:MM:SSZ`\n\n**Throws**\n- DateTime Error\n",
+    "returns": [
+      "@zune/globaltype/DateTime.toIsoDate/return/0"
+    ],
     "params": [
       {
         "name": "self",
-        "documentation": "@zune/globaltype/Thread.send/param/0"
+        "documentation": "@zune/globaltype/DateTime.toIsoDate/param/0"
+      }
+    ]
+  },
+  "@zune/globaltype/DateTime.formatLocalTime": {
+    "code_sample": "",
+    "documentation": "\n\n**Throws**\n- DateTime Error\n- Memory Error\n",
+    "returns": [
+      "@zune/globaltype/DateTime.formatLocalTime/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@zune/globaltype/DateTime.formatLocalTime/param/0"
       },
       {
-        "name": "...",
-        "documentation": "@zune/globaltype/Thread.send/param/1"
+        "name": "format",
+        "documentation": "@zune/globaltype/DateTime.formatLocalTime/param/1"
       }
     ]
   },
-  "@zune/globaltype/Thread.send/param/1": {
+  "@zune/globaltype/DateTime.formatUniversalTime": {
     "code_sample": "",
-    "documentation": "The values to send to the thread."
+    "documentation": "\n\n**Throws**\n- DateTime Error\n- Memory Error\n",
+    "returns": [
+      "@zune/globaltype/DateTime.formatUniversalTime/return/0"
+    ],
+    "params": [
+      {
+        "name": "self",
+        "documentation": "@zune/globaltype/DateTime.formatUniversalTime/param/0"
+      },
+      {
+        "name": "format",
+        "documentation": "@zune/globaltype/DateTime.formatUniversalTime/param/1"
+      }
+    ]
   }
 }

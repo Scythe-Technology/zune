@@ -7,6 +7,9 @@ local task = zune.task
 local serde = zune.serde
 local crypto = zune.crypto
 
+local spec = require("@zune/spec")
+
+local head = require("./head")
 local session = require("./session")
 local Response = require("./response")
 
@@ -197,7 +200,7 @@ local function writeFrame(conn: session.Session, opcode: number, payload: buffer
         local out = buffer.create(header_len + plen)
         buffer.copy(out, 0, header, 0, header_len)
         if plen > 0 then
-            if key ~= nil then
+            if key then
                 maskCopy(out, header_len, payload, 0, plen, key)
             else
                 buffer.copy(out, header_len, payload, 0, plen)
@@ -212,7 +215,7 @@ local function writeFrame(conn: session.Session, opcode: number, payload: buffer
     while off < plen do
         local count = math.min(LARGE, plen - off)
         local chunk = buffer.create(count)
-        if key ~= nil then
+        if key then
             maskCopy(chunk, 0, payload, off, count, key)
         else
             buffer.copy(chunk, 0, payload, off, count)
@@ -222,19 +225,12 @@ local function writeFrame(conn: session.Session, opcode: number, payload: buffer
     end
 end
 
-local function hostHeader(host: string): string
-    if string.find(host, ":", 1, true) ~= nil then
-        return `[{host}]`
-    end
-    return host
-end
-
 local function optionalFunction(options: ConnectOptions, field: string): ((...any) -> ...any)?
     local value = (options :: any)[field]
-    if value == nil then
+    if not value then
         return nil
     end
-    if type(value) ~= "function" then
+    if not spec.fn(value) then
         error(`{field} must be a function`, 0)
     end
     return value
@@ -242,10 +238,10 @@ end
 
 local function timeoutSeconds(opts: ConnectOptions): number?
     local timeout_seconds: number? = 30
-    if opts.timeout == nil then
+    if not opts.timeout then
         return timeout_seconds
     end
-    if type(opts.timeout) ~= "number" then
+    if not spec.number(opts.timeout) then
         error("timeout must be a number", 0)
     end
     if opts.timeout == 0 then
@@ -258,64 +254,29 @@ local function timeoutSeconds(opts: ConnectOptions): number?
 end
 
 local function messageLimit(opts: ConnectOptions): number
-    if opts.max_message == nil then
+    if not opts.max_message then
         return MAX_MESSAGE
     end
-    if type(opts.max_message) ~= "number" or opts.max_message < 0 then
+    if not spec.number(opts.max_message) or opts.max_message < 0 then
         error("invalid limit", 0)
     end
     return math.floor(opts.max_message)
 end
 
-local function headerLines(headers: { [string]: string }?): ({ string }, boolean, boolean)
-    local host_handled = false
-    local user_agent_handled = false
-    local lines: { string } = {}
-    if headers == nil then
-        return lines, host_handled, user_agent_handled
-    end
-    if type(headers) ~= "table" then
-        error("headers must be a table", 0)
-    end
-    for key, value in headers do
-        if type(key) ~= "string" then
-            error(`header index is not a string (got {type(key)})`, 0)
-        end
-        if type(value) ~= "string" then
-            error(`header value must be a string (got {type(value)})`, 0)
-        end
-        local lower = string.lower(key)
-        local reason = BLOCKED[lower]
-        if reason ~= nil then
-            error(reason, 0)
-        end
-        if lower == "host" then
-            host_handled = true
-        elseif lower == "user-agent" then
-            user_agent_handled = true
-        end
-        if #value > 0 then
-            table.insert(lines, `{key}: {value}`)
-        end
-    end
-    return lines, host_handled, user_agent_handled
-end
-
 local function protocolHeader(protocols: { string }?): string?
-    if protocols == nil then
+    if not protocols then
         return nil
     end
-    if type(protocols) ~= "table" then
+    if not spec.table(protocols) then
         error("protocols must be a table", 0)
     end
     local parts: { string } = {}
     local index = 1
-    while protocols[index] ~= nil do
-        local value = protocols[index]
-        if type(value) ~= "string" then
-            error(`protocol value is not a string (got {type(value)})`, 0)
+    while protocols[index] do
+        if not spec.string(protocols[index]) then
+            error(`protocol value is not a string (got {type(protocols[index])})`, 0)
         end
-        table.insert(parts, value)
+        table.insert(parts, protocols[index])
         index += 1
     end
     if #parts == 0 then
@@ -334,7 +295,7 @@ local function upgradeHead(
 ): buffer
     local lines: { string } = { `GET {parsed.target} HTTP/1.1` }
     if not host_handled then
-        table.insert(lines, `Host: {hostHeader(parsed.host)}`)
+        table.insert(lines, `Host: {head.host(parsed.host)}`)
     end
     for _, line in extra do
         table.insert(lines, line)
@@ -343,13 +304,14 @@ local function upgradeHead(
     table.insert(lines, "Connection: keep-alive, Upgrade")
     table.insert(lines, "Sec-WebSocket-Version: 13")
     table.insert(lines, `Sec-WebSocket-Key: {key}`)
-    if protocols ~= nil then
+    if protocols then
         table.insert(lines, `Sec-WebSocket-Protocol: {protocols}`)
     end
     if not user_agent_handled then
         table.insert(lines, `User-Agent: {session.user_agent}`)
     end
-    return buffer.fromstring(table.concat(lines, "\r\n") .. "\r\n\r\n")
+    table.insert(lines, "\r\n")
+    return buffer.fromstring(table.concat(lines, "\r\n"))
 end
 
 local function readUpgrade(conn: session.Session): (Handshake, buffer?)
@@ -362,7 +324,7 @@ local function readUpgrade(conn: session.Session): (Handshake, buffer?)
         end
         local ok, done = pcall(Response.parse, parser, mem.slice(recv_buf, 0, n))
         if not ok then
-            if (done :: any) == "body too large" and parser.status ~= nil and parser.status ~= 101 then
+            if (done :: any) == "body too large" and parser.status and parser.status ~= 101 then
                 return {
                     status_code = parser.status,
                     reason = parser.reason or "",
@@ -377,7 +339,7 @@ local function readUpgrade(conn: session.Session): (Handshake, buffer?)
         end
     end
     local status = parser.status
-    if status == nil then
+    if not status then
         error("connection closed", 0)
     end
     return {
@@ -390,7 +352,7 @@ end
 
 local function emit(peer: Peer, scope: string, err: string)
     local on_error = peer.on_error
-    if on_error == nil then
+    if not on_error then
         return
     end
     pcall(on_error, peer.socket, scope, err)
@@ -407,12 +369,12 @@ local function finish(peer: Peer)
     end
     peer.conn:close()
     local on_close = peer.on_close
-    if on_close ~= nil then
+    if on_close then
         pcall(on_close, peer.socket, peer.close_code)
     end
     local waiting = peer.read_thread
     peer.read_thread = nil
-    if waiting ~= nil then
+    if waiting then
         task.spawn(waiting)
     end
 end
@@ -478,15 +440,17 @@ local function sendMessage(peer: Peer, message: string | buffer)
     local payload: buffer
     local opcode: number
     local plen: number
-    if type(message) == "string" then
-        payload = buffer.fromstring(message)
-        plen = #message
+    if spec.string(message) then
+        local text = message :: string
+        payload = buffer.fromstring(text)
+        plen = #text
         opcode = OP_TEXT
-    elseif type(message) == "buffer" then
-        plen = buffer.len(message)
+    elseif spec.buffer(message) then
+        local bytes = message :: buffer
+        plen = buffer.len(bytes)
         payload = buffer.create(plen)
         if plen > 0 then
-            buffer.copy(payload, 0, message, 0, plen)
+            buffer.copy(payload, 0, bytes, 0, plen)
         end
         opcode = OP_BIN
     else
@@ -502,15 +466,17 @@ local function sendMessage(peer: Peer, message: string | buffer)
     })
 end
 
+local closeCodeSpec = spec.union(spec.minInteger(0), spec.maxInteger(65535))
+local reservedCloseSpec = spec.oneOf(1005, 1006, 1015)
 local function sendClose(peer: Peer, close_code: number?)
     if peer.stage ~= "active" then
         return
     end
-    local chosen = if close_code == nil then 1000 else close_code
-    if type(chosen) ~= "number" or chosen ~= math.floor(chosen) or chosen < 0 or chosen > 65535 then
+    local chosen = if not close_code then 1000 else close_code
+    if not closeCodeSpec(chosen) then
         error("invalid close code, cannot be used", 0)
     end
-    if chosen == 1005 or chosen == 1006 or chosen == 1015 then
+    if reservedCloseSpec(chosen) then
         error("invalid close code, cannot be used", 0)
     end
     peer.stage = "closing"
@@ -547,14 +513,13 @@ local function failProtocol(peer: Peer, scope: string, name: string, close_code:
 end
 
 local function deliver(peer: Peer, op: number, payload: buffer)
-    if peer.stage ~= "active" or peer.on_message == nil then
+    if peer.stage ~= "active" or not peer.on_message then
         return
     end
-    local on_message = peer.on_message
     if op == OP_TEXT then
-        pcall(on_message, peer.socket, buffer.tostring(payload))
+        pcall(peer.on_message, peer.socket, buffer.tostring(payload))
     else
-        pcall(on_message, peer.socket, payload)
+        pcall(peer.on_message, peer.socket, payload)
     end
 end
 
@@ -583,7 +548,7 @@ end
 local function writeIncoming(peer: Peer, dest: BufferArray, src: buffer, src_off: number, count: number): boolean
     local wrote, werr = dest:write(src, src_off, count)
     if wrote ~= count then
-        failProtocol(peer, "protocol", if type(werr) == "string" then werr else "message too large", 1009)
+        failProtocol(peer, "protocol", werr or "message too large", 1009)
         return false
     end
     return true
@@ -596,20 +561,20 @@ local function appendFragment(
     piece_large: BufferArray?,
     piece_len: number
 ): boolean
-    if reader.message_size == 0 and piece_large ~= nil then
+    if reader.message_size == 0 and piece_large then
         reader.message_large = piece_large
         reader.message_size = piece_len
         return true
     end
 
     local message_large = reader.message_large
-    if message_large ~= nil then
-        if piece_large ~= nil then
+    if message_large then
+        if piece_large then
             local bytes = readBig(peer, piece_large, piece_len)
             if peer.failed or not writeExact(peer, message_large, bytes, piece_len) then
                 return false
             end
-        elseif piece ~= nil and piece_len > 0 then
+        elseif piece and piece_len > 0 then
             if not writeExact(peer, message_large, piece, piece_len) then
                 return false
             end
@@ -618,23 +583,23 @@ local function appendFragment(
         return true
     end
 
-    if piece_large ~= nil or reader.message_size + piece_len > LARGE then
+    if piece_large or reader.message_size + piece_len > LARGE then
         local grown = io.createBufferArray({
             size = reader.message_size + piece_len,
             limit = peer.max_message,
         })
         local message = reader.message
-        if message ~= nil and reader.message_size > 0 then
+        if message and reader.message_size > 0 then
             if not writeExact(peer, grown, message, reader.message_size) then
                 return false
             end
         end
-        if piece_large ~= nil then
+        if piece_large then
             local bytes = readBig(peer, piece_large, piece_len)
             if peer.failed or not writeExact(peer, grown, bytes, piece_len) then
                 return false
             end
-        elseif piece ~= nil and piece_len > 0 then
+        elseif piece and piece_len > 0 then
             if not writeExact(peer, grown, piece, piece_len) then
                 return false
             end
@@ -647,10 +612,10 @@ local function appendFragment(
 
     local grown = buffer.create(reader.message_size + piece_len)
     local message = reader.message
-    if message ~= nil and reader.message_size > 0 then
+    if message and reader.message_size > 0 then
         buffer.copy(grown, 0, message, 0, reader.message_size)
     end
-    if piece ~= nil and piece_len > 0 then
+    if piece and piece_len > 0 then
         buffer.copy(grown, reader.message_size, piece, 0, piece_len)
     end
     reader.message = grown
@@ -683,7 +648,7 @@ local function onFrame(peer: Peer, reader: Reader): boolean
                 return false
             end
             local remote_code = 1000
-            if piece_len >= 2 and piece ~= nil then
+            if piece_len >= 2 and piece then
                 remote_code = buffer.readu8(piece, 0) * 256 + buffer.readu8(piece, 1)
             end
             peer.close_code = remote_code
@@ -707,13 +672,13 @@ local function onFrame(peer: Peer, reader: Reader): boolean
 
     local data_op = opcode
     if opcode == OP_CONT then
-        if reader.message_opcode == nil then
+        if not reader.message_opcode then
             failProtocol(peer, "protocol", "UnexpectedContinuation", 1002)
             return false
         end
         data_op = reader.message_opcode :: number
     elseif opcode == OP_TEXT or opcode == OP_BIN then
-        if reader.message_opcode ~= nil then
+        if reader.message_opcode then
             failProtocol(peer, "protocol", "FragmentInProgress", 1002)
             return false
         end
@@ -727,17 +692,15 @@ local function onFrame(peer: Peer, reader: Reader): boolean
         return false
     end
 
-    if reader.is_final and reader.message_opcode == nil then
-        local payload = if piece_large ~= nil
-            then readBig(peer, piece_large, piece_len)
-            else (piece or buffer.create(0))
+    if reader.is_final and not reader.message_opcode then
+        local payload = if piece_large then readBig(peer, piece_large, piece_len) else (piece or buffer.create(0))
         if not peer.failed then
             deliver(peer, data_op, payload)
         end
         return not peer.failed
     end
 
-    if reader.message_opcode == nil then
+    if not reader.message_opcode then
         reader.message_opcode = data_op
     end
     if not appendFragment(peer, reader, piece, piece_large, piece_len) then
@@ -745,7 +708,7 @@ local function onFrame(peer: Peer, reader: Reader): boolean
     end
     if reader.is_final then
         local op = reader.message_opcode :: number
-        local payload = if reader.message_large ~= nil
+        local payload = if reader.message_large
             then readBig(peer, reader.message_large, reader.message_size)
             else (reader.message or buffer.create(0))
         reader.message_opcode = nil
@@ -924,7 +887,7 @@ end
 
 local function readLoop(peer: Peer, reader: Reader, spill: buffer?)
     local ok, err = pcall(function()
-        if spill ~= nil and buffer.len(spill) > 0 then
+        if spill and buffer.len(spill) > 0 then
             if not consume(peer, reader, spill, buffer.len(spill)) then
                 return
             end
@@ -1028,8 +991,10 @@ end
 
 local websocket = {}
 
+local schemeSpec = spec.oneOf("ws", "wss")
+local certBundleSpec = spec.object("CryptoTlsCertBundle")
 function websocket.connect(url: string, options: ConnectOptions?): Socket
-    if options ~= nil and type(options) ~= "table" then
+    if options and not spec.table(options) then
         error("expected options to be a table", 0)
     end
     local opts: ConnectOptions = options or {}
@@ -1042,29 +1007,29 @@ function websocket.connect(url: string, options: ConnectOptions?): Socket
     local max_message = messageLimit(opts)
 
     local parsed = session.parseUrl(url)
-    if parsed.scheme ~= "ws" and parsed.scheme ~= "wss" then
+    if not schemeSpec(parsed.scheme) then
         error("unsupported URI scheme", 0)
     end
 
-    local extra, host_handled, user_agent_handled = headerLines(opts.headers)
+    local extra, host_handled, user_agent_handled = head.lines(opts.headers, BLOCKED)
     local protocols = protocolHeader(opts.protocols)
 
     local force_tls = false
     local sni = parsed.host
     local ca: TlsCertBundle? = nil
-    if opts.tls ~= nil then
-        if type(opts.tls) ~= "table" then
+    if opts.tls then
+        if not spec.table(opts.tls) then
             error("expected field 'tls' to be a table", 0)
         end
         force_tls = true
-        if opts.tls.host ~= nil then
-            if type(opts.tls.host) ~= "string" then
+        if opts.tls.host then
+            if not spec.string(opts.tls.host) then
                 error("expected field 'tls.host' to be a string", 0)
             end
             sni = opts.tls.host
         end
-        if opts.tls.ca ~= nil then
-            if type(opts.tls.ca) ~= "userdata" then
+        if opts.tls.ca then
+            if not certBundleSpec(opts.tls.ca) then
                 error("expected field 'tls.ca' to be a CertBundle", 0)
             end
             ca = opts.tls.ca
@@ -1120,7 +1085,7 @@ function websocket.connect(url: string, options: ConnectOptions?): Socket
     local info = upgrade.info
 
     local accepted = true
-    if on_accept ~= nil then
+    if on_accept then
         ok, result = pcall(on_accept, socket, info)
         if not ok then
             conn:close()
@@ -1148,18 +1113,18 @@ function websocket.connect(url: string, options: ConnectOptions?): Socket
 end
 
 local function hasToken(value: string?, token: string): boolean
-    if value == nil then
+    if not value then
         return false
     end
     local lower = string.lower(value)
-    local i = 1
-    while i <= #lower do
-        local comma = string.find(lower, ",", i, true)
-        local part = if comma then string.sub(lower, i, comma - 1) else string.sub(lower, i)
+    local i = 0
+    while i < #lower do
+        local comma = mem.findScalarPos(lower, i, 44) -- ','
+        local part = if comma then string.sub(lower, i + 1, comma) else string.sub(lower, i + 1)
         if (string.match(part, "^%s*(.-)%s*$") or "") == token then
             return true
         end
-        if comma == nil then
+        if not comma then
             return false
         end
         i = comma + 1
@@ -1175,7 +1140,7 @@ function websocket.handles(method: string, headers: { [string]: string }): boole
         return false
     end
     local upgrade = headers.upgrade
-    if upgrade ~= nil and string.lower(upgrade) ~= "websocket" then
+    if upgrade and string.lower(upgrade) ~= "websocket" then
         return false
     end
     return true
@@ -1192,7 +1157,7 @@ local function rejectHttp(
         ["Connection"] = "close",
         ["Content-Type"] = "text/plain",
     }
-    if extra ~= nil then
+    if extra then
         for name, value in extra do
             headers[name] = value
         end
@@ -1209,25 +1174,27 @@ local function rejectHttp(
     )
 end
 
+local keySpec = spec.intersection(spec.string, spec.minLength(24), spec.maxLength(24))
+local protocolSpec = spec.intersection(spec.string, spec.minLength(1))
 function websocket.accept(conn: session.Session, incoming: UpgradeRequest, spill: buffer?, handlers: ServerHandlers)
     local headers = incoming.headers
     local version = headers["sec-websocket-version"]
-    if version == nil or string.sub(version, 1, 2) ~= "13" then
+    if not version or string.sub(version, 1, 2) ~= "13" then
         rejectHttp(conn, 426, "Upgrade Required", "Unsupported WebSocket version. Use 13.", {
             ["Sec-WebSocket-Version"] = "13",
         })
         return
     end
     local key = headers["sec-websocket-key"]
-    if type(key) ~= "string" or #key ~= 24 then
+    if not keySpec(key) then
         rejectHttp(conn, 400, "Bad Request", "Invalid WebSocket key.")
         return
     end
 
     local upgrade = handlers.upgrade
-    if upgrade ~= nil then
+    if upgrade then
         local ok, result = pcall(upgrade, incoming)
-        if not ok or type(result) ~= "boolean" then
+        if not ok or not spec.boolean(result) then
             rejectHttp(conn, 500, "Internal Server Error", "An error occurred on the server")
             return
         end
@@ -1243,7 +1210,7 @@ function websocket.accept(conn: session.Session, incoming: UpgradeRequest, spill
         ["Connection"] = "Upgrade",
         ["Sec-WebSocket-Accept"] = acceptValue(key),
     }
-    if type(protocol) == "string" and protocol ~= "" then
+    if protocolSpec(protocol) then
         reply_headers["Sec-WebSocket-Protocol"] = protocol
     end
     local peer, reader = createPeer(conn, {
@@ -1269,7 +1236,7 @@ function websocket.accept(conn: session.Session, incoming: UpgradeRequest, spill
     end
     peer.stage = "active"
     local open = handlers.open
-    if open ~= nil then
+    if open then
         open(peer.socket)
     end
     readLoop(peer, reader, spill)

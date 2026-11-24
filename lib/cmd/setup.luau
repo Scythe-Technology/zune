@@ -1,8 +1,8 @@
 --!strict
 --- @description Setup environment for luau-lsp with editor of your choice.
 
-local process = zune.process
 local serde = zune.serde
+local process = zune.process
 
 local fs = require("@zune/fs")
 local io = require("@zune/io")
@@ -141,7 +141,7 @@ local function install(cwd: Dir, editor: Editor, definition_path: string, docume
         nonblocking = true,
     })
 
-    local reader = io.createReader(file, { positional = true })
+    local reader = io.createPosReader(file)
     local existing = buffer.tostring(reader:readRemainingAlloc())
     if #existing > editor.empty_limit then
         file:close()
@@ -153,7 +153,7 @@ local function install(cwd: Dir, editor: Editor, definition_path: string, docume
         print(body)
     end
 
-    local writer = io.createWriter(file, { positional = true })
+    local writer = io.createPosWriter(file)
     writer:writeAll(body)
     file:setSize(#body)
     file:close()

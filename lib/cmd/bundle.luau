@@ -61,6 +61,7 @@ local state = {
         use_color = true,
         table_address = true,
         recursive_table = false,
+        sorted = false,
         buffer_max_display = 48,
     },
 }
@@ -153,7 +154,7 @@ local function expand(arg: string, into: { string }, scripts_only: boolean): { s
     local parts = splitSlash(pattern)
     local static_count = 0
     for index, part in parts do
-        if findMeta(part) ~= nil then
+        if findMeta(part) then
             break
         end
         static_count = index
@@ -181,7 +182,7 @@ local function expand(arg: string, into: { string }, scripts_only: boolean): { s
     local recursive = string.find(pattern, "**", 1, true) ~= nil
     if not recursive then
         for index = 1, #parts - 1 do
-            if findMeta(parts[index]) ~= nil then
+            if findMeta(parts[index]) then
                 recursive = true
                 break
             end
@@ -256,7 +257,7 @@ while index <= #process.args do
         continue
     end
     verbose(ansi.blue, "info", `processing argument '{arg}'`)
-    if string.sub(arg, 1, 1) == "-" then
+    if mem.startsWith(arg, "-") then
         if arg == "-f" or arg == "--files" then
             basket = state.files
         elseif arg == "-s" or arg == "--scripts" then
@@ -277,26 +278,26 @@ while index <= #process.args do
             state.jit = false
         elseif arg == "--no_home" then
             state.home = ""
-        elseif string.sub(arg, 1, 2) == "-O" then
+        elseif mem.startsWith(arg, "-O") then
             state.optimization_level = level(arg, "O")
-        elseif string.sub(arg, 1, 2) == "-g" then
+        elseif mem.startsWith(arg, "-g") then
             state.debug_level = level(arg, "g")
-        elseif string.sub(arg, 1, 6) == "--out=" then
+        elseif mem.startsWith(arg, "--out=") then
             state.out_path = string.sub(arg, 7)
             if state.out_path == "" or state.out_path == "-" then
                 fail("error", "usage: --out=<file>")
             end
-        elseif string.sub(arg, 1, 6) == "--exe=" then
+        elseif mem.startsWith(arg, "--exe=") then
             state.exe_path = string.sub(arg, 7)
             if state.exe_path == "" then
                 fail("error", "usage: --exe=<file>")
             end
-        elseif string.sub(arg, 1, 7) == "--home=" then
+        elseif mem.startsWith(arg, "--home=") then
             state.home = string.sub(arg, 8)
             if state.home == "" then
                 fail("error", "usage: --home=<dir>")
             end
-        elseif string.sub(arg, 1, 14) == "--compression=" then
+        elseif mem.startsWith(arg, "--compression=") then
             local kind = string.sub(arg, 15)
             if kind ~= "none" then
                 fail("error", `compression '{kind}' is not supported`)
@@ -318,17 +319,19 @@ end
 
 local function compile(source: string): buffer
     local body = source
-    if string.sub(body, 1, 2) == "#!" then
-        local newline = string.find(body, "\n", 1, true)
-        body = if newline then string.sub(body, newline) else ""
+    if mem.startsWith(body, "#!") then
+        local newline = mem.findScalar(body, 10) -- '\n'
+        body = if newline then string.sub(body, newline + 1) else ""
     end
-    local ok, bytecode = pcall(function()
-        return zune.luau.compile(body, {
+    local ok, bytecode = pcall(
+        zune.luau.compile,
+        body,
+        {
             debug_level = state.debug_level,
             optimization_level = state.optimization_level,
-        })
-    end)
-    if not ok or type(bytecode) ~= "buffer" then
+        } :: any
+    )
+    if not ok then
         return fail("compile error", tostring(bytecode))
     end
     return bytecode
@@ -364,8 +367,22 @@ type Item = {
 local items: { Item } = {}
 local seen: { [string]: boolean } = {}
 
+local cwd_real = fs.realPathAlloc(cwd)
+
+local function bundleName(path: string): string
+    local resolved = fs.path.resolve(path)
+    if not fs.path.isAbsolute(resolved) then
+        return resolved
+    end
+    local name = fs.path.relative(cwd_real, resolved)
+    if name == "" then
+        return "."
+    end
+    return (string.gsub(name, "\\", "/"))
+end
+
 local function addItem(kind: number, path: string, size: number, body: buffer?)
-    local name = fs.path.resolve(path)
+    local name = bundleName(path)
     if seen[name] then
         fail("error", `'{name}' is already bundled`)
         return
@@ -423,7 +440,7 @@ end
 local payload = zune.io.createBufferArray({
     limit = payload_len,
 })
-local into = io.createWriter(payload, { positional = true })
+local into = io.createPosWriter(payload)
 
 local function writeBits(buf: buffer, bit_at: number, value: number, count: number): number
     buffer.writebits(buf, bit_at, count, value)
@@ -452,6 +469,7 @@ do
             `    use_color: {ansi.cyan}{if state.format.use_color then 1 else 0}{ansi.reset}`,
             `    table_address: {ansi.cyan}{if state.format.table_address then 1 else 0}{ansi.reset}`,
             `    recursive_table: {ansi.cyan}{if state.format.recursive_table then 1 else 0}{ansi.reset}`,
+            `    sorted: {ansi.cyan}{if state.format.sorted then 1 else 0}{ansi.reset}`,
             `    max_depth: {ansi.cyan}{state.format.max_depth}{ansi.reset}`,
             `    buffer_max_display: {ansi.cyan}{state.format.buffer_max_display}{ansi.reset}`,
         }, "\n")
@@ -468,9 +486,10 @@ do
     bit_at = writeBits(buf, bit_at, if state.format.use_color then 1 else 0, 1)
     bit_at = writeBits(buf, bit_at, if state.format.table_address then 1 else 0, 1)
     bit_at = writeBits(buf, bit_at, if state.format.recursive_table then 1 else 0, 1)
+    bit_at = writeBits(buf, bit_at, if state.format.sorted then 1 else 0, 1)
     bit_at = writeBits(buf, bit_at, state.format.max_depth, 8)
     bit_at = writeBits(buf, bit_at, state.format.buffer_max_display, 15)
-    bit_at = writeBits(buf, bit_at, 0, 3) -- reserved
+    bit_at = writeBits(buf, bit_at, 0, 2) -- reserved
     mem.reverse(buf, bit_at // 8 - 5, 5)
 
     local feature_names = {
@@ -496,6 +515,7 @@ do
         "net",
         "time",
         "thread",
+        "hash",
     }
     for _, feature in feature_names do
         local enabled = if (config.runtime.features :: any)[feature] == true then 1 else 0
@@ -528,7 +548,7 @@ local function pipeFile(path: string, size: number)
         fail("error", tostring(file))
         return
     end
-    local moved = io.createReader(file, { positional = true }):pipe(into, size)
+    local moved = io.createPosReader(file):pipe(into, size)
     file:close()
     if moved ~= size then
         fail("error", `'{path}' ended early`)
@@ -577,7 +597,7 @@ local hits = {}
 local from = 0
 while true do
     local at = mem.findPos(exe_file, from, IMAGE_PATTERN)
-    if at == nil then
+    if not at then
         break
     end
     table.insert(hits, at)
@@ -621,14 +641,14 @@ local created, handle = pcall(function()
         permissions = 493, -- o755
     })
 end)
-if not created or type(handle) ~= "userdata" then
+if not created then
     fail("error", `failed to create '{out}': {tostring(handle)}`)
 end
 
-local writer = io.createWriter(handle, { positional = true })
+local writer = io.createPosWriter(handle)
 writer:writeAll(exe_file)
 
-io.createReader(payload, { positional = true }):pipe(writer)
+io.createPosReader(payload):pipe(writer)
 
 handle:sync()
 handle:close()

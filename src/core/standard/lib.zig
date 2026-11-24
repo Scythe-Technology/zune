@@ -32,6 +32,7 @@ pub const libraries = struct {
     pub const net = @import("net/lib.zig");
     pub const time = @import("time/lib.zig");
     pub const thread = @import("thread/lib.zig");
+    pub const hash = @import("hash.zig");
 
     test {
         _ = @This().fs;
@@ -55,6 +56,7 @@ pub const libraries = struct {
         _ = @This().fmt;
         _ = @This().gpio;
         _ = @This().ascii;
+        _ = @This().hash;
     }
 };
 
